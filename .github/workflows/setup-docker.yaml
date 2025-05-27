@@ -1,0 +1,15 @@
+name: setup-docker
+
+on:
+  pull_request:
+
+jobs:
+  setup-docker:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run setup script
+        run: |
+          ./setup-dev-env.sh -y -v docker

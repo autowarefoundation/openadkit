@@ -1,0 +1,19 @@
+# Ignore git and metadata directories
+.git
+.github
+.vscode
+
+# Ignore all markdown files
+*.md
+
+# Ignore a part of files under src
+src/**/.*
+src/**/*.asc
+src/**/*.gif
+src/**/*.md
+src/**/*.svg
+
+# Ignore generated files by colcon
+build
+install
+log

@@ -1,0 +1,87 @@
+name: docker-build-and-push
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  load-env:
+    uses: ./.github/workflows/load-env.yaml
+
+  docker-build-and-push:
+    needs: [load-env]
+    strategy:
+      matrix:
+        platform: [amd64, arm64]
+        include:
+          - platform: amd64
+            runner: ubuntu-22.04
+            arch-platform: linux/amd64
+            lib-dir: x86_64
+          - platform: arm64
+            runner: ubuntu-22.04-arm
+            arch-platform: linux/arm64
+            lib-dir: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set git config
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: step-security/changed-files@v45
+        with:
+          files: |
+            *.env
+            *.repos
+            .github/actions/combine-multi-arch-images/action.yaml
+            .github/actions/docker-build-and-push*/action.yaml
+            .github/workflows/docker-build-and-push.yaml
+            ansible-galaxy-requirements.yaml
+            ansible/**
+            docker/**
+      
+      - name: Free disk space
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/free-disk-space
+
+      - name: Build 'openadkit'
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/docker-build-and-push-openadkit
+        with:
+          platform: ${{ matrix.platform }}
+          target-image: openadkit
+          build-args: |
+            *.platform=${{ matrix.arch-platform }}
+            *.args.ROS_DISTRO=${{ needs.load-env.outputs.rosdistro }}
+            *.args.LIB_DIR=${{ matrix.lib-dir }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-${{ github.ref_name }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-${{ github.ref_name }},mode=max
+
+      - name: Show disk space
+        if: always()
+        run: |
+          df -h
+
+  update-docker-manifest-openadkit:
+    needs: docker-build-and-push
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine multi arch images for 'openadkit'
+        uses: ./.github/actions/combine-multi-arch-images
+        with:
+          package-name: openadkit

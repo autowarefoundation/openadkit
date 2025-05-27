@@ -5,6 +5,7 @@ services:
       - autoware_map:/root/autoware_map
     environment:
       - RUN_MODE=planning-simulator
+      - MAP_PATH=/root/autoware_map
       - SCENARIO_SIMULATION=true
   
   scenario_simulator:

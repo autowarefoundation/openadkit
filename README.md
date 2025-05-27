@@ -14,6 +14,12 @@ To run the demo, you need to have Docker installed. Which you can install by usi
 ./setup-dev-env.sh -y docker --no-nvidia
 ```
 
+cd into the demo directory:
+
+```bash
+cd demo
+```
+
 Then, you can run the demo by using the following command:
 
 ```bash

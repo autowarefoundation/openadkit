@@ -188,8 +188,8 @@ export PATH="${PIPX_BIN_DIR:=$HOME/.local/bin}:$PATH"
 pipx install --include-deps --force "ansible==6.*"
 
 # Install ansible collections
-echo -e "\e[36m"ansible-galaxy collection install -f -r "$SCRIPT_DIR/ansible-galaxy-requirements.yaml" "\e[m"
-ansible-galaxy collection install -f -r "$SCRIPT_DIR/ansible-galaxy-requirements.yaml"
+echo -e "\e[36m"ansible-galaxy collection install -f -r "$SCRIPT_DIR/ansible/ansible-galaxy-requirements.yaml" "\e[m"
+ansible-galaxy collection install -f -r "$SCRIPT_DIR/ansible/ansible-galaxy-requirements.yaml"
 
 # Run ansible
 echo -e "\e[36m"ansible-playbook "$target_playbook" "${ansible_args[@]}" "\e[m"

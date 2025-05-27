@@ -17,7 +17,10 @@ jobs:
 
       - name: Load env
         run: |
-          cat .env | sed -e "s/^\s*//" -e "/^#/d" >> $GITHUB_ENV
+          cat amd64.env | sed -e "s/^\s*//" -e "/^#/d" >> $GITHUB_ENV
+          if [ "$(uname -m)" = "aarch64" ]; then
+            cat arm64.env | sed -e "s/^\s*//" -e "/^#/d" >> $GITHUB_ENV
+          fi
 
       - name: Set env
         id: set-env

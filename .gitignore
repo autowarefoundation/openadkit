@@ -2,9 +2,11 @@
 *.swp
 *.swo
 
-# Visual Studio Code
+# IDE
 .vscode/
 *.code-workspace
+*.cursorignore
+*.cursorrules
 
 # colcon
 build/

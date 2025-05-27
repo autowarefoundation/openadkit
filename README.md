@@ -26,4 +26,4 @@ To stop the demo, you can use the following command:
 docker compose down
 ```
 
-**The simulation will be running with Rviz that you can access it using the URL provided in the terminal.**
+**The visualizer Rviz is accessible through the URL provided in the terminal using any modern browser.**

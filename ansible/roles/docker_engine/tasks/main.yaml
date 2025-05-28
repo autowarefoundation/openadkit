@@ -83,3 +83,7 @@
     name: "{{ ansible_user_id }}"
     groups: docker
     append: true
+
+# newgrp docker
+- name: Refresh group membership for current session
+  ansible.builtin.meta: reset_connection

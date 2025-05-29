@@ -2,6 +2,8 @@
 
 [Open AD Kit](https://autoware.org/open-ad-kit/) is a set of containers for Autoware to make development and deployment easier on various platforms.
 
+![oadkit](https://github.com/user-attachments/assets/0172eed1-c2cf-4f8d-b94c-91ed092e421c)
+
 - [autoware](./docker/autoware/README.md): Autoware container for development and deployment.
 - [scenario-simulator](./docker/scenario-simulator/README.md): Simulation container for Autoware scenario testing.
 - [visualizer](./docker/visualizer/README.md): RViz-based remote operation and visualization container for Autoware.

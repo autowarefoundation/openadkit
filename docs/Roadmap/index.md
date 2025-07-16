@@ -1,6 +1,18 @@
 # Roadmap
 
 ```mermaid
+---
+config:
+  themeVariables:
+    cScaleLabel0: '#FFFFFF'
+    cScale0: '#f9a03f'
+    cScaleLabel1: '#FFFFFF'
+    cScale1: '#3d8bff'
+    cScaleLabel2: '#FFFFFF'
+    cScale2: '#00c4b3'
+    cScaleLabel3: '#FFFFFF'
+    cScale3: '#7b61ff'
+---
 
 timeline
     title Open AD Kit Roadmap

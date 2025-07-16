@@ -1,1 +1,1 @@
-# Open AD Kit Contributing
+# Contributing

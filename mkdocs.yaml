@@ -5,6 +5,14 @@ edit_uri: https://github.com/autowarefoundation/openadkit/edit/main/docs/
 docs_dir: docs
 copyright: Copyright &copy; 2025 The Autoware Foundation
 
+nav:
+  - Home: Introduction/index.md
+  - Quickstart: Quickstart/index.md
+  - Modules: Modules/index.md
+  - Tools: Tools/index.md
+  - Roadmap: Roadmap/index.md
+  - Contributing: Contributing/index.md
+
 theme:
   name: material
   features:

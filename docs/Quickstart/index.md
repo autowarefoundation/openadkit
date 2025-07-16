@@ -1,1 +1,1 @@
-# Open AD Kit Quickstart
+# Quickstart

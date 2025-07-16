@@ -1,7 +1,7 @@
 nav:
   - Introduction: ./index.md
   - Quickstart: ./Quickstart/index.md
-  - Modules: ./Modules/index.md
+  - Services: ./Services/index.md
   - Tools: ./Tools/index.md
   - Deployments: ./Deployments/index.md
   - Roadmap: ./Roadmap/index.md

@@ -8,6 +8,7 @@ CLR_RED="\033[31m"
 CLR_RESET="\033[0m"
 INSTALL_NVIDIA=false
 
+#### Functions ####
 print_help() {
     echo "Setup runtime environment for Autoware Open AD Kit"
     echo "Usage: setup.sh [OPTIONS]"
@@ -107,7 +108,7 @@ install_docker() {
     echo -e "${CLR_GREEN}Docker installed successfully!${CLR_RESET}"
 }
 
-# Main
+#### Main ####
 parse_args "$@"
 load_env
 

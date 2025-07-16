@@ -12,13 +12,13 @@ target "docker-metadata-action-scenario-simulator" {}
 target "visualizer" {
   inherits = ["docker-metadata-action-visualizer"]
   context = "."
-  dockerfile = "docker/visualizer/Dockerfile"
+  dockerfile = "tools/visualizer/Dockerfile"
   target = "visualizer"
 }
 
 target "scenario-simulator" {
   inherits = ["docker-metadata-action-scenario-simulator"]
   context = "."
-  dockerfile = "docker/scenario-simulator/Dockerfile"
+  dockerfile = "tools/scenario-simulator/Dockerfile"
   target = "scenario-simulator"
 }

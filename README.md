@@ -69,9 +69,9 @@ gantt
     axisFormat %Y-%m
 
     section Q1: Structure
-    Core Library Refactor  :active, done, 2025-01-01, 90d
-    Setup CI/CD Pipeline :done, 2025-01-01, 90d
-    Initial Documentation  :done, 2025-01-01, 90d
+    Core Library Refactor  :active, done, 2025-02-01, 60d
+    Setup CI/CD Pipeline :done, 2025-02-01, 60d
+    Initial Documentation  :done, 2025-02-01, 60d
 
     section Q2: Modularity
     Feature A Development  :active, 2025-04-01, 90d

@@ -10,6 +10,7 @@ nav:
   - Quickstart: ./Quickstart/index.md
   - Modules: ./Modules/index.md
   - Tools: ./Tools/index.md
+  - Deployments: ./Deployments/index.md
   - Roadmap: ./Roadmap/index.md
   - Contributing: ./Contributing/index.md
 

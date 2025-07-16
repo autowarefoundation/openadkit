@@ -1,5 +1,5 @@
-name: docker-build-and-push-openadkit
-description: Composite action to build and push openadkit images to registry.
+name: build-push-tools
+description: Composite action to build and push openadkit-tools images to registry.
 
 inputs:
   platform:
@@ -76,7 +76,7 @@ runs:
       run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
       shell: bash
 
-    - name: Docker meta for openadkit:visualizer
+    - name: Docker meta for openadkit-tools:visualizer
       id: meta-visualizer
       uses: docker/metadata-action@v5
       with:
@@ -89,7 +89,7 @@ runs:
         flavor: |
           latest=false
 
-    - name: Docker meta for openadkit:scenario-simulator
+    - name: Docker meta for openadkit-tools:scenario-simulator
       id: meta-scenario-simulator
       uses: docker/metadata-action@v5
       with:
@@ -99,19 +99,6 @@ runs:
           type=raw,value=scenario-simulator-${{ steps.date.outputs.date }}-${{ inputs.platform }}
           type=ref,event=tag,prefix=scenario-simulator-,suffix=-${{ inputs.platform }}
         bake-target: docker-metadata-action-scenario-simulator
-        flavor: |
-          latest=false
-
-    - name: Docker meta for openadkit:autoware
-      id: meta-autoware
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/${{ github.repository_owner }}/${{ inputs.target-image }}
-        tags: |
-          type=raw,value=autoware-${{ inputs.platform }}
-          type=raw,value=autoware-${{ steps.date.outputs.date }}-${{ inputs.platform }}
-          type=ref,event=tag,prefix=autoware-,suffix=-${{ inputs.platform }}
-        bake-target: docker-metadata-action-autoware
         flavor: |
           latest=false
 
@@ -130,7 +117,6 @@ runs:
           docker/docker-bake.hcl
           ${{ steps.meta-visualizer.outputs.bake-file }}
           ${{ steps.meta-scenario-simulator.outputs.bake-file }}
-          ${{ steps.meta-autoware.outputs.bake-file }}
         provenance: false
         set: |
           ${{ inputs.build-args }}

@@ -1,1 +1,0 @@
-# Open AD Kit Documentation

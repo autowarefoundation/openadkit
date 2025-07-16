@@ -1,5 +1,5 @@
 nav:
-  - Introduction: ./Introduction/index.md
+  - Home: ./Introduction/index.md
   - Quickstart: ./Quickstart/index.md
   - Modules: ./Modules/index.md
   - Tools: ./Tools/index.md

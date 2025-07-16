@@ -1,45 +1,39 @@
-# Open AD Kit
+# Open AD Kit: Containerized Autoware Workloads
 
-[Open AD Kit](https://autoware.org/open-ad-kit/) is a set of containers for Autoware to make development and deployment easier on various platforms.
+Open AD Kit is a collaborative project developed by the Autoware Foundation and its member companies and alliance partners. It aims to bring software-defined best practices to the Autoware project and to enhance the Autoware ecosystem and capabilities by partnering with other organizations that share the goal of creating software-defined vehicles.
 
-- [autoware](./docker/autoware/README.md): Autoware container for development and deployment.
-- [scenario-simulator](./docker/scenario-simulator/README.md): Simulation container for Autoware scenario testing.
-- [visualizer](./docker/visualizer/README.md): RViz-based remote operation and visualization container for Autoware.
-- **zenoh-bridge**: Bridge container to create efficient DDS messaging pipeline between edge and cloud (WIP).
-- **controller**: Control container to send an receive messages between Autoware and the vehicle (WIP).
+Open AD Kit aims to democratize autonomous drive (AD) systems by bringing the cloud and edge closer together. In doing so, Open AD Kit will lower the threshold for developing and deploying the Autoware software stack by providing an efficient and modernized CI-CD approach.
 
-![oadkit](https://github.com/user-attachments/assets/0172eed1-c2cf-4f8d-b94c-91ed092e421c)
+### The First SOAFEE Blueprint
 
-## Demo
+The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem. Open AD Kit's containerized workloads for the Autoware software stack can be deployed on a variety of platforms with microservices architecture.
 
-To run the demo, you need to have Docker installed. Which you can install by using the following command:
+## Key Features
 
-```bash
-./setup-dev-env.sh -y docker --no-nvidia
-```
+### Granular Workloads
 
-**Note: If you are using a non-root user, you need logout/login or refresh user groups by:**
+Open AD Kit is a granular containerized project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each workload is designed to be independent and can be deployed on a variety of platforms.
 
-```bash
-newgrp docker
-```
+![Granular Workloads](docs/assets/images/granular-workloads.png)
 
-cd into the demo directory:
+### Mixed Critical Implementation
 
-```bash
-cd demo
-```
+Open AD Kit is a mixed critical implementation project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each workload is designed to be independent and can be deployed on a variety of platforms.
 
-Then, you can run the demo by using the following command:
+![Mixed Criticality](docs/assets/images/mixed-criticality.png)
 
-```bash
-docker compose up
-```
+### Cloud Native
 
-To stop the demo, you can use the following command:
+Open AD Kit is a cloud native project, which means that it is designed to be deployed on a variety of platforms with microservices architecture.
 
-```bash
-docker compose down
-```
+![Cloud Native](docs/assets/images/cloud-native.png)
 
-**The visualizer Rviz is accessible through the URL provided in the terminal using any modern browser.**
+### Connected and Continuous
+
+From data collection, calibration, and map annotation to machine learning operations, open-source simulation and system validation, the Open AD Kit initiative envisions an always connected, complete autonomous driving development and deployment platform.
+
+![Connected and Continuous](docs/assets/images/connected-continuous.png)
+
+## Getting Started
+
+![Documentation](docs/assets/images/documentation.png)

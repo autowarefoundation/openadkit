@@ -8,6 +8,7 @@ copyright: Copyright &copy; 2025 The Autoware Foundation
 nav:
   - Introduction: ./index.md
   - Quickstart: ./Quickstart/index.md
+  - Architecture: ./Architecture/index.md
   - Services: ./Services/index.md
   - Tools: ./Tools/index.md
   - Deployments: ./Deployments/index.md

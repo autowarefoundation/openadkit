@@ -1,45 +1,68 @@
-# Open AD Kit
+# Open AD Kit: Containerized Autoware Workloads
 
-[Open AD Kit](https://autoware.org/open-ad-kit/) is a set of containers for Autoware to make development and deployment easier on various platforms.
+<div align="center">
 
-- [autoware](./docker/autoware/README.md): Autoware container for development and deployment.
-- [scenario-simulator](./docker/scenario-simulator/README.md): Simulation container for Autoware scenario testing.
-- [visualizer](./docker/visualizer/README.md): RViz-based remote operation and visualization container for Autoware.
-- **zenoh-bridge**: Bridge container to create efficient DDS messaging pipeline between edge and cloud (WIP).
-- **controller**: Control container to send an receive messages between Autoware and the vehicle (WIP).
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](https://autowarefoundation.github.io/openadkit/)
+[![Autoware Discord](https://img.shields.io/discord/953808765935816715?logo=discord&logoColor=white&style=flat&label=Autoware)](https://discord.gg/Q94UsPvReQ)
+[![Autoware](https://img.shields.io/badge/Linkedin-Autoware-0a66c2?logo=linkedin&logoColor=white&style=flat)](https://www.linkedin.com/company/the-autoware-foundation/)
+[![Autoware Twitter / X](https://img.shields.io/twitter/follow/Autoware?logo=x&logoColor=white&style=flat)](https://twitter.com/intent/follow?screen_name=Autoware)
 
-![oadkit](https://github.com/user-attachments/assets/0172eed1-c2cf-4f8d-b94c-91ed092e421c)
+</div>
 
-## Demo
+Open AD Kit is a collaborative project developed by the Autoware Foundation and its member companies and alliance partners. It aims to bring software-defined best practices to the Autoware project and to enhance the Autoware ecosystem and capabilities by partnering with other organizations that share the goal of creating software-defined vehicles.
 
-To run the demo, you need to have Docker installed. Which you can install by using the following command:
+Open AD Kit aims to democratize autonomous drive (AD) systems by bringing the cloud and edge closer together. In doing so, Open AD Kit will lower the threshold for developing and deploying the Autoware software stack by providing an efficient and modernized CI-CD approach.
 
-```bash
-./setup-dev-env.sh -y docker --no-nvidia
-```
+#### The First SOAFEE Blueprint
 
-**Note: If you are using a non-root user, you need logout/login or refresh user groups by:**
+The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem. Open AD Kit's containerized workloads for the Autoware software stack can be deployed on a variety of platforms with microservices architecture.
 
-```bash
-newgrp docker
-```
+## Key Features
 
-cd into the demo directory:
+### Granular Workloads
 
-```bash
-cd demo
-```
+Open AD Kit is a granular containerized project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each workload is designed to be independent and can be deployed on a variety of platforms.
 
-Then, you can run the demo by using the following command:
+- **Independent microservices** for sensing, perception, planning, control, and visualization
+- **Multi-platform deployment** supporting both amd64 and arm64 architectures  
+- **Service mesh integration** with configurable environment variables
 
-```bash
-docker compose up
-```
+![Granular Workloads](docs/assets/images/granular-workloads.png)
 
-To stop the demo, you can use the following command:
+### Mixed Criticality
 
-```bash
-docker compose down
-```
+Open AD Kit is a mixed critical implementation project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each workload is designed to be independent and can be deployed on a variety of platforms.
 
-**The visualizer Rviz is accessible through the URL provided in the terminal using any modern browser.**
+- **Flexible deployment** separating safety-critical and monitoring workloads
+- **Configurable criticality** from development testing to production safety systems
+- **Hardware abstraction** supporting safety island compute architectures
+
+![Mixed Criticality](docs/assets/images/mixed-criticality.png)
+
+### Cloud Native
+
+Open AD Kit leverages modern cloud native technologies to deliver scalable, portable autonomous driving workloads.
+
+- **Seamless scaling** from development laptops to production edge devices
+- **Hybrid cloud support** bridging development and production environments
+- **Container orchestration** ready for Kubernetes and similar platforms
+
+![Cloud Native](docs/assets/images/cloud-native.png)
+
+### Connected and Continuous
+
+From data collection, calibration, and map annotation to machine learning operations, open-source simulation and system validation, the Open AD Kit initiative envisions an always connected, complete autonomous driving development and deployment platform.
+
+- **Automated CI/CD** with GitHub Actions integration
+- **Optimized build caching** for faster deployment cycles
+- **Continuous testing** in containerized environments
+
+![Connected and Continuous](docs/assets/images/connected-continuous.png)
+
+## Getting Started
+
+- **[Quick start](https://autowarefoundation.github.io/openadkit/Quickstart/)**
+- **[Documentation](https://autowarefoundation.github.io/openadkit/)**
+- **[Roadmap](https://autowarefoundation.github.io/openadkit/Roadmap/)**
+- **[Contributing](https://autowarefoundation.github.io/openadkit/Contributing/)**

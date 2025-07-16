@@ -1,5 +1,3 @@
 services: 
   scenario_simulator:
     image: ghcr.io/autowarefoundation/openadkit:scenario-simulator
-    volumes:
-      - autoware_map:/opt/autoware/share/kashiwanoha_map/map

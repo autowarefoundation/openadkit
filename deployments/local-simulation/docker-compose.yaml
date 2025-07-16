@@ -1,19 +1,17 @@
 services:
   autoware:
-    image: ghcr.io/autowarefoundation/autoware:universe
+    image: ghcr.io/autowarefoundation/openadkit:autoware
     volumes:
-      - ../map:/root/autoware_map
+      - ../mount/kashiwanoha_map:/root/autoware_map
     environment:
       - RUN_MODE=planning-simulator
       - MAP_PATH=/root/autoware_map
       - SCENARIO_SIMULATION=true
-  
+
   scenario_simulator:
-    image: ghcr.io/autowarefoundation/openadkit:scenario-simulator
-    volumes:
-      - ../map:/opt/autoware/share/kashiwanoha_map/map
+    image: ghcr.io/autowarefoundation/openadkit-tools:scenario-simulator
       
   visualizer:
-    image: ghcr.io/autowarefoundation/openadkit:visualizer
+    image: ghcr.io/autowarefoundation/openadkit-tools:visualizer
     ports:
       - 6080:6080

@@ -2,7 +2,7 @@ services:
   autoware:
     image: ghcr.io/autowarefoundation/openadkit:autoware
     volumes:
-      - autoware_map:/root/autoware_map
+      - ../mount/kashiwanoha_map:/root/autoware_map
     environment:
       - RUN_MODE=planning-simulator
       - MAP_PATH=/root/autoware_map

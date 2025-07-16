@@ -62,33 +62,6 @@ Open AD Kit envisions an always connected, complete autonomous driving developme
 
 ![Connected and Continuous](docs/assets/images/connected-continuous.png)
 
-```mermaid
-gantt
-    title Open AD Kit Roadmap
-    dateFormat  YYYY-MM-DD
-    axisFormat %Y-%m
-
-    section P1: Structure
-    Visualizer/Simulator containers  :active, done, 2025-04-01, 30d
-    Documentation v1.0 :done, 2025-05-01, 90d
-    Zenoh Bridge/Safety Island Integration :done, 2025-06-01, 90d
-
-    section P2: Modularity
-    Move modular containers to OpenADKit  :active, 2025-07-01, 30d
-    Launch file validation    :2025-08-01, 30d
-    Modular Open AD Kit        :2025-09-01, 30d
-
-    section P3: Configurability
-    Configurable Open AD Kit  :crit, 2025-10-01, 30d
-    Real-Vehicle Integration :2025-11-01, 30d
-    Documentation v1.1         :milestone, 2025-12-01, 30d
-
-    section P4: Orchestration
-    Enabling Orchestration       :2026-01-01, 30d
-    Integration AutoSD/Bluechi       :2026-02-01, 30d
-    OTA Support   :milestone, 2026-03-01, 30d
-```
-
 ## Getting Started
 
 - **[Quick start](https://autowarefoundation.github.io/openadkit/Quickstart/)**

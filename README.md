@@ -4,7 +4,7 @@ Open AD Kit is a collaborative project developed by the Autoware Foundation and 
 
 Open AD Kit aims to democratize autonomous drive (AD) systems by bringing the cloud and edge closer together. In doing so, Open AD Kit will lower the threshold for developing and deploying the Autoware software stack by providing an efficient and modernized CI-CD approach.
 
-### The First SOAFEE Blueprint
+#### The First SOAFEE Blueprint
 
 The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem. Open AD Kit's containerized workloads for the Autoware software stack can be deployed on a variety of platforms with microservices architecture.
 
@@ -36,4 +36,7 @@ From data collection, calibration, and map annotation to machine learning operat
 
 ## Getting Started
 
-![Documentation](docs/assets/images/documentation.png)
+- **[Quick start](https://autowarefoundation.github.io/openadkit/Quickstart/)**
+- **[Documentation](https://autowarefoundation.github.io/openadkit/)**
+- **[Roadmap](https://autowarefoundation.github.io/openadkit/Roadmap/)**
+- **[Contributing](https://autowarefoundation.github.io/openadkit/Contributing/)**

@@ -17,25 +17,61 @@ on:
       - labeled
   workflow_dispatch:
 
-jobs:
-  prevent-no-label-execution:
-    uses: autowarefoundation/autoware-github-actions/.github/workflows/prevent-no-label-execution.yaml@v1
-    with:
-      label: documentation
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-  deploy-docs:
-    needs: prevent-no-label-execution
-    if: ${{ needs.prevent-no-label-execution.outputs.run == 'true' }}
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Deploy docs
-        uses: autowarefoundation/autoware-github-actions/deploy-docs@v1
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          latest: ${{ github.event_name != 'pull_request_target' && github.ref_name == github.event.repository.default_branch }}
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install mkdocs-material
+          pip install mkdocs-awesome-pages-plugin
+          pip install mkdocs-exclude
+          pip install mkdocs-macros-plugin
+          pip install mkdocs-same-dir
+          pip install pymdown-extensions
+          pip install fontawesome-markdown
+          pip install python-markdown-math
+          pip install mdx-truly-sane-lists
+          pip install plantuml-markdown
+          pip install mkdocs-git-revision-date-localized-plugin
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Build with MkDocs
+        run: mkdocs build --clean --strict
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

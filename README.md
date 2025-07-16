@@ -68,22 +68,22 @@ gantt
     dateFormat  YYYY-MM-DD
     axisFormat %Y-%m
 
-    section Q1 2025: Structure
+    section Q1: Structure
     Core Library Refactor  :active, done, 2025-01-01, 90d
     Setup CI/CD Pipeline :done, 2025-01-01, 90d
     Initial Documentation  :done, 2025-01-01, 90d
 
-    section Q2 2025: Modularity
+    section Q2: Modularity
     Feature A Development  :active, 2025-04-01, 90d
     API for Feature A    :2025-04-01, 90d
     Alpha Release        :2025-04-01, 90d
 
-    section Q3 2025: Configurability
+    section Q3: Configurability
     Feature B Development  :crit, 2025-07-01, 90d
     User Feedback Campaign :2025-07-01, 90d
     Beta Release         :milestone, 2025-07-01, 90d
 
-    section Q4 2025: Orchestration
+    section Q4: Orchestration
     Final Bugfixes       :2025-10-01, 90d
     Marketing Push       :2025-10-01, 90d
     Version 1.0 Launch   :milestone, 2025-10-01, 90d

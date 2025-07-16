@@ -62,6 +62,33 @@ Open AD Kit envisions an always connected, complete autonomous driving developme
 
 ![Connected and Continuous](docs/assets/images/connected-continuous.png)
 
+```mermaid
+gantt
+    title Open AD Kit Roadmap
+    dateFormat  YYYY-MM-DD
+    axisFormat %Y-%m
+
+    section Q1 2025: Foundation
+    Core Library Refactor  :active, done, 2025-01-01, 30d
+    Setup CI/CD Pipeline :done, 2025-01-15, 20d
+    Initial Documentation  :done, 2025-02-01, 25d
+
+    section Q2 2025: Alpha Release
+    Feature A Development  :active, 2025-04-01, 40d
+    API for Feature A    :2025-04-10, 30d
+    Alpha Release        :2025-05-20, 10d
+
+    section Q3 2025: Beta & Feedback
+    Feature B Development  :crit, 2025-07-01, 45d
+    User Feedback Campaign :2025-08-15, 30d
+    Beta Release         :milestone, 2025-09-15, 0d
+
+    section Q4 2025: Public Launch
+    Final Bugfixes       :2025-10-01, 30d
+    Marketing Push       :2025-10-15, 45d
+    Version 1.0 Launch   :milestone, 2025-12-01, 0d
+```
+
 ## Getting Started
 
 - **[Quick start](https://autowarefoundation.github.io/openadkit/Quickstart/)**

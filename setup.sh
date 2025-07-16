@@ -4,11 +4,9 @@
 set -e
 SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
 CLR_GREEN="\033[32m"
+CLR_RED="\033[31m"
 CLR_RESET="\033[0m"
-
-# Default options
 INSTALL_NVIDIA=false
-NON_INTERACTIVE=false
 
 print_help() {
     echo "Setup runtime environment for Autoware Open AD Kit"
@@ -16,7 +14,6 @@ print_help() {
     echo "Options:"
     echo "  --help          Display this help message"
     echo "  -h              Display this help message"
-    echo "  -y              Use non-interactive mode"
     echo "  --nvidia        Install NVIDIA container toolkit"
     echo ""
 }
@@ -27,10 +24,6 @@ parse_args() {
             --help|-h)
                 print_help
                 exit 0
-                ;;
-            -y)
-                NON_INTERACTIVE=true
-                shift
                 ;;
             --nvidia)
                 INSTALL_NVIDIA=true
@@ -81,33 +74,48 @@ install_nvidia_container_toolkit() {
 
 install_docker() {
     echo "Installing Docker..."
+
+    if command -v docker &> /dev/null; then
+        echo "Docker is already installed. Skipping installation."
+        return
+    fi
+
+    # Remove old docker packages
     for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do 
         sudo apt-get remove -y "$pkg" 2>/dev/null || true
     done
 
+    # Install ca-certificates curl
     sudo apt-get update && sudo apt-get install -y ca-certificates curl
     sudo install -m 0755 -d /etc/apt/keyrings
     sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
     sudo chmod a+r /etc/apt/keyrings/docker.asc
 
+    # Add Docker's official GPG key
     echo \
     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
     $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
     sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update
 
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # Install Docker
+    sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+    # Add user to docker group
     sudo groupadd docker 2>/dev/null || true
     sudo usermod -aG docker "$USER"
 
     echo -e "${CLR_GREEN}Docker installed successfully!${CLR_RESET}"
-    newgrp docker
 }
 
 # Main
 parse_args "$@"
 load_env
+
+if ! sudo -n true 2>/dev/null; then
+    echo -e "${CLR_RED}This script requires sudo privileges. Please run with a user that has sudo access.${CLR_RESET}"
+    exit 1
+fi
+
 install_docker
 [ "$INSTALL_NVIDIA" = true ] && install_nvidia_container_toolkit
 

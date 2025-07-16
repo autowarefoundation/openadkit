@@ -5,7 +5,7 @@
 - [autoware](./docker/autoware/README.md): Autoware container for development and deployment.
 - [scenario-simulator](./docker/scenario-simulator/README.md): Simulation container for Autoware scenario testing.
 - [visualizer](./docker/visualizer/README.md): RViz-based remote operation and visualization container for Autoware.
-- **bridge**: Bridge container to create efficient DDS messaging pipeline between edge and cloud (WIP).
+- **zenoh-bridge**: Bridge container to create efficient DDS messaging pipeline between edge and cloud (WIP).
 - **controller**: Control container to send an receive messages between Autoware and the vehicle (WIP).
 
 ![oadkit](https://github.com/user-attachments/assets/0172eed1-c2cf-4f8d-b94c-91ed092e421c)

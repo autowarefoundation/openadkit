@@ -1,11 +1,11 @@
-name: docker-build-and-push
+name: build-push-tools
 
 on:
   push:
     branches:
       - main
     paths:
-      - docker
+      - tools
   schedule:
     - cron: '0 21 * * *'
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
   load-env:
     uses: ./.github/workflows/load-env.yaml
 
-  docker-build-and-push:
+  build-push-tools:
     needs: [load-env]
     strategy:
       matrix:
@@ -46,8 +46,8 @@ jobs:
             *.env
             *.repos
             .github/actions/combine-multi-arch-images/action.yaml
-            .github/actions/docker-build-and-push*/action.yaml
-            .github/workflows/docker-build-and-push.yaml
+            .github/actions/build-push-tools*/action.yaml
+            .github/workflows/build-push-tools.yaml
             ansible/**
             docker/**
       
@@ -57,14 +57,14 @@ jobs:
           (github.event_name == 'push' && github.ref_type == 'tag') }}
         uses: ./.github/actions/free-disk-space
 
-      - name: Build 'openadkit'
+      - name: Build 'openadkit-tools'
         if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'push' && github.ref_type == 'tag') }}
-        uses: ./.github/actions/docker-build-and-push-openadkit
+        uses: ./.github/actions/build-push-tools
         with:
           platform: ${{ matrix.platform }}
-          target-image: openadkit
+          target-image: openadkit-tools
           build-args: |
             *.platform=${{ matrix.arch-platform }}
             *.args.ROS_DISTRO=${{ needs.load-env.outputs.rosdistro }}
@@ -78,14 +78,14 @@ jobs:
         run: |
           df -h
 
-  update-docker-manifest-openadkit:
-    needs: docker-build-and-push
+  update-docker-manifest-openadkit-tools:
+    needs: build-push-tools
     runs-on: ubuntu-22.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Combine multi arch images for 'openadkit'
+      - name: Combine multi arch images for 'openadkit-tools'
         uses: ./.github/actions/combine-multi-arch-images
         with:
-          package-name: openadkit
+          package-name: openadkit-tools

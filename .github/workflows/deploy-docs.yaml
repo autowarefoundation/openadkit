@@ -51,7 +51,7 @@ jobs:
           pip install python-markdown-math
           pip install mdx-truly-sane-lists
           pip install plantuml-markdown
-          pip install mkdocs-mermaid2
+          pip install mkdocs-mermaid2-plugin
           pip install mkdocs-pymdownx-snippets
 
       - name: Setup Pages

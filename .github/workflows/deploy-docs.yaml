@@ -52,7 +52,6 @@ jobs:
           pip install mdx-truly-sane-lists
           pip install plantuml-markdown
           pip install mkdocs-mermaid2-plugin
-          pip install mkdocs-pymdownx-snippets
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

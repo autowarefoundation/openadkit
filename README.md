@@ -14,23 +14,39 @@ The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Archite
 
 Open AD Kit is a granular containerized project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each workload is designed to be independent and can be deployed on a variety of platforms.
 
+- **Independent microservices** for sensing, perception, planning, control, and visualization
+- **Multi-platform deployment** supporting both amd64 and arm64 architectures  
+- **Service mesh integration** with configurable environment variables
+
 ![Granular Workloads](docs/assets/images/granular-workloads.png)
 
-### Mixed Critical Implementation
+### Mixed Criticality
 
 Open AD Kit is a mixed critical implementation project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each workload is designed to be independent and can be deployed on a variety of platforms.
+
+- **Flexible deployment** separating safety-critical and monitoring workloads
+- **Configurable criticality** from development testing to production safety systems
+- **Hardware abstraction** supporting safety island compute architectures
 
 ![Mixed Criticality](docs/assets/images/mixed-criticality.png)
 
 ### Cloud Native
 
-Open AD Kit is a cloud native project, which means that it is designed to be deployed on a variety of platforms with microservices architecture.
+Open AD Kit leverages modern cloud native technologies to deliver scalable, portable autonomous driving workloads.
+
+- **Seamless scaling** from development laptops to production edge devices
+- **Hybrid cloud support** bridging development and production environments
+- **Container orchestration** ready for Kubernetes and similar platforms
 
 ![Cloud Native](docs/assets/images/cloud-native.png)
 
 ### Connected and Continuous
 
 From data collection, calibration, and map annotation to machine learning operations, open-source simulation and system validation, the Open AD Kit initiative envisions an always connected, complete autonomous driving development and deployment platform.
+
+- **Automated CI/CD** with GitHub Actions integration
+- **Optimized build caching** for faster deployment cycles
+- **Continuous testing** in containerized environments
 
 ![Connected and Continuous](docs/assets/images/connected-continuous.png)
 

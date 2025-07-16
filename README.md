@@ -68,3 +68,26 @@ Open AD Kit envisions an always connected, complete autonomous driving developme
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
 - **[Roadmap](https://autowarefoundation.github.io/openadkit/Roadmap/)**
 - **[Contributing](https://autowarefoundation.github.io/openadkit/Contributing/)**
+
+## Roadmap
+```mermaid
+
+timeline
+    title Open AD Kit Roadmap
+    P1-Structure
+      : Visualizer/Simulator containers
+      : Zenoh Bridge/Safety Island Integration
+      : Documentation v1.0
+    P2-Modularity
+      : Build modular containers in OpenADKit (Active)
+      : Launch file validation
+      : Modular Open AD Kit
+    P3-Configurability
+      : Configurable Open AD Kit
+      : Real-Vehicle Integration
+      : Documentation v1.1
+    P4-Orchestration
+      : Enabling Orchestration
+      : Integration AutoSD/Bluechi
+      : OTA Support
+```

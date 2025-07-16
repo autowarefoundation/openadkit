@@ -1,4 +1,4 @@
-# Open AD Kit: Cloud-Edge Simulation
+# Open AD Kit: Remote Simulation
 
 - **autoware**: Autoware container for development and deployment.
 - **scenario-simulator**: Simulation container for Autoware scenario testing.

@@ -68,25 +68,25 @@ gantt
     dateFormat  YYYY-MM-DD
     axisFormat %Y-%m
 
-    section Q1: Structure
-    Core Library Refactor  :active, done, 2025-02-01, 60d
-    Setup CI/CD Pipeline :done, 2025-02-01, 60d
-    Initial Documentation  :done, 2025-02-01, 60d
+    section P1: Structure
+    Visualizer/Simulator containers  :active, done, 2025-04-01, 30d
+    Documentation v1.0 :done, 2025-05-01, 90d
+    Zenoh Bridge/Safety Island Integration :done, 2025-06-01, 90d
 
-    section Q2: Modularity
-    Feature A Development  :active, 2025-04-01, 90d
-    API for Feature A    :2025-04-01, 90d
-    Alpha Release        :2025-04-01, 90d
+    section P2: Modularity
+    Move modular containers to OpenADKit  :active, 2025-07-01, 30d
+    Launch file validation    :2025-08-01, 30d
+    Modular Open AD Kit        :2025-09-01, 30d
 
-    section Q3: Configurability
-    Feature B Development  :crit, 2025-07-01, 90d
-    User Feedback Campaign :2025-07-01, 90d
-    Beta Release         :milestone, 2025-07-01, 90d
+    section P3: Configurability
+    Configurable Open AD Kit  :crit, 2025-10-01, 30d
+    Real-Vehicle Integration :2025-11-01, 30d
+    Documentation v1.1         :milestone, 2025-12-01, 30d
 
-    section Q4: Orchestration
-    Final Bugfixes       :2025-10-01, 90d
-    Marketing Push       :2025-10-01, 90d
-    Version 1.0 Launch   :milestone, 2025-10-01, 90d
+    section P4: Orchestration
+    Enabling Orchestration       :2026-01-01, 30d
+    Integration AutoSD/Bluechi       :2026-02-01, 30d
+    OTA Support   :milestone, 2026-03-01, 30d
 ```
 
 ## Getting Started

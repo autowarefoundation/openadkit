@@ -1,6 +1,6 @@
 # Open AD Kit: Tools
 
-This directory contains tools for Open AD Kit.
+This directory contains Open AD Kit tools.
 
 - [Scenario Simulator](./scenario-simulator/README.md): Scenario simulator service for Autoware.
 - [Visualizer](./visualizer/README.md): Visualization service for RViz.

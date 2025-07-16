@@ -1,20 +1,14 @@
 # Open AD Kit: Containerized Autoware Workloads
 
-<p align="center">
-    <a href="https://opensource.org/licenses/Apache-2.0">
-        <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
-    <a href="https://autowarefoundation.github.io/openadkit/">
-        <img src="https://img.shields.io/badge/docs-available-brightgreen.svg" alt="Documentation"></a>
-    <a href="https://discord.gg/Q94UsPvReQ">
-        <img src="https://img.shields.io/discord/953808765935816715?logo=discord&logoColor=white&style=flat&label=Autoware"
-            alt="Autoware Discord"></a>
-    <a href="https://www.linkedin.com/company/the-autoware-foundation/">
-        <img src="https://img.shields.io/badge/Linkedin-Autoware-0a66c2?logo=linkedin&logoColor=white&style=flat"
-            alt="Autoware"></a>
-    <a href="https://twitter.com/intent/follow?screen_name=Autoware">
-        <img src="https://img.shields.io/twitter/follow/Autoware?logo=x&logoColor=white&style=flat"
-            alt="Autoware Twitter / X"></a>
-</p>
+<div align="center">
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](https://autowarefoundation.github.io/openadkit/)
+[![Autoware Discord](https://img.shields.io/discord/953808765935816715?logo=discord&logoColor=white&style=flat&label=Autoware)](https://discord.gg/Q94UsPvReQ)
+[![Autoware](https://img.shields.io/badge/Linkedin-Autoware-0a66c2?logo=linkedin&logoColor=white&style=flat)](https://www.linkedin.com/company/the-autoware-foundation/)
+[![Autoware Twitter / X](https://img.shields.io/twitter/follow/Autoware?logo=x&logoColor=white&style=flat)](https://twitter.com/intent/follow?screen_name=Autoware)
+
+</div>
 
 Open AD Kit is a collaborative project developed by the Autoware Foundation and its member companies and alliance partners. It aims to bring software-defined best practices to the Autoware project and to enhance the Autoware ecosystem and capabilities by partnering with other organizations that share the goal of creating software-defined vehicles.
 

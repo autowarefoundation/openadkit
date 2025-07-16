@@ -48,11 +48,9 @@ jobs:
           pip install mkdocs-macros-plugin
           pip install mkdocs-same-dir
           pip install pymdown-extensions
-          pip install fontawesome-markdown
           pip install python-markdown-math
           pip install mdx-truly-sane-lists
           pip install plantuml-markdown
-          pip install mkdocs-git-revision-date-localized-plugin
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

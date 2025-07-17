@@ -63,8 +63,8 @@ jobs:
         run: |
           # Create a temporary mkdocs config for PR preview with proper base path
           cp mkdocs.yaml mkdocs-pr.yaml
-          echo "site_url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/" >> mkdocs-pr.yaml
-          sed -i 's/^site_url:.*/site_url: https:\/\/${{ github.repository_owner }}.github.io\/${{ github.event.repository.name }}\/pr-${{ github.event.number }}\//' mkdocs-pr.yaml || true
+          # Replace site_url for PR preview
+          sed -i 's#^site_url:.*#site_url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/#' mkdocs-pr.yaml
 
       - name: Build with MkDocs (Main)
         if: github.event_name == 'push'

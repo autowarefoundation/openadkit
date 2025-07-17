@@ -15,25 +15,30 @@ on:
       - opened
       - synchronize
       - labeled
+      - closed
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write
 
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.event_name }}-${{ github.event.number || github.ref }}"
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # For pull requests, checkout the PR branch
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -53,24 +58,188 @@ jobs:
           pip install plantuml-markdown
           pip install mkdocs-mermaid2-plugin
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
+      - name: Configure MkDocs for PR preview
+        if: github.event_name == 'pull_request_target'
+        run: |
+          # Create a temporary mkdocs config for PR preview with proper base path
+          cp mkdocs.yaml mkdocs-pr.yaml
+          echo "site_url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/" >> mkdocs-pr.yaml
+          sed -i 's/^site_url:.*/site_url: https:\/\/${{ github.repository_owner }}.github.io\/${{ github.event.repository.name }}\/pr-${{ github.event.number }}\//' mkdocs-pr.yaml || true
 
-      - name: Build with MkDocs
+      - name: Build with MkDocs (Main)
+        if: github.event_name == 'push'
         run: mkdocs build --clean --verbose
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Build with MkDocs (PR Preview)
+        if: github.event_name == 'pull_request_target'
+        run: mkdocs build --clean --verbose --config-file mkdocs-pr.yaml
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: docs-site
           path: ./site
 
-  deploy:
+  # Deploy to main GitHub Pages (only on push to main)
+  deploy-main:
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-site
+          path: ./site
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # Deploy PR preview to subdirectory (only on pull requests)
+  deploy-preview:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target' && github.event.action != 'closed'
+    environment:
+      name: pr-preview-${{ github.event.number }}
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Create gh-pages branch if it doesn't exist
+        run: |
+          if ! git show-ref --verify --quiet refs/heads/gh-pages; then
+            echo "gh-pages branch doesn't exist, creating it..."
+            git checkout --orphan gh-pages
+            git rm -rf .
+            echo "# Documentation Preview" > README.md
+            git add README.md
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git commit -m "Initialize gh-pages branch"
+            git push origin gh-pages
+          fi
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-site
+          path: ./pr-build
+
+      - name: Deploy to PR subdirectory
+        run: |
+          # Ensure we're on the right branch
+          git checkout gh-pages
+          
+          # Create or update the PR preview directory
+          rm -rf pr-${{ github.event.number }}
+          mkdir -p pr-${{ github.event.number }}
+          cp -r pr-build/* pr-${{ github.event.number }}/
+          
+          # Configure git
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          
+          # Add and commit changes
+          git add pr-${{ github.event.number }}
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Deploy preview for PR #${{ github.event.number }}"
+            git push origin gh-pages
+          fi
+
+      - name: Comment PR with preview link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📖 Documentation Preview')
+            );
+            
+            const previewUrl = `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/`;
+            
+            const commentBody = `📖 **Documentation Preview**
+            
+            The documentation changes in this PR can be previewed at:
+            🔗 **Preview URL**: ${previewUrl}
+            
+            This preview will be updated automatically when you push new commits to this PR.
+            
+            ---
+            *This comment is automatically updated by the docs deployment workflow.*`;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
+
+  # Cleanup PR preview when PR is closed
+  cleanup-preview:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target' && github.event.action == 'closed'
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Remove PR preview directory
+        run: |
+          if git show-ref --verify --quiet refs/heads/gh-pages && [ -d "pr-${{ github.event.number }}" ]; then
+            rm -rf pr-${{ github.event.number }}
+            
+            # Configure git
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            
+            # Commit removal
+            git add .
+            if git diff --staged --quiet; then
+              echo "No changes to commit"
+            else
+              git commit -m "Remove preview for closed PR #${{ github.event.number }}"
+              git push origin gh-pages
+            fi
+          else
+            echo "gh-pages branch doesn't exist or PR directory not found"
+          fi

@@ -1,3 +1,5 @@
 services: 
   scenario_simulator:
-    image: ghcr.io/autowarefoundation/openadkit:scenario-simulator
+    image: ghcr.io/autowarefoundation/openadkit-tools:scenario-simulator
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp

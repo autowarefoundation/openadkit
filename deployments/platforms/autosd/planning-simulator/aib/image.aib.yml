@@ -1,0 +1,50 @@
+name: awf-oak
+
+image:
+  hostname: awf-oak-plan-sim
+  selinux_booleans:
+    domain_can_mmap_files: true
+  image_size: 20 GiB
+  partitions:
+    boot:
+      size: 300 MiB
+
+content:
+  rpms:
+    - git
+    - podman
+  container_images:
+    - source: ghcr.io/autowarefoundation/autoware
+      tag: universe-0.45.1-amd64
+      name: localhost/autoware:latest
+    - source: ghcr.io/autowarefoundation/autoware-tools
+      tag: scenario-simulator
+      name: localhost/autoware-tools:scenario-simulator
+  make_dirs:
+    - path: /var/log/awf
+      mode: 0755
+      exist_ok: true
+      parents: true
+    - path: /opt/tier4
+      mode: 0755
+      exist_ok: true
+      parents: true
+  add_files:
+    # systemd unit that fetches the tier4 git repository
+    - source_path: ../workloads/systemd/awf-oak-git.service
+      path: /etc/systemd/system/awf-oak-git.service
+    # awf oak pod
+    - source_path: ../workloads/container-files/awf-oak.pod
+      path: /etc/containers/systemd/awf-oak.pod
+    # awf oak planning service
+    - source_path: ../workloads/container-files/awf-oak-planning.container
+      path: /etc/containers/systemd/awf-oak-planning.container
+    # awf oak simulator service
+    - source_path: ../workloads/container-files/awf-oak-simulator.container
+      path: /etc/containers/systemd/awf-oak-simulator.container
+  systemd:
+    enabled_services:
+      - awf-oak-git.service
+
+auth:
+  root_password: $6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.

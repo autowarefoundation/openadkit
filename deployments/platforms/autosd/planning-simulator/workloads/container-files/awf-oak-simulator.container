@@ -1,0 +1,22 @@
+[Unit]
+Description=Open Autoware AD Kit Scenario Simulator
+Wants=network-online.target
+After=network-online.target
+After=awf-oak-planning.service
+
+[Install]
+WantedBy=default.target
+
+[Service]
+Type=oneshot
+
+[Container]
+Pod=awf-oak.pod
+ContainerName=awf-oak-simulator
+Image=localhost/autoware-tools:scenario-simulator
+Network=bridge
+Environment=ROS_DOMAIN=26
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=ROSBAG2_STORAGE_DEFAULT_URI=/var/log/awf
+Volume=/opt/tier4/scenario_simulator_v2/test_runner/scenario_test_runner/scenario:/etc/awf/scenario:Z
+Volume=/var/log/awf:/var/log/awf:Z

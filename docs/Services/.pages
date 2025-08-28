@@ -1,7 +1,0 @@
-nav:
-  - Introduction: index.md
-  - Sensing-Perception: Sensing-Perception/index.md
-  - Planning-Control: Planning-Control/index.md
-  - Localization-Mapping: Localization-Mapping/index.md
-  - Vehicle-System: Vehicle-System/index.md
-  - API: API/index.md

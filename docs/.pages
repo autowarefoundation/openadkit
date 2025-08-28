@@ -4,5 +4,6 @@ nav:
   - Architecture: ./Architecture/index.md
   - Services: ./Services/index.md
   - Tools: ./Tools/index.md
+  - Platforms: ./Platforms/index.md
   - Deployments: ./Deployments/index.md
   - Contributing: ./Contributing/index.md

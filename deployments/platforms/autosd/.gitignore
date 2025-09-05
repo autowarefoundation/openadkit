@@ -1,0 +1,4 @@
+_build/
+auto-image-builder.sh
+outputs/*
+!outputs/.keepme

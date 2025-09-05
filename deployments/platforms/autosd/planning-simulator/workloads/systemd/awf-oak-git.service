@@ -1,0 +1,12 @@
+[Install]
+WantedBy=default.target
+
+[Unit]
+Description=Open Autoware AD Kit Map Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=git clone https://github.com/tier4/scenario_simulator_v2 -b 16.9.0 /opt/tier4/scenario_simulator_v2

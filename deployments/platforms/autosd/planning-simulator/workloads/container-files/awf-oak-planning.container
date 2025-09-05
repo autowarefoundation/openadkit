@@ -1,0 +1,20 @@
+[Unit]
+Description=Open Autoware AD Kit Panning
+Wants=network-online.target
+After=network-online.target
+After=awf-oak-git.service
+
+[Install]
+WantedBy=default.target
+
+[Container]
+Pod=awf-oak.pod
+ContainerName=awf-oak-planning
+Image=localhost/autoware:latest
+Network=bridge
+Environment=ROS_DOMAIN=26
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=ROSBAG2_STORAGE_DEFAULT_URI=/var/log/awd
+Volume=/opt/tier4/scenario_simulator_v2/map/kashiwanoha_map/map:/etc/awf/map:Z
+Volume=/var/log/awf:/var/log/awf:Z
+Exec=/ros_entrypoint.sh ros2 launch autoware_launch planning_simulator.launch.xml map_path:=/etc/awf/map vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit scenario_simulation:=true rviz:=false perception/enable_traffic_light:=false

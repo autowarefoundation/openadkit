@@ -39,17 +39,6 @@ parse_args() {
     done
 }
 
-load_env() {
-    echo "Loading environment variables..."
-    if [ "$(uname -m)" = "aarch64" ]; then
-        # shellcheck disable=SC1091
-        source "$SCRIPT_DIR/arm64.env"
-    else
-        # shellcheck disable=SC1091
-        source "$SCRIPT_DIR/amd64.env"
-    fi
-}
-
 install_nvidia_container_toolkit() {
     echo "Installing NVIDIA Container Toolkit..."
     
@@ -110,7 +99,6 @@ install_docker() {
 
 #### Main ####
 parse_args "$@"
-load_env
 
 if ! sudo -n true 2>/dev/null; then
     echo -e "${CLR_RED}This script requires sudo privileges. Please run with a user that has sudo access.${CLR_RESET}"

@@ -2,22 +2,22 @@
 
 ## 1. Introduction
 
-This document provides a comprehensive implementation guide and technical overview for the distributed architecture of the OpenADKit project. The core objective is to separate compute-intensive and lightweight components of an autonomous driving system, enabling deployment across different hardware. For example, the core Autoware software stack runs on the local side (e.g., vehicle, or a powerful simulation server). Users can remotely visualize and manage Autoware from their laptops or a cloud-based management system.
+This document provides a comprehensive implementation guide and technical overview for the distributed architecture of the OpenADKit project. The core objective is to separate compute-intensive and lightweight components of an autonomous driving system, enabling deployment across different hardware. For example, the core Autoware software stack runs on the edge side (e.g., vehicle, or a powerful simulation server). Users can remotely visualize and manage Autoware from their laptops or a cloud-based management system.
 
 To achieve this, we utilize [Zenoh](https://zenoh.io/) as a high-performance, low-latency communication protocol, paired with the [`zenoh-bridge-ros2dds`](https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds) tool to seamlessly connect two ROS 2 (Robot Operating System 2) environments isolated by Docker virtual networks. This manual covers architecture design, setup steps, system startup, and troubleshooting, providing complete operational guidance.
 
 ## 2. Detailed Architecture Design
 
-### 2.1. Core Concept: Client-Server Model
+### 2.1. Core Concept: Edge-Cloud Model
 
-The system decouples the previously monolithic architecture into a client-server model:
+The system decouples the previously monolithic architecture into an edge-cloud model:
 
-- **Vehicle/Server Side**: Includes components with high computational demands (especially CPU and GPU).
+- **Edge Side**: Includes components with high computational demands (especially CPU and GPU).
   - `autoware`: Core perception, decision-making, and planning modules.
-  - `scenario_simulator`: Generates virtual traffic environments, obstacles, and vehicle dynamics, providing simulated sensor data for Autoware.
-  - **Deployment**: Typically on vehicles or powerful servers.
+  - `scenario_simulator`: Generates virtual traffic environments and provides simulated sensor data for Autoware.
+  - **Deployment**: Typically on vehicles or powerful edge machine.
 
-- **Monitor Side**: Includes lightweight components critical for user interaction and visualization.
+- **Cloud Side**: Includes lightweight components critical for user interaction and visualization.
   - `visualizer`: Based on RViz2, encapsulated with noVNC, allowing users to access the visualization interface via any modern web browser without installing ROS 2 or RViz locally.
   - **Deployment**: Typically on a user's laptop or a cloud-based management system, where low computational power is sufficient.
 
@@ -34,60 +34,60 @@ graph TD
     classDef bridge fill:#fffbe6,stroke:#f0ad4e
     classDef invisible stroke:none,fill:none
 
-    %% === Monitor ===
-    subgraph Monitor["Monitor (noVNC)"]
+    %% === Cloud Side ===
+    subgraph CloudSide["Cloud Side (User Machine)"]
         direction LR
-        class Monitor machine
+        class CloudSide machine
 
-        subgraph VisualizerNet[visualizer_net Network]
+        subgraph CloudNet[cloud_net Network]
             direction TB
-            class VisualizerNet network
+            class CloudNet network
             
             visualizer["**Visualizer**<br><br>Based on RViz2<br>Provides noVNC Remote Desktop"]
-            visualizer_bridge["**Visualizer Zenoh Bridge**<br><br><u>Role</u>: Client<br>Converts Zenoh ↔️ DDS"]
+            cloud_bridge["**Cloud Zenoh Bridge**<br><br><u>Role</u>: Router<br>Listens on TCP/7447<br>Converts Zenoh ↔️ DDS"]
             class visualizer service
-            class visualizer_bridge bridge
+            class cloud_bridge bridge
             
-            visualizer -->|"ROS2 DDS Data"| visualizer_bridge
+            visualizer -->|"ROS2 DDS Data"| cloud_bridge
         end
     end
 
-    %% === Vehicle Server ===
-    subgraph VehicleServer[Vehicle Server]
+    %% === Edge Side ===
+    subgraph EdgeSide["Edge Side (Vehicle/Server)"]
         direction LR
-        class VehicleServer machine
+        class EdgeSide machine
 
-        subgraph AutowareNet[autoware_net Network]
+        subgraph EdgeNet[edge_net Network]
             direction TB
-            class AutowareNet network
+            class EdgeNet network
 
             autoware["**Autoware**<br><br>Core Autonomous Driving Algorithms<br>Perception, Planning, Control"]
             scenario_simulator["**Scenario Simulator**<br><br>Provides Simulation Scenarios<br>With Sensor Data"]
-            autoware_bridge["**Autoware Zenoh Bridge**<br><br><u>Role</u>: Router<br>Listens on TCP/7447<br>Converts DDS ↔️ Zenoh"]
+            edge_bridge["**Edge Zenoh Bridge**<br><br><u>Role</u>: Client<br>Converts DDS ↔️ Zenoh"]
             class autoware,scenario_simulator service
-            class autoware_bridge bridge
+            class edge_bridge bridge
 
             autoware <-->|"ROS2 DDS Data"| scenario_simulator
-            autoware -->|"ROS2 DDS Data"| autoware_bridge
-            scenario_simulator -->|"ROS2 DDS Data"| autoware_bridge
+            autoware -->|"ROS2 DDS Data"| edge_bridge
+            scenario_simulator -->|"ROS2 DDS Data"| edge_bridge
         end
     end
 
     %% === External & Cross-Network Connections ===
     user[fa:fa-user User] -->|"HTTP (Port 6080)"| visualizer
-    visualizer_bridge <-->|"<b>Zenoh Protocol over zenoh_net</b><br>Connects to tcp/autoware_zenoh_bridge:7447"| autoware_bridge
+    edge_bridge -->|"<b>Zenoh Protocol over zenoh_net</b><br>Connects to tcp/cloud_zenoh_bridge:7447"| cloud_bridge
 ```
 
 ### 2.3. Network Isolation and Communication Bridge
 
 - **Network Design**:
-  - `autoware_net`: An isolated virtual network for `autoware` and `scenario_simulator`, using ROS 2 DDS multicast for low-latency communication.
-  - `visualizer_net`: An isolated network for `visualizer`, simulating physical or logical separation from the server.
-  - TCP/IP (use `zenoh_net` docker network in this demo for simplicity): The network that is possible to connect `autoware_zenoh_bridge` and `visualizer_zenoh_bridge`, ensuring a clean cross-domain data transmission path.
+  - `edge_net`: An isolated virtual network for `autoware` and `scenario_simulator`, using ROS 2 DDS multicast for low-latency communication.
+  - `cloud_net`: An isolated network for `visualizer`, simulating physical or logical separation from the server.
+  - TCP/IP (use `zenoh_net` docker network in this demo for simplicity): The network that is possible to connect `edge_zenoh_bridge` and `cloud_zenoh_bridge`, ensuring a clean cross-domain data transmission path.
 
 - **Communication Core: Zenoh Bridge**:
-  - `autoware_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Router**, scans ROS 2 topics in `autoware_net`, converts them to Zenoh format, and listens for client connections on TCP/7447 in `zenoh_net`.
-  - `visualizer_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Client**, connecting to `autoware_zenoh_bridge` via `zenoh_net`, receiving Zenoh data, and converting it back to ROS 2 DDS for `visualizer` to subscribe.
+  - `cloud_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Router**, listening for client connections on TCP port `7447`. It receives Zenoh data from the edge and converts it to ROS 2 DDS for the `visualizer`.
+  - `edge_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Client**, connecting to the `cloud_zenoh_bridge` via `zenoh_net`. It scans for ROS 2 topics in `edge_net`, converts them to the Zenoh protocol, and forwards them to the router.
   - `config/zenoh-bridge-ros2dds.json5`: A configuration file defining the bridge's mode, listening endpoints, and topic filtering rules, allowing precise control over transmitted data to optimize bandwidth.
 
 ## 3. User Manual
@@ -128,10 +128,10 @@ Ensure the following software is installed:
    docker-compose up -d
    ```
    - `-d` runs containers in the background.
-   - First-time execution may take a few minutes to pull images from `ghcr.io` and `eclipse`.
+   - The first launch may take several minutes to download the required Docker images.
 
 2. **Monitor Startup Logs (Optional)**:
-   View service logs to check startup status:
+   To view the real-time logs from all services, run:
    ```bash
    docker-compose logs -f
    ```
@@ -143,54 +143,45 @@ Ensure the following software is installed:
    - `autoware`
    - `scenario_simulator`
    - `visualizer`
-   - `autoware_zenoh_bridge`
-   - `visualizer_zenoh_bridge`
+   - `edge_zenoh_bridge`
+   - `cloud_zenoh_bridge`
 
 2. **Access noVNC Visualization Interface**:
-   Open a browser and navigate to:
+   Open a web browser and navigate to:
    ```
    http://localhost:6080
    ```
    Use the default password `openadkit`.
 
 3. **Verify Operation**:
-   - The noVNC interface should display RViz2.
-   - If `Global Status` shows `OK` (green), the system is running correctly, showing maps, autonomous vehicle models, and simulated objects.
-   - If `Warning` appears, refer to the "Troubleshooting" section.
+   - The noVNC interface should display the RViz2 visualization tool.
+   - If the `Global Status` in the RViz2 "Displays" panel shows `OK` (green text), the system is running correctly. You should see maps, the vehicle model, and other simulated objects.
+   - If it shows `Warning`, please refer to the troubleshooting section below.
 
 4. **Stop the System**:
-   Stop and remove containers and networks:
+    To stop and remove all containers and networks, run:
    ```bash
    docker-compose down -v
    ```
-   - `-v` removes the `autoware_map` volume; omit to retain map data.
+   - The `-v` flag also removes the `autoware_map` volume. Omit it if you wish to preserve the downloaded map data for future use.
 
 ## 4. Troubleshooting
 
-### Issue 1: Visualizer Shows "Global Status: Warning" or Blank Screen
+### Issue 1: Visualizer Shows "Global Status: Warning" or a Blank Screen
 
-- **Cause**: A race condition where ROS 2 nodes start before the Zenoh bridge is ready.
+- **Cause**: This can be a race condition where ROS 2 nodes in one container start before the Zenoh bridge connection is fully established, preventing topics from being discovered correctly. The `depends_on` option in `docker-compose.yaml` helps, but doesn't guarantee service readiness.
 - **Solutions**:
-  1. **Restart Services**:
+  1. **Restart Services**: A simple restart often resolves timing issues.
      ```bash
      docker-compose restart
      ```
-  2. **Increase Wait Time**:
-     Edit `docker-compose.yaml`, e.g., change `autoware`’s `sleep 16` to `sleep 30`:
-     ```yaml
-     services:
-       autoware:
-         entrypoint: >
-           bash -c "echo 'Waiting longer for bridges...' && sleep 30 && echo 'Starting...' && /entrypoint.sh"
-     ```
-     Then run:
+  2. **Staged Startup**: Manually start the core services first, wait a moment, then start the compute-heavy services.
      ```bash
-     docker-compose up -d --force-recreate
-     ```
-  3. **Staged Startup**:
-     ```bash
-     docker-compose up -d autoware_zenoh_bridge visualizer_zenoh_bridge visualizer
+     # Start the cloud side and the bridges
+     docker-compose up -d cloud_zenoh_bridge edge_zenoh_bridge visualizer
+     # Wait for them to initialize
      sleep 15
+     # Start the edge side
      docker-compose up -d autoware scenario_simulator
      ```
 

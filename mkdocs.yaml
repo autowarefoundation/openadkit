@@ -5,16 +5,6 @@ edit_uri: https://github.com/autowarefoundation/openadkit/edit/main/docs/
 docs_dir: docs
 copyright: Copyright &copy; 2025 The Autoware Foundation
 
-nav:
-  - Introduction: ./index.md
-  - Quickstart: ./Quickstart/index.md
-  - Architecture: ./Architecture/index.md
-  - Services: ./Services/index.md
-  - Tools: ./Tools/index.md
-  - Platforms: ./Platforms/index.md
-  - Deployments: ./Deployments/index.md
-  - Contributing: ./Contributing/index.md
-
 theme:
   name: material
   features:
@@ -60,10 +50,9 @@ plugins:
   - awesome-pages
   - exclude:
       regex:
-        - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?jpg).*$
+        - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?jpg|(.\\*\\.)?pages).*$
         - ^(.*/)?[^.]*$
   - macros
-  - same-dir
   - search
 
 markdown_extensions:

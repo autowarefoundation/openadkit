@@ -1,6 +1,6 @@
 # Deployment
 
-## Zenoh-bridge
+## [Zenoh-bridge](zenoh-bridge/index.md)
 
 The `zenoh-bridge` provides the communication backbone for the OpenADKit's distributed architecture. It demonstrates a "Cloud-Edge" deployment model by seamlessly bridging two isolated ROS 2 environments, decoupling compute-intensive components from lightweight visualization tools.
 

@@ -1,3 +1,3 @@
 # zenoh-bridge demo
 
-See [zenoh-bridge](/docs/deployments/zenoh-bridge/index.md) deployment.
+See [zenoh-bridge](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/) deployment.

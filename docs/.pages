@@ -1,9 +1,9 @@
 nav:
-  - index.md
-  - quickstart
-  - architecture
-  - services
-  - tools
-  - platforms
-  - deployments
-  - contributing
+  - Introduction: index.md
+  - Getting Started: GettingStarted
+  - Deployments: Deployments
+  - Services: Services
+  - Tools: Tools
+  - Platforms: Platforms
+  - Hardware: Hardware
+  - Contributing: Contributing

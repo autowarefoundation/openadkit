@@ -1,13 +1,13 @@
 # Openadkit: Containerized MkDocs Development
 
-This document explains how to set up a containerized development environment for MkDocs in the Openadkit project using Docker. The `docker/Dockerfile` is designed to replicate the dependencies and configuration used in the project's GitHub Actions workflow, ensuring consistency between local development and CI/CD environments.
+This document explains how to set up a containerized development environment for MkDocs in the Openadkit project using Docker. The `doc_env/Dockerfile` is designed to replicate the dependencies and configuration used in the project's GitHub Actions workflow, ensuring consistency between local development and CI/CD environments.
 
 ## TL;DR
 
 In the Openadkit project root directory:
 
 ```bash
-docker build -f docker/Dockerfile -t mkdocs-dev .
+docker build -f doc_env/Dockerfile -t mkdocs-dev .
 ```
 
 Then run the development server:
@@ -25,7 +25,7 @@ Access the MkDocs development server at `http://localhost:8000`.
 
 ## Dockerfile Overview
 
-The `docker/Dockerfile` sets up a Python 3.11 environment with all required MkDocs plugins, matching the GitHub Actions configuration. It includes:
+The `doc_env/Dockerfile` sets up a Python 3.11 environment with all required MkDocs plugins, matching the GitHub Actions configuration. It includes:
 
 - Base image: `python:3.11-slim`
 - Installed dependencies:
@@ -47,11 +47,11 @@ The `docker/Dockerfile` sets up a Python 3.11 environment with all required MkDo
 To build the Docker image, run the following command in the project root directory:
 
 ```bash
-docker build -f docker/Dockerfile -t mkdocs-dev .
+docker build -f doc_env/Dockerfile -t mkdocs-dev .
 ```
 
 ### Parameters Explained:
-- `-f docker/Dockerfile`: Specifies the path to the Dockerfile located in the `docker/` directory.
+- `-f doc_env/Dockerfile`: Specifies the path to the Dockerfile located in the `doc_env/` directory.
 - `-t mkdocs-dev`: Tags the image as `mkdocs-dev` for easy reference.
 - `.`: Sets the build context to the project root, including `mkdocs.yml` and `docs/` for copying into the image.
 

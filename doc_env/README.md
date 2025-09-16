@@ -1,104 +1,103 @@
 # Openadkit: Containerized MkDocs Development
 
-This document explains how to set up a containerized development environment for MkDocs in the Openadkit project using Docker. The `doc_env/Dockerfile` is designed to replicate the dependencies and configuration used in the project's GitHub Actions workflow, ensuring consistency between local development and CI/CD environments.
+This document explains how to set up a containerized development environment for MkDocs in the Openadkit project using Docker and Makefile. The `doc_env/Dockerfile` and `Makefile` are designed to replicate the dependencies and configuration used in the project's GitHub Actions workflow, ensuring consistency between local development and CI/CD environments.
 
 ## TL;DR
 
-In the Openadkit project root directory:
+In the Openadkit project **root directory**:
 
 ```bash
-docker build -f doc_env/Dockerfile -t mkdocs-dev .
+make prepare
+make serve
 ```
 
-Then run the development server:
+Access the MkDocs development server at `http://localhost:8000`. To build the static site:
 
 ```bash
-docker run -it --rm -p 8000:8000 -v $(pwd):/app mkdocs-dev
+make build
 ```
-
-Access the MkDocs development server at `http://localhost:8000`.
 
 ## Prerequisites
 
 - **Docker**: Ensure Docker is installed on your system. Download and install from [docker.com](https://www.docker.com/get-started).
-- **Project Files**: The project root must contain `mkdocs.yml` and a `docs/` directory with Markdown files.
+- **Project Files**: The project root must contain `mkdocs.yaml` and a `docs/` directory with Markdown files.
 
-## Dockerfile Overview
+## Makefile Overview
 
-The `doc_env/Dockerfile` sets up a Python 3.11 environment with all required MkDocs plugins, matching the GitHub Actions configuration. It includes:
+The `Makefile` simplifies common tasks for managing the MkDocs environment. Available commands:
 
-- Base image: `python:3.11-slim`
-- Installed dependencies:
-  - `mkdocs-material`
-  - `mkdocs-awesome-pages-plugin`
-  - `mkdocs-exclude`
-  - `mkdocs-macros-plugin`
-  - `mkdocs-same-dir`
-  - `pymdown-extensions`
-  - `python-markdown-math`
-  - `mdx-truly-sane-lists`
-  - `plantuml-markdown`
-  - `mkdocs-mermaid2-plugin`
-- Working directory: `/app`
-- Exposed port: `8000` for the MkDocs development server
+- `make prepare`: Builds the Docker image with required MkDocs dependencies.
+- `make serve`: Starts the MkDocs development server at `http://localhost:8000`.
+- `make build`: Generates the static site in the `site/` directory with correct permissions.
+- `make clean`: Removes the `site/` directory to clean up build artifacts.
+- `make help`: Displays available commands.
 
-## Building the Docker Image
+Run `make help` to see all options.
 
-To build the Docker image, run the following command in the project root directory:
+## Setup and Usage
 
-```bash
-docker build -f doc_env/Dockerfile -t mkdocs-dev .
-```
+1. **Build the Docker Image**
 
-### Parameters Explained:
-- `-f doc_env/Dockerfile`: Specifies the path to the Dockerfile located in the `doc_env/` directory.
-- `-t mkdocs-dev`: Tags the image as `mkdocs-dev` for easy reference.
-- `.`: Sets the build context to the project root, including `mkdocs.yml` and `docs/` for copying into the image.
+   Run the following command to build the Docker image:
 
-### Notes:
-- The build context (`.`) must include `mkdocs.yml` and `docs/` to match the `COPY` instructions in the Dockerfile.
-- Use a `.dockerignore` file to exclude unnecessary files (e.g., `site/`, `tmp/`) to reduce build time. Example `.dockerignore`:
+   ```bash
+   make prepare
+   ```
+
+   This builds the `mkdocs-dev` image using the `doc_env/Dockerfile`, which includes:
+   - Base image: `python:3.11-slim`
+   - Installed MkDocs plugins: `mkdocs-material`, `mkdocs-awesome-pages-plugin`, `mkdocs-exclude`, `mkdocs-macros-plugin`, `mkdocs-same-dir`, `pymdown-extensions`, `python-markdown-math`, `mdx-truly-sane-lists`, `plantuml-markdown`, `mkdocs-mermaid2-plugin`
+   - Working directory: `/app`
+   - Exposed port: `8000`
+
+2. **Run the Development Server**
+
+   Start the MkDocs development server with:
+
+   ```bash
+   make serve
+   ```
+
+   - Opens `http://localhost:8000` in your browser to view the live site.
+   - Changes to `docs/` or `mkdocs.yaml` trigger automatic reloading.
+   - The current directory is mounted to `/app` in the container for live updates.
+
+3. **Build the Static Site**
+
+   Generate the static site with:
+
+   ```bash
+   make build
+   ```
+
+   - Outputs the static site to the `site/` directory.
+   - Ensures file permissions match the host user, avoiding root ownership issues.
+   - Matches the output of the GitHub Actions workflow.
+
+4. **Clean Up**
+
+   Remove the `site/` directory with:
+
+   ```bash
+   make clean
+   ```
+
+## Notes
+
+- **File Permissions**: The `make build` command uses `--user $(id -u):$(id -g)` to ensure the `site/` directory has the same ownership as your host user, avoiding permission issues on Linux systems.
+- **Customizing Plugins**: Update both `doc_env/Dockerfile` and `mkdocs.yaml` if additional MkDocs plugins are needed.
+- **Optimizing Builds**: Use a `.dockerignore` file to exclude unnecessary files (e.g., `site/`, `.github/`) to reduce build time. Example `.dockerignore`:
   ```
   .github/
   deployments/
+  site/
   ```
-
-## Running the Development Server
-
-To start the MkDocs development server, run:
-
-```bash
-docker run -it --rm -p 8000:8000 -v $(pwd):/app mkdocs-dev
-```
-
-### Parameters Explained:
-- `-it`: Runs the container in interactive mode with a pseudo-TTY, allowing real-time logs.
-- `--rm`: Automatically removes the container when it exits, keeping your system clean.
-- `-p 8000:8000`: Maps port `8000` on the host to port `8000` in the container, enabling access to the MkDocs server at `http://localhost:8000`.
-- `-v $(pwd):/app`: Mounts the current directory to `/app` in the container, enabling live reloading when editing Markdown files.
-- `mkdocs-dev`: The name of the Docker image built earlier.
-
-### Accessing the Server:
-- Open a browser and navigate to `http://localhost:8000` to view the live MkDocs site.
-- Changes to files in `docs/` or `mkdocs.yml` will trigger automatic reloading.
-
-## Building the Static Site
-
-To generate the static site (e.g., for testing the production build), run:
-
-```bash
-docker run -it --rm -v $(pwd):/app mkdocs-dev mkdocs build
-```
-
-- This command generates the static site in the `site/` directory, matching the output of the GitHub Actions workflow.
-- The `-v $(pwd):/app` ensures the generated `site/` directory is saved to your local filesystem.
-
-
-## Additional Notes
-
-- **Consistency with CI/CD**: The Dockerfile mirrors the dependencies in the GitHub Actions workflow, ensuring identical behavior between local development and production builds.
-- **Customizing Plugins**: If additional MkDocs plugins are needed, update both the `Dockerfile` and `mkdocs.yml` to maintain consistency.
-- **Cleaning Up**: Remove unused images and containers with `docker system prune` to free up disk space.
+- **Cleaning Up Docker**: Use `docker system prune` to remove unused images and containers.
 - **Documentation**: Refer to `docs/dev/index.md` for additional development environment details.
+
+## Troubleshooting
+
+- **Permission Issues**: If the `site/` directory has incorrect permissions, ensure `make build` is used instead of directly running `docker run ... mkdocs build`.
+- **Port Conflicts**: If port `8000` is in use, stop other services or change the port mapping (e.g., `-p 8001:8000` in the `make serve` command by editing the `Makefile`).
 
 For further assistance, consult the main `README.md` or open an issue in the Openadkit repository.

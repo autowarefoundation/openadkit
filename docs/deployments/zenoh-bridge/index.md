@@ -44,7 +44,7 @@ graph TD
             class CloudNet network
             
             visualizer["**Visualizer**<br><br>Based on RViz2<br>Provides noVNC Remote Desktop"]
-            cloud_bridge["**Cloud Zenoh Bridge**<br><br><u>Role</u>: Router<br>Listens on TCP/7447<br>Converts Zenoh ↔️ DDS"]
+            cloud_bridge["**Cloud Zenoh Bridge**<br><br><u>Role</u>: Router<br>Listens on TCP/7448<br>Converts Zenoh ↔️ DDS"]
             class visualizer workload
             class cloud_bridge bridge
             
@@ -75,7 +75,7 @@ graph TD
 
     %% === External & Cross-Network Connections ===
     user[fa:fa-user User] -->|"HTTP (Port 6080)"| visualizer
-    edge_bridge -->|"<b>Zenoh Protocol over zenoh_net</b><br>Connects to tcp/cloud_zenoh_bridge:7447"| cloud_bridge
+    edge_bridge -->|"<b>Zenoh Protocol over zenoh_net</b><br>Connects to tcp/cloud_zenoh_bridge:7448"| cloud_bridge
 ```
 
 ### 2.3. Network Isolation and Communication Bridge
@@ -86,7 +86,7 @@ graph TD
   - TCP/IP (use `zenoh_net` docker network in this demo for simplicity): The network that is possible to connect `edge_zenoh_bridge` and `cloud_zenoh_bridge`, ensuring a clean cross-domain data transmission path.
 
 - **Communication Core: Zenoh Bridge**:
-  - `cloud_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Router**, listening for client connections on TCP port `7447`. It receives Zenoh data from the edge and converts it to ROS 2 DDS for the `visualizer`.
+  - `cloud_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Router**, listening for client connections on TCP port `7448`. It receives Zenoh data from the edge and converts it to ROS 2 DDS for the `visualizer`.
   - `edge_zenoh_bridge` (`zenoh-bridge-ros2dds` container): Acts as a **Client**, connecting to the `cloud_zenoh_bridge` via `zenoh_net`. It scans for ROS 2 topics in `edge_net`, converts them to the Zenoh protocol, and forwards them to the router.
   - `config/zenoh-bridge-ros2dds.json5`: A configuration file defining the bridge's mode, listening endpoints, and topic filtering rules, allowing precise control over transmitted data to optimize bandwidth.
 
@@ -106,7 +106,7 @@ Ensure the following software is installed:
    Execute the following commands in a terminal:
    ```bash
    git clone https://github.com/autowarefoundation/openadkit
-   cd openadkit
+   cd openadkit/deployments/demos/zenoh-bridge
    ```
 
 2. **Verify Directory Structure**:
@@ -122,10 +122,22 @@ Ensure the following software is installed:
 
 ### 3.3. Starting the System
 
-1. **Launch All Workloads**:
-   In the project root directory, run:
+1. **Launch Workloads**:
+   
+   **Option A: Split Topology (Recommended)**
+   Separate Edge and Cloud components to simulate a real-world distributed environment.
    ```bash
-   docker-compose up -d
+   # Terminal 1: Start Edge components (Autoware, Simulator, Edge Bridge)
+   ./edge.sh up -d
+
+   # Terminal 2: Start Cloud components (Visualizer, Cloud Bridge)
+   ./cloud.sh up -d
+   ```
+
+   **Option B: Monolithic Deployment**
+   Run everything on a single machine using standard Docker Compose.
+   ```bash
+   docker compose up -d
    ```
    - `-d` runs containers in the background.
    - The first launch may take several minutes to download the required Docker images.
@@ -133,7 +145,7 @@ Ensure the following software is installed:
 2. **Monitor Startup Logs (Optional)**:
    To view the real-time logs from all workloads, run:
    ```bash
-   docker-compose logs -f
+   docker compose logs -f
    ```
 
 ### 3.4. Verification and Usage
@@ -149,7 +161,7 @@ Ensure the following software is installed:
 2. **Access noVNC Visualization Interface**:
    Open a web browser and navigate to:
    ```
-   http://localhost:6080
+   http://localhost:6081
    ```
    Use the default password `openadkit`.
 
@@ -159,9 +171,17 @@ Ensure the following software is installed:
    - If it shows `Warning`, please refer to the troubleshooting section below.
 
 4. **Stop the System**:
-    To stop and remove all containers and networks, run:
+    To stop the containers:
+
    ```bash
-   docker-compose down -v
+   # Stop Cloud
+   ./cloud.sh down
+
+   # Stop Edge
+   ./edge.sh down
+
+   # Stop All and remove volumes (Recommended for full cleanup)
+   docker compose down -v
    ```
    - The `-v` flag also removes the `autoware_map` volume. Omit it if you wish to preserve the downloaded map data for future use.
 
@@ -177,20 +197,20 @@ Ensure the following software is installed:
      ```
   2. **Staged Startup**: Manually start the core workloads first, wait a moment, then start the compute-heavy workloads.
      ```bash
-     # Start the cloud side and the bridges
-     docker-compose up -d cloud_zenoh_bridge edge_zenoh_bridge visualizer
+     # Start the cloud side
+     ./cloud.sh up -d
      # Wait for them to initialize
      sleep 15
      # Start the edge side
-     docker-compose up -d autoware scenario_simulator
+     ./edge.sh up -d
      ```
 
 ### Issue 2: Port Conflict (Port is already allocated)
 
-- **Cause**: Ports `6080` or `7447` are in use by another program.
+- **Cause**: Ports `6081` or `7448` are in use by another program.
 - **Solution**:
   - Stop the program using the port.
-  - Or modify `docker-compose.yaml`, e.g., change `6080:6080` to `8080:6080`, and access via `http://localhost:8080`.
+  - Or modify `docker-compose.yaml`, e.g., change `6081:6080` to `8080:6080`, and access via `http://localhost:8080`.
 
 ### Issue 3: Container Fails to Start with `file not found` or Permission Issues
 

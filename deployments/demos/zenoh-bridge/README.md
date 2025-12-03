@@ -6,8 +6,7 @@ This project demonstrates how to bridge Autoware data from Edge to Cloud using Z
 
 The project provides different deployment strategies to suit various testing needs:
 
-### 1. `local` (Standard Demo)
-*   Path: `./local`
+### 1. Standard Demo
 *   Description: The unified local environment supporting both Split Topology (Edge/Cloud separation) and Monolithic deployment.
 *   Usage:
     *   Split: `./edge.sh up -d` + `./cloud.sh up -d`
@@ -35,3 +34,18 @@ cd local
 ```
 
 Then access the visualizer at `http://localhost:6081`.
+
+## Shutdown
+
+To stop the containers:
+
+```bash
+# Stop Cloud
+./cloud.sh down
+
+# Stop Edge
+./edge.sh down
+
+# Stop All and remove volumes
+docker compose down -v
+```

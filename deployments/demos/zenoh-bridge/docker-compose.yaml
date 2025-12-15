@@ -6,8 +6,6 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
-    networks:
-      - local_net
     command: > 
       bash -c "source /opt/ros/humble/setup.bash &&
       ros2 launch autoware_launch planning_simulator.launch.xml
@@ -26,8 +24,6 @@ services:
       - ROS_DOMAIN_ID=0
     volumes:
       - autoware_map:/opt/autoware/share/kashiwanoha_map/map
-    networks:
-      - local_net
     depends_on:
       - edge_zenoh_bridge
 
@@ -40,10 +36,8 @@ services:
       - ./config:/config
     command: >
       -l tcp/0.0.0.0:7447
-      -e tcp/cloud_zenoh_bridge:7448
+      -e tcp/${CLOUD_IP:-cloud_zenoh_bridge}:7448
       -c /config/zenoh-bridge-ros2dds.json5
-    networks:
-      - local_net
 
   visualizer:
     image: ghcr.io/autowarefoundation/autoware-tools:visualizer
@@ -53,8 +47,6 @@ services:
       - REMOTE_PASSWORD=o
     ports:
       - "0.0.0.0:6081:6080"
-    networks:
-      - local_net
     depends_on:
       - cloud_zenoh_bridge
 
@@ -68,12 +60,6 @@ services:
     command: >
       -l tcp/0.0.0.0:7448
       -c /config/zenoh-bridge-ros2dds.json5
-    networks:
-      - local_net
 
 volumes:
   autoware_map:
-
-networks:
-  local_net:
-    driver: bridge

@@ -8,7 +8,24 @@ The project provides different deployment strategies to suit various testing nee
 
 ### 1. Standard Demo
 *   Description: The unified local environment supporting both Split Topology (Edge/Cloud separation) and Monolithic deployment.
-*   Usage:
+*  ## Distributed Deployment (Multi-Machine)
+
+To deploy on separate machines (e.g., one Cloud, one Edge):
+
+1.  **Cloud Machine**:
+    ```bash
+    ./cloud.sh
+    # Note the IP address of this machine (e.g., 192.168.1.100)
+    ```
+
+2.  **Edge Machine**:
+    ```bash
+    export CLOUD_IP=192.168.1.100  # Replace with actual Cloud IP
+    ./edge.sh
+    ```
+
+## Usage
+:
     *   Split: `./edge.sh up -d` + `./cloud.sh up -d`
     *   Mono: `docker compose up -d`
 *   Best for: General testing, demonstrating Edge-Cloud architecture, and PR verification.

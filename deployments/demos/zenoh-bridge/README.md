@@ -8,24 +8,7 @@ The project provides different deployment strategies to suit various testing nee
 
 ### 1. Standard Demo
 *   Description: The unified local environment supporting both Split Topology (Edge/Cloud separation) and Monolithic deployment.
-*  ## Distributed Deployment (Multi-Machine)
-
-To deploy on separate machines (e.g., one Cloud, one Edge):
-
-1.  **Cloud Machine**:
-    ```bash
-    ./cloud.sh
-    # Note the IP address of this machine (e.g., 192.168.1.100)
-    ```
-
-2.  **Edge Machine**:
-    ```bash
-    export CLOUD_IP=192.168.1.100  # Replace with actual Cloud IP
-    ./edge.sh
-    ```
-
-## Usage
-:
+*   Usage:
     *   Split: `./edge.sh up -d` + `./cloud.sh up -d`
     *   Mono: `docker compose up -d`
 *   Best for: General testing, demonstrating Edge-Cloud architecture, and PR verification.
@@ -51,6 +34,37 @@ cd local
 ```
 
 Then access the visualizer at `http://localhost:6081`.
+
+## Distributed Deployment (Multi-Machine)
+
+To deploy on separate machines (e.g., one Cloud, one Edge):
+
+1.  **Cloud Machine**:
+    Run `cloud.sh` to start services. It will automatically detect and display available IP addresses:
+    ```bash
+    ./cloud.sh
+    # [Info] Cloud services started.
+    #        To connect from Edge, set CLOUD_IP to one of the following:
+    #        [Public/Routable IPs]
+    #        - 192.168.1.100
+    ```
+
+2.  **Edge Machine**:
+    Use the displayed IP to connect:
+    ```bash
+    export CLOUD_IP=192.168.1.100
+    ./edge.sh
+    ```
+
+## CLI Reference
+
+Scripts (`cloud.sh`, `edge.sh`) support the following commands:
+
+*   `up [args]` (default): Start services. Accepts docker compose arguments (e.g., `./cloud.sh up -d`).
+*   `down`: Stop and remove services.
+*   `dry-run`: Preview composition config and connection information without starting containers.
+    *   Useful for checking `CLOUD_IP` candidates on the Cloud machine without launching everything.
+*   `...`: Any other command (e.g., `logs`, `restart`, `ps`) is passed directly to `docker compose`.
 
 ## Shutdown
 

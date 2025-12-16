@@ -60,7 +60,7 @@ To deploy on separate machines (e.g., one Cloud, one Edge):
 
 Scripts (`cloud.sh`, `edge.sh`) support the following commands:
 
-*   `up [args]` (default): Start services. Accepts docker compose arguments (e.g., `./cloud.sh up -d`).
+*   `up [args]` (default): Start services (foreground). To run in background, add `-d` (e.g., `./cloud.sh up -d`).
 *   `down`: Stop and remove services.
 *   `dry-run`: Preview composition config and connection information without starting containers.
     *   Useful for checking `CLOUD_IP` candidates on the Cloud machine without launching everything.

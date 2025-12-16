@@ -35,8 +35,12 @@ source ./common.sh
 CLOUD_SERVICES="visualizer cloud_zenoh_bridge"
 
 run_compose "Cloud" "$CLOUD_SERVICES" "$@"
-if [ "$1" == "up" ] || [ -z "$1" ]; then
-    echo -e "${YELLOW}[Info]${NC} Cloud services started."
+if [ "$1" == "up" ] || [ -z "$1" ] || [ "$1" == "dry-run" ]; then
+    if [ "$1" == "dry-run" ]; then
+        echo -e "${YELLOW}[Info]${NC} Dry Run mode. Connection info below:"
+    else
+        echo -e "${YELLOW}[Info]${NC} Cloud services started."
+    fi
     echo -e "       To connect from Edge, set CLOUD_IP to one of the following:"
 
     # Process and display IPs

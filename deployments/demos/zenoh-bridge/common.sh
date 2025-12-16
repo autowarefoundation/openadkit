@@ -37,6 +37,12 @@ run_compose() {
             docker compose rm -f -v $target_services
             ;;
             
+        "dry-run")
+            echo -e "${YELLOW}[${context_name}]${NC} [Dry Run] Would start services: ${GREEN}${target_services}${NC}"
+            echo -e "${YELLOW}[${context_name}]${NC} Validating compose configuration..."
+            docker compose config
+            ;;
+
         *)
             # Pass through other commands (e.g., start, stop, restart, logs, pull, ps)
             echo -e "${YELLOW}[${context_name}]${NC} Executing: docker compose $cmd $args ..."

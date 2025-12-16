@@ -55,6 +55,8 @@ services:
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=1
+    ports:
+      - "7448:7448"
     volumes:
       - ./config:/config
     command: >

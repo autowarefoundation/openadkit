@@ -2,6 +2,17 @@
 
 This project demonstrates how to bridge Autoware data from Edge to Cloud using Zenoh.
 
+## Demo
+
+[![[openadkit x zenoh-bridge] remote control (cloud/edge) demo](https://img.youtube.com/vi/6yhhxlVQTKI/0.jpg)](https://www.youtube.com/watch?v=6yhhxlVQTKI)
+
+| Time  | Description                  |
+| :---- | :--------------------------- |
+| 00:00 | Start cloud services         |
+| 00:16 | Start edge services          |
+| 00:52 | Demo: Stop, planning, resume |
+| 01:53 | Stop edge and cloud services |
+
 ## Project Structure
 
 The project provides different deployment strategies to suit various testing needs:
@@ -34,6 +45,8 @@ cd local
 ```
 
 Then access the visualizer at `http://localhost:6081`.
+
+
 
 ## Distributed Deployment (Multi-Machine)
 

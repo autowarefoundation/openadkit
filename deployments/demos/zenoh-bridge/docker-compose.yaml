@@ -45,6 +45,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
       - REMOTE_PASSWORD=o
+      - USE_SIM_TIME=true
     ports:
       - "0.0.0.0:6081:6080"
     depends_on:

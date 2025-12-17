@@ -24,15 +24,10 @@ The project provides different deployment strategies to suit various testing nee
     *   Mono: `docker compose up -d`
 *   Best for: General testing, demonstrating Edge-Cloud architecture, and PR verification.
 
-### 2. `net-topo-test` (Advanced Networking)
-*   Path: `./net-topo-test`
-*   Description: Experimental setups for testing complex network topologies (e.g., multi-network, double-bridge).
-*   Status: Under active development.
-
-### 3. `probe_tool` (Monitoring)
-*   Path: `./probe_tool`
-*   Description: Custom Python tools for monitoring ROS 2 topics and Zenoh sessions.
-*   Status: Under active development.
+### Experimental / WIP
+*   **`net-topo-test`**: Advanced networking scenarios (e.g., multi-network).
+*   **`probe_tool`**: Python-based monitoring tools.
+> Note: These components are under active development and not yet fully integrated.
 
 ## Quick Start
 

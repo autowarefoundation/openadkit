@@ -1,32 +1,32 @@
 #!/bin/bash
 
 # Function to get IPs excluding docker/br/veth interfaces
-    get_ips() {
-        ip -o -4 addr show | awk '
-        $2 !~ /^(docker|br-|veth|lo$)/ {
-            ip = $4; sub("/.*", "", ip);
-            # RFC 1918 Private IP ranges
-            if (ip ~ /^10\./ || ip ~ /^192\.168\./ || ip ~ /^172\.(1[6-9]|2[0-9]|3[0-1])\./) {
-                print "match_private " ip;
-            } else {
-                # Assume everything else is Public/Routable
-                print "match_public " ip;
-            }
-        }'
-    }
+get_ips() {
+    ip -o -4 addr show | awk '
+    $2 !~ /^(docker|br-|veth|lo$)/ {
+        ip = $4; sub("/.*", "", ip);
+        # RFC 1918 Private IP ranges
+        if (ip ~ /^10\./ || ip ~ /^192\.168\./ || ip ~ /^172\.(1[6-9]|2[0-9]|3[0-1])\./) {
+            print "match_private " ip;
+        } else {
+            # Assume everything else is Public/Routable
+            print "match_public " ip;
+        }
+    }'
+}
 
-    # Function to get Docker Internal IP of cloud_zenoh_bridge
-    get_docker_ip() {
-        local container_id
-        container_id=$(docker compose ps -q cloud_zenoh_bridge)
-        
-        if [ -z "$container_id" ]; then
-            return
-        fi
+# Function to get Docker Internal IP of cloud_zenoh_bridge
+get_docker_ip() {
+    local container_id
+    container_id=$(docker compose ps -q cloud_zenoh_bridge)
+    
+    if [ -z "$container_id" ]; then
+        return
+    fi
 
-        # Use pure docker inspect with Go template (println adds newline for multiple IPs)
-        docker inspect "$container_id" -f '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' 2>/dev/null
-    }
+    # Use pure docker inspect with Go template (println adds newline for multiple IPs)
+    docker inspect "$container_id" -f '{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}' 2>/dev/null
+}
 
 # Import common library
 source ./common.sh

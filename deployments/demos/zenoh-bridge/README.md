@@ -17,17 +17,13 @@ This project demonstrates how to bridge Autoware data from Edge to Cloud using Z
 
 The project provides different deployment strategies to suit various testing needs:
 
-### 1. Standard Demo
-*   Description: The unified local environment supporting both Split Topology (Edge/Cloud separation) and Monolithic deployment.
-*   Usage:
-    *   Split: `./edge.sh up -d` + `./cloud.sh up -d`
-    *   Mono: `docker compose up -d`
-*   Best for: General testing, demonstrating Edge-Cloud architecture, and PR verification.
+### Monolithic Demo
+*   Single compose deployment without network separation.
+*   Usage: `docker compose up -d`
 
-### Experimental / WIP
-*   **`net-topo-test`**: Advanced networking scenarios (e.g., multi-network).
-*   **`probe_tool`**: Python-based monitoring tools.
-> Note: These components are under active development and not yet fully integrated.
+### Split Topology Demo
+*   Simulates Edge/Cloud separation (Unified local environment).
+*   Usage: `./edge.sh up -d` + `./cloud.sh up -d`
 
 ## Quick Start
 

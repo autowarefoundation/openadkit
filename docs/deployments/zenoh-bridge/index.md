@@ -6,6 +6,17 @@ This document provides a comprehensive implementation guide and technical overvi
 
 To achieve this, we utilize [Zenoh](https://zenoh.io/) as a high-performance, low-latency communication protocol, paired with the [`zenoh-bridge-ros2dds`](https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds) tool to seamlessly connect two ROS 2 (Robot Operating System 2) environments isolated by Docker virtual networks. This manual covers architecture design, setup steps, system startup, and troubleshooting, providing complete operational guidance.
 
+### 1.1. Demo Video
+
+[![[openadkit x zenoh-bridge] remote control (cloud/edge) demo](https://img.youtube.com/vi/6yhhxlVQTKI/0.jpg)](https://www.youtube.com/watch?v=6yhhxlVQTKI)
+
+| Time  | Description                  |
+| :---- | :--------------------------- |
+| 00:00 | Start cloud services         |
+| 00:16 | Start edge services          |
+| 00:52 | Demo: Stop, planning, resume |
+| 01:53 | Stop edge and cloud services |
+
 ## 2. Detailed Architecture Design
 
 ### 2.1. Core Concept: Edge-Cloud Model
@@ -141,6 +152,26 @@ Ensure the following software is installed:
    ```
    - `-d` runs containers in the background.
    - The first launch may take several minutes to download the required Docker images.
+
+   **Option C: Distributed Deployment (Multi-Machine)**
+   To deploy on separate machines (e.g., one Cloud, one Edge):
+
+   **1. Cloud Machine:**
+   Run `cloud.sh` to start services. It will automatically detect and display available IP addresses:
+   ```bash
+   ./cloud.sh
+   # [Info] Cloud services started.
+   #        To connect from Edge, set CLOUD_IP to one of the following:
+   #        [Public/Routable IPs]
+   #        - 192.168.1.100
+   ```
+
+   **2. Edge Machine:**
+   Use the displayed IP to connect:
+   ```bash
+   export CLOUD_IP=192.168.1.100
+   ./edge.sh
+   ```
 
 2. **Monitor Startup Logs (Optional)**:
    To view the real-time logs from all workloads, run:

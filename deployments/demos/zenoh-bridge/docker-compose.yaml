@@ -40,7 +40,7 @@ services:
       -c /config/zenoh-bridge-ros2dds.json5
 
   visualizer:
-    image: ghcr.io/autowarefoundation/autoware-tools:visualizer
+    image: ghcr.io/autowarefoundation/autoware-tools@sha256:72bf3a15106bf284fda123bd6e1de993f94ad7fce46cd5117451d3e33cebad90
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1

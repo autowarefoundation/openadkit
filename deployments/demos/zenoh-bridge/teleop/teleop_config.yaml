@@ -1,0 +1,14 @@
+/**:
+  ros__parameters:
+    start_as_external: true
+    init_pose:
+      presets:
+        # [x, y, z, yaw]
+        # Yaw Calculated from Quaternion (z, w) using 2 * atan2(z, w)
+        names: ["origin", "intersection"]
+        
+        # Origin: x=3716.72, y=73751.86, z=0.0, yaw=0.4876
+        origin: [3716.724853515625, 73751.859375, 0.0, 0.48758900169925923]
+        
+        # Intersection: x=3778.82, y=73751.16, z=0.0, yaw=-2.6401
+        intersection: [3778.824951171875, 73751.15625, 0.0, -2.6400681157659216]

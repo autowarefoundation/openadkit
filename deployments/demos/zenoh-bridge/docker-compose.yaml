@@ -64,5 +64,16 @@ services:
       -l tcp/0.0.0.0:7448
       -c /config/zenoh-bridge-ros2dds.json5
 
+  teleop:
+    image: ghcr.io/evshary/autoware_manual_control:feat-ci-image-release
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=1
+    volumes:
+      - ./teleop/teleop_config.yaml:/autoware_manual_control_ws/src/autoware_manual_control/teleop_config.yaml
+    command: sleep infinity
+    depends_on:
+      - cloud_zenoh_bridge
+
 volumes:
   autoware_map:

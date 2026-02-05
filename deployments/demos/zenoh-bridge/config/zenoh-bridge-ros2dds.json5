@@ -106,6 +106,15 @@
             "/vehicle/status/steering_status",
             "/vehicle/status/turn_indicators_status",
             "/vehicle/status/velocity_status",
+            "/control/command/control_cmd",
+            "/control/command/gear_cmd",
+            "/control/gate_mode_cmd",
+            "/api/autoware/set/engage",
+            "/external/selected/control_cmd",
+            "/external/selected/gear_cmd",
+            "/control/current_gate_mode",
+            "/api/autoware/get/engage",
+            "/devtools/latency/.*",
          ],
          subscribers: [
             "/api/autoware/get/emergency",
@@ -193,6 +202,15 @@
             "/vehicle/status/steering_status",
             "/vehicle/status/turn_indicators_status",
             "/vehicle/status/velocity_status",
+            "/control/command/control_cmd",
+            "/control/command/gear_cmd",
+            "/control/gate_mode_cmd",
+            "/api/autoware/set/engage",
+            "/external/selected/control_cmd",
+            "/external/selected/gear_cmd",
+            "/control/current_gate_mode",
+            "/api/autoware/get/engage",
+            "/devtools/latency/.*",
          ],
          service_servers: [
             "/api/autoware/set/emergency",
@@ -213,6 +231,7 @@
             "/rviz/set_parameters_atomically",
 
             "/simulation/.*",
+            "/api/autoware/set/engage",
          ],
          service_clients: [
             "/api/autoware/set/emergency",
@@ -233,6 +252,7 @@
             "/rviz/set_parameters_atomically",
 
             "/simulation/.*",
+            "/api/autoware/set/engage",
          ],
          action_servers: [".*/rotate_absolute"],
          action_clients: [],

@@ -12,7 +12,7 @@ services:
       map_path:=/autoware_map
       vehicle_model:=sample_vehicle
       sensor_model:=sample_sensor_kit
-      scenario_simulation:=true
+      scenario_simulation:=${SCENARIO_SIMULATION:-true}
       rviz:=false"
     depends_on: 
       - edge_zenoh_bridge

@@ -60,6 +60,55 @@ To deploy on separate machines (e.g., one Cloud, one Edge):
     ./edge.sh
     ```
 
+## Teleoperation (Manual Control)
+
+We provide a containerized terminal-based teleoperation interface.
+
+### 1. Start Services
+
+**Step 1: Start Cloud with Teleop (Prerequisite)**
+This service hosts the teleoperation backend.
+```bash
+./cloud.sh up --with-teleop -d
+```
+
+**Step 2: Start Edge (Choose Mode)**
+
+*   **Mode A: Standard Simulation** (Default)
+    ```bash
+    ./edge.sh -d
+    ```
+
+*   **Mode B: No Simulation** (Recommended for Teleop)
+    Ideal for pure control testing without scenario interference.
+    ```bash
+    ./edge.sh --no-sim -d
+    ```
+
+### 2. Launch Interface
+Run the helper script to connect to the teleop container:
+```bash
+./run_teleop.sh
+```
+
+### 3. Controls
+The interface uses keyboard inputs to control the vehicle.
+
+| Key       | Function       | Description                                                  |
+| :-------- | :------------- | :----------------------------------------------------------- |
+| **W**     | Throttle       | Accelerate                                                   |
+| **S**     | Brake          | Decelerate                                                   |
+| **A**     | Turn Left      | Steer left                                                   |
+| **D**     | Turn Right     | Steer right                                                  |
+| **Z**     | Auto/Local     | **Toggle Control Mode** (Must be in Local/External to drive) |
+| **M**     | Switch Mode    | Cycle modes: `STOP` -> `PHYSICS` -> `CRUISE`                 |
+| **X**     | Gear: Drive    | Shift to Drive (D)                                           |
+| **C**     | Gear: Reverse  | Shift to Reverse (R)                                         |
+| **V**     | Gear: Park     | Shift to Park (P)                                            |
+| **Space** | Emergency Stop | Immediate max braking / Resume                               |
+| **R**     | Reset Pose     | Reset to initial position                                    |
+| **Q**     | Quit           | Exit the interface                                           |
+
 ## CLI Reference
 
 Scripts (`cloud.sh`, `edge.sh`) support the following commands:

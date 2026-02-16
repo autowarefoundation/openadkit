@@ -47,24 +47,33 @@ parse_args() {
 
 install_nvidia_container_toolkit() {
     echo "Installing NVIDIA Container Toolkit..."
-    
-    # Add NVIDIA container toolkit GPG key
-    sudo curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
-        -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-    
-    # Add NVIDIA container toolkit repository
-    echo "deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://nvidia.github.io/libnvidia-container/stable/deb/$(dpkg --print-architecture) /" | \
+
+    # Remove any pre-existing NVIDIA container toolkit repo configuration
+    sudo rm -f /etc/apt/sources.list.d/nvidia-container-toolkit*.list
+    sudo rm -f /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+    # Install prerequisites for GPG key handling
+    sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+        ca-certificates curl gnupg2
+
+    # Add NVIDIA container toolkit GPG key (dearmored per official NVIDIA docs)
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+        sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+    # Add NVIDIA container toolkit repository using official repo list
+    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
         sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
-    
+
     # Install NVIDIA Container Toolkit
     sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
-    
+
     # Add NVIDIA runtime support to docker engine
     sudo nvidia-ctk runtime configure --runtime=docker
-    
+
     # Restart docker daemon
     sudo systemctl restart docker
-    
+
     echo -e "${CLR_GREEN}NVIDIA Container Toolkit installed successfully!${CLR_RESET}"
 }
 
@@ -77,7 +86,7 @@ install_docker() {
     fi
 
     # Remove old docker packages
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do 
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
         sudo apt-get remove -y "$pkg" 2>/dev/null || true
     done
 
@@ -106,7 +115,7 @@ install_docker() {
 
 download_autoware_artifacts() {
     echo "Downloading Autoware artifacts..."
-    
+
     # Remove apt installed ansible (In Ubuntu 22.04, ansible the version is old)
     sudo apt-get purge ansible
 

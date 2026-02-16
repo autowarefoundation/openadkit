@@ -1,0 +1,296 @@
+name: docker-build-and-push
+description: Composite action to build and push non-CUDA component images to registry.
+
+inputs:
+  platform:
+    description: Target platform.
+    required: true
+  target-image:
+    description: Target docker image name in the registry.
+    required: true
+  build-args:
+    description: Additional build args.
+    required: false
+  max-parallelism:
+    default: "2"
+    description: Maximum parallelism for buildkitd.
+    required: false
+  suffix:
+    description: Suffix for image tags.
+    required: false
+    default: ""
+  set-latest:
+    description: Whether to set the latest flavor for images.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install jq and vcstool
+      run: |
+        sudo apt-get -y update
+        sudo apt-get -y install jq python3-pip
+        pip install --no-cache-dir vcstool
+      shell: bash
+
+    - name: Run vcs import
+      run: |
+        mkdir -p src
+        vcs import --recursive --shallow src < repositories/autoware.repos
+      shell: bash
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        buildkitd-config-inline: |
+          [worker.oci]
+            max-parallelism = ${{ inputs.max-parallelism }}
+        install: true
+
+    - name: Restore ccache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          root-ccache
+        key: ccache-${{ inputs.platform }}-main-${{ inputs.platform == 'arm64' && 'arm64-' || '' }}${{ hashFiles('src/**/*.cpp') }}
+        restore-keys: |
+          ccache-${{ inputs.platform }}-main-${{ inputs.platform == 'arm64' && 'arm64-' || '' }}
+          ccache-${{ inputs.platform }}-
+
+    - name: Restore apt-get
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          var-cache-apt
+        key: apt-get-${{ inputs.platform }}-main-${{ inputs.platform == 'arm64' && 'arm64-' || '' }}${{ hashFiles('src/**/package.xml') }}
+        restore-keys: |
+          apt-get-${{ inputs.platform }}-main-${{ inputs.platform == 'arm64' && 'arm64-' || '' }}
+          apt-get-${{ inputs.platform }}-
+
+    - name: Inject cache into docker
+      uses: reproducible-containers/buildkit-cache-dance@7c892679bab8ff382a8c88ab7f973d5e30a8f239
+      with:
+        utility-image: ghcr.io/containerd/busybox:latest
+        cache-map: |
+          {
+            "root-ccache": "/root/.ccache",
+            "var-cache-apt": "/var/cache/apt"
+          }
+        skip-extraction: true
+
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+      shell: bash
+
+    # =========================================================================
+    # Base image metadata
+    # =========================================================================
+
+    - name: Docker meta for autoware-base
+      id: meta-autoware-base
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-base${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-base-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-base-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-base
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-base-cuda
+      id: meta-autoware-base-cuda
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-base-cuda${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-base-cuda-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-base-cuda-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-base-cuda
+        flavor: |
+          latest=false
+
+    # =========================================================================
+    # Intermediate image metadata
+    # =========================================================================
+
+    - name: Docker meta for rosdep-depend
+      id: meta-rosdep-depend
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=rosdep-depend${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=rosdep-depend-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=rosdep-depend-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-rosdep-depend
+        flavor: |
+          latest=false
+
+    - name: Docker meta for core-devel
+      id: meta-core-devel
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=core-devel${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=core-devel-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=core-devel-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-core-devel
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-common-devel
+      id: meta-autoware-common-devel
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-common-devel${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-common-devel-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-common-devel-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-common-devel
+        flavor: |
+          latest=false
+
+    # =========================================================================
+    # Runtime image metadata
+    # =========================================================================
+
+    - name: Docker meta for autoware-sensing-perception
+      id: meta-autoware-sensing-perception
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-sensing-perception${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-sensing-perception-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-sensing-perception-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-sensing-perception
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-localization-mapping
+      id: meta-autoware-localization-mapping
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-localization-mapping${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-localization-mapping-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-localization-mapping-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-localization-mapping
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-planning-control
+      id: meta-autoware-planning-control
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-planning-control${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-planning-control-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-planning-control-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-planning-control
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-vehicle-system
+      id: meta-autoware-vehicle-system
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-vehicle-system${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-vehicle-system-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-vehicle-system-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-vehicle-system
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-visualization
+      id: meta-autoware-visualization
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-visualization${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-visualization-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-visualization-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-visualization
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-api
+      id: meta-autoware-api
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-api${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-api-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-api-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-api
+        flavor: |
+          latest=false
+
+    - name: Docker meta for autoware-universe
+      id: meta-autoware-universe
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=autoware-universe${{ inputs.suffix }}-${{ inputs.platform }}
+          type=raw,value=autoware-universe-${{ steps.date.outputs.date }}${{ inputs.suffix }}-${{ inputs.platform }}
+          type=ref,event=tag,prefix=autoware-universe-,suffix=${{ inputs.suffix }}-${{ inputs.platform }}
+        bake-target: docker-metadata-action-autoware-universe
+        flavor: |
+          latest=${{ inputs.set-latest }}
+
+    # =========================================================================
+    # Build and push
+    # =========================================================================
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ github.token }}
+
+    - name: Build and push base images
+      uses: docker/bake-action@v5
+      with:
+        push: true
+        files: |
+          components/docker-bake-base.hcl
+          ${{ steps.meta-autoware-base.outputs.bake-file }}
+          ${{ steps.meta-autoware-base-cuda.outputs.bake-file }}
+        provenance: false
+        set: |
+          ${{ inputs.build-args }}
+
+    - name: Build and push component images
+      uses: docker/bake-action@v5
+      with:
+        push: true
+        files: |
+          components/docker-bake.hcl
+          ${{ steps.meta-rosdep-depend.outputs.bake-file }}
+          ${{ steps.meta-core-devel.outputs.bake-file }}
+          ${{ steps.meta-autoware-common-devel.outputs.bake-file }}
+          ${{ steps.meta-autoware-sensing-perception.outputs.bake-file }}
+          ${{ steps.meta-autoware-localization-mapping.outputs.bake-file }}
+          ${{ steps.meta-autoware-planning-control.outputs.bake-file }}
+          ${{ steps.meta-autoware-vehicle-system.outputs.bake-file }}
+          ${{ steps.meta-autoware-visualization.outputs.bake-file }}
+          ${{ steps.meta-autoware-api.outputs.bake-file }}
+          ${{ steps.meta-autoware-universe.outputs.bake-file }}
+        provenance: false
+        set: |
+          ${{ inputs.build-args }}

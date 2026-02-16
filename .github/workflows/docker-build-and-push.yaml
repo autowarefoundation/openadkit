@@ -1,0 +1,461 @@
+name: docker-build-and-push
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Humble
+  # ===========================================================================
+
+  load-env:
+    uses: ./.github/workflows/load-env.yaml
+    with:
+      env_file: amd64.env
+
+  docker-build-and-push:
+    needs: load-env
+    strategy:
+      matrix:
+        platform: [amd64, arm64]
+        include:
+          - platform: amd64
+            runner: ubuntu-22.04
+            arch-platform: linux/amd64
+            lib-dir: x86_64
+          - platform: arm64
+            runner: ubuntu-22.04-arm
+            arch-platform: linux/arm64
+            lib-dir: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Change permission of workspace
+        run: |
+          sudo chown -R $USER:$USER ${{ github.workspace }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set git config
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: step-security/changed-files@v46
+        with:
+          files: |
+            *.env
+            repositories/*.repos
+            .github/actions/combine-multi-arch-images/action.yaml
+            .github/actions/docker-build-and-push*/action.yaml
+            .github/workflows/docker-build-and-push.yaml
+            ansible-galaxy-requirements.yaml
+            ansible/**
+            components/**
+            docker/**
+            setup-dev-env.sh
+
+      - name: Free disk space
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/free-disk-space
+
+      - name: Build 'Autoware' without CUDA
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/docker-build-and-push
+        with:
+          platform: ${{ matrix.platform }}
+          target-image: openadkit
+          build-args: |
+            *.platform=${{ matrix.arch-platform }}
+            *.args.ROS_DISTRO=${{ needs.load-env.outputs.rosdistro }}
+            *.args.BASE_IMAGE=${{ needs.load-env.outputs.base_image }}
+            *.args.AUTOWARE_BASE_IMAGE=${{ needs.load-env.outputs.autoware_base_image }}
+            *.args.AUTOWARE_BASE_CUDA_IMAGE=${{ needs.load-env.outputs.autoware_base_cuda_image }}
+            *.args.LIB_DIR=${{ matrix.lib-dir }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-${{ github.ref_name }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-${{ github.ref_name }},mode=max
+
+      - name: Show disk space
+        if: always()
+        run: |
+          df -h
+
+  docker-build-and-push-tools:
+    needs: [load-env, docker-build-and-push]
+    strategy:
+      matrix:
+        platform: [amd64, arm64]
+        include:
+          - platform: amd64
+            runner: ubuntu-22.04
+            arch-platform: linux/amd64
+            lib-dir: x86_64
+          - platform: arm64
+            runner: ubuntu-22.04-arm
+            arch-platform: linux/arm64
+            lib-dir: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set git config
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: step-security/changed-files@v46
+        with:
+          files: |
+            *.env
+            repositories/*.repos
+            .github/actions/combine-multi-arch-images/action.yaml
+            .github/actions/docker-build-and-push*/action.yaml
+            .github/workflows/docker-build-and-push.yaml
+            ansible-galaxy-requirements.yaml
+            ansible/**
+            components/**
+            docker/**
+            tools/**
+            setup-dev-env.sh
+
+      - name: Free disk space
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/free-disk-space
+
+      - name: Build 'openadkit-tools'
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/docker-build-and-push-tools
+        with:
+          platform: ${{ matrix.platform }}
+          target-image: openadkit-tools
+          build-args: |
+            *.platform=${{ matrix.arch-platform }}
+            *.args.ROS_DISTRO=${{ needs.load-env.outputs.rosdistro }}
+            *.args.LIB_DIR=${{ matrix.lib-dir }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:tools-${{ matrix.platform }}-${{ github.ref_name }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:tools-${{ matrix.platform }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:tools-${{ matrix.platform }}-${{ github.ref_name }},mode=max
+
+      - name: Show disk space
+        if: always()
+        run: |
+          df -h
+
+  docker-build-and-push-cuda:
+    needs: [load-env, docker-build-and-push]
+    strategy:
+      matrix:
+        platform: [amd64, arm64]
+        include:
+          - platform: amd64
+            runner: [self-hosted, Linux, X64]
+            arch-platform: linux/amd64
+            lib-dir: x86_64
+          - platform: arm64
+            runner: [self-hosted, Linux, ARM64]
+            arch-platform: linux/arm64
+            lib-dir: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Change permission of workspace
+        run: |
+          sudo chown -R $USER:$USER ${{ github.workspace }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set git config
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: step-security/changed-files@v46
+        with:
+          files: |
+            *.env
+            repositories/*.repos
+            .github/actions/combine-multi-arch-images/action.yaml
+            .github/actions/docker-build-and-push*/action.yaml
+            .github/workflows/docker-build-and-push.yaml
+            ansible-galaxy-requirements.yaml
+            ansible/**
+            components/**
+            docker/**
+            setup-dev-env.sh
+
+      - name: Free disk space
+        if: ${{ runner.environment == 'github-hosted' &&
+          (steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag')) }}
+        uses: ./.github/actions/free-disk-space
+
+      - name: Build 'Autoware' with CUDA
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/docker-build-and-push-cuda
+        with:
+          platform: ${{ matrix.platform }}
+          target-image: openadkit
+          build-args: |
+            *.platform=${{ matrix.arch-platform }}
+            *.args.ROS_DISTRO=${{ needs.load-env.outputs.rosdistro }}
+            *.args.BASE_IMAGE=${{ needs.load-env.outputs.base_image }}
+            *.args.AUTOWARE_BASE_IMAGE=${{ needs.load-env.outputs.autoware_base_image }}
+            *.args.AUTOWARE_BASE_CUDA_IMAGE=${{ needs.load-env.outputs.autoware_base_cuda_image }}
+            *.args.LIB_DIR=${{ matrix.lib-dir }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:cuda-${{ matrix.platform }}-${{ github.ref_name }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:cuda-${{ matrix.platform }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:cuda-${{ matrix.platform }}-${{ github.ref_name }},mode=max
+
+      - name: Show disk space
+        if: always()
+        run: |
+          df -h
+
+  # ===========================================================================
+  # Multi-arch manifest creation (Humble)
+  # ===========================================================================
+
+  update-docker-manifest:
+    needs: docker-build-and-push
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine multi-arch images for 'openadkit' without CUDA
+        uses: ./.github/actions/combine-multi-arch-images
+        with:
+          package-name: openadkit
+
+  update-docker-manifest-cuda:
+    needs: docker-build-and-push-cuda
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine multi-arch images for 'openadkit' with CUDA
+        uses: ./.github/actions/combine-multi-arch-images
+        with:
+          package-name: openadkit
+
+  update-docker-manifest-tools:
+    needs: docker-build-and-push-tools
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine multi-arch images for 'openadkit-tools'
+        uses: ./.github/actions/combine-multi-arch-images
+        with:
+          package-name: openadkit-tools
+
+  # ===========================================================================
+  # Jazzy
+  # ===========================================================================
+
+  load-env-jazzy:
+    uses: ./.github/workflows/load-env.yaml
+    with:
+      env_file: amd64_jazzy.env
+
+  docker-build-and-push-jazzy:
+    needs: [load-env-jazzy]
+    strategy:
+      matrix:
+        platform: [amd64]
+        include:
+          - platform: amd64
+            runner: ubuntu-24.04
+            arch-platform: linux/amd64
+            lib-dir: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Change permission of workspace
+        run: |
+          sudo chown -R $USER:$USER ${{ github.workspace }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set git config
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: step-security/changed-files@v46
+        with:
+          files: |
+            *.env
+            repositories/*.repos
+            .github/actions/combine-multi-arch-images/action.yaml
+            .github/actions/docker-build-and-push*/action.yaml
+            .github/workflows/docker-build-and-push.yaml
+            ansible-galaxy-requirements.yaml
+            ansible/**
+            components/**
+            docker/**
+            setup-dev-env.sh
+
+      - name: Free disk space
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/free-disk-space
+
+      - name: Build 'Autoware Jazzy' without CUDA
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/docker-build-and-push
+        with:
+          platform: ${{ matrix.platform }}
+          target-image: openadkit
+          build-args: |
+            *.platform=${{ matrix.arch-platform }}
+            *.args.ROS_DISTRO=${{ needs.load-env-jazzy.outputs.rosdistro }}
+            *.args.BASE_IMAGE=${{ needs.load-env-jazzy.outputs.base_image }}
+            *.args.AUTOWARE_BASE_IMAGE=${{ needs.load-env-jazzy.outputs.autoware_base_image }}
+            *.args.AUTOWARE_BASE_CUDA_IMAGE=${{ needs.load-env-jazzy.outputs.autoware_base_cuda_image }}
+            *.args.LIB_DIR=${{ matrix.lib-dir }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-jazzy-${{ github.ref_name }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-jazzy-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:${{ matrix.platform }}-jazzy-${{ github.ref_name }},mode=max
+          set-latest: "false"
+          suffix: -jazzy
+
+      - name: Show disk space
+        if: always()
+        run: |
+          df -h
+
+  docker-build-and-push-jazzy-cuda:
+    needs: [load-env-jazzy, docker-build-and-push-jazzy]
+    strategy:
+      matrix:
+        platform: [amd64]
+        include:
+          - platform: amd64
+            runner: [self-hosted, Linux, X64]
+            arch-platform: linux/amd64
+            lib-dir: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Change permission of workspace
+        run: |
+          sudo chown -R $USER:$USER ${{ github.workspace }}
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set git config
+        uses: autowarefoundation/autoware-github-actions/set-git-config@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: step-security/changed-files@v46
+        with:
+          files: |
+            *.env
+            repositories/*.repos
+            .github/actions/combine-multi-arch-images/action.yaml
+            .github/actions/docker-build-and-push*/action.yaml
+            .github/workflows/docker-build-and-push.yaml
+            ansible-galaxy-requirements.yaml
+            ansible/**
+            components/**
+            docker/**
+            setup-dev-env.sh
+
+      - name: Free disk space
+        if: ${{ runner.environment == 'github-hosted' &&
+          (steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag')) }}
+        uses: ./.github/actions/free-disk-space
+
+      - name: Build 'Autoware Jazzy' with CUDA
+        if: ${{ steps.changed-files.outputs.any_changed == 'true' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' && github.ref_type == 'tag') }}
+        uses: ./.github/actions/docker-build-and-push-cuda
+        with:
+          platform: ${{ matrix.platform }}
+          target-image: openadkit
+          build-args: |
+            *.platform=${{ matrix.arch-platform }}
+            *.args.ROS_DISTRO=${{ needs.load-env-jazzy.outputs.rosdistro }}
+            *.args.BASE_IMAGE=${{ needs.load-env-jazzy.outputs.base_image }}
+            *.args.AUTOWARE_BASE_IMAGE=${{ needs.load-env-jazzy.outputs.autoware_base_image }}
+            *.args.AUTOWARE_BASE_CUDA_IMAGE=${{ needs.load-env-jazzy.outputs.autoware_base_cuda_image }}
+            *.args.LIB_DIR=${{ matrix.lib-dir }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:cuda-${{ matrix.platform }}-jazzy-${{ github.ref_name }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:cuda-${{ matrix.platform }}-jazzy-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository }}-buildcache:cuda-${{ matrix.platform }}-jazzy-${{ github.ref_name }},mode=max
+          suffix: -jazzy
+
+      - name: Show disk space
+        if: always()
+        run: |
+          df -h
+
+  # ===========================================================================
+  # Multi-arch manifest creation (Jazzy)
+  # ===========================================================================
+
+  update-docker-manifest-jazzy:
+    needs: [docker-build-and-push-jazzy]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine multi-arch images for 'openadkit' Jazzy
+        uses: ./.github/actions/combine-multi-arch-images
+        with:
+          package-name: openadkit
+
+  update-docker-manifest-jazzy-cuda:
+    needs: [docker-build-and-push-jazzy-cuda]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Combine multi-arch images for 'openadkit' Jazzy with CUDA
+        uses: ./.github/actions/combine-multi-arch-images
+        with:
+          package-name: openadkit

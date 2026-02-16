@@ -1,0 +1,707 @@
+# yabloc_pose_initializer
+- name: Create yabloc_pose_initializer directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/yabloc_pose_initializer"
+    mode: "755"
+    state: directory
+
+- name: Download yabloc_pose_initializer/resources.tar.gz
+  become: true
+  ansible.builtin.get_url:
+    url: https://s3.ap-northeast-2.wasabisys.com/pinto-model-zoo/136_road-segmentation-adas-0001/resources.tar.gz
+    dest: "{{ data_dir }}/yabloc_pose_initializer/resources.tar.gz"
+    mode: "644"
+    checksum: sha256:1f660e15f95074bade32b1f80dbf618e9cee1f0b9f76d3f4671cb9be7f56eb3a
+
+- name: Extract yabloc_pose_initializer/resources.tar.gz
+  ansible.builtin.unarchive:
+    src: "{{ data_dir }}/yabloc_pose_initializer/resources.tar.gz"
+    dest: "{{ data_dir }}/yabloc_pose_initializer/"
+
+# bevfusion
+- name: Create bevfusion directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/bevfusion"
+    mode: "755"
+    state: directory
+
+- name: Download bevfusion/bevfusion_lidar.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/bevfusion/t4base_120m/v2/bevfusion_lidar.onnx
+    dest: "{{ data_dir }}/bevfusion/bevfusion_lidar.onnx"
+    mode: "644"
+    checksum: sha256:5c29087963bf2c4dc02bf45c29d459303be602d63f9b6adff22a75c9cfb459a6
+
+- name: Download bevfusion/bevfusion_camera_lidar.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/bevfusion/t4base_120m/v2/bevfusion_camera_lidar.onnx
+    dest: "{{ data_dir }}/bevfusion/bevfusion_camera_lidar.onnx"
+    mode: "644"
+    checksum: sha256:aa78d2f219146cb1423287643bbef81666d429ddcde4432a2e51db3f212a7c68
+
+- name: Download bevfusion/bevfusion_image_backbone.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/bevfusion/t4base_120m/v2/bevfusion_image_backbone.onnx
+    dest: "{{ data_dir }}/bevfusion/bevfusion_image_backbone.onnx"
+    mode: "644"
+    checksum: sha256:799af1e486b5c1245c8e2783bc77522d49e4a6535320ae77eba1b0f829385797
+
+- name: Download bevfusion/ml_package_bevfusion_lidar.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/bevfusion/t4base_120m/v2/ml_package_bevfusion_lidar.param.yaml
+    dest: "{{ data_dir }}/bevfusion/ml_package_bevfusion_lidar.param.yaml"
+    mode: "644"
+    checksum: sha256:866265b9f0fc8c17805c0974339d3c7c4e601c1aa212818971fc650d71782181
+
+- name: Download bevfusion/ml_package_bevfusion_camera_lidar.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/bevfusion/t4base_120m/v2/ml_package_bevfusion_camera_lidar.param.yaml
+    dest: "{{ data_dir }}/bevfusion/ml_package_bevfusion_camera_lidar.param.yaml"
+    mode: "644"
+    checksum: sha256:50707efcbb7fa80527d0a2effe677557d0be5df5cd72276f9af152399f27c719
+
+- name: Download bevfusion/detection_class_remapper.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/bevfusion/t4base_120m/v2/detection_class_remapper.param.yaml
+    dest: "{{ data_dir }}/bevfusion/detection_class_remapper.param.yaml"
+    mode: "644"
+    checksum: sha256:928f9eb14ac042d725909f12b2be1532c16b09a683485c5936cf04fb04728520
+
+# bevdet
+- name: Create tensorrt_bevdet directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/tensorrt_bevdet"
+    mode: "755"
+    state: directory
+
+- name: Download tensorrt_bevdet/tensorrt_bevdet.tar.gz
+  become: true
+  ansible.builtin.get_url:
+    url: https://autoware-files.s3.us-west-2.amazonaws.com/models/tensorrt_bevdet.tar.gz
+    dest: "{{ data_dir }}/tensorrt_bevdet/tensorrt_bevdet.tar.gz"
+    mode: "644"
+    checksum: sha256:c7d16ad395e949e7a654ab511fb3294135553f92c50f2595e63a1b3e0d142c6a
+
+- name: Extract tensorrt_bevdet/tensorrt_bevdet.tar.gz
+  ansible.builtin.unarchive:
+    src: "{{ data_dir }}/tensorrt_bevdet/tensorrt_bevdet.tar.gz"
+    dest: "{{ data_dir }}/tensorrt_bevdet/"
+
+# image_projection_based_fusion
+- name: Create image_projection_based_fusion directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/image_projection_based_fusion"
+    mode: "755"
+    state: directory
+
+- name: Download image_projection_based_fusion/pts_voxel_encoder_pointpainting.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/pointpainting/v5/pts_voxel_encoder_pointpainting.onnx
+    dest: "{{ data_dir }}/image_projection_based_fusion/pts_voxel_encoder_pointpainting.onnx"
+    mode: "644"
+    checksum: sha256:3ca452ea5ca9467bf782955f75704ba8466841e275e8b8acd991b9911d53249e
+
+- name: Download image_projection_based_fusion/pts_backbone_neck_head_pointpainting.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/pointpainting/v5/pts_backbone_neck_head_pointpainting.onnx
+    dest: "{{ data_dir }}/image_projection_based_fusion/pts_backbone_neck_head_pointpainting.onnx"
+    mode: "644"
+    checksum: sha256:7fe62fcebe0e0f62a000d06aa94d779feb444d933671a4a3189fe01be8c19a00
+- name: Download image_projection_based_fusion/detection_class_remapper.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/pointpainting/v5/detection_class_remapper.param.yaml
+    dest: "{{ data_dir }}/image_projection_based_fusion/detection_class_remapper.param.yaml"
+    mode: "644"
+    checksum: sha256:c711f8875ece9b527dfe31ffc75f8c0de2e77945ef67860a959a4e04c36772d5
+- name: Download image_projection_based_fusion/pointpainting_ml_package.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/pointpainting/v5/pointpainting_ml_package.param.yaml
+    dest: "{{ data_dir }}/image_projection_based_fusion/pointpainting_ml_package.param.yaml"
+    mode: "644"
+    checksum: sha256:a70f8a01d592aa4e85d481d44377f37ea35ea5271c064723d6d0db7d375990a3
+# lidar_apollo_instance_segmentation
+- name: Create lidar_apollo_instance_segmentation directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/lidar_apollo_instance_segmentation"
+    mode: "755"
+    state: directory
+
+- name: Download lidar_apollo_instance_segmentation/vlp-16.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/lidar_apollo_instance_segmentation/vlp-16.onnx
+    dest: "{{ data_dir }}/lidar_apollo_instance_segmentation/vlp-16.onnx"
+    mode: "644"
+    checksum: sha256:eec521ebad7553d0ea2c90472a293aecb7499ab592632f0e100481c8196eb421
+
+- name: Download lidar_apollo_instance_segmentation/hdl-64.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/lidar_apollo_instance_segmentation/hdl-64.onnx
+    dest: "{{ data_dir }}/lidar_apollo_instance_segmentation/hdl-64.onnx"
+    mode: "644"
+    checksum: sha256:86348d8c4bced750f54288b01cc471c0d4f1ec9c693466169ef19413731e6ecc
+
+- name: Download lidar_apollo_instance_segmentation/vls-128.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/lidar_apollo_instance_segmentation/vls-128.onnx
+    dest: "{{ data_dir }}/lidar_apollo_instance_segmentation/vls-128.onnx"
+    mode: "644"
+    checksum: sha256:95ef950bb694bd6de91b7e47f5d191d557e92a7f5e2a6bdf655a8b5eed4075cc
+
+# lidar_centerpoint
+- name: Create lidar_centerpoint directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/lidar_centerpoint"
+    mode: "755"
+    state: directory
+
+- name: Download lidar_centerpoint/pts_voxel_encoder_centerpoint.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/pts_voxel_encoder_centerpoint.onnx
+    dest: "{{ data_dir }}/lidar_centerpoint/pts_voxel_encoder_centerpoint.onnx"
+    mode: "644"
+    checksum: sha256:dc1a876580d86ee7a341d543f8ade2ede7f43bd032dc5b44155b1f0175405764
+
+- name: Download lidar_centerpoint/pts_backbone_neck_head_centerpoint.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/pts_backbone_neck_head_centerpoint.onnx
+    dest: "{{ data_dir }}/lidar_centerpoint/pts_backbone_neck_head_centerpoint.onnx"
+    mode: "644"
+    checksum: sha256:3fe7e128955646740c41a25be0c8f141d5a94594fe79d7405fe2a859e391542e
+
+- name: Download lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/pts_voxel_encoder_centerpoint_tiny.onnx
+    dest: "{{ data_dir }}/lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.onnx"
+    mode: "644"
+    checksum: sha256:2c53465715c1fd2e9dc5727ef3fca74f4cdf0538f74286b0946e219d0ca5693b
+
+- name: Download lidar_centerpoint/pts_backbone_neck_head_centerpoint_tiny.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/pts_backbone_neck_head_centerpoint_tiny.onnx
+    dest: "{{ data_dir }}/lidar_centerpoint/pts_backbone_neck_head_centerpoint_tiny.onnx"
+    mode: "644"
+    checksum: sha256:9bb0b634f3664bd098ce7d6a3d8a9fb7cc8d9b8252b27f302c71e43316bab551
+- name: Download lidar_centerpoint/centerpoint_ml_package.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/centerpoint_ml_package.param.yaml
+    dest: "{{ data_dir }}/lidar_centerpoint/centerpoint_ml_package.param.yaml"
+    mode: "644"
+    checksum: sha256:9bbc16e521dd87c91cbadf1cb89c8b81393d1f8e1069af385aaba677576f0e27
+- name: Download lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/centerpoint_tiny_ml_package.param.yaml
+    dest: "{{ data_dir }}/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml"
+    mode: "644"
+    checksum: sha256:e0846b08fbd023d6a7c085f5389d0ccaef8ad9cd2c5e1eb7dbc6583618e38424
+- name: Download lidar_centerpoint/centerpoint_sigma_ml_package.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/centerpoint_sigma_ml_package.param.yaml
+    dest: "{{ data_dir }}/lidar_centerpoint/centerpoint_sigma_ml_package.param.yaml"
+    mode: "644"
+    checksum: sha256:9bbc16e521dd87c91cbadf1cb89c8b81393d1f8e1069af385aaba677576f0e27
+- name: Download lidar_centerpoint/detection_class_remapper.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/detection_class_remapper.param.yaml
+    dest: "{{ data_dir }}/lidar_centerpoint/detection_class_remapper.param.yaml"
+    mode: "644"
+    checksum: sha256:c711f8875ece9b527dfe31ffc75f8c0de2e77945ef67860a959a4e04c36772d5
+- name: Download lidar_centerpoint/deploy_metadata.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/deploy_metadata.yaml
+    dest: "{{ data_dir }}/lidar_centerpoint/deploy_metadata.yaml"
+    mode: "644"
+    checksum: sha256:152536f053c3750b60d349800e1b983b418029d6dadf087614a00c661942a178
+
+# lidar_transfusion
+- name: Create lidar_transfusion directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/lidar_transfusion"
+    mode: "755"
+    state: directory
+
+- name: Download lidar_transfusion/transfusion.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/transfusion/t4xx1_90m/v2.1/transfusion.onnx
+    dest: "{{ data_dir }}/lidar_transfusion/transfusion.onnx"
+    mode: "644"
+    checksum: sha256:1d8f0ee6d59ccc3cca914f9892f6ac8f0a9e35082abb91da183c00e3e2c2718a
+
+- name: Download lidar_transfusion/transfusion_ml_package.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/transfusion/t4xx1_90m/v2.1/transfusion_ml_package.param.yaml
+    dest: "{{ data_dir }}/lidar_transfusion/transfusion_ml_package.param.yaml"
+    mode: "644"
+    checksum: sha256:476f7727adc17a823962f2e09ba23d40f3116c50be48361d98179d054cd131b6
+
+- name: Download lidar_transfusion/detection_class_remapper.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/transfusion/t4xx1_90m/v2.1/detection_class_remapper.param.yaml
+    dest: "{{ data_dir }}/lidar_transfusion/detection_class_remapper.param.yaml"
+    mode: "644"
+    checksum: sha256:c711f8875ece9b527dfe31ffc75f8c0de2e77945ef67860a959a4e04c36772d5
+
+# tensorrt_yolox
+- name: Create tensorrt_yolox directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/tensorrt_yolox"
+    mode: "755"
+    state: directory
+
+- name: Download tensorrt_yolox/yolox-tiny.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/yolox-tiny.onnx
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-tiny.onnx"
+    mode: "644"
+    checksum: sha256:471a665f4243e654dff62578394e508db22ee29fe65d9e389dfc3b0f2dee1255
+
+- name: Download tensorrt_yolox/yolox-sPlus-opt.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/yolox-sPlus-opt.onnx
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-sPlus-opt.onnx"
+    mode: "644"
+    checksum: sha256:36b0832177b01e6b278e00c7369f1de71e616c36261cbae50f0753d41289da01
+
+- name: Download tensorrt_yolox/yolox-sPlus-opt.EntropyV2-calibration.table
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/yolox-sPlus-opt.EntropyV2-calibration.table
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-sPlus-opt.EntropyV2-calibration.table"
+    mode: "644"
+    checksum: sha256:b9e9d7da33342262ccaea4469b4d02b8abb32b6d7bf737f9e0883fece1b8f580
+
+- name: Download tensorrt_yolox/yolox-sPlus-T4-960x960-pseudo-finetune.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/object_detection_yolox_s/v1/yolox-sPlus-T4-960x960-pseudo-finetune.onnx
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-sPlus-T4-960x960-pseudo-finetune.onnx"
+    mode: "644"
+    checksum: sha256:f5054e8a890c3be86dc1b4b89a5a36fb2279d4f6110b0159e793be062641bf65
+
+- name: Download tensorrt_yolox/yolox-sPlus-T4-960x960-pseudo-finetune.EntropyV2-calibration.table
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/object_detection_yolox_s/v1/yolox-sPlus-T4-960x960-pseudo-finetune.EntropyV2-calibration.table
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-sPlus-T4-960x960-pseudo-finetune.EntropyV2-calibration.table"
+    mode: "644"
+    checksum: sha256:cc378d327db5616b0b3a4d077bf37100c25a50ecd22d2b542f54098da100f34c
+
+- name: Download tensorrt_yolox/label.txt
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/label.txt
+    dest: "{{ data_dir }}/tensorrt_yolox/label.txt"
+    mode: "644"
+    checksum: sha256:3540a365bfd6d8afb1b5d8df4ec47f82cb984760d3270c9b41dbbb3422d09a0c
+
+# cspell: ignore semseg
+- name: Download tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/object_detection_semseg_yolox_s/v1/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx"
+    mode: "644"
+    checksum: sha256:73b3812432cedf65cebf02ca4cb630542fc3b1671c4c0fbf7cee50fa38e416a8
+
+- name: Download tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.EntropyV2-calibration.table
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/object_detection_semseg_yolox_s/v1/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.EntropyV2-calibration.table
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.EntropyV2-calibration.table"
+    mode: "644"
+    checksum: sha256:28cd6524d4bcdb2809592a225d28330433e58dc02c92169ea555b44c1a51a584
+
+- name: Download tensorrt_yolox/semseg_color_map.csv
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/object_detection_semseg_yolox_s/v1/semseg_color_map.csv
+    dest: "{{ data_dir }}/tensorrt_yolox/semseg_color_map.csv"
+    mode: "644"
+    checksum: sha256:3d93ca05f31b63424d7d7246a01a2365953705a0ed3323ba5b6fddd744a4bfea
+
+# tensorrt_rtmdet
+- name: Create tensorrt_rtmdet directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/tensorrt_rtmdet"
+    mode: "755"
+    state: directory
+
+- name: Download tensorrt_rtmdet_onnx_models.tar.gz
+  become: true
+  ansible.builtin.get_url:
+    url: https://autoware-files.s3.us-west-2.amazonaws.com/models/tensorrt_rtmdet_onnx_models.tar.gz
+    dest: "{{ data_dir }}/tensorrt_rtmdet/tensorrt_rtmdet_onnx_models.tar.gz"
+    mode: "644"
+    checksum: sha256:eaf6fe9caf1b4a0211dc3b0f4068b1fd6c1d35fe1582cc2aed95b8ed9468c598
+
+- name: Extract tensorrt_rtmdet_onnx_models.tar.gz
+  ansible.builtin.unarchive:
+    src: "{{ data_dir }}/tensorrt_rtmdet/tensorrt_rtmdet_onnx_models.tar.gz"
+    dest: "{{ data_dir }}/tensorrt_rtmdet/"
+    extra_opts:
+      - --strip-components=1 # Removes the top-level folder during extraction
+
+# tensorrt_yolox for whole_image_traffic_light_detector
+- name: Download tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tl_detector_yolox_s/v1/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"
+    mode: "644"
+    checksum: sha256:0b8478553f2f0374a1236e65f669f11335b1fea7756ca7bcdfcf9646657ed594
+
+- name: Download tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.EntropyV2-calibration.table
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tl_detector_yolox_s/v1/yolox_s_car_ped_tl_detector_960_960_batch_1.EntropyV2-calibration.table
+    dest: "{{ data_dir }}/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.EntropyV2-calibration.table"
+    mode: "644"
+    checksum: sha256:690cff409519aca26f4ec0fc56ed35d9aa23ee1c18d6205c43469ae06e2f4e02
+
+- name: Download tensorrt/car_ped_tl_detector_labels.txt
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tl_detector_yolox_s/v1/car_ped_tl_detector_labels.txt
+    dest: "{{ data_dir }}/tensorrt_yolox/car_ped_tl_detector_labels.txt"
+    mode: "644"
+    checksum: sha256:a2a91f5fe9c2e68e3e3647a272bb9bb25cd07631a1990a3fb15efddce7691131
+
+# traffic_light_classifier
+- name: Create traffic_light_classifier directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/traffic_light_classifier"
+    mode: "755"
+    state: directory
+
+- name: Download traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_1.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/traffic_light_classifier_mobilenetv2_batch_1.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_1.onnx"
+    mode: "644"
+    checksum: sha256:455b71b3b20d3a96aa0e49f32714ba50421f668a2f9b9907c30b1346ac8a3703
+
+- name: Download traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_4.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/traffic_light_classifier_mobilenetv2_batch_4.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_4.onnx"
+    mode: "644"
+    checksum: sha256:41bb79a23a4ac57956adb8e9cb3904420db1b0cd032e97b670cc4f8b174ae3fe
+
+- name: Download traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/traffic_light_classifier_mobilenetv2_batch_6.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"
+    mode: "644"
+    checksum: sha256:e4792eed6a46fdbd02be2f3a4f1ce91f36fa77698493caf3102e445178c0f058
+
+- name: Download traffic_light_classifier/traffic_light_classifier_efficientNet_b1_batch_1.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/traffic_light_classifier_efficientNet_b1_batch_1.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/traffic_light_classifier_efficientNet_b1_batch_1.onnx"
+    mode: "644"
+    checksum: sha256:55ebb0d117a5e8943f8d1c6769f1d856b533079d4d871d8e923255cc992ad48a
+
+- name: Download traffic_light_classifier/traffic_light_classifier_efficientNet_b1_batch_4.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/traffic_light_classifier_efficientNet_b1_batch_4.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/traffic_light_classifier_efficientNet_b1_batch_4.onnx"
+    mode: "644"
+    checksum: sha256:684e29843e3128eadb774018730644b3ab9b0a06dc4cdaeed579c2f3fa5d5265
+
+- name: Download traffic_light_classifier/traffic_light_classifier_efficientNet_b1_batch_6.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/traffic_light_classifier_efficientNet_b1_batch_6.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/traffic_light_classifier_efficientNet_b1_batch_6.onnx"
+    mode: "644"
+    checksum: sha256:44d94540fa8b89dfb39cd9a8523cf010ddfb10ea2f1f9b53bf3618ce7f4912ad
+
+- name: Download traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_1.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v3/ped_traffic_light_classifier_mobilenetv2_batch_1.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_1.onnx"
+    mode: "644"
+    checksum: sha256:b52632fee96d1bc99922e743335ebfd49d6a0645c8a04e615f156e38661add24
+
+- name: Download traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_4.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v3/ped_traffic_light_classifier_mobilenetv2_batch_4.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_4.onnx"
+    mode: "644"
+    checksum: sha256:ef0a3052857cdc6f380da524560548b40e9e46f876cccf3cd0cb40ccddae9892
+
+- name: Download traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v3/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx
+    dest: "{{ data_dir }}/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"
+    mode: "644"
+    checksum: sha256:b56700551254afa985916d03b74372ebc675f2d9b76ee0e39c46e88c37744a4f
+
+- name: Download traffic_light_classifier/lamp_labels.txt
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v2/lamp_labels.txt
+    dest: "{{ data_dir }}/traffic_light_classifier/lamp_labels.txt"
+    mode: "644"
+    checksum: sha256:1a5a49eeec5593963eab8d70f48b8a01bfb07e753e9688eb1510ad26e803579d
+
+- name: Download traffic_light_classifier/lamp_labels_ped.txt
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/traffic_light_classifier/v3/lamp_labels_ped.txt
+    dest: "{{ data_dir }}/traffic_light_classifier/lamp_labels_ped.txt"
+    mode: "644"
+    checksum: sha256:5427e1b7c2e33acd9565ede29e77992c38137bcf7d7074c73ebbc38080c6bcac
+
+# diffusion_planner
+- name: Create diffusion_planner directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/diffusion_planner"
+    mode: "755"
+    state: directory
+
+- name: Create diffusion_planner v2.0 directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/diffusion_planner/v2.0"
+    mode: "755"
+    state: directory
+
+- name: Download diffusion_planner/v2.0/diffusion_planner.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/diffusion_planner/v2.0/diffusion_planner.onnx
+    dest: "{{ data_dir }}/diffusion_planner/v2.0/diffusion_planner.onnx"
+    mode: "644"
+    checksum: sha256:622c2c2f21115900c712f80b58560b5a6425be5f70d5aa82a96ef0b13af8c24b
+
+- name: Download diffusion_planner/v2.0/diffusion_planner.param.json
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/diffusion_planner/v2.0/diffusion_planner.param.json
+    dest: "{{ data_dir }}/diffusion_planner/v2.0/diffusion_planner.param.json"
+    mode: "644"
+    checksum: sha256:bf41f12d85b31e363acf84f46d6a9e4e28da6c2ccce0e3fcf91ee4910f4b8453
+
+- name: Create diffusion_planner v3.0 directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/diffusion_planner/v3.0"
+    mode: "755"
+    state: directory
+
+- name: Download diffusion_planner/v3.0/diffusion_planner.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/diffusion_planner/v3.0/diffusion_planner.onnx
+    dest: "{{ data_dir }}/diffusion_planner/v3.0/diffusion_planner.onnx"
+    mode: "644"
+    checksum: sha256:3026918b55869b02ea561c1e1b9fed05c34092294c035d743f1d1cb756f4abcc
+
+- name: Download diffusion_planner/v3.0/diffusion_planner.param.json
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/diffusion_planner/v3.0/diffusion_planner.param.json
+    dest: "{{ data_dir }}/diffusion_planner/v3.0/diffusion_planner.param.json"
+    mode: "644"
+    checksum: sha256:d726ce7b257ddaf39da8a7dfbd016512e866843c26a9622fdec8a59b45da3e04
+
+# tensorrt_vad
+- name: Create tensorrt_vad directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/vad"
+    mode: "755"
+    state: directory
+
+- name: Create tensorrt_vad v0.1 directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/vad/v0.1"
+    mode: "755"
+    state: directory
+
+- name: Download tensorrt_vad/vad-carla-tiny_backbone.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/tensorrt_vad/carla_tiny/v0.1/vad-carla-tiny_backbone.onnx
+    dest: "{{ data_dir }}/vad/v0.1/vad-carla-tiny_backbone.onnx"
+    mode: "644"
+    checksum: sha256:04b925f2750fd1c4adf16b5aae9c149d0baa39185e99d141232ebe20bddba4da
+
+- name: Download tensorrt_vad/vad-carla-tiny_head.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/tensorrt_vad/carla_tiny/v0.1/vad-carla-tiny_head.onnx
+    dest: "{{ data_dir }}/vad/v0.1/vad-carla-tiny_head.onnx"
+    mode: "644"
+    checksum: sha256:31f49a592a764ce82bbe6e26d0bfc99dc8a9613628884dc73dd5e67521ff3e9e
+
+- name: Download tensorrt_vad/vad-carla-tiny_head_no_prev.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/tensorrt_vad/carla_tiny/v0.1/vad-carla-tiny_head_no_prev.onnx
+    dest: "{{ data_dir }}/vad/v0.1/vad-carla-tiny_head_no_prev.onnx"
+    mode: "644"
+    checksum: sha256:6a89d479e0717b1e526f1aa3a1137c631a9ef854e810d0328a035aae11818c2a
+
+- name: Download tensorrt_vad/vad-carla-tiny.param.json
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/planning/models/tensorrt_vad/carla_tiny/v0.1/vad-carla-tiny.param.json
+    dest: "{{ data_dir }}/vad/v0.1/vad-carla-tiny.param.json"
+    mode: "644"
+    checksum: sha256:03d3187fed3c70f761456afc2e93e18c1765113b1c1580ffa78ab42b10dbd179
+
+# traffic_light_fine_detector
+- name: Create traffic_light_fine_detector directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/traffic_light_fine_detector"
+    mode: "755"
+    state: directory
+
+- name: Download traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_1.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tlr_yolox_s/v3/tlr_car_ped_yolox_s_batch_1.onnx
+    dest: "{{ data_dir }}/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_1.onnx"
+    mode: "644"
+    checksum: sha256:1ad633066a1195006f4709f8fa07800dd65a74a814b3efb4c99bcc5a1a7962f6
+
+- name: Download traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_4.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tlr_yolox_s/v3/tlr_car_ped_yolox_s_batch_4.onnx
+    dest: "{{ data_dir }}/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_4.onnx"
+    mode: "644"
+    checksum: sha256:cf93eb1e1a97aefc6edd0c0c4d77c7f5fc2aa1e81e3c5c9cd49d976173d03a04
+
+- name: Download traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tlr_yolox_s/v3/tlr_car_ped_yolox_s_batch_6.onnx
+    dest: "{{ data_dir }}/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx"
+    mode: "644"
+    checksum: sha256:0b05a89fb30f1f92c6ec687d48e8ceda4da6f81cbd82d8a102d168753a6cedb6
+
+- name: Download traffic_light_fine_detector/tlr_labels.txt
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/tlr_yolox_s/v3/tlr_labels.txt
+    dest: "{{ data_dir }}/traffic_light_fine_detector/tlr_labels.txt"
+    mode: "644"
+    checksum: sha256:a2a91f5fe9c2e68e3e3647a272bb9bb25cd07631a1990a3fb15efddce7691131
+
+# simpl_prediction
+- name: Create simpl_prediction directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/simpl_prediction"
+    mode: "755"
+    state: directory
+
+- name: Download simpl_prediction/simpl.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/simpl/v0.1.0/simpl.onnx
+    dest: "{{ data_dir }}/simpl_prediction/simpl.onnx"
+    mode: "644"
+    checksum: sha256:ad5e03983193c4d188432f314334697d6a216e7ffc91fb651eee5d6e4c42f492
+
+# ptv3
+- name: Create ptv3 directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/ptv3"
+    mode: "755"
+    state: directory
+
+- name: Download ptv3/ptv3.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/ptv3/v1/ptv3.onnx
+    dest: "{{ data_dir }}/ptv3/ptv3.onnx"
+    mode: "644"
+    checksum: sha256:b5d8f7f038599de46e66148d46182600155820c6f6f2fd37e787461f97d143ff
+
+- name: Download ptv3/ml_package_ptv3.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/ptv3/v1/ml_package_ptv3.param.yaml
+    dest: "{{ data_dir }}/ptv3/ml_package_ptv3.param.yaml"
+    mode: "644"
+    checksum: sha256:9a3e35648d6eb46771b208a6534a2dcb19d26efca20a9d8df5abc05a9970d0ec
+
+# frnet
+- name: Create lidar_frnet directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/lidar_frnet"
+    mode: "755"
+    state: directory
+
+- name: Download lidar_frnet/frnet.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/frnet/v1/frnet.onnx
+    dest: "{{ data_dir }}/lidar_frnet/frnet.onnx"
+    mode: "644"
+    checksum: sha256:acaaf0190e9dbf67e4987542fc57bcec4102a842a40ee24a9dc8fa1948bedf04
+
+- name: Download lidar_frnet/ml_package_frnet.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/perception/models/frnet/v1/ml_package_frnet.param.yaml
+    dest: "{{ data_dir }}/lidar_frnet/ml_package_frnet.param.yaml"
+    mode: "644"
+    checksum: sha256:34577cc7902acd942a51f401bdcf560da91c3c80df8d553bfdc775f118b499b8
+
+# calibration_status_classifier
+- name: Create calibration_status_classifier directory inside {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/calibration_status_classifier"
+    mode: "755"
+    state: directory
+
+- name: Download calibration_status_classifier/calibration_status_classifier.onnx
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/sensing/models/calibration_status_classifier/v1/calibration_status_classifier.onnx
+    dest: "{{ data_dir }}/calibration_status_classifier/calibration_status_classifier.onnx"
+    mode: "644"
+    checksum: sha256:86b575c03a25d08b97a295878cf572fdea016bdab1a48e396194c06a6bc28565
+
+- name: Download calibration_status_classifier/ml_package_calibration_status_classifier.param.yaml
+  become: true
+  ansible.builtin.get_url:
+    url: https://awf.ml.dev.web.auto/sensing/models/calibration_status_classifier/v1/ml_package_calibration_status_classifier.param.yaml
+    dest: "{{ data_dir }}/calibration_status_classifier/ml_package_calibration_status_classifier.param.yaml"
+    mode: "644"
+    checksum: sha256:39d99ce065eea608e2bea3e560eeb1bcee18b2636f988c28afed5219e3e69760

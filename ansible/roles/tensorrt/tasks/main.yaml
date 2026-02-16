@@ -1,0 +1,48 @@
+- name: Install TensorRT
+  become: true
+  ansible.builtin.apt:
+    name:
+      - libnvinfer10={{ tensorrt_version }}
+      - libnvinfer-plugin10={{ tensorrt_version }}
+      - libnvonnxparsers10={{ tensorrt_version }}
+    allow_change_held_packages: true
+    allow_downgrade: true
+    update_cache: true
+
+- name: Install TensorRT Dev
+  become: true
+  ansible.builtin.apt:
+    name:
+      - libnvinfer-dev={{ tensorrt_version }}
+      - libnvinfer-plugin-dev={{ tensorrt_version }}
+      - libnvinfer-headers-dev={{ tensorrt_version }}
+      - libnvinfer-headers-plugin-dev={{ tensorrt_version }}
+      - libnvonnxparsers-dev={{ tensorrt_version }}
+    allow_change_held_packages: true
+    allow_downgrade: true
+    update_cache: true
+  when: install_devel == 'y'
+
+# apt-mark hold
+- name: Prevent CUDA-related packages from upgrading
+  become: true
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  with_items:
+    - libnvinfer10
+    - libnvinfer-plugin10
+    - libnvonnxparsers10
+
+- name: Prevent CUDA-related Dev packages from upgrading
+  become: true
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  with_items:
+    - libnvinfer-dev
+    - libnvinfer-plugin-dev
+    - libnvinfer-headers-dev
+    - libnvinfer-headers-plugin-dev
+    - libnvonnxparsers-dev
+  when: install_devel == 'y'

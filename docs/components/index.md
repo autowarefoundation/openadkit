@@ -1,6 +1,6 @@
 # Components
 
-Open AD Kit is a component based project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each Autoware component is designed to be independent and can be configured to work together to achieve a particular task, such as a planning simulation or a full autonomous driving stack for a specific vehicle.
+Open AD Kit is a component based project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each **Autoware component** is designed to be independent and can be configured to work together to achieve a particular task, such as a simulation or a full autonomous driving stack.
 
 ![Granular Components](../assets/images/granular-components.png)
 

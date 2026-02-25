@@ -1,10 +1,8 @@
 # Tools
 
-Open AD Kit provides a set of tools to help you build, deploy, and manage your autonomous driving system. It's a collection of tools for the Autoware ecosystem.
+Open AD Kit includes containerized third-party tools for testing, deploying, and managing autonomous driving systems. These tools complement the **Autoware components** and can be integrated into deployments as needed.
 
-## Main Tools
-
-### Scenario Simulator - TBD
+## Scenario Simulator - TBD
 
 The scenario simulator is a tool that enables users to test their autonomous driving system in a virtual environment. It supports two types of scenario simulators:
 

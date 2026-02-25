@@ -34,7 +34,5 @@
 
 ## Next Steps
 
-- [Running a Deployment Sample](../deployments/)
-- Learn more about the Open AD Kit components
-  - [Components](../components/)
-  - [Tools](../tools/)
+- [Running a sample deployment](../deployments/)
+- [Learn more about the Open AD Kit components](../components/)

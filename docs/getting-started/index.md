@@ -18,7 +18,7 @@
     cd openadkit
     ```
 
-2. Setup the runtime environment by running the following command, requires sudo privileges ( Skip if you already have the environment setup on your platform ):
+2. Setup the runtime environment by running the `setup.sh` script located at the root of the repository. This requires sudo privileges (skip if you already have the environment setup on your platform):
 
     ```bash
     sudo ./setup.sh

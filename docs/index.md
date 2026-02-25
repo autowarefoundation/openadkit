@@ -27,7 +27,7 @@ The primary components include:
 - **API**: Offers an interface for external systems to interact with the vehicle.
 - **Simulator**: Allows for testing the AD stack in a virtual environment with ad-hoc simulations.
 
-These components communicate with each other over a service mesh, allowing for flexible deployment and scaling. For more details on the [Autoware components](./components/).
+These components communicate with each other over a service mesh, allowing for flexible deployment and scaling. For more details, see the [Autoware components](./components/).
 
 ## Tools
 
@@ -35,7 +35,7 @@ In addition to the **Autoware components**, Open AD Kit provides essential tools
 
 - **Scenario Simulator-TBD**: Allows for testing the AD stack in a virtual environment. It supports complex scenario-based simulations for validation and CI/CD.
 
-For more details on the [Tools](./tools/).
+For more details, see the [Tools](./tools/).
 
 ## Deployments
 
@@ -45,7 +45,7 @@ Deployments are defined using container orchestration files (e.g., `docker-compo
 
 This modular structure allows users to start with a minimal deployment and incrementally add components and tools as their system evolves.
 
-For more details on the [Deployments](./deployments/).
+For more details, see the [Deployments](./deployments/).
 
 ## Supported Platforms
 
@@ -60,25 +60,8 @@ Open AD Kit supports a variety of platforms as **development** and **SOAFEE prod
 - [EWAOL](https://ewaol.docs.arm.com/en/kirkstone-dev/)
 - [AutoSD](https://docs.centos.org/automotive-sig-documentation/features-and-concepts/)
 
-For more details on the [Supported SOAFEE Platforms](./platforms/).
+For more details, see the [Supported SOAFEE Platforms](./platforms/).
 
 ## Supported Hardware
 
-### System Requirements
-
-Open AD Kit supports **amd64** and **arm64** architectures with the following requirements:
-
-- CPU with 8 cores
-- 16GB RAM
-- [Optional] NVIDIA GPU (4GB RAM)
-
-### Tested Hardware
-
-- [ADLink AADP-AVA](https://www.adlinktech.com/products/Computer_on_Modules/COM-HPC-Server-Carrier-and-Starter-Kit/Ampere_Altra_Developer_Platform)
-- [NVIDIA Jetson Orin](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/) (TBD)
-
-Learn more about the [Hardware](./hardware/).
-
-### Tested Cloud Instances
-
-- AWS EC2 G5.4XLarge (TBD)
+For detailed information on system requirements, tested hardware, and cloud instances, please refer to the [Hardware](./hardware/) section.

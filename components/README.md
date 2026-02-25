@@ -7,66 +7,61 @@ Detailed instructions on how to deploy the components can be found in the [Open 
 ## Build Pipeline
 
 ```mermaid
-flowchart TB
-    subgraph base["Base Images"]
-        B[autoware-base]
-        BC[autoware-base-cuda]
-    end
+block-beta
+    columns 7
 
-    subgraph intermediate["Intermediate Images"]
-        RD[rosdep-depend]
-        CD[core-devel]
-        ACD[autoware-common-devel]
-        ACDC[autoware-common-devel-cuda]
-    end
+    space:2 ROS["ros:humble-ros-base-jammy"]:3 space:2
 
-    subgraph runtime["Runtime Images"]
-        SP[sensing-perception]
-        LM[localization-mapping]
-        PC[planning-control]
-        VS[vehicle-system]
-        VIZ[visualization]
-        API[api]
-    end
+    space:7
 
-    subgraph runtime_cuda["Runtime Images (CUDA)"]
-        SPC[sensing-perception-cuda]
-        UNIC[autoware-cuda]
-    end
+    space:2 CB["common-base"]:3 space:2
 
-    %% Base flow
-    B --> BC
-    B --> RD
-    B --> CD
-    CD --> ACD
-    BC --> ACDC
+    space:7
 
-    %% Runtime dependencies
-    ACD --> SP
-    ACD --> LM
-    ACD --> PC
-    ACD --> VS
-    ACD --> VIZ
-    ACD --> API
+    space:2 CD["common-devel"]:3 space:2
 
-    %% CUDA runtime
-    ACDC --> SPC
-    ACDC --> UNIC
+    space:7
 
-    %% rosdep provides deps to all
-    RD -.->|deps| SP
-    RD -.->|deps| LM
-    RD -.->|deps| PC
-    RD -.->|deps| VS
-    RD -.->|deps| API
-    RD -.->|deps| SPC
-    RD -.->|deps| UNIC
+    SP["sensing-perception"] LM["localization-mapping"] PC["planning-control"] VS["vehicle-system"] API["api"] VIZ["visualizer"] SIM["simulator"]
+
+    space:7
+
+    space:2 UNI["universe"]:3 space:2
+
+    ROS --> CB
+    CB --> CD
+    CD --> SP
+    CD --> LM
+    CD --> PC
+    CD --> VS
+    CD --> API
+    CD --> VIZ
+    CD --> SIM
+    SP --> UNI
+    LM --> UNI
+    PC --> UNI
+    VS --> UNI
+    API --> UNI
+    VIZ --> UNI
+    SIM --> UNI
+
+    style ROS fill:#334155,stroke:#64748b,color:#e2e8f0
+    style CB fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe
+    style CD fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe
+    style SP fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style LM fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style PC fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style VS fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style API fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style VIZ fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style SIM fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style UNI fill:#4c1d95,stroke:#a855f7,color:#e9d5ff
 ```
 
 ### Build Groups
 
 | Group | Description | Targets |
 |-------|-------------|---------|
-| `default` | All images | intermediate + runtime |
-| `intermediate` | Build dependencies | rosdep-depend, core-devel, autoware-common-devel |
-| `runtime` | Final component images | sensing-perception, localization-mapping, planning-control, vehicle-system, visualization, api |
+| `common` | Common images | base, devel |
+| `component` | Component images | sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator |
+| `universe` | Universe images | universe, universe-cuda |

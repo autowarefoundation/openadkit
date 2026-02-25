@@ -2,10 +2,11 @@
 set -eo pipefail
 
 function cleanup_system() {
-    local lib_dir=$1
-    local ros_distro=$2
+    local lib_dir
+    lib_dir="$(uname -m)-linux-gnu"
+    local ros_distro=$1
 
-    find /usr/lib/"$lib_dir"-linux-gnu -name "*.a" -type f -delete &&
+    find /usr/lib/"$lib_dir" -name "*.a" -type f -delete &&
         find / -name "*.o" -type f -delete &&
         find / -name "*.h" -type f -delete &&
         find / -name "*.hpp" -type f -delete &&
@@ -15,5 +16,4 @@ function cleanup_system() {
             /usr/include /usr/share/doc /usr/lib/gcc /usr/lib/jvm /usr/lib/llvm*
 }
 
-./cleanup_apt.sh
 cleanup_system "$@"

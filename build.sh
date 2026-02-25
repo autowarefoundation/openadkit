@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
-
 set -e
+
+SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
+WORKSPACE_ROOT="$SCRIPT_DIR"
 
 # Function to print help message
 print_help() {
     echo "Usage: build.sh [OPTIONS]"
     echo "Options:"
-    echo "  --help          Display this help message"
-    echo "  -h              Display this help message"
-    echo "  --no-cuda       Disable CUDA support"
-    echo "  --platform      Specify the platform (default: current platform)"
-    echo "  --target        Specify the target image (default: universe)"
+    echo "  -h | --help     Display this help message"
+    echo "  --platform      Specify the platform (linux/amd64 or linux/arm64, default: current platform)"
     echo "  --ros-distro    Specify ROS distribution (humble or jazzy, default: humble)"
-    echo "  --intermediate  Build intermediate images only (rosdep-depend, core-devel, universe-common-devel)"
-    echo ""
-    echo "Note: The --platform option should be one of 'linux/amd64' or 'linux/arm64'."
+    echo "  --no-cuda       Do not build CUDA images (default: false)"
+    echo "  --target        Specify the target images to build (common, components, universe, default: components)"
 }
-
-SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
-WORKSPACE_ROOT="$SCRIPT_DIR/.."
 
 # Parse arguments
 parse_arguments() {
@@ -43,9 +38,6 @@ parse_arguments() {
             option_ros_distro="$2"
             shift
             ;;
-        --intermediate)
-            option_intermediate_only=true
-            ;;
         *)
             echo "Unknown option: $1"
             print_help
@@ -65,29 +57,12 @@ set_ros_distro() {
     fi
 }
 
-# Set CUDA options
-set_cuda_options() {
-    if [ "$option_no_cuda" = "true" ]; then
-        setup_args="--no-nvidia"
-        image_name_suffix=""
-    else
-        image_name_suffix="-cuda"
-    fi
-}
-
-# Note: Image tags are loaded from env files (amd64.env or amd64_jazzy.env)
-# via the load_env() function, which sets $autoware_base_image and $autoware_base_cuda_image
-
 # Set build options
 set_build_options() {
     if [ -n "$option_target" ]; then
         target="$option_target"
-        image_name_suffix=""
-    elif [ "$option_intermediate_only" = "true" ]; then
-        target="intermediate"
-        image_name_suffix=""
     else
-        target="universe"
+        target="components"
     fi
 }
 
@@ -103,40 +78,22 @@ set_platform() {
     fi
 }
 
-# Set arch lib dir
-set_arch_lib_dir() {
-    if [ "$platform" = "linux/arm64" ]; then
-        lib_dir="aarch64"
-    elif [ "$platform" = "linux/amd64" ]; then
-        lib_dir="x86_64"
-    else
-        echo "Unsupported platform: $platform"
-        exit 1
-    fi
-}
-
-# Load env
-load_env() {
-    if [ "$ros_distro" = "humble" ]; then
-        source "$WORKSPACE_ROOT/amd64.env"
-    else
-        source "$WORKSPACE_ROOT/amd64_jazzy.env"
-    fi
-    if [ "$platform" = "linux/arm64" ]; then
-        source "$WORKSPACE_ROOT/arm64.env"
-    fi
-}
-
-# Clone repositories
+# Clone autoware repositories
 clone_repositories() {
     cd "$WORKSPACE_ROOT"
-    if [ ! -d "src" ]; then
-        mkdir -p src
-        vcs import src <repositories/autoware.repos
+
+    if [ ! -d "autoware" ]; then
+        echo "Cloning Autoware repository..."
+        git clone https://github.com/autowarefoundation/autoware.git autoware
+    fi
+
+    if [ ! -d "autoware/src" ]; then
+        mkdir -p autoware/src
+        vcs import autoware/src <autoware/repositories/autoware.repos
     else
         echo "Source directory already exists. Updating repositories..."
-        vcs import src <repositories/autoware.repos
-        vcs pull src
+        vcs import autoware/src <autoware/repositories/autoware.repos
+        vcs pull autoware/src
     fi
 }
 
@@ -145,120 +102,123 @@ build_images() {
     # https://github.com/docker/buildx/issues/484
     export BUILDKIT_STEP_LOG_MAX_SIZE=10000000
 
-    echo "Building images for platform: $platform"
-    echo "ROS distro: $ros_distro"
-    echo "Base image: $base_image"
-    echo "Setup args: $setup_args"
-    echo "Lib dir: $lib_dir"
-    echo "Image name suffix: $image_name_suffix"
-    echo "Target: $target"
+    local bake_file="$SCRIPT_DIR/components/docker-bake.hcl"
+    local base_image="ros:${ros_distro}-ros-base-jammy"
+    local image_common="openadkit-common"
+    local image_component="openadkit"
+
+    echo "Building images with:"
+    echo "  Target: $target"
+    echo "  Platform: $platform"
+    echo "  ROS distro: $ros_distro"
+    echo "  Base image: $base_image"
+    echo "  CUDA: $([ "$option_no_cuda" = "true" ] && echo "disabled" || echo "enabled")"
 
     set -x
 
-    # Build base images first
-    docker buildx bake --allow=ssh --load --progress=plain -f "$SCRIPT_DIR/docker-bake-base.hcl" \
+    # =========================================================================
+    # Stage 1: Common images
+    # =========================================================================
+    docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
         --set "*.context=$WORKSPACE_ROOT" \
         --set "*.ssh=default" \
         --set "*.platform=$platform" \
         --set "*.args.ROS_DISTRO=$ros_distro" \
         --set "*.args.BASE_IMAGE=$base_image" \
-        --set "*.args.SETUP_ARGS=$setup_args" \
-        --set "*.args.LIB_DIR=$lib_dir" \
-        --set "base.tags=$autoware_base_image" \
-        --set "base-cuda.tags=$autoware_base_cuda_image"
+        --set "common-base.tags=${image_common}:base" \
+        --set "common-devel.tags=${image_common}:devel" \
+        common-base common-devel
 
-    # Build intermediate images (rosdep, core, universe-common)
-    docker buildx bake --allow=ssh --load --progress=plain -f "$SCRIPT_DIR/docker-bake.hcl" \
-        --set "*.context=$WORKSPACE_ROOT" \
-        --set "*.ssh=default" \
-        --set "*.platform=$platform" \
-        --set "*.args.ROS_DISTRO=$ros_distro" \
-        --set "*.args.AUTOWARE_BASE_IMAGE=$autoware_base_image" \
-        --set "*.args.AUTOWARE_BASE_CUDA_IMAGE=$autoware_base_cuda_image" \
-        --set "*.args.ROSDEP_IMAGE=ghcr.io/autowarefoundation/openadkit/rosdep-depend:latest" \
-        --set "*.args.CORE_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit/core-devel:latest" \
-        --set "*.args.UNIVERSE_COMMON_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-common-devel:latest" \
-        --set "*.args.SETUP_ARGS=$setup_args" \
-        --set "*.args.LIB_DIR=$lib_dir" \
-        --set "rosdep-depend.tags=ghcr.io/autowarefoundation/openadkit/rosdep-depend:latest" \
-        --set "core-devel.tags=ghcr.io/autowarefoundation/openadkit/core-devel:latest" \
-        --set "universe-common-devel.tags=ghcr.io/autowarefoundation/openadkit/universe-common-devel:latest" \
-        intermediate
-
-    # Build CUDA intermediate if needed
     if [ "$option_no_cuda" != "true" ]; then
-        docker buildx bake --allow=ssh --load --progress=plain -f "$SCRIPT_DIR/docker-bake-cuda.hcl" \
+        docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
             --set "*.context=$WORKSPACE_ROOT" \
             --set "*.ssh=default" \
             --set "*.platform=$platform" \
             --set "*.args.ROS_DISTRO=$ros_distro" \
-            --set "*.args.AUTOWARE_BASE_IMAGE=$autoware_base_image" \
-            --set "*.args.AUTOWARE_BASE_CUDA_IMAGE=$autoware_base_cuda_image" \
-            --set "*.args.CORE_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit/core-devel:latest" \
-            --set "*.args.SETUP_ARGS=$setup_args" \
-            --set "*.args.LIB_DIR=$lib_dir" \
-            --set "universe-common-devel-cuda.tags=ghcr.io/autowarefoundation/openadkit/universe-common-devel-cuda:latest" \
-            universe-common-devel-cuda
+            --set "*.args.BASE_IMAGE=$base_image" \
+            --set "common-base-cuda.tags=${image_common}:base-cuda" \
+            --set "common-devel-cuda.tags=${image_common}:devel-cuda" \
+            common-base-cuda common-devel-cuda
     fi
 
-    # If only intermediate images were requested, stop here
-    if [ "$option_intermediate_only" = "true" ]; then
+    if [ "$target" = "common" ]; then
         set +x
         return
     fi
 
-    # Build runtime images
-    docker buildx bake --allow=ssh --load --progress=plain -f "$SCRIPT_DIR/docker-bake.hcl" \
+    # =========================================================================
+    # Stage 2: Component images
+    # =========================================================================
+    docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
         --set "*.context=$WORKSPACE_ROOT" \
         --set "*.ssh=default" \
         --set "*.platform=$platform" \
         --set "*.args.ROS_DISTRO=$ros_distro" \
-        --set "*.args.AUTOWARE_BASE_IMAGE=$autoware_base_image" \
-        --set "*.args.AUTOWARE_BASE_CUDA_IMAGE=$autoware_base_cuda_image" \
-        --set "*.args.ROSDEP_IMAGE=ghcr.io/autowarefoundation/openadkit/rosdep-depend:latest" \
-        --set "*.args.UNIVERSE_COMMON_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-common-devel:latest" \
-        --set "*.args.UNIVERSE_COMMON_DEVEL_CUDA_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-common-devel-cuda:latest" \
-        --set "*.args.SENSING_PERCEPTION_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-sensing-perception:latest" \
-        --set "*.args.SENSING_PERCEPTION_CUDA_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-sensing-perception-cuda:latest" \
-        --set "*.args.LOCALIZATION_MAPPING_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-localization-mapping:latest" \
-        --set "*.args.PLANNING_CONTROL_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-planning-control:latest" \
-        --set "*.args.VEHICLE_SYSTEM_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-vehicle-system:latest" \
-        --set "*.args.VISUALIZATION_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-visualization:latest" \
-        --set "*.args.API_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-api:latest" \
-        --set "*.args.SETUP_ARGS=$setup_args" \
-        --set "*.args.LIB_DIR=$lib_dir" \
-        --set "universe-sensing-perception.tags=ghcr.io/autowarefoundation/openadkit/universe-sensing-perception:latest" \
-        --set "universe-localization-mapping.tags=ghcr.io/autowarefoundation/openadkit/universe-localization-mapping:latest" \
-        --set "universe-planning-control.tags=ghcr.io/autowarefoundation/openadkit/universe-planning-control:latest" \
-        --set "universe-vehicle-system.tags=ghcr.io/autowarefoundation/openadkit/universe-vehicle-system:latest" \
-        --set "universe-visualization.tags=ghcr.io/autowarefoundation/openadkit/universe-visualization:latest" \
-        --set "universe-api.tags=ghcr.io/autowarefoundation/openadkit/universe-api:latest" \
-        --set "universe.tags=ghcr.io/autowarefoundation/openadkit/universe:latest" \
-        "$target"
+        --set "*.args.COMMON_BASE_IMAGE=${image_common}:base" \
+        --set "*.args.COMMON_DEVEL_IMAGE=${image_common}:devel" \
+        --set "sensing-perception.tags=${image_component}:sensing-perception" \
+        --set "localization-mapping.tags=${image_component}:localization-mapping" \
+        --set "planning-control.tags=${image_component}:planning-control" \
+        --set "vehicle-system.tags=${image_component}:vehicle-system" \
+        --set "api.tags=${image_component}:api" \
+        --set "visualizer.tags=${image_component}:visualizer" \
+        --set "simulator.tags=${image_component}:simulator" \
+        sensing-perception localization-mapping planning-control vehicle-system api visualizer simulator
 
-    # Build CUDA runtime images if needed
-    if [ "$option_no_cuda" != "true" ] && [ "$target" = "universe" ]; then
-        docker buildx bake --allow=ssh --load --progress=plain -f "$SCRIPT_DIR/docker-bake-cuda.hcl" \
+    if [ "$option_no_cuda" != "true" ]; then
+        docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
             --set "*.context=$WORKSPACE_ROOT" \
             --set "*.ssh=default" \
             --set "*.platform=$platform" \
             --set "*.args.ROS_DISTRO=$ros_distro" \
-            --set "*.args.AUTOWARE_BASE_IMAGE=$autoware_base_image" \
-            --set "*.args.AUTOWARE_BASE_CUDA_IMAGE=$autoware_base_cuda_image" \
-            --set "*.args.ROSDEP_IMAGE=ghcr.io/autowarefoundation/openadkit/rosdep-depend:latest" \
-            --set "*.args.UNIVERSE_COMMON_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-common-devel:latest" \
-            --set "*.args.UNIVERSE_COMMON_DEVEL_CUDA_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-common-devel-cuda:latest" \
-            --set "*.args.SENSING_PERCEPTION_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-sensing-perception:latest" \
-            --set "*.args.SENSING_PERCEPTION_CUDA_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-sensing-perception-cuda:latest" \
-            --set "*.args.LOCALIZATION_MAPPING_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-localization-mapping:latest" \
-            --set "*.args.PLANNING_CONTROL_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-planning-control:latest" \
-            --set "*.args.VEHICLE_SYSTEM_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-vehicle-system:latest" \
-            --set "*.args.VISUALIZATION_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-visualization:latest" \
-            --set "*.args.API_IMAGE=ghcr.io/autowarefoundation/openadkit/universe-api:latest" \
-            --set "*.args.SETUP_ARGS=$setup_args" \
-            --set "*.args.LIB_DIR=$lib_dir" \
-            --set "universe-sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit/universe-sensing-perception-cuda:latest" \
-            --set "universe-cuda.tags=ghcr.io/autowarefoundation/openadkit/universe-cuda:latest"
+            --set "*.args.COMMON_BASE_CUDA_IMAGE=${image_common}:base-cuda" \
+            --set "*.args.COMMON_DEVEL_CUDA_IMAGE=${image_common}:devel-cuda" \
+            --set "sensing-perception-cuda.tags=${image_component}:sensing-perception-cuda" \
+            sensing-perception-cuda
+    fi
+
+    if [ "$target" = "components" ]; then
+        set +x
+        return
+    fi
+
+    # =========================================================================
+    # Stage 3: Universe images
+    # =========================================================================
+    docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
+        --set "*.context=$WORKSPACE_ROOT" \
+        --set "*.ssh=default" \
+        --set "*.platform=$platform" \
+        --set "*.args.ROS_DISTRO=$ros_distro" \
+        --set "*.args.COMMON_BASE_IMAGE=${image_common}:base" \
+        --set "*.args.COMMON_DEVEL_IMAGE=${image_common}:devel" \
+        --set "*.args.SENSING_PERCEPTION_IMAGE=${image_component}:sensing-perception" \
+        --set "*.args.LOCALIZATION_MAPPING_IMAGE=${image_component}:localization-mapping" \
+        --set "*.args.PLANNING_CONTROL_IMAGE=${image_component}:planning-control" \
+        --set "*.args.VEHICLE_SYSTEM_IMAGE=${image_component}:vehicle-system" \
+        --set "*.args.API_IMAGE=${image_component}:api" \
+        --set "*.args.VISUALIZER_IMAGE=${image_component}:visualizer" \
+        --set "*.args.SIMULATOR_IMAGE=${image_component}:simulator" \
+        --set "universe.tags=${image_component}:universe" \
+        universe
+
+    if [ "$option_no_cuda" != "true" ]; then
+        docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
+            --set "*.context=$WORKSPACE_ROOT" \
+            --set "*.ssh=default" \
+            --set "*.platform=$platform" \
+            --set "*.args.ROS_DISTRO=$ros_distro" \
+            --set "*.args.COMMON_BASE_CUDA_IMAGE=${image_common}:base-cuda" \
+            --set "*.args.COMMON_DEVEL_CUDA_IMAGE=${image_common}:devel-cuda" \
+            --set "*.args.SENSING_PERCEPTION_CUDA_IMAGE=${image_component}:sensing-perception-cuda" \
+            --set "*.args.LOCALIZATION_MAPPING_IMAGE=${image_component}:localization-mapping" \
+            --set "*.args.PLANNING_CONTROL_IMAGE=${image_component}:planning-control" \
+            --set "*.args.VEHICLE_SYSTEM_IMAGE=${image_component}:vehicle-system" \
+            --set "*.args.API_IMAGE=${image_component}:api" \
+            --set "*.args.VISUALIZER_IMAGE=${image_component}:visualizer" \
+            --set "*.args.SIMULATOR_IMAGE=${image_component}:simulator" \
+            --set "universe-cuda.tags=${image_component}:universe-cuda" \
+            universe-cuda
     fi
 
     set +x
@@ -272,11 +232,8 @@ remove_dangling_images() {
 # Main script execution
 parse_arguments "$@"
 set_ros_distro
-set_cuda_options
 set_build_options
 set_platform
-set_arch_lib_dir
-load_env
 clone_repositories
 build_images
 remove_dangling_images

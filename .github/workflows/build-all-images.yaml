@@ -1,0 +1,308 @@
+name: build-all-images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
+  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+  BAKE_FILE: components/docker-bake.hcl
+
+jobs:
+  # =============================================================================
+  # Stage 1: Build common images
+  # =============================================================================
+  build-common:
+    runs-on: ubicloud-standard-16-ubuntu-2204
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Install jq and vcs2l
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3-pip
+          pip install --no-cache-dir vcs2l
+        shell: bash
+
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Autoware repository
+        uses: actions/checkout@v6
+        with:
+          repository: autowarefoundation/autoware
+          ref: main
+          path: autoware
+          fetch-depth: 1
+    
+      - name: Pull Autoware Source
+        run: |
+            mkdir -p autoware/src
+            vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Extract metadata for openadkit-common:base
+        id: meta-common-base
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-base
+          tags: |
+            type=raw,value=base,enable={{is_default_branch}}
+            type=raw,value=base-${{ steps.date.outputs.date }}
+          flavor: |
+            latest=false
+
+      - name: Extract metadata for openadkit-common:base-cuda
+        id: meta-common-base-cuda
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-base-cuda
+          tags: |
+            type=raw,value=base-cuda,enable={{is_default_branch}}
+            type=raw,value=base-cuda-${{ steps.date.outputs.date }}
+          flavor: |
+            latest=false
+
+      - name: Extract metadata for openadkit-common:devel
+        id: meta-common-devel
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-devel
+          tags: |
+            type=raw,value=devel,enable={{is_default_branch}}
+            type=raw,value=devel-${{ steps.date.outputs.date }}
+          flavor: |
+            latest=false
+
+      - name: Extract metadata for openadkit-common:devel-cuda
+        id: meta-common-devel-cuda
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-devel-cuda
+          tags: |
+            type=raw,value=devel-cuda,enable={{is_default_branch}}
+            type=raw,value=devel-cuda-${{ steps.date.outputs.date }}
+          flavor: |
+            latest=false
+
+      - name: Build and push common images
+        uses: docker/bake-action@v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta-common-base.outputs.bake-file }}
+            ${{ steps.meta-common-base-cuda.outputs.bake-file }}
+            ${{ steps.meta-common-devel.outputs.bake-file }}
+            ${{ steps.meta-common-devel-cuda.outputs.bake-file }}
+          targets: |
+            common-base
+            common-base-cuda
+            common-devel
+            common-devel-cuda
+          push: true
+          set: |
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-main,mode=max
+
+  # =============================================================================
+  # Stage 2: Build component images (parallel)
+  # =============================================================================
+  build-components:
+    runs-on: ubicloud-standard-8-ubuntu-2204
+    needs: build-common
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: sensing-perception
+          - target: sensing-perception-cuda
+          - target: localization-mapping
+          - target: planning-control
+          - target: vehicle-system
+          - target: api
+          - target: visualizer
+          - target: simulator
+    steps:
+      - name: Install jq and vcs2l
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3-pip
+          pip install --no-cache-dir vcs2l
+        shell: bash
+
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Autoware repository
+        uses: actions/checkout@v6
+        with:
+          repository: autowarefoundation/autoware
+          ref: main
+          path: autoware
+          fetch-depth: 1
+    
+      - name: Pull Autoware Source
+        run: |
+            mkdir -p autoware/src
+            vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Extract metadata for ${{ matrix.target }}
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
+          bake-target: docker-metadata-action-${{ matrix.target }}
+          tags: |
+            type=raw,value=${{ matrix.target }},enable={{is_default_branch}}
+            type=raw,value=${{ matrix.target }}-${{ steps.date.outputs.date }}
+          flavor: |
+            latest=false
+
+      - name: Build and push ${{ matrix.target }}
+        uses: docker/bake-action@v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta.outputs.bake-file }}
+          targets: ${{ matrix.target }}
+          push: true
+          set: |
+            *.args.COMMON_BASE_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base
+            *.args.COMMON_BASE_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-cuda
+            *.args.COMMON_DEVEL_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel
+            *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-main,mode=max
+
+  # =============================================================================
+  # Stage 3: Build universe and universe-cuda images (parallel)
+  # =============================================================================
+  build-universe:
+    runs-on: ubicloud-standard-8-ubuntu-2204
+    needs: [build-common, build-components]
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: universe
+          - target: universe-cuda
+    steps:
+      - name: Install jq and vcs2l
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3-pip
+          pip install --no-cache-dir vcs2l
+        shell: bash
+
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Autoware repository
+        uses: actions/checkout@v6
+        with:
+          repository: autowarefoundation/autoware
+          ref: main
+          path: autoware
+          fetch-depth: 1
+    
+      - name: Pull Autoware Source
+        run: |
+            mkdir -p autoware/src
+            vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Extract metadata for ${{ matrix.target }}
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
+          bake-target: docker-metadata-action-${{ matrix.target }}
+          tags: |
+            type=raw,value=${{ matrix.target }},enable={{is_default_branch}}
+            type=raw,value=${{ matrix.target }}-${{ steps.date.outputs.date }}
+          flavor: |
+            latest=false
+
+      - name: Build and push ${{ matrix.target }}
+        uses: docker/bake-action@v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta.outputs.bake-file }}
+          targets: ${{ matrix.target }}
+          push: true
+          set: |
+            *.args.COMMON_BASE_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base
+            *.args.COMMON_BASE_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-cuda
+            *.args.COMMON_DEVEL_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel
+            *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda
+            *.args.SENSING_PERCEPTION_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:sensing-perception
+            *.args.SENSING_PERCEPTION_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:sensing-perception-cuda
+            *.args.LOCALIZATION_MAPPING_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:localization-mapping
+            *.args.PLANNING_CONTROL_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:planning-control
+            *.args.VEHICLE_SYSTEM_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:vehicle-system
+            *.args.API_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:api
+            *.args.VISUALIZER_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:visualizer
+            *.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-main,mode=max

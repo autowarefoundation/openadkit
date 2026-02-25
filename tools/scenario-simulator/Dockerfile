@@ -36,8 +36,6 @@ RUN --mount=type=cache,target=${CCACHE_DIR} \
 FROM ghcr.io/autowarefoundation/autoware:universe AS scenario-simulator
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
-ARG LIB_DIR
-
 COPY --from=builder /opt/autoware /opt/autoware
 COPY --from=builder /rosdep-simulator-exec-depend-packages.txt /tmp/rosdep-simulator-exec-depend-packages.txt
 
@@ -50,7 +48,7 @@ RUN --mount=type=ssh \
     && pip3 install --no-cache-dir yamale \
     && pip3 install --no-cache-dir xmlschema==3.4.5 \
     && cat /tmp/rosdep-simulator-exec-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
-    && /autoware/cleanup_system.sh $LIB_DIR $ROS_DISTRO
+    && /autoware/cleanup_system.sh $ROS_DISTRO
 
 COPY docker/tools/scenario-simulator/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

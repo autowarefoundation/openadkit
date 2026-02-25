@@ -1,119 +1,139 @@
-// Docker Bake configuration for OpenADKit component images
-// This file defines build targets for runtime images only (no devel images)
+// Docker Bake configuration for Open AD Kit images
+// This file defines build targets for all images
 
 group "default" {
   targets = [
-    "rosdep-depend",
-    "core-devel",
-    "autoware-common-devel",
-    "autoware-sensing-perception",
-    "autoware-localization-mapping",
-    "autoware-planning-control",
-    "autoware-vehicle-system",
-    "autoware-visualization",
-    "autoware-api",
-    "autoware-universe"
+    "common",
+    "component",
+    "universe"
   ]
 }
 
-// Intermediate images group (build dependencies)
-group "intermediate" {
+group "common" {
   targets = [
-    "rosdep-depend",
-    "core-devel",
-    "autoware-common-devel"
+    "common-base",
+    "common-base-cuda",
+    "common-devel",
+    "common-devel-cuda"
   ]
 }
 
-// Runtime images group (final products)
-group "runtime" {
+group "component" {
   targets = [
-    "autoware-sensing-perception",
-    "autoware-localization-mapping",
-    "autoware-planning-control",
-    "autoware-vehicle-system",
-    "autoware-visualization",
-    "autoware-api",
-    "autoware-universe"
+    "sensing-perception",
+    "sensing-perception-cuda",
+    "localization-mapping",
+    "planning-control",
+    "vehicle-system",
+    "api",
+    "visualizer",
+    "simulator",
+  ]
+}
+
+group "universe" {
+  targets = [
+    "universe",
+    "universe-cuda"
   ]
 }
 
 // For docker/metadata-action
-target "docker-metadata-action-rosdep-depend" {}
-target "docker-metadata-action-core-devel" {}
-target "docker-metadata-action-autoware-common-devel" {}
-target "docker-metadata-action-autoware-sensing-perception" {}
-target "docker-metadata-action-autoware-localization-mapping" {}
-target "docker-metadata-action-autoware-planning-control" {}
-target "docker-metadata-action-autoware-vehicle-system" {}
-target "docker-metadata-action-autoware-visualization" {}
-target "docker-metadata-action-autoware-api" {}
-target "docker-metadata-action-autoware-universe" {}
+target "docker-metadata-action-common-base" {}
+target "docker-metadata-action-common-base-cuda" {}
+target "docker-metadata-action-common-devel" {}
+target "docker-metadata-action-common-devel-cuda" {}
+target "docker-metadata-action-sensing-perception" {}
+target "docker-metadata-action-sensing-perception-cuda" {}
+target "docker-metadata-action-localization-mapping" {}
+target "docker-metadata-action-planning-control" {}
+target "docker-metadata-action-vehicle-system" {}
+target "docker-metadata-action-api" {}
+target "docker-metadata-action-visualizer" {}
+target "docker-metadata-action-simulator" {}
+target "docker-metadata-action-universe" {}
+target "docker-metadata-action-universe-cuda" {}
 
-// =============================================================================
-// Intermediate build images
-// =============================================================================
-
-target "rosdep-depend" {
-  inherits = ["docker-metadata-action-rosdep-depend"]
-  dockerfile = "components/autoware-base/Dockerfile"
-  target = "rosdep-depend"
+target "common-base" {
+  inherits = ["docker-metadata-action-common-base"]
+  dockerfile = "components/common/Dockerfile"
+  target = "common-base"
 }
 
-target "core-devel" {
-  inherits = ["docker-metadata-action-core-devel"]
-  dockerfile = "components/autoware-base/Dockerfile"
-  target = "core-devel"
+target "common-base-cuda" {
+  inherits = ["docker-metadata-action-common-base-cuda"]
+  dockerfile = "components/common/Dockerfile"
+  target = "common-base-cuda"
 }
 
-target "autoware-common-devel" {
-  inherits = ["docker-metadata-action-autoware-common-devel"]
-  dockerfile = "components/autoware-base/Dockerfile"
-  target = "autoware-common-devel"
+target "common-devel" {
+  inherits = ["docker-metadata-action-common-devel"]
+  dockerfile = "components/common/Dockerfile"
+  target = "common-devel"
 }
 
-// =============================================================================
-// Runtime images
-// =============================================================================
-
-target "autoware-sensing-perception" {
-  inherits = ["docker-metadata-action-autoware-sensing-perception"]
-  dockerfile = "components/autoware-sensing-perception/Dockerfile"
-  target = "autoware-sensing-perception"
+target "common-devel-cuda" {
+  inherits = ["docker-metadata-action-common-devel-cuda"]
+  dockerfile = "components/common/Dockerfile"
+  target = "common-devel-cuda"
 }
 
-target "autoware-localization-mapping" {
-  inherits = ["docker-metadata-action-autoware-localization-mapping"]
-  dockerfile = "components/autoware-localization-mapping/Dockerfile"
-  target = "autoware-localization-mapping"
+target "sensing-perception" {
+  inherits = ["docker-metadata-action-sensing-perception"]
+  dockerfile = "components/sensing-perception/Dockerfile"
+  target = "sensing-perception"
 }
 
-target "autoware-planning-control" {
-  inherits = ["docker-metadata-action-autoware-planning-control"]
-  dockerfile = "components/autoware-planning-control/Dockerfile"
-  target = "autoware-planning-control"
+target "sensing-perception-cuda" {
+  inherits = ["docker-metadata-action-sensing-perception-cuda"]
+  dockerfile = "components/sensing-perception/Dockerfile.cuda"
+  target = "sensing-perception-cuda"
 }
 
-target "autoware-vehicle-system" {
-  inherits = ["docker-metadata-action-autoware-vehicle-system"]
-  dockerfile = "components/autoware-vehicle-system/Dockerfile"
-  target = "autoware-vehicle-system"
+target "localization-mapping" {
+  inherits = ["docker-metadata-action-localization-mapping"]
+  dockerfile = "components/localization-mapping/Dockerfile"
+  target = "localization-mapping"
 }
 
-target "autoware-visualization" {
-  inherits = ["docker-metadata-action-autoware-visualization"]
-  dockerfile = "components/autoware-base/Dockerfile"
-  target = "autoware-visualization"
+target "planning-control" {
+  inherits = ["docker-metadata-action-planning-control"]
+  dockerfile = "components/planning-control/Dockerfile"
+  target = "planning-control"
 }
 
-target "autoware-api" {
-  inherits = ["docker-metadata-action-autoware-api"]
-  dockerfile = "components/autoware-api/Dockerfile"
-  target = "autoware-api"
+target "api" {
+  inherits = ["docker-metadata-action-api"]
+  dockerfile = "components/api/Dockerfile"
+  target = "api"
 }
 
-target "autoware-universe" {
-  inherits = ["docker-metadata-action-autoware-universe"]
-  dockerfile = "components/autoware-universe/Dockerfile"
-  target = "autoware-universe"
+target "vehicle-system" {
+  inherits = ["docker-metadata-action-vehicle-system"]
+  dockerfile = "components/vehicle-system/Dockerfile"
+  target = "vehicle-system"
+}
+
+target "visualizer" {
+  inherits = ["docker-metadata-action-visualizer"]
+  dockerfile = "components/visualizer/Dockerfile"
+  target = "visualizer"
+}
+
+target "simulator" {
+  inherits = ["docker-metadata-action-simulator"]
+  dockerfile = "components/simulator/Dockerfile"
+  target = "simulator"
+}
+
+target "universe" {
+  inherits = ["docker-metadata-action-universe"]
+  dockerfile = "components/universe/Dockerfile"
+  target = "universe"
+}
+
+target "universe-cuda" {
+  inherits = ["docker-metadata-action-universe-cuda"]
+  dockerfile = "components/universe/Dockerfile.cuda"
+  target = "universe-cuda"
 }

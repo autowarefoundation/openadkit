@@ -1,9 +1,6 @@
-# Autoware Planning Simulation
+# Autoware Open AD Kit Planning Simulation
 
-This sample deployment shows how to run autoware **planning simulation**.
-
-- **autoware**: Autoware monolithic container for development and deployment.
-- **visualizer**: RViz-based remote operation and visualization container for Autoware.
+This sample deployment shows how to run Autoware Open AD Kit **planning simulation**.
 
 ## Requirements
 
@@ -27,7 +24,7 @@ unzip -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
 1. Start the deployment by running the following command:
 
     ```bash
-    docker compose up -d
+    docker compose --env-file planning-simulation.env up -d
     ```
 
 2. Open a browser to visualize the simulation and navigate to:

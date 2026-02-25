@@ -3,6 +3,17 @@ name: build-all-images
 on:
   push:
     branches: [main]
+    paths:
+      - 'components/docker-bake.hcl'
+      - 'components/common/**'
+      - 'components/sensing-perception/**'
+      - 'components/localization-mapping/**'
+      - 'components/planning-control/**'
+      - 'components/vehicle-system/**'
+      - 'components/api/**'
+      - 'components/visualizer/**'
+      - 'components/simulator/**'
+      - 'components/universe/**'
   workflow_dispatch:
 
 env:

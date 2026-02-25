@@ -24,8 +24,8 @@ services:
     container_name: autoware-planning
     network_mode: host
     init: true
-    ipc: host
     pid: service:map
+    ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
@@ -47,8 +47,8 @@ services:
     container_name: autoware-vehicle
     network_mode: host
     init: true
-    ipc: host
     pid: service:map
+    ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
@@ -69,8 +69,8 @@ services:
     container_name: autoware-system
     network_mode: host
     init: true
-    ipc: host
     pid: service:map
+    ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
@@ -81,6 +81,81 @@ services:
       launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
       launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
       sensor_model:=${SENSOR_MODEL}
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  sensing:
+    image: ${SENSING_PERCEPTION_IMAGE}
+    container_name: autoware-sensing
+    network_mode: host
+    init: true
+    pid: service:map
+    ipc: host
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ${DATA_PATH}:/autoware_data:rw
+    depends_on:
+      - map
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_sensing_component.launch.xml
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_SENSING}
+      launch_sensing_driver:=${LAUNCH_SENSING_DRIVER}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+  
+  perception:
+    image: ${SENSING_PERCEPTION_IMAGE}
+    container_name: autoware-perception
+    network_mode: host
+    init: true
+    pid: service:map
+    ipc: host
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ${DATA_PATH}:/autoware_data:rw
+    depends_on:
+      - map
+      - system
+      - sensing
+    command: >
+      ros2 launch autoware_launch tier4_perception_component.launch.xml
+      data_path:=/autoware_data
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
+      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
+      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
+      perception_mode:=${PERCEPTION_MODE}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+    
+  localization:
+    image: ghcr.io/autowarefoundation/openadkit:localization-mapping
+    container_name: autoware-localization
+    network_mode: host
+    init: true
+    pid: service:map
+    ipc: host
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+      - system
+      - sensing
+      - perception
+    command: >
+      ros2 launch autoware_launch tier4_localization_component.launch.xml
       system_run_mode:=${SYSTEM_RUN_MODE}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
@@ -117,8 +192,8 @@ services:
     container_name: autoware-simulator
     network_mode: host
     init: true
-    ipc: host
     pid: service:map
+    ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
@@ -152,8 +227,8 @@ services:
     container_name: autoware-api
     network_mode: host
     init: true
-    ipc: host
     pid: service:map
+    ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
@@ -171,8 +246,8 @@ services:
     image: ghcr.io/autowarefoundation/openadkit:visualizer
     network_mode: host
     init: true
-    ipc: host
     pid: service:map
+    ipc: host
     ports:
       - 6080:6080
     environment:
@@ -180,3 +255,22 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
+  
+  rosbag:
+    image: ghcr.io/autowarefoundation/openadkit:universe
+    container_name: autoware-rosbag
+    network_mode: host
+    init: true
+    pid: service:map
+    ipc: host
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ${ROSBAG_PATH}:/autoware_map/rosbag:ro
+    command: >
+      bash -c "ros2 bag info /autoware_map/rosbag -s ${ROSBAG_FORMAT} &&
+      ros2 bag play /autoware_map/rosbag -r ${ROSBAG_RATE} -s ${ROSBAG_FORMAT}"
+    restart: "no"
+    profiles:
+      - rosbag

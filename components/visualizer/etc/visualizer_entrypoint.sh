@@ -4,8 +4,8 @@
 
 # Check if RVIZ_CONFIG is provided
 if [ -z "$RVIZ_CONFIG" ]; then
-    echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /autoware/rviz/autoware.rviz\e[0m"
-    RVIZ_CONFIG="/autoware/rviz/autoware.rviz"
+    echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /opt/autoware/share/autoware_launch/rviz/autoware.rviz\e[0m"
+    RVIZ_CONFIG="/opt/autoware/share/autoware_launch/rviz/autoware.rviz"
     export RVIZ_CONFIG
 fi
 
@@ -90,9 +90,11 @@ source "/opt/autoware/setup.bash"
 
 # Execute passed command if provided, otherwise launch rviz2
 if [ "$REMOTE_DISPLAY" == "false" ]; then
+    echo "Launching local rviz2 display"
     [ $# -eq 0 ] && rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
     exec "$@"
 else
+    echo "Launching remote rviz2 display"
     configure_vnc
     [ $# -eq 0 ] && sleep infinity
     exec "$@"

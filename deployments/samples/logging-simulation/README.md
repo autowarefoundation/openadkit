@@ -1,10 +1,6 @@
-# Autoware Logging Simulation
+# Autoware Open AD Kit Logging Simulation
 
-This sample deployment shows how to run autoware **logging simulation**.
-
-- **autoware**: Autoware monolithic container for development and deployment.
-- **rosbag**: Rosbag container for Autoware sensor simulation with rosbag data.
-- **visualizer**: RViz-based remote operation and visualization container for Autoware.
+This sample deployment shows how to run Autoware Open AD Kit **logging simulation**.
 
 ## Requirements
 
@@ -41,7 +37,7 @@ unzip -d ~/autoware_map/ ~/autoware_map/sample-rosbag.zip
 1. Start the deployment by running the following command:
 
     ```bash
-    docker compose up -d
+    docker compose --env-file logging-simulation.env up -d
     ```
 
 2. Open a browser to visualize the simulation and navigate to:
@@ -61,7 +57,7 @@ unzip -d ~/autoware_map/ ~/autoware_map/sample-rosbag.zip
 3. To start the logging simulation, you should run the following command to play the rosbag:
 
     ```bash
-    docker compose up rosbag -d
+    docker compose --env-file logging-simulation.env up rosbag -d
     ```
 
 ## Stop the Deployment

@@ -20,9 +20,15 @@ Open AD Kit aims to democratize autonomous drive (AD) systems by bringing the cl
 
 The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem.
 
+### Quick Links
+
+- **[Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/)**
+- **[Documentation](https://autowarefoundation.github.io/openadkit/)**
+- **[Contributing](https://autowarefoundation.github.io/openadkit/contributing/)**
+
 ## Key Features
 
-### Granular Components
+### Modular Components
 
 Open AD Kit is a micro-service based project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each component is designed to be independent and can be deployed on a variety of platforms.
 
@@ -61,31 +67,3 @@ Open AD Kit envisions an always connected, complete autonomous driving developme
 - **Continuous testing** in containerized environments
 
 ![Connected and Continuous](docs/assets/images/connected-continuous.png)
-
-## Roadmap
-
-```mermaid
-graph LR
-    A[Q2/2025<br/>Open AD Kit components and tools definition]
-    B[Q3/2025<br/>Modular Autoware components]
-    C[Q4/2025<br/>Configurable components for use cases]
-    D[Q1/2026<br/>Component orchestration support]
-
-    A --> B --> C --> D;
-
-    classDef p1 fill:#0d2c54,stroke:#333,stroke-width:2px,color:#fff,font-weight:bold;
-    classDef p2 fill:#2d6a8b,stroke:#333,stroke-width:2px,color:#fff,font-weight:bold;
-    classDef p3 fill:#3690c0,stroke:#333,stroke-width:2px,color:#fff,font-weight:bold;
-    classDef p4 fill:#673ab7,stroke:#333,stroke-width:2px,color:#fff,font-weight:bold;
-
-    class A p1;
-    class B p2;
-    class C p3;
-    class D p4;
-```
-
-## Getting Started
-
-- **[Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/)**
-- **[Documentation](https://autowarefoundation.github.io/openadkit/)**
-- **[Contributing](https://autowarefoundation.github.io/openadkit/contributing/)**

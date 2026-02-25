@@ -16,7 +16,7 @@ jobs:
   # Stage 1: Build common images
   # =============================================================================
   build-common:
-    runs-on: ubicloud-standard-16-ubuntu-2204
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
@@ -131,7 +131,7 @@ jobs:
   # Stage 2: Build component images (parallel)
   # =============================================================================
   build-components:
-    runs-on: ubicloud-standard-8-ubuntu-2204
+    runs-on: ubuntu-22.04
     needs: build-common
     permissions:
       contents: read
@@ -220,7 +220,7 @@ jobs:
   # Stage 3: Build universe and universe-cuda images (parallel)
   # =============================================================================
   build-universe:
-    runs-on: ubicloud-standard-8-ubuntu-2204
+    runs-on: ubuntu-22.04
     needs: [build-common, build-components]
     permissions:
       contents: read

@@ -5,7 +5,7 @@ group "default" {
   targets = [
     "common",
     "component",
-    "universe"
+    "universe-all"
   ]
 }
 
@@ -31,7 +31,7 @@ group "component" {
   ]
 }
 
-group "universe" {
+group "universe-all" {
   targets = [
     "universe",
     "universe-cuda"

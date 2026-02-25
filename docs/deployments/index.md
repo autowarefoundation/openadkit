@@ -1,6 +1,6 @@
 # Deployments
 
-A **deployment** is a running instance of Open AD Kit, a specific combination of **Autoware components** configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
+A **deployment** is a running instance of Open AD Kit, a specific combination of Autoware components configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
 
 ## Sample Deployments
 

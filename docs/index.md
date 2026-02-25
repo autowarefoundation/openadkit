@@ -4,11 +4,9 @@ Open AD Kit adopts a modular, component-based architecture designed for flexibil
 
 ## Architecture
 
-The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem.
+The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the **Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem**.
 
-![Soafee Architecture](assets/images/soafee_architecture.drawio.png)
-
-At the heart of the Open AD Kit are two main types of components: **Autoware Components** and **Tools**.
+![Soafee Architecture](assets/images/openadkit.drawio.png)
 
 ## Components
 

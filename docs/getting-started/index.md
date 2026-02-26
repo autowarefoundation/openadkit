@@ -3,7 +3,6 @@
 ## Requirements
 
 - Docker Engine
-- Docker Compose
 - NVIDIA Container Toolkit (Optional but highly recommended for sensing and perception tasks)
 - Autoware artifacts (Optional but highly recommended for sensing and perception tasks)
 

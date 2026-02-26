@@ -6,7 +6,6 @@
 [![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](https://autowarefoundation.github.io/openadkit/)
 [![Autoware Discord](https://img.shields.io/discord/953808765935816715?logo=discord&logoColor=white&style=flat&label=Autoware)](https://discord.gg/Q94UsPvReQ)
 [![Autoware](https://img.shields.io/badge/Linkedin-Autoware-0a66c2?logo=linkedin&logoColor=white&style=flat)](https://www.linkedin.com/company/the-autoware-foundation/)
-[![Autoware Twitter / X](https://img.shields.io/twitter/follow/Autoware?logo=x&logoColor=white&style=flat)](https://twitter.com/intent/follow?screen_name=Autoware)
 
 </div>
 

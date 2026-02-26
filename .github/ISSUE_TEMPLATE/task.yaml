@@ -1,8 +1,6 @@
-# This file is automatically synced from:
-# https://github.com/autowarefoundation/sync-file-templates
-# To make changes, update the source repository and follow the guidelines in its README.
+# Task Template
 
-name: Task
+name: Task Plan
 description: Plan a task
 body:
   - type: checkboxes
@@ -10,8 +8,6 @@ body:
       label: Checklist
       description: Confirm the following items before proceeding. If one cannot be satisfied, create a discussion thread instead.
       options:
-        - label: I've read the [contribution guidelines](https://github.com/autowarefoundation/autoware/blob/main/CONTRIBUTING.md).
-          required: true
         - label: I've searched other issues and no duplicate issues were found.
           required: true
         - label: I've agreed with the maintainers that I can plan this task.
@@ -35,12 +31,5 @@ body:
     attributes:
       label: Possible approaches
       description: Describe possible approaches for the task.
-    validations:
-      required: true
-
-  - type: textarea
-    attributes:
-      label: Definition of done
-      description: Write the definition of done for the task.
     validations:
       required: true

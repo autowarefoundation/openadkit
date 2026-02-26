@@ -17,4 +17,4 @@ The Open AD Kit supports **amd64** and **arm64** architectures with the followin
 
 ## Tested Cloud Instances
 
-- AWS EC2 G5.4XLarge (TBD)
+- AWS EC2 G5.4XLarge

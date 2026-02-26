@@ -1,3 +1,5 @@
 nav:
   - index.md
+  - samples
+  - demos
   - zenoh-bridge

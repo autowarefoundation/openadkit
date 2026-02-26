@@ -10,10 +10,10 @@ Here is an explanatory blog post on the [benefits of open standards in automotiv
 
 AutoSD is the upstream binary distribution that serves as the public, in-development preview of Red Hat In-Vehicle Operating System (OS). AutoSD is downstream of CentOS Stream, so it retains most of the CentOS Stream code with a few divergences, such as an optimized automotive-specific kernel rather than CentOS Stream's kernel package. Red Hat In-Vehicle OS is based on both AutoSD and RHEL, both of which are downstreams of CentOS Stream. 
 
-Instructions on how to build and deploy Open AD Kit on AutoSD can be found in the [AutoSD folder](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd).
+Instructions on how to build and deploy Open AD Kit on AutoSD can be found in the [AutoSD folder](autosd/index.md).
 
 ### [EWAOL](https://ewaol.docs.arm.com/en/kirkstone-dev/)
 
 The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying and orchestrating applications on edge platforms, delivered via the `meta-ewaol` Yocto layer to build distribution images. It organizes the stack into user-defined containerized application workloads (deployed by end users), an EWAOL Linux filesystem that provides core services such as Docker, K3s, and Xen along with validation and development tooling, and platform-specific system software (firmware, bootloader, OS, and optional Xen) integrated from `meta-arm`, `meta-arm-bsp`, and `meta-virtualization`. EWAOL is the reference implementation for SOAFEE, extending cloud-native methods to automotive with an emphasis on real-time and functional safety.
 
-Instructions on how to run Open AD Kit on EWAOL can be found in the [EWAOL folder](https://github.com/autowarefoundation/openadkit/tree/main/platforms/ewaol) (TBD).
+Instructions on how to run Open AD Kit on EWAOL can be found in the [EWAOL folder](ewaol/index.md) (TBD).

@@ -6,14 +6,11 @@ A **deployment** is a running instance of Open AD Kit, a specific combination of
 
 Sample deployment configurations to help you get started. Recommended for **learning and development**.
 
-- [Sample Deployments](https://github.com/autowarefoundation/openadkit/tree/main/deployments/samples)
+- [Planning Simulation](samples/planning-simulation/index.md) - Run the Autoware planning simulation with a sample map.
+- [Logging Simulation](samples/logging-simulation/index.md) - Run the Autoware logging simulation with a sample rosbag.
 
 ## Demo Deployments
 
-[Demo deployment](https://github.com/autowarefoundation/openadkit/tree/main/deployments/demos) configurations that are specific to certain **use case scenarios**.
+Demo deployment configurations that are specific to certain **use case scenarios**.
 
-- [Zenoh-bridge](zenoh-bridge/index.md)
-
-    The `zenoh-bridge` provides the communication backbone for the OpenADKit's distributed architecture. It demonstrates a "Cloud-Edge" deployment model by seamlessly bridging two isolated ROS 2 environments, decoupling compute-intensive components from lightweight visualization tools.
-
-    In this model, the core `autoware` stack runs on an **edge device** (e.g., a vehicle or server), while the `visualizer` can be accessed remotely from a user's machine (the **cloud side**).
+- [Zenoh-bridge](zenoh-bridge/index.md) - Demonstrates a "Cloud-Edge" deployment model by seamlessly bridging two isolated ROS 2 environments, decoupling compute-intensive components from lightweight visualization tools.

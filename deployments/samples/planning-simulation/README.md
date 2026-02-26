@@ -27,7 +27,7 @@ unzip -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
     docker compose --env-file planning-simulation.env up -d
     ```
 
-2. Open a browser to visualize the simulation and navigate to:
+2. Wait for the deployment to start for about 10 seconds and then open a browser to visualize the simulation and navigate to:
 
     ```bash
     http://localhost:6080/vnc.html
@@ -41,10 +41,10 @@ unzip -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
     > http://<your-server-ip>:6080/vnc.html
     > ```
 
-3. After you see the visualizer, you can start the autonomous driving simulation by following the [planning simulation instructions](https://autowarefoundation.github.io/autoware-documentation/main/tutorials/ad-hoc-simulation/planning-simulation/#2-set-an-initial-pose-for-the-ego-vehicle) in the Autoware documentation.
+3. After you see the visualizer, you can start the autonomous driving simulation by following the [planning simulation instructions](https://autowarefoundation.github.io/autoware-documentation/main/demos/planning-sim/lane-driving/#2-set-an-initial-pose-for-the-ego-vehicle) in the Autoware documentation.
 
 ## Stop the Deployment
 
 ```bash
-docker compose down
+docker compose --env-file planning-simulation.env down
 ```

@@ -40,7 +40,7 @@ unzip -d ~/autoware_map/ ~/autoware_map/sample-rosbag.zip
     docker compose --env-file logging-simulation.env up -d
     ```
 
-2. Open a browser to visualize the simulation and navigate to:
+2. Wait for the deployment to start for about 10 seconds and then open a browser to visualize the simulation and navigate to:
 
     ```bash
     http://localhost:6080/vnc.html
@@ -65,5 +65,5 @@ unzip -d ~/autoware_map/ ~/autoware_map/sample-rosbag.zip
 Stop the deployment by running the following command:
 
 ```bash
-docker compose --profile rosbag down
+docker compose --env-file logging-simulation.env --profile rosbag down
 ```

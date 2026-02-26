@@ -8,6 +8,16 @@ The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Archite
 
 ![Soafee Architecture](assets/images/openadkit.drawio.png)
 
+## Deployments
+
+A **deployment** is a running instance of Open AD Kit, a specific combination of **Autoware components** configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
+
+Deployments are defined using container orchestration files (e.g., `docker-compose.yaml`). This makes them portable and easy to reproduce across different environments, from a developer's laptop to edge devices in a vehicle. This container-based approach is a cornerstone of the Open AD Kit's cloud-native and platform-agnostic philosophy, aligning with standards like SOAFEE.
+
+This modular structure allows users to start with a minimal deployment and incrementally add components and tools as their system evolves.
+
+For more details, see the [Deployments](./deployments/).
+
 ## Components
 
 The core functional components of the Open AD Kit are derived from the main **[Autoware Universe](https://github.com/autowarefoundation/autoware_universe)** project. Each component is packaged as an independent containerized component, responsible for a specific aspect of the autonomous driving pipeline. This modular approach provides flexibility in composing different AD systems by combining different components.
@@ -34,16 +44,6 @@ In addition to the **Autoware components**, Open AD Kit provides essential tools
 - **Scenario Simulator-TBD**: Allows for testing the AD stack in a virtual environment. It supports complex scenario-based simulations for validation and CI/CD.
 
 For more details, see the [Tools](./tools/).
-
-## Deployments
-
-A **deployment** is a running instance of Open AD Kit, a specific combination of **Autoware components** configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
-
-Deployments are defined using container orchestration files (e.g., `docker-compose.yaml`). This makes them portable and easy to reproduce across different environments, from a developer's laptop to edge devices in a vehicle. This container-based approach is a cornerstone of the Open AD Kit's cloud-native and platform-agnostic philosophy, aligning with standards like SOAFEE.
-
-This modular structure allows users to start with a minimal deployment and incrementally add components and tools as their system evolves.
-
-For more details, see the [Deployments](./deployments/).
 
 ## Supported Platforms
 

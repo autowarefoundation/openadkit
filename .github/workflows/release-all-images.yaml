@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
+    inputs:
+      autoware_tag:
+        description: The Autoware tag to release
+        required: true
 
 env:
   REGISTRY: ghcr.io

@@ -30,23 +30,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
+      - name: Validate manual tag format
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "${{ inputs.autoware_tag }}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || (echo "Invalid tag format '${{ inputs.autoware_tag }}': must be X.Y.Z" && exit 1)
+
       - name: Get latest upstream semver tag (e.g. 1.2.3)
         id: latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tags_json=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/autowarefoundation/autoware/tags?per_page=3")
-          tag=$(
-            echo "$tags_json" \
-            | jq -r '.[].name' \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-            | sort -V \
-            | tail -n 1
-          )
-          [ -n "$tag" ] || (echo "No semver tags found" && exit 1)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.autoware_tag }}"
+          else
+            tags_json=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/autowarefoundation/autoware/tags?per_page=3")
+            tag=$(
+              echo "$tags_json" \
+              | jq -r '.[].name' \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sort -V \
+              | tail -n 1
+            )
+          fi
+          [ -n "$tag" ] || (echo "No semver tag found" && exit 1)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "Latest Autoware tag: $tag"
+          echo "Tag: $tag"
 
       - name: Cache lookup for processed tag
         id: cache
@@ -60,7 +70,10 @@ jobs:
       - name: Decide whether to run
         id: decide
         run: |
-          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — forcing run for tag ${{ steps.latest.outputs.tag }}"
+          elif [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             echo "Already processed tag ${{ steps.latest.outputs.tag }}"
           else

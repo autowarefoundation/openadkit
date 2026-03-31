@@ -2,7 +2,9 @@ name: build-all-images
 
 on:
   push:
-    branches: [main]
+on:
+  schedule:
+    - cron: '0 0 1 * *'
     paths:
       - 'components/docker-bake.hcl'
       - 'components/common/**'

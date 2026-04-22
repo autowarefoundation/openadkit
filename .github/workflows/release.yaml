@@ -26,6 +26,7 @@ jobs:
   validate:
     runs-on: ubuntu-22.04
     permissions:
+      actions: read
       contents: read
       packages: read
     outputs:
@@ -45,6 +46,32 @@ jobs:
         run: |
           [ "${{ github.ref }}" = "refs/heads/main" ] \
             || (echo "Release must be triggered from main branch (got ${{ github.ref }})" && exit 1)
+
+      - name: Validate source build run
+        id: get-sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f2)
+          run_attempt=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f3)
+          run_json=$(gh api repos/${{ github.repository }}/actions/runs/${run_id}/attempts/${run_attempt})
+
+          workflow_name=$(printf '%s' "$run_json" | jq -r '.name')
+          workflow_path=$(printf '%s' "$run_json" | jq -r '.path')
+          head_branch=$(printf '%s' "$run_json" | jq -r '.head_branch')
+          status=$(printf '%s' "$run_json" | jq -r '.status')
+          conclusion=$(printf '%s' "$run_json" | jq -r '.conclusion')
+          sha=$(printf '%s' "$run_json" | jq -r '.head_sha')
+
+          [ "$workflow_name" = "build-all-images" ] || (echo "Expected build-all-images run, got '${workflow_name}'" && exit 1)
+          [ "$workflow_path" = ".github/workflows/build-all-images.yaml" ] || (echo "Unexpected workflow path '${workflow_path}'" && exit 1)
+          [ "$head_branch" = "main" ] || (echo "Source build must come from main branch (got '${head_branch}')" && exit 1)
+          [ "$status" = "completed" ] || (echo "Source build must be completed (got '${status}')" && exit 1)
+          [ "$conclusion" = "success" ] || (echo "Source build must succeed (got '${conclusion}')" && exit 1)
+
+          [ -n "$sha" ] || (echo "Could not resolve SHA for run_id ${run_id} attempt ${run_attempt}" && exit 1)
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
       - name: Check git tag does not already exist
         env:
@@ -70,18 +97,6 @@ jobs:
           docker buildx imagetools inspect \
             ${{ env.IMAGE_PREFIX_COMMON }}:base-humble-${{ inputs.build_tag }} \
             || (echo "build_tag '${{ inputs.build_tag }}' not found in registry" && exit 1)
-
-      - name: Resolve git SHA for build_tag
-        id: get-sha
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          run_id=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f2)
-          sha=$(gh api repos/${{ github.repository }}/actions/runs/${run_id} --jq '.head_sha')
-          [ -n "$sha" ] || (echo "Could not resolve SHA for run_id ${run_id}" && exit 1)
-          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
-          echo "Resolved SHA: ${sha} (from run_id: ${run_id})"
 
   # =============================================================================
   # Stage 2: Promote all images to release tag

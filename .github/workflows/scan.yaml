@@ -1,0 +1,49 @@
+name: scan-images
+
+on:
+  workflow_run:
+    workflows: [build-all-images]
+    types: [completed]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+
+jobs:
+  scan:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        ros-distro: [humble, jazzy]
+        target: [universe, sensing-perception, localization-mapping, planning-control]
+    steps:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan ${{ matrix.target }}-${{ matrix.ros-distro }}
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX_COMPONENT }}:${{ matrix.target }}-${{ matrix.ros-distro }}
+          format: sarif
+          output: trivy-${{ matrix.target }}-${{ matrix.ros-distro }}.sarif
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+
+      - name: Upload scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros-distro }}.sarif
+          category: ${{ matrix.target }}-${{ matrix.ros-distro }}

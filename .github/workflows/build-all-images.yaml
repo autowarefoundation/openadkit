@@ -62,15 +62,18 @@ jobs:
         platform: [linux/amd64, linux/arm64]
         ros-distro: [humble, jazzy]
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Free Disk Space (Ubuntu)
+        uses: ./.github/actions/free-disk-space
+
       - name: Install jq and vcs2l
         run: |
           sudo apt-get update
           sudo apt-get install -y jq pipx
           pipx install vcs2l
         shell: bash
-
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@v6
 
       - name: Checkout Autoware repository
         uses: actions/checkout@v6
@@ -213,15 +216,18 @@ jobs:
             ros-distro: jazzy
             target: sensing-perception-cuda
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Free Disk Space (Ubuntu)
+        uses: ./.github/actions/free-disk-space
+
       - name: Install jq and vcs2l
         run: |
           sudo apt-get update
           sudo apt-get install -y jq pipx
           pipx install vcs2l
         shell: bash
-
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@v6
 
       - name: Checkout Autoware repository
         uses: actions/checkout@v6

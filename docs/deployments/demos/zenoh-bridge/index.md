@@ -1,8 +1,8 @@
-# OpenADKit Remote Visualization with Zenoh Bridge: Implementation Report and User Manual
+# Open AD Kit Remote Visualization with Zenoh Bridge: Implementation Report and User Manual
 
 ## 1. Introduction
 
-This document provides a comprehensive implementation guide and technical overview for the distributed architecture of the OpenADKit project. The core objective is to separate compute-intensive and lightweight components of an autonomous driving system, enabling deployment across different hardware. For example, the core Autoware software stack runs on the edge side (e.g., vehicle, or a powerful simulation server). Users can remotely visualize and manage Autoware from their laptops or a cloud-based management system.
+This document provides a comprehensive implementation guide and technical overview for the distributed architecture of the Open AD Kit project. The core objective is to separate compute-intensive and lightweight components of an autonomous driving system, enabling deployment across different hardware. For example, the core Autoware software stack runs on the edge side (e.g., vehicle, or a powerful simulation server). Users can remotely visualize and manage Autoware from their laptops or a cloud-based management system.
 
 To achieve this, we utilize [Zenoh](https://zenoh.io/) as a high-performance, low-latency communication protocol, paired with the [`zenoh-bridge-ros2dds`](https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds) tool to seamlessly connect two ROS 2 (Robot Operating System 2) environments isolated by Docker virtual networks. This manual covers architecture design, setup steps, system startup, and troubleshooting, providing complete operational guidance.
 
@@ -85,7 +85,7 @@ graph TD
     end
 
     %% === External & Cross-Network Connections ===
-    user[fa:fa-user User] -->|"HTTP (Port 6080)"| visualizer
+    user[fa:fa-user User] -->|"HTTP (Port 6081)"| visualizer
     edge_bridge -->|"<b>Zenoh Protocol over zenoh_net</b><br>Connects to tcp/cloud_zenoh_bridge:7448"| cloud_bridge
 ```
 

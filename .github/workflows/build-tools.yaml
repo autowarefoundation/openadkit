@@ -16,7 +16,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX_TOOLS: ghcr.io/${{ github.repository_owner }}/autoware-tools
+  IMAGE_PREFIX_TOOLS: ghcr.io/${{ github.repository_owner }}/openadkit-tools
   BAKE_FILE: tools/docker-bake.hcl
 
 jobs:
@@ -103,5 +103,5 @@ jobs:
           set: |
             *.platform=linux/amd64
             *.args.ROS_DISTRO=humble
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/autoware-tools-buildcache:scenario-simulator-amd64-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/autoware-tools-buildcache:scenario-simulator-amd64-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-tools-buildcache:scenario-simulator-amd64-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-tools-buildcache:scenario-simulator-amd64-main,mode=max

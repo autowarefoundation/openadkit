@@ -13,7 +13,7 @@ Type=oneshot
 [Container]
 Pod=awf-oak.pod
 ContainerName=awf-oak-simulator
-Image=localhost/autoware-tools:scenario-simulator
+Image=localhost/openadkit-tools:scenario-simulator
 Network=bridge
 Environment=ROS_DOMAIN=26
 Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp

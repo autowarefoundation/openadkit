@@ -18,7 +18,7 @@ services:
       - edge_zenoh_bridge
 
   scenario_simulator:
-    image: ghcr.io/autowarefoundation/autoware-tools:scenario-simulator
+    image: ghcr.io/autowarefoundation/openadkit-tools:scenario-simulator
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0

@@ -17,9 +17,9 @@ content:
     - source: ghcr.io/autowarefoundation/autoware
       tag: universe-0.45.1-amd64
       name: localhost/autoware:latest
-    - source: ghcr.io/autowarefoundation/autoware-tools
+    - source: ghcr.io/autowarefoundation/openadkit-tools
       tag: scenario-simulator
-      name: localhost/autoware-tools:scenario-simulator
+      name: localhost/openadkit-tools:scenario-simulator
   make_dirs:
     - path: /var/log/awf
       mode: 0755

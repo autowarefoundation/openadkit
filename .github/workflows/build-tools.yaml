@@ -67,6 +67,7 @@ jobs:
         run: |
           mkdir -p autoware/src
           vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+          vcs import --shallow autoware/src < autoware/repositories/simulator.repos
         shell: bash
 
       - name: Set up Docker Buildx

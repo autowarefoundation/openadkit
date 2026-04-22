@@ -1,3 +1,5 @@
-# Open AD Kit Tools -TBD
+# Open AD Kit Tools
 
-This directory offers tools for Open AD Kit to make development and deployment easier. These tools are also containerized and can be integrated into deployments as needed.
+This directory contains containerized tools that complement the core Open AD Kit images.
+
+- [Scenario Simulator](./scenario-simulator/README.md): Runs Tier IV Scenario Simulator in a container for scenario-based validation and local testing.

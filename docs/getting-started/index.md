@@ -4,7 +4,7 @@
 
 - Docker Engine
 - NVIDIA Container Toolkit (Optional but highly recommended for sensing and perception tasks)
-- Autoware artifacts (Optional but highly recommended for sensing and perception tasks)
+- Autoware artifacts (Optional in general, but required for sensing and perception deployments such as Logging Simulation)
 
     > All the above requirements can be installed by running the **setup.sh** script.
 
@@ -31,7 +31,9 @@
     sudo ./setup.sh --download-artifacts
     ```
 
+    > This step is required for deployments that mount `${HOME}/autoware_data`, including the Logging Simulation sample.
+
 ## Next Steps
 
-- [Running a sample deployment](../deployments/)
-- [Learn more about the Open AD Kit components](../components/)
+- [Running a sample deployment](../deployments/index.md)
+- [Learn more about the Open AD Kit components](../components/index.md)

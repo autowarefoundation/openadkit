@@ -1,6 +1,6 @@
 # Autoware Tools - Scenario Simulator
 
-Runs Scenario Simulator in a container.
+Runs Scenario Simulator in a container. Open AD Kit builds and publishes this image as `ghcr.io/autowarefoundation/autoware-tools:scenario-simulator`.
 
 ## Standalone Run
 

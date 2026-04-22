@@ -41,7 +41,7 @@ These components communicate with each other over a service mesh, allowing for f
 
 In addition to the **Autoware components**, Open AD Kit provides essential tools for development, simulation, and visualization. These tools are also containerized and can be integrated into deployments as needed.
 
-- **Scenario Simulator-TBD**: Allows for testing the AD stack in a virtual environment. It supports complex scenario-based simulations for validation and CI/CD.
+- **Scenario Simulator**: Allows for testing the AD stack in a virtual environment with scenario-based simulations for validation and CI/CD.
 
 For more details, see the [Tools](./tools/).
 

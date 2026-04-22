@@ -1,11 +1,12 @@
 ### Builder
+ARG ROS_DISTRO=humble
 FROM ghcr.io/autowarefoundation/autoware:universe-devel AS builder
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 ENV CCACHE_DIR="/root/.ccache"
 
-COPY src/simulator /autoware/src/simulator
-COPY docker/scripts/ /autoware/
+COPY autoware/src/simulator /autoware/src/simulator
+COPY components/common/scripts/ /autoware/
 RUN chmod +x /autoware/*.sh
 WORKDIR /autoware
 
@@ -36,6 +37,7 @@ RUN --mount=type=cache,target=${CCACHE_DIR} \
 FROM ghcr.io/autowarefoundation/autoware:universe AS scenario-simulator
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
+COPY components/common/scripts/ /autoware/
 COPY --from=builder /opt/autoware /opt/autoware
 COPY --from=builder /rosdep-simulator-exec-depend-packages.txt /tmp/rosdep-simulator-exec-depend-packages.txt
 
@@ -51,6 +53,6 @@ RUN --mount=type=ssh \
     && cat /tmp/rosdep-simulator-exec-depend-packages.txt | xargs apt-get install -y --no-install-recommends \
     && /autoware/cleanup_system.sh $ROS_DISTRO
 
-COPY docker/tools/scenario-simulator/entrypoint.sh /entrypoint.sh
+COPY tools/scenario-simulator/etc/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

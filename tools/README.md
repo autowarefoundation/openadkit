@@ -1,3 +1,3 @@
-# Open AD Kit Tools -TBD
+# Open AD Kit Tools
 
-This directory offers tools for Open AD Kit to make development and deployment easier. These tools are also containerized and can be integrated into deployments as needed.
+This directory contains containerized tools for Open AD Kit. The Scenario Simulator image is built in CI and published as `ghcr.io/autowarefoundation/autoware-tools:scenario-simulator`.

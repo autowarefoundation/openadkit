@@ -1,0 +1,106 @@
+name: build-tools
+
+on:
+  push:
+    paths:
+      - 'components/common/scripts/**'
+      - 'tools/**'
+      - '.github/workflows/build-tools.yaml'
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: build-tools-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_TOOLS: ghcr.io/${{ github.repository_owner }}/autoware-tools
+  BAKE_FILE: tools/docker-bake.hcl
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    outputs:
+      autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+    steps:
+      - name: Resolve shared build inputs
+        id: prepare
+        run: |
+          set -euo pipefail
+          autoware_ref=$(git ls-remote https://github.com/autowarefoundation/autoware refs/heads/main | cut -f1)
+          build_tag="$(date -u +'%Y%m%d')-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "autoware_ref=${autoware_ref}" >> "$GITHUB_OUTPUT"
+          echo "build_tag=${build_tag}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  build-scenario-simulator:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Install jq and vcs2l
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq pipx
+          pipx install vcs2l
+        shell: bash
+
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Autoware repository
+        uses: actions/checkout@v6
+        with:
+          repository: autowarefoundation/autoware
+          ref: ${{ needs.prepare.outputs.autoware_ref }}
+          path: autoware
+          fetch-depth: 1
+
+      - name: Pull Autoware Source
+        run: |
+          mkdir -p autoware/src
+          vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for scenario-simulator
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_TOOLS }}
+          bake-target: docker-metadata-action-scenario-simulator
+          tags: |
+            type=raw,value=scenario-simulator,enable={{is_default_branch}}
+            type=raw,value=scenario-simulator-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Build and push scenario-simulator
+        uses: docker/bake-action@v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta.outputs.bake-file }}
+          targets: scenario-simulator
+          push: true
+          set: |
+            *.platform=linux/amd64
+            *.args.ROS_DISTRO=humble
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/autoware-tools-buildcache:scenario-simulator-amd64-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/autoware-tools-buildcache:scenario-simulator-amd64-main,mode=max

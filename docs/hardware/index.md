@@ -13,7 +13,10 @@ The Open AD Kit supports **amd64** and **arm64** architectures with the followin
 ## Tested Hardware
 
 - [ADLink AADP-AVA](https://www.adlinktech.com/products/Computer_on_Modules/COM-HPC-Server-Carrier-and-Starter-Kit/Ampere_Altra_Developer_Platform)
-- [NVIDIA Jetson Orin](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/) (TBD)
+
+## Planned Validation
+
+- [NVIDIA Jetson Orin](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/)
 
 ## Tested Cloud Instances
 

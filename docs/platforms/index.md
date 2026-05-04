@@ -1,6 +1,6 @@
 # Supported Platforms
 
-As the Autoware Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software defined vehicle ecosystem, it supports a variety of platforms as core SOAFEE platforms.
+As the Autoware Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software defined vehicle ecosystem, it tracks multiple platform directions. The repository currently contains runnable assets for AutoSD; EWAOL remains a documented target rather than an implemented one.
 
 Here is an explanatory blog post on the [benefits of open standards in automotive development](https://www.soafee.io/blog/2025/the-benefits-of-open-standards-in-automotive-development/).
 
@@ -16,4 +16,4 @@ Instructions on how to build and deploy Open AD Kit on AutoSD can be found in th
 
 The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying and orchestrating applications on edge platforms, delivered via the `meta-ewaol` Yocto layer to build distribution images. It organizes the stack into user-defined containerized application workloads (deployed by end users), an EWAOL Linux filesystem that provides core services such as Docker, K3s, and Xen along with validation and development tooling, and platform-specific system software (firmware, bootloader, OS, and optional Xen) integrated from `meta-arm`, `meta-arm-bsp`, and `meta-virtualization`. EWAOL is the reference implementation for SOAFEE, extending cloud-native methods to automotive with an emphasis on real-time and functional safety.
 
-Instructions on how to run Open AD Kit on EWAOL can be found in the [EWAOL folder](ewaol/index.md) (TBD).
+The [EWAOL page](ewaol/index.md) currently captures project intent and status only. Runnable deployment instructions are still planned.

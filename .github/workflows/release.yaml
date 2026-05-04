@@ -1,0 +1,178 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v1.0.0)'
+        required: true
+      build_tag:
+        description: 'Build tag to promote (e.g. 123456789-1)'
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
+  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+
+jobs:
+  # =============================================================================
+  # Stage 1: Validate inputs before touching anything
+  # =============================================================================
+  validate:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    outputs:
+      sha: ${{ steps.get-sha.outputs.sha }}
+    steps:
+      - name: Validate version format
+        run: |
+          echo "${{ inputs.version }}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            || (echo "Invalid version format '${{ inputs.version }}': must be vX.Y.Z" && exit 1)
+
+      - name: Validate build_tag format
+        run: |
+          echo "${{ inputs.build_tag }}" | grep -E '^[0-9]+-[0-9]+$' \
+            || (echo "Invalid build_tag format '${{ inputs.build_tag }}': must be RUN_ID-RUN_ATTEMPT" && exit 1)
+
+      - name: Check release runs from main branch
+        run: |
+          [ "${{ github.ref }}" = "refs/heads/main" ] \
+            || (echo "Release must be triggered from main branch (got ${{ github.ref }})" && exit 1)
+
+      - name: Validate source build run
+        id: get-sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f1)
+          run_attempt=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f2)
+          run_json=$(gh api repos/${{ github.repository }}/actions/runs/${run_id}/attempts/${run_attempt})
+
+          workflow_name=$(printf '%s' "$run_json" | jq -r '.name')
+          workflow_path=$(printf '%s' "$run_json" | jq -r '.path')
+          head_branch=$(printf '%s' "$run_json" | jq -r '.head_branch')
+          status=$(printf '%s' "$run_json" | jq -r '.status')
+          conclusion=$(printf '%s' "$run_json" | jq -r '.conclusion')
+          sha=$(printf '%s' "$run_json" | jq -r '.head_sha')
+
+          [ "$workflow_name" = "build-all-images" ] || (echo "Expected build-all-images run, got '${workflow_name}'" && exit 1)
+          [ "$workflow_path" = ".github/workflows/build-all-images.yaml" ] || (echo "Unexpected workflow path '${workflow_path}'" && exit 1)
+          [ "$head_branch" = "main" ] || (echo "Source build must come from main branch (got '${head_branch}')" && exit 1)
+          [ "$status" = "completed" ] || (echo "Source build must be completed (got '${status}')" && exit 1)
+          [ "$conclusion" = "success" ] || (echo "Source build must succeed (got '${conclusion}')" && exit 1)
+
+          [ -n "$sha" ] || (echo "Could not resolve SHA for run_id ${run_id} attempt ${run_attempt}" && exit 1)
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Check git tag does not already exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh api repos/${{ github.repository }}/git/refs/tags/${{ inputs.version }} 2>/dev/null; then
+            echo "Tag ${{ inputs.version }} already exists — aborting to prevent duplicate release"
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify build_tag exists in registry
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.IMAGE_PREFIX_COMMON }}:base-humble-${{ inputs.build_tag }} \
+            || (echo "build_tag '${{ inputs.build_tag }}' not found in registry" && exit 1)
+
+  # =============================================================================
+  # Stage 2: Promote all images to release tag
+  # =============================================================================
+  release-images:
+    runs-on: ubuntu-22.04
+    needs: validate
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote all images to ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          BUILD_TAG="${{ inputs.build_tag }}"
+          VERSION="${{ inputs.version }}"
+          COMMON="${{ env.IMAGE_PREFIX_COMMON }}"
+          COMPONENT="${{ env.IMAGE_PREFIX_COMPONENT }}"
+
+          DISTROS="humble jazzy"
+          COMMON_VARIANTS="base base-cuda devel devel-cuda"
+          COMPONENT_TARGETS="sensing-perception sensing-perception-cuda localization-mapping planning-control vehicle-system api visualizer simulator universe universe-cuda"
+
+          for distro in ${DISTROS}; do
+            for variant in ${COMMON_VARIANTS}; do
+              echo "Promoting ${COMMON}:${variant}-${distro}-${BUILD_TAG} → ${VERSION}"
+              docker buildx imagetools create \
+                -t "${COMMON}:${variant}-${distro}-${VERSION}" \
+                "${COMMON}:${variant}-${distro}-${BUILD_TAG}"
+            done
+            for target in ${COMPONENT_TARGETS}; do
+              echo "Promoting ${COMPONENT}:${target}-${distro}-${BUILD_TAG} → ${VERSION}"
+              docker buildx imagetools create \
+                -t "${COMPONENT}:${target}-${distro}-${VERSION}" \
+                "${COMPONENT}:${target}-${distro}-${BUILD_TAG}"
+            done
+          done
+
+  # =============================================================================
+  # Stage 3: Create git tag and GitHub Release
+  # =============================================================================
+  release-github:
+    runs-on: ubuntu-22.04
+    needs: [validate, release-images]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Create git tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ inputs.version }}',
+              sha: '${{ needs.validate.outputs.sha }}'
+            })
+            console.log('Created tag ${{ inputs.version }} at ${{ needs.validate.outputs.sha }}')
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ inputs.version }}" \
+            --title "OpenADKit ${{ inputs.version }}" \
+            --generate-notes

@@ -44,7 +44,7 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
-      - REMOTE_PASSWORD=o
+      - REMOTE_PASSWORD=openadkit
       - USE_SIM_TIME=true
     ports:
       - "0.0.0.0:6081:6080"

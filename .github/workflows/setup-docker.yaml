@@ -3,6 +3,9 @@ name: setup-docker
 on:
   workflow_dispatch:
   pull_request:
+    paths:
+      - 'setup.sh'
+      - '.github/workflows/setup-docker.yaml'
 
 jobs:
   setup-docker:

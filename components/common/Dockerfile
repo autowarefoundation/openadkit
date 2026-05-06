@@ -90,7 +90,6 @@ RUN --mount=type=ssh \
   --mount=type=bind,source=autoware/src/universe/external/pointcloud_to_laserscan,target=/autoware/src/universe/external/pointcloud_to_laserscan \
   --mount=type=bind,source=autoware/src/universe/external/rtklib_ros_bridge,target=/autoware/src/universe/external/rtklib_ros_bridge \
   --mount=type=bind,source=autoware/src/universe/external/tier4_autoware_msgs,target=/autoware/src/universe/external/tier4_autoware_msgs \
-  --mount=type=bind,source=autoware/src/middleware/external,target=/autoware/src/middleware/external \
   apt-get update \
   && source /opt/ros/"$ROS_DISTRO"/setup.bash \
   && rosdep update \
@@ -113,8 +112,7 @@ RUN --mount=type=cache,target="${CCACHE_DIR}" \
   --mount=type=bind,source=autoware/src/universe/external/pointcloud_to_laserscan,target=/autoware/src/universe/external/pointcloud_to_laserscan \
   --mount=type=bind,source=autoware/src/universe/external/rtklib_ros_bridge,target=/autoware/src/universe/external/rtklib_ros_bridge \
   --mount=type=bind,source=autoware/src/universe/external/tier4_autoware_msgs,target=/autoware/src/universe/external/tier4_autoware_msgs \
-  --mount=type=bind,source=autoware/src/middleware/external,target=/autoware/src/middleware/external \
-  --mount=type=bind,source=/autoware/src/launcher,target=/autoware/src/launcher \
+  --mount=type=bind,source=autoware/src/launcher,target=/autoware/src/launcher \
   source /opt/ros/"$ROS_DISTRO"/setup.bash \
   && /scripts/build_and_clean.sh "${CCACHE_DIR}" /opt/autoware
 

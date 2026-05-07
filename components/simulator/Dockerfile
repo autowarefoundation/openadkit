@@ -24,6 +24,7 @@ RUN --mount=type=cache,target="${CCACHE_DIR}" \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/sensing/autoware_cuda_utils,target=/autoware/src/universe/autoware_universe/perception/autoware_cuda_utils \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor,target=/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions,target=/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
+  --mount=type=bind,source=/autoware/src/universe/autoware_universe/control/autoware_external_cmd_selector,target=/autoware/src/universe/autoware_universe/control/autoware_external_cmd_selector \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter,target=/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \
   apt-get update \
   && source /opt/ros/"$ROS_DISTRO"/setup.bash \

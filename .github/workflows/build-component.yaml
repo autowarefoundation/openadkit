@@ -93,6 +93,7 @@ jobs:
       rebuild_common: ${{ steps.prepare.outputs.rebuild_common }}
       target: ${{ steps.prepare.outputs.target }}
       ros_distro: ${{ steps.prepare.outputs.ros_distro }}
+      platform: ${{ steps.prepare.outputs.platform }}
       platforms: ${{ steps.prepare.outputs.platforms }}
       create_manifest: ${{ steps.prepare.outputs.create_manifest }}
       needs_cuda_common: ${{ steps.prepare.outputs.needs_cuda_common }}
@@ -213,6 +214,7 @@ jobs:
             echo "rebuild_common=${rebuild_common}"
             echo "target=${INPUT_TARGET}"
             echo "ros_distro=${INPUT_ROS_DISTRO}"
+            echo "platform=${INPUT_PLATFORM}"
             echo "platforms=${platforms}"
             echo "create_manifest=${create_manifest}"
             echo "needs_cuda_common=${needs_cuda_common}"
@@ -534,13 +536,14 @@ jobs:
 
   summarize:
     needs: [prepare, build-target, create-manifest]
-    if: always() && needs.prepare.result == 'success' && needs.build-target.result == 'success'
+    if: always() && needs.prepare.result == 'success' && needs.build-target.result == 'success' && (needs.prepare.outputs.create_manifest != 'true' || needs.create-manifest.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Write job summary
         env:
           TARGET: ${{ needs.prepare.outputs.target }}
           DISTRO: ${{ needs.prepare.outputs.ros_distro }}
+          PLATFORM: ${{ needs.prepare.outputs.platform }}
           BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
           COMMON_TAG: ${{ needs.prepare.outputs.common_tag }}
           DEPENDENCY_TAG: ${{ needs.prepare.outputs.dependency_tag }}
@@ -562,9 +565,14 @@ jobs:
             echo "| **dependency_tag** | \`${DEPENDENCY_TAG}\` |"
             echo ""
             echo "### Published image references"
-            echo "- Platform-specific: \`${IMAGE}:${TARGET}-amd64-${DISTRO}-${BUILD_TAG}\`"
             if [ "${CREATE_MANIFEST}" = "true" ]; then
+              echo "- Platform-specific: \`${IMAGE}:${TARGET}-amd64-${DISTRO}-${BUILD_TAG}\`"
+              echo "- Platform-specific: \`${IMAGE}:${TARGET}-arm64-${DISTRO}-${BUILD_TAG}\`"
               echo "- Multi-arch: \`${IMAGE}:${TARGET}-${DISTRO}-${BUILD_TAG}\`"
+            elif [ "${PLATFORM}" = "linux/arm64" ]; then
+              echo "- Platform-specific: \`${IMAGE}:${TARGET}-arm64-${DISTRO}-${BUILD_TAG}\`"
+            else
+              echo "- Platform-specific: \`${IMAGE}:${TARGET}-amd64-${DISTRO}-${BUILD_TAG}\`"
             fi
             echo ""
             echo "Stable tags are not updated by this workflow. Use **release** to promote a full build set."

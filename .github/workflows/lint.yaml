@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '**/*.sh'
+      - '.github/workflows/lint.yaml'
 
 jobs:
   shellcheck:

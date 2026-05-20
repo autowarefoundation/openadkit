@@ -20,6 +20,9 @@ log/
 # Python
 *.pyc
 
+# MkDocs
+/site/
+
 # rviz Screen Capture
 capture/
 

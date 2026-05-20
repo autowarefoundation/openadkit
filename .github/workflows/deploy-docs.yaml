@@ -10,6 +10,7 @@ on:
       - "**/*.svg"
       - "**/*.png"
       - "**/*.jpg"
+      - "docs/assets/**"
   workflow_dispatch:
 
 permissions:
@@ -41,12 +42,10 @@ jobs:
           pip install mkdocs-awesome-pages-plugin
           pip install mkdocs-exclude
           pip install mkdocs-macros-plugin
-          pip install mkdocs-same-dir
           pip install pymdown-extensions
           pip install python-markdown-math
           pip install mdx-truly-sane-lists
           pip install plantuml-markdown
-          pip install mkdocs-mermaid2-plugin
 
       - name: Build with MkDocs
         run: mkdocs build --clean --verbose
@@ -83,4 +82,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-

@@ -7,12 +7,10 @@ RUN pip install --no-cache-dir \
     mkdocs-awesome-pages-plugin \
     mkdocs-exclude \
     mkdocs-macros-plugin \
-    mkdocs-same-dir \
     pymdown-extensions \
     python-markdown-math \
     mdx-truly-sane-lists \
-    plantuml-markdown \
-    mkdocs-mermaid2-plugin
+    plantuml-markdown
 
 EXPOSE 8000
 

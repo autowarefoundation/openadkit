@@ -13,20 +13,23 @@ run_scenario_simulator() {
     # Set default values if not provided
     LAUNCH_AUTOWARE=${LAUNCH_AUTOWARE:-false}
     LAUNCH_RVIZ=${LAUNCH_RVIZ:-false}
-    ARCHITECTURE_TYPE=${ARCHITECTURE_TYPE:-awf/universe/20240605}
+    LAUNCH_VISUALIZATION=${LAUNCH_VISUALIZATION:-true}
+    ARCHITECTURE_TYPE=${ARCHITECTURE_TYPE:-awf/universe/20250130}
     SENSOR_MODEL=${SENSOR_MODEL:-sample_sensor_kit}
     VEHICLE_MODEL=${VEHICLE_MODEL:-sample_vehicle}
     INITIALIZE_DURATION=${INITIALIZE_DURATION:-90}
     GLOBAL_FRAME_RATE=${GLOBAL_FRAME_RATE:-30}
     OUTPUT_DIRECTORY=${OUTPUT_DIRECTORY:-/autoware/scenario-sim/output}
     SCENARIO=${SCENARIO:-$(ros2 pkg prefix --share scenario_test_runner)/scenario/sample.yaml}
-    GLOBAL_TIMEOUT=${GLOBAL_TIMEOUT:-120}
+    GLOBAL_TIMEOUT=${GLOBAL_TIMEOUT:-180}
     RECORD=${RECORD:-false}
     USE_SIM_TIME=${USE_SIM_TIME:-false}
+    USE_CUSTOM_CENTERLINE=${USE_CUSTOM_CENTERLINE:-true}
 
     # Print all variables
     echo "LAUNCH_AUTOWARE: $LAUNCH_AUTOWARE"
     echo "LAUNCH_RVIZ: $LAUNCH_RVIZ"
+    echo "LAUNCH_VISUALIZATION: $LAUNCH_VISUALIZATION"
     echo "ARCHITECTURE_TYPE: $ARCHITECTURE_TYPE"
     echo "SENSOR_MODEL: $SENSOR_MODEL"
     echo "VEHICLE_MODEL: $VEHICLE_MODEL"
@@ -37,11 +40,13 @@ run_scenario_simulator() {
     echo "GLOBAL_TIMEOUT: $GLOBAL_TIMEOUT"
     echo "RECORD: $RECORD"
     echo "USE_SIM_TIME: $USE_SIM_TIME"
+    echo "USE_CUSTOM_CENTERLINE: $USE_CUSTOM_CENTERLINE"
 
     # Launch scenario test runner
     ros2 launch scenario_test_runner scenario_test_runner.launch.py \
         launch_autoware:="$LAUNCH_AUTOWARE" \
         launch_rviz:="$LAUNCH_RVIZ" \
+        launch_visualization:="$LAUNCH_VISUALIZATION" \
         architecture_type:="$ARCHITECTURE_TYPE" \
         sensor_model:="$SENSOR_MODEL" \
         vehicle_model:="$VEHICLE_MODEL" \
@@ -51,7 +56,8 @@ run_scenario_simulator() {
         scenario:="$SCENARIO" \
         global_timeout:="$GLOBAL_TIMEOUT" \
         record:="$RECORD" \
-        use_sim_time:="$USE_SIM_TIME"
+        use_sim_time:="$USE_SIM_TIME" \
+        use_custom_centerline:="$USE_CUSTOM_CENTERLINE"
 }
 
 # Source ROS and Autoware setup files

@@ -3,4 +3,5 @@
 Sample deployment configurations to help you get started. Recommended for **learning and development**.
 
 - [Planning Simulation](planning-simulation/index.md) - Run the Autoware planning simulation with a sample map.
+- [Scenario Simulation](scenario-simulation/index.md) - Run the Autoware scenario simulation with the Tier IV Scenario Simulator.
 - [Logging Simulation](logging-simulation/index.md) - Run the Autoware logging simulation with a sample rosbag.

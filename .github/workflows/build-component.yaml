@@ -1,0 +1,572 @@
+name: build-component
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Component image to build
+        required: true
+        type: choice
+        options:
+          - sensing-perception
+          - sensing-perception-cuda
+          - localization-mapping
+          - planning-control
+          - vehicle-system
+          - api
+          - visualizer
+          - simulator
+          - universe
+          - universe-cuda
+      ros_distro:
+        description: ROS distribution
+        required: true
+        type: choice
+        default: humble
+        options:
+          - humble
+          - jazzy
+      platform:
+        description: Target platform(s)
+        required: true
+        type: choice
+        default: linux/amd64
+        options:
+          - linux/amd64
+          - linux/arm64
+          - both
+      rebuild_common:
+        description: Rebuild common-base and common-devel before the component (recommended on feature branches)
+        required: true
+        type: boolean
+        default: true
+      common_image_source:
+        description: Which common images to use as the build base (stable only works on main after a recent full build)
+        required: true
+        type: choice
+        default: build_tag
+        options:
+          - stable
+          - build_tag
+      common_build_tag:
+        description: Common image build tag (RUN_ID-RUN_ATTEMPT). Required when common_image_source is build_tag and rebuild_common is false.
+        required: false
+        type: string
+      dependency_image_source:
+        description: Which component images universe targets should copy from
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - build_tag
+      dependency_build_tag:
+        description: Component image build tag for universe dependencies. Required when dependency_image_source is build_tag.
+        required: false
+        type: string
+
+concurrency:
+  group: build-component-${{ github.ref }}-${{ inputs.target }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
+  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+  BAKE_FILE: components/docker-bake.hcl
+  ROS_HUMBLE_BASE_IMAGE: ros:humble-ros-base-jammy@sha256:5417e56962ff6e15d4cf9b2f78a71a78f3901f47cd78696b575b7eecdb54eb78
+  ROS_JAZZY_BASE_IMAGE: ros:jazzy-ros-base-noble@sha256:eac11a5285beeb1e1884e71f7091c610e08452e823bfb3f43afaa334375325f6
+
+jobs:
+  prepare:
+    runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && 'depot-ubuntu-24.04-16' || github.repository_owner == 'oguzkaganozt' && 'ubicloud-standard-16-ubuntu-2204' || 'ubuntu-22.04' }}
+    permissions:
+      contents: read
+    outputs:
+      autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      cache_scope: ${{ steps.prepare.outputs.cache_scope }}
+      common_tag: ${{ steps.prepare.outputs.common_tag }}
+      dependency_tag: ${{ steps.prepare.outputs.dependency_tag }}
+      common_image_source: ${{ steps.prepare.outputs.common_image_source }}
+      dependency_image_source: ${{ steps.prepare.outputs.dependency_image_source }}
+      rebuild_common: ${{ steps.prepare.outputs.rebuild_common }}
+      target: ${{ steps.prepare.outputs.target }}
+      ros_distro: ${{ steps.prepare.outputs.ros_distro }}
+      platforms: ${{ steps.prepare.outputs.platforms }}
+      create_manifest: ${{ steps.prepare.outputs.create_manifest }}
+      needs_cuda_common: ${{ steps.prepare.outputs.needs_cuda_common }}
+    steps:
+      - name: Resolve build inputs
+        id: prepare
+        env:
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_ROS_DISTRO: ${{ inputs.ros_distro }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
+          INPUT_REBUILD_COMMON: ${{ inputs.rebuild_common }}
+          INPUT_COMMON_IMAGE_SOURCE: ${{ inputs.common_image_source }}
+          INPUT_COMMON_BUILD_TAG: ${{ inputs.common_build_tag }}
+          INPUT_DEPENDENCY_IMAGE_SOURCE: ${{ inputs.dependency_image_source }}
+          INPUT_DEPENDENCY_BUILD_TAG: ${{ inputs.dependency_build_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${INPUT_TARGET}" == *cuda* ]] && [ "${INPUT_PLATFORM}" != "linux/amd64" ]; then
+            echo "CUDA targets (${INPUT_TARGET}) only support linux/amd64 platform." >&2
+            exit 1
+          fi
+
+          if [ "${INPUT_REBUILD_COMMON}" = "true" ] && [ "${INPUT_COMMON_IMAGE_SOURCE}" = "build_tag" ] && [ -n "${INPUT_COMMON_BUILD_TAG}" ]; then
+            echo "Do not set common_build_tag when rebuild_common is true." >&2
+            exit 1
+          fi
+
+          if [ "${INPUT_REBUILD_COMMON}" = "false" ] && [ "${INPUT_COMMON_IMAGE_SOURCE}" = "build_tag" ] && [ -z "${INPUT_COMMON_BUILD_TAG}" ]; then
+            echo "common_build_tag is required when common_image_source is build_tag and rebuild_common is false." >&2
+            exit 1
+          fi
+
+          if [ -n "${INPUT_COMMON_BUILD_TAG}" ] && [[ ! "${INPUT_COMMON_BUILD_TAG}" =~ ^[0-9]+-[0-9]+$ ]]; then
+            echo "Invalid common_build_tag '${INPUT_COMMON_BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT" >&2
+            exit 1
+          fi
+
+          if [ "${INPUT_DEPENDENCY_IMAGE_SOURCE}" = "build_tag" ] && [ -z "${INPUT_DEPENDENCY_BUILD_TAG}" ]; then
+            echo "dependency_build_tag is required when dependency_image_source is build_tag." >&2
+            exit 1
+          fi
+
+          if [ -n "${INPUT_DEPENDENCY_BUILD_TAG}" ] && [[ ! "${INPUT_DEPENDENCY_BUILD_TAG}" =~ ^[0-9]+-[0-9]+$ ]]; then
+            echo "Invalid dependency_build_tag '${INPUT_DEPENDENCY_BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT" >&2
+            exit 1
+          fi
+
+          autoware_ref=$(git ls-remote https://github.com/autowarefoundation/autoware refs/heads/main | cut -f1)
+          build_tag="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          safe_ref=$(printf '%s' "${GITHUB_REF_NAME:-unknown}" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-60)
+          ref_hash=$(printf '%s' "${GITHUB_REF:-unknown}" | sha256sum | cut -c1-12)
+
+          if [ "${GITHUB_REF:-}" = "refs/heads/main" ]; then
+            cache_scope="main"
+          else
+            cache_scope="${safe_ref}-${ref_hash}"
+          fi
+
+          rebuild_common="${INPUT_REBUILD_COMMON}"
+          if [ "${rebuild_common}" = "false" ] && [ "${INPUT_COMMON_IMAGE_SOURCE}" = "stable" ] && [ "${GITHUB_REF:-}" != "refs/heads/main" ]; then
+            echo "::notice::Stable common images are only supported on main. Forcing rebuild_common=true on ${GITHUB_REF_NAME}."
+            rebuild_common="true"
+          fi
+
+          if [ "${rebuild_common}" = "true" ]; then
+            common_image_source="build_tag"
+            common_tag="${build_tag}"
+          else
+            common_image_source="${INPUT_COMMON_IMAGE_SOURCE}"
+            if [ "${common_image_source}" = "build_tag" ]; then
+              common_tag="${INPUT_COMMON_BUILD_TAG}"
+            else
+              common_tag="stable"
+            fi
+          fi
+
+          dependency_image_source="${INPUT_DEPENDENCY_IMAGE_SOURCE}"
+          if [ "${dependency_image_source}" = "build_tag" ]; then
+            dependency_tag="${INPUT_DEPENDENCY_BUILD_TAG}"
+          else
+            dependency_tag="stable"
+          fi
+
+          case "${INPUT_PLATFORM}" in
+            linux/amd64)
+              platforms='["linux/amd64"]'
+              create_manifest="false"
+              ;;
+            linux/arm64)
+              platforms='["linux/arm64"]'
+              create_manifest="false"
+              ;;
+            both)
+              platforms='["linux/amd64","linux/arm64"]'
+              create_manifest="true"
+              ;;
+            *)
+              echo "Unsupported platform '${INPUT_PLATFORM}'" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ "${INPUT_TARGET}" == *cuda* ]]; then
+            needs_cuda_common="true"
+          else
+            needs_cuda_common="false"
+          fi
+
+          {
+            echo "autoware_ref=${autoware_ref}"
+            echo "build_tag=${build_tag}"
+            echo "cache_scope=${cache_scope}"
+            echo "common_tag=${common_tag}"
+            echo "dependency_tag=${dependency_tag}"
+            echo "common_image_source=${common_image_source}"
+            echo "dependency_image_source=${dependency_image_source}"
+            echo "rebuild_common=${rebuild_common}"
+            echo "target=${INPUT_TARGET}"
+            echo "ros_distro=${INPUT_ROS_DISTRO}"
+            echo "platforms=${platforms}"
+            echo "create_manifest=${create_manifest}"
+            echo "needs_cuda_common=${needs_cuda_common}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  build-common:
+    needs: prepare
+    if: needs.prepare.outputs.rebuild_common == 'true'
+    runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && (matrix.platform == 'linux/amd64' && 'depot-ubuntu-24.04-16' || 'depot-ubuntu-24.04-arm-16') || github.repository_owner == 'oguzkaganozt' && (matrix.platform == 'linux/amd64' && 'ubicloud-standard-16-ubuntu-2204' || 'ubicloud-standard-16-arm-ubuntu-2204') || (matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm') }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.prepare.outputs.platforms) }}
+    steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Free Disk Space (Ubuntu)
+        uses: ./.github/actions/free-disk-space
+
+      - name: Install jq and vcs2l
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq pipx
+          pipx install vcs2l
+        shell: bash
+
+      - name: Checkout Autoware repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          repository: autowarefoundation/autoware
+          ref: ${{ needs.prepare.outputs.autoware_ref }}
+          path: autoware
+          fetch-depth: 1
+
+      - name: Pull Autoware Source
+        run: |
+          mkdir -p autoware/src
+          vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for openadkit-common:base
+        id: meta-common-base
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-base
+          tags: |
+            type=raw,value=base-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Extract metadata for openadkit-common:devel
+        id: meta-common-devel
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-devel
+          tags: |
+            type=raw,value=devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Extract metadata for openadkit-common:base-cuda
+        if: needs.prepare.outputs.needs_cuda_common == 'true' && matrix.platform == 'linux/amd64'
+        id: meta-common-base-cuda
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-base-cuda
+          tags: |
+            type=raw,value=base-cuda-amd64-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Extract metadata for openadkit-common:devel-cuda
+        if: needs.prepare.outputs.needs_cuda_common == 'true' && matrix.platform == 'linux/amd64'
+        id: meta-common-devel-cuda
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMMON }}
+          bake-target: docker-metadata-action-common-devel-cuda
+          tags: |
+            type=raw,value=devel-cuda-amd64-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Build and push common images
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta-common-base.outputs.bake-file }}
+            ${{ steps.meta-common-devel.outputs.bake-file }}
+          targets: |
+            common-base
+            common-devel
+          push: true
+          set: |
+            *.platform=${{ matrix.platform }}
+            *.args.ROS_DISTRO=${{ needs.prepare.outputs.ros_distro }}
+            *.args.BASE_IMAGE=${{ needs.prepare.outputs.ros_distro == 'jazzy' && env.ROS_JAZZY_BASE_IMAGE || env.ROS_HUMBLE_BASE_IMAGE }}
+            *.labels.org.opencontainers.image.build-tag=${{ needs.prepare.outputs.build_tag }}
+            *.labels.org.opencontainers.image.run-id=${{ github.run_id }}
+            *.labels.org.opencontainers.image.revision=${{ github.sha }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-main
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
+
+      - name: Build and push common CUDA images
+        if: needs.prepare.outputs.needs_cuda_common == 'true' && matrix.platform == 'linux/amd64'
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta-common-base-cuda.outputs.bake-file }}
+            ${{ steps.meta-common-devel-cuda.outputs.bake-file }}
+          targets: |
+            common-base-cuda
+            common-devel-cuda
+          push: true
+          set: |
+            *.platform=${{ matrix.platform }}
+            *.args.ROS_DISTRO=${{ needs.prepare.outputs.ros_distro }}
+            *.args.BASE_IMAGE=${{ needs.prepare.outputs.ros_distro == 'jazzy' && env.ROS_JAZZY_BASE_IMAGE || env.ROS_HUMBLE_BASE_IMAGE }}
+            *.labels.org.opencontainers.image.build-tag=${{ needs.prepare.outputs.build_tag }}
+            *.labels.org.opencontainers.image.run-id=${{ github.run_id }}
+            *.labels.org.opencontainers.image.revision=${{ github.sha }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ needs.prepare.outputs.ros_distro }}-main
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
+
+  build-target:
+    needs: [prepare, build-common]
+    if: always() && needs.prepare.result == 'success' && (needs.build-common.result == 'success' || needs.build-common.result == 'skipped')
+    runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && (matrix.platform == 'linux/amd64' && 'depot-ubuntu-24.04-16' || 'depot-ubuntu-24.04-arm-16') || github.repository_owner == 'oguzkaganozt' && (matrix.platform == 'linux/amd64' && 'ubicloud-standard-16-ubuntu-2204' || 'ubicloud-standard-16-arm-ubuntu-2204') || (matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm') }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.prepare.outputs.platforms) }}
+    steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Free Disk Space (Ubuntu)
+        uses: ./.github/actions/free-disk-space
+
+      - name: Install jq and vcs2l
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq pipx
+          pipx install vcs2l
+        shell: bash
+
+      - name: Checkout Autoware repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          repository: autowarefoundation/autoware
+          ref: ${{ needs.prepare.outputs.autoware_ref }}
+          path: autoware
+          fetch-depth: 1
+
+      - name: Pull Autoware Source
+        run: |
+          mkdir -p autoware/src
+          vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for ${{ needs.prepare.outputs.target }}
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
+          bake-target: docker-metadata-action-${{ needs.prepare.outputs.target }}
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Resolve base image references
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          DISTRO: ${{ needs.prepare.outputs.ros_distro }}
+          COMMON_IMAGE_SOURCE: ${{ needs.prepare.outputs.common_image_source }}
+          DEPENDENCY_IMAGE_SOURCE: ${{ needs.prepare.outputs.dependency_image_source }}
+          COMMON_TAG: ${{ needs.prepare.outputs.common_tag }}
+          DEPENDENCY_TAG: ${{ needs.prepare.outputs.dependency_tag }}
+          IMAGE_PREFIX_COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
+          IMAGE_PREFIX_COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
+        run: |
+          set -euo pipefail
+
+          if [ "${PLATFORM}" = "linux/amd64" ]; then
+            arch=amd64
+          else
+            arch=arm64
+          fi
+
+          image_tag_suffix() {
+            local source="$1"
+            local tag="$2"
+            if [ "${source}" = "build_tag" ]; then
+              printf -- '-%s' "${tag}"
+            fi
+          }
+
+          common_suffix=$(image_tag_suffix "${COMMON_IMAGE_SOURCE}" "${COMMON_TAG}")
+          dependency_suffix=$(image_tag_suffix "${DEPENDENCY_IMAGE_SOURCE}" "${DEPENDENCY_TAG}")
+
+          {
+            echo "COMMON_BASE_IMAGE=${IMAGE_PREFIX_COMMON}:base-${arch}-${DISTRO}${common_suffix}"
+            echo "COMMON_DEVEL_IMAGE=${IMAGE_PREFIX_COMMON}:devel-${arch}-${DISTRO}${common_suffix}"
+            echo "COMMON_BASE_CUDA_IMAGE=${IMAGE_PREFIX_COMMON}:base-cuda-amd64-${DISTRO}${common_suffix}"
+            echo "COMMON_DEVEL_CUDA_IMAGE=${IMAGE_PREFIX_COMMON}:devel-cuda-amd64-${DISTRO}${common_suffix}"
+            echo "SENSING_PERCEPTION_IMAGE=${IMAGE_PREFIX_COMPONENT}:sensing-perception-${arch}-${DISTRO}${dependency_suffix}"
+            echo "SENSING_PERCEPTION_CUDA_IMAGE=${IMAGE_PREFIX_COMPONENT}:sensing-perception-cuda-amd64-${DISTRO}${dependency_suffix}"
+            echo "LOCALIZATION_MAPPING_IMAGE=${IMAGE_PREFIX_COMPONENT}:localization-mapping-${arch}-${DISTRO}${dependency_suffix}"
+            echo "PLANNING_CONTROL_IMAGE=${IMAGE_PREFIX_COMPONENT}:planning-control-${arch}-${DISTRO}${dependency_suffix}"
+            echo "VEHICLE_SYSTEM_IMAGE=${IMAGE_PREFIX_COMPONENT}:vehicle-system-${arch}-${DISTRO}${dependency_suffix}"
+            echo "API_IMAGE=${IMAGE_PREFIX_COMPONENT}:api-${arch}-${DISTRO}${dependency_suffix}"
+            echo "VISUALIZER_IMAGE=${IMAGE_PREFIX_COMPONENT}:visualizer-${arch}-${DISTRO}${dependency_suffix}"
+            echo "SIMULATOR_IMAGE=${IMAGE_PREFIX_COMPONENT}:simulator-${arch}-${DISTRO}${dependency_suffix}"
+          } >> "$GITHUB_ENV"
+
+          echo "Using COMMON_BASE_IMAGE=${IMAGE_PREFIX_COMMON}:base-${arch}-${DISTRO}${common_suffix}"
+        shell: bash
+
+      - name: Build and push component image
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta.outputs.bake-file }}
+          targets: ${{ needs.prepare.outputs.target }}
+          push: true
+          set: |
+            *.platform=${{ matrix.platform }}
+            *.args.ROS_DISTRO=${{ needs.prepare.outputs.ros_distro }}
+            *.args.COMMON_BASE_IMAGE=${{ env.COMMON_BASE_IMAGE }}
+            *.args.COMMON_BASE_CUDA_IMAGE=${{ env.COMMON_BASE_CUDA_IMAGE }}
+            *.args.COMMON_DEVEL_IMAGE=${{ env.COMMON_DEVEL_IMAGE }}
+            *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.COMMON_DEVEL_CUDA_IMAGE }}
+            *.args.SENSING_PERCEPTION_IMAGE=${{ env.SENSING_PERCEPTION_IMAGE }}
+            *.args.SENSING_PERCEPTION_CUDA_IMAGE=${{ env.SENSING_PERCEPTION_CUDA_IMAGE }}
+            *.args.LOCALIZATION_MAPPING_IMAGE=${{ env.LOCALIZATION_MAPPING_IMAGE }}
+            *.args.PLANNING_CONTROL_IMAGE=${{ env.PLANNING_CONTROL_IMAGE }}
+            *.args.VEHICLE_SYSTEM_IMAGE=${{ env.VEHICLE_SYSTEM_IMAGE }}
+            *.args.API_IMAGE=${{ env.API_IMAGE }}
+            *.args.VISUALIZER_IMAGE=${{ env.VISUALIZER_IMAGE }}
+            *.args.SIMULATOR_IMAGE=${{ env.SIMULATOR_IMAGE }}
+            *.labels.org.opencontainers.image.build-tag=${{ needs.prepare.outputs.build_tag }}
+            *.labels.org.opencontainers.image.run-id=${{ github.run_id }}
+            *.labels.org.opencontainers.image.revision=${{ github.sha }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ needs.prepare.outputs.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-main
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ needs.prepare.outputs.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ needs.prepare.outputs.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
+
+  create-manifest:
+    needs: [prepare, build-target]
+    if: needs.prepare.outputs.create_manifest == 'true'
+    runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && 'depot-ubuntu-24.04-16' || github.repository_owner == 'oguzkaganozt' && 'ubicloud-standard-16-ubuntu-2204' || 'ubuntu-22.04' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifest
+        env:
+          TARGET: ${{ needs.prepare.outputs.target }}
+          DISTRO: ${{ needs.prepare.outputs.ros_distro }}
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          IMAGE: ${{ env.IMAGE_PREFIX_COMPONENT }}
+        run: |
+          set -euo pipefail
+
+          base_tag="${TARGET}-${DISTRO}-${BUILD_TAG}"
+          amd64_ref="${IMAGE}:${TARGET}-amd64-${DISTRO}-${BUILD_TAG}"
+          arm64_ref="${IMAGE}:${TARGET}-arm64-${DISTRO}-${BUILD_TAG}"
+
+          echo "Creating multi-arch manifest ${IMAGE}:${base_tag}"
+          docker buildx imagetools create -t "${IMAGE}:${base_tag}" "${amd64_ref}" "${arm64_ref}"
+        shell: bash
+
+  summarize:
+    needs: [prepare, build-target, create-manifest]
+    if: always() && needs.prepare.result == 'success' && needs.build-target.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write job summary
+        env:
+          TARGET: ${{ needs.prepare.outputs.target }}
+          DISTRO: ${{ needs.prepare.outputs.ros_distro }}
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          COMMON_TAG: ${{ needs.prepare.outputs.common_tag }}
+          DEPENDENCY_TAG: ${{ needs.prepare.outputs.dependency_tag }}
+          COMMON_IMAGE_SOURCE: ${{ needs.prepare.outputs.common_image_source }}
+          DEPENDENCY_IMAGE_SOURCE: ${{ needs.prepare.outputs.dependency_image_source }}
+          CREATE_MANIFEST: ${{ needs.prepare.outputs.create_manifest }}
+          IMAGE: ${{ env.IMAGE_PREFIX_COMPONENT }}
+        run: |
+          {
+            echo "## Component Build Complete"
+            echo "| Key | Value |"
+            echo "|-----|-------|"
+            echo "| **target** | \`${TARGET}\` |"
+            echo "| **ros_distro** | \`${DISTRO}\` |"
+            echo "| **build_tag** | \`${BUILD_TAG}\` |"
+            echo "| **common_image_source** | \`${COMMON_IMAGE_SOURCE}\` |"
+            echo "| **common_tag** | \`${COMMON_TAG}\` |"
+            echo "| **dependency_image_source** | \`${DEPENDENCY_IMAGE_SOURCE}\` |"
+            echo "| **dependency_tag** | \`${DEPENDENCY_TAG}\` |"
+            echo ""
+            echo "### Published image references"
+            echo "- Platform-specific: \`${IMAGE}:${TARGET}-amd64-${DISTRO}-${BUILD_TAG}\`"
+            if [ "${CREATE_MANIFEST}" = "true" ]; then
+              echo "- Multi-arch: \`${IMAGE}:${TARGET}-${DISTRO}-${BUILD_TAG}\`"
+            fi
+            echo ""
+            echo "Stable tags are not updated by this workflow. Use **release** to promote a full build set."
+          } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash

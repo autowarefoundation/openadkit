@@ -18,12 +18,28 @@ services:
       - edge_zenoh_bridge
 
   scenario_simulator:
-    image: ghcr.io/autowarefoundation/autoware-tools:scenario-simulator
+    image: ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
     volumes:
-      - autoware_map:/opt/autoware/share/kashiwanoha_map/map
+      - autoware_map:/home/ubuntu/Desktop/scenario_simulator_ws/install/kashiwanoha_map/share/kashiwanoha_map/map
+    command: >
+      ros2 launch scenario_test_runner scenario_test_runner.launch.py
+      architecture_type:=awf/universe/20250130
+      global_frame_rate:=30
+      global_timeout:=180
+      initialize_duration:=90
+      launch_autoware:=false
+      launch_rviz:=false
+      launch_visualization:=false
+      output_directory:=/autoware/scenario-sim/output
+      record:=false
+      scenario:=/home/ubuntu/Desktop/scenario_simulator_ws/install/scenario_test_runner/share/scenario_test_runner/scenario/sample.yaml
+      sensor_model:=sample_sensor_kit
+      use_custom_centerline:=true
+      use_sim_time:=false
+      vehicle_model:=sample_vehicle
     depends_on:
       - edge_zenoh_bridge
 

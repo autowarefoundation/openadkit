@@ -17,9 +17,9 @@ content:
     - source: ghcr.io/autowarefoundation/autoware
       tag: universe-0.45.1-amd64
       name: localhost/autoware:latest
-    - source: ghcr.io/autowarefoundation/autoware-tools
-      tag: scenario-simulator
-      name: localhost/autoware-tools:scenario-simulator
+    - source: ghcr.io/tier4/scenario_simulator_v2
+      tag: humble-25.0.20-runtime
+      name: localhost/scenario_simulator_v2:runtime
   make_dirs:
     - path: /var/log/awf
       mode: 0755

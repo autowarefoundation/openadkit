@@ -1,5 +1,9 @@
 # Open AD Kit Tools
 
-This directory contains containerized tools that complement the core Open AD Kit images.
+Open AD Kit uses upstream tool containers directly where possible instead of rebuilding custom wrappers.
 
-- [Scenario Simulator](./scenario-simulator/README.md): Runs Tier IV Scenario Simulator in a container for scenario-based validation and local testing.
+Scenario simulation deployments use the official Tier IV Scenario Simulator image:
+
+```text
+ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+```

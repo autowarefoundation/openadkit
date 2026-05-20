@@ -230,7 +230,7 @@ services:
       use_custom_centerline:=${USE_CUSTOM_CENTERLINE}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
+    restart: "no"
 
   visualizer:
     image: ghcr.io/autowarefoundation/openadkit:visualizer

@@ -4,7 +4,14 @@ This sample deployment shows how to run Autoware Open AD Kit **planning simulati
 
 ## Requirements
 
-In order to run the planning simulation, you need to have the planning simulation **sample map**. You can download it by running the following commands:
+In order to run the planning simulation, you need the planning simulation **sample map**.
+
+If `gdown` or `unzip` are not installed yet, install them first:
+
+```bash
+sudo apt-get install -y python3-pip unzip
+python3 -m pip install --user gdown
+```
 
 ### Sample Planning Map
 
@@ -13,8 +20,9 @@ Download and unpack a planning simulation sample map that is used in this sample
 - You can also download [the map](https://drive.google.com/file/d/1499_nsbUbIeturZaDj7jhUownh5fvXHd/view?usp=sharing) manually.
 
 ```bash
-gdown -O ~/autoware_map/ 'https://docs.google.com/uc?export=download&id=1499_nsbUbIeturZaDj7jhUownh5fvXHd'
-unzip -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
+mkdir -p ~/autoware_map
+gdown -O ~/autoware_map/sample-map-planning.zip 'https://docs.google.com/uc?export=download&id=1499_nsbUbIeturZaDj7jhUownh5fvXHd'
+unzip -o -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
 ```
 
 > **Note**: This sample map(Copyright 2020 TIER IV, Inc.) is only for demonstration purposes. You can use your own map by following the [How-to Guide](https://autowarefoundation.github.io/autoware-documentation/main/how-to-guides/integrating-autoware/creating-maps/).
@@ -33,7 +41,7 @@ unzip -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
     http://localhost:6080/vnc.html
     ```
 
-    Use the default password `openadkit` to access the visualizer. **It can take a few seconds to visualizer to start.**
+    Use the default password `openadkit` to access the visualizer. **It can take a few seconds for the visualizer to start.**
 
     > If your machine is on a remote server, you can access the visualizer by using its accessible IP address:
     >

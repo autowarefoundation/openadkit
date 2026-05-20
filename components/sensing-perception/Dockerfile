@@ -31,7 +31,7 @@ RUN --mount=type=cache,target="${CCACHE_DIR}" \
   && /scripts/cleanup_apt.sh true \
   && source /opt/ros/"$ROS_DISTRO"/setup.bash \
   && source /opt/autoware/setup.bash \
-  && /scripts/build_and_clean.sh "${CCACHE_DIR}" /opt/autoware
+  && /scripts/build_and_clean.sh "${CCACHE_DIR}" /opt/autoware "--parallel-workers 1 --cmake-args -DBUILD_TESTING=OFF"
 
 # =============================================================================
 # Runtime stage: sensing-perception

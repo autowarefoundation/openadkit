@@ -11,6 +11,7 @@ on:
       - "**/*.svg"
       - "**/*.png"
       - "**/*.jpg"
+      - "docs/assets/**"
   workflow_dispatch:
 
 permissions:
@@ -43,7 +44,7 @@ jobs:
         run: mkdocs build --clean --verbose
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-site
           path: ./site

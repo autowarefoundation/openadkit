@@ -1,6 +1,6 @@
 # Components
 
-Open AD Kit is a component based project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each **Autoware component** is designed to be independent and can be configured to work together to achieve a particular task, such as a simulation or a full autonomous driving stack.
+Open AD Kit is a component-based project designed to run on a variety of platforms with containerized services. Each **Autoware function** remains independently deployable, while the published images group closely related functions together where that keeps the runtime layout simpler.
 
 ![Granular Components](../assets/images/granular-components.png)
 
@@ -30,14 +30,10 @@ The planning component is responsible for planning the vehicle's path. Planning 
 
 The control component is responsible for controlling the vehicle's actuators. Control component can be configured to use a variety of control algorithms, including **PID and MPC**. For more details, see the [Autoware control design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/control/).
 
-### Vehicle
+### Vehicle and System
 
-The vehicle component is responsible for managing the vehicle's state. Vehicle component can be configured to use a variety of vehicle algorithms, including **vehicle state estimation and vehicle control**. For more details, see the [Autoware vehicle design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/vehicle/).
+The `vehicle-system` image packages both the vehicle interface and system-level services used by the Open AD Kit deployments. On the functional side, the vehicle component manages vehicle-specific interfaces and state, while the system component provides health monitoring and related system services. For more details, see the [Autoware vehicle design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/vehicle/).
 
 ### API
 
-The API component is responsible for providing [AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-interfaces/ad-api/) interface for the vehicle's state. API component can be configured to enable/disable various interfaces. For more details, see the [Autoware Interface design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/).
-
-### System
-
-The system component is responsible for managing the vehicle's system. System component can be configured to use a variety of system algorithms, including **system health monitoring and system error handling**.
+The API component is responsible for providing [AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-interfaces/ad-api/) interface for the vehicle's state. API component can be configured to enable or disable various interfaces. For more details, see the [Autoware Interface design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/).

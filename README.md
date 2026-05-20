@@ -31,9 +31,9 @@ The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Archite
 
 Open AD Kit is a micro-service based project, which means that it is designed to be deployed on a variety of platforms with microservices architecture. Each component is designed to be independent and can be deployed on a variety of platforms.
 
-- **Independent components** for sensing, perception, mapping, localization, planning, control, and visualization
-- **Multi-platform deployment** supporting both amd64 and arm64 architectures  
-- **Service mesh integration** with configurable environment variables
+- **Independent images** for sensing, perception, mapping, localization, planning, control, APIs, simulation, and visualization
+- **Multi-platform deployment** supporting both amd64 and arm64 architectures
+- **Configurable ROS 2 container deployments** with environment-driven composition
 
 ![Granular Components](docs/assets/images/granular-components.png)
 
@@ -53,7 +53,7 @@ Open AD Kit leverages modern cloud native technologies to deliver scalable, port
 
 - **Seamless scaling** from development laptops to production edge devices
 - **Hybrid cloud support** bridging development and production environments
-- **Container orchestration** ready for Kubernetes and similar platforms
+- **Containerized runtimes** using Docker Compose, Docker Bake, and platform-specific integrations such as AutoSD
 
 ![Cloud Native](docs/assets/images/cloud-native.png)
 

@@ -27,10 +27,9 @@ The project provides different deployment strategies to suit various testing nee
 
 ## Quick Start
 
-We recommend using the Split Topology mode in the `local` directory:
+We recommend using the Split Topology mode from this directory:
 
 ```bash
-cd local
 ./edge.sh up -d
 ./cloud.sh up -d
 ```

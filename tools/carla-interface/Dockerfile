@@ -20,13 +20,25 @@ RUN apt-get update \
 RUN python3 - <<'PY'
 from pathlib import Path
 
-path = Path('/opt/autoware/lib/python3.10/site-packages/autoware_carla_interface/carla_autoware.py')
+matches = list(Path('/opt/autoware').glob('**/autoware_carla_interface/carla_autoware.py'))
+if not matches:
+    raise SystemExit('autoware_carla_interface/carla_autoware.py not found under /opt/autoware')
+
+path = matches[0]
 text = path.read_text()
-old = '        client.load_world(self.carla_map)\n        self.world = client.get_world()\n'
+old = '''        client.load_world(self.carla_map)
+
+        # Wait for the world to be fully loaded
+        # This is critical for non-default maps that need time to load
+        time.sleep(2.0)
+
+        self.world = client.get_world()
+'''
 new = '''        current_world = client.get_world()
         current_map = current_world.get_map().name
         if not current_map.endswith("/" + self.carla_map):
             client.load_world(self.carla_map)
+            time.sleep(2.0)
         self.world = client.get_world()
 '''
 if old not in text:

@@ -49,7 +49,7 @@ on:
           - stable
           - build_tag
       common_build_tag:
-        description: Common image build tag (RUN_ID-RUN_ATTEMPT). Required when common_image_source is build_tag and rebuild_common is false.
+        description: Common image build tag (RUN_ID-RUN_ATTEMPT or YYYYMMDD-RUN_ID-RUN_ATTEMPT). Required when common_image_source is build_tag and rebuild_common is false.
         required: false
         type: string
       dependency_image_source:
@@ -61,7 +61,7 @@ on:
           - stable
           - build_tag
       dependency_build_tag:
-        description: Dependency image build tag for universe dependencies. Required when dependency_image_source is build_tag.
+        description: Dependency image build tag for universe dependencies (RUN_ID-RUN_ATTEMPT or YYYYMMDD-RUN_ID-RUN_ATTEMPT). Required when dependency_image_source is build_tag.
         required: false
         type: string
 concurrency:
@@ -126,8 +126,9 @@ jobs:
             exit 1
           fi
 
-          if [ -n "${INPUT_COMMON_BUILD_TAG}" ] && [[ ! "${INPUT_COMMON_BUILD_TAG}" =~ ^[0-9]+-[0-9]+$ ]]; then
-            echo "Invalid common_build_tag '${INPUT_COMMON_BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT" >&2
+          build_tag_pattern='^([0-9]{8}-)?[0-9]+-[0-9]+$'
+          if [ -n "${INPUT_COMMON_BUILD_TAG}" ] && [[ ! "${INPUT_COMMON_BUILD_TAG}" =~ ${build_tag_pattern} ]]; then
+            echo "Invalid common_build_tag '${INPUT_COMMON_BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT or YYYYMMDD-RUN_ID-RUN_ATTEMPT" >&2
             exit 1
           fi
 
@@ -136,8 +137,8 @@ jobs:
             exit 1
           fi
 
-          if [ -n "${INPUT_DEPENDENCY_BUILD_TAG}" ] && [[ ! "${INPUT_DEPENDENCY_BUILD_TAG}" =~ ^[0-9]+-[0-9]+$ ]]; then
-            echo "Invalid dependency_build_tag '${INPUT_DEPENDENCY_BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT" >&2
+          if [ -n "${INPUT_DEPENDENCY_BUILD_TAG}" ] && [[ ! "${INPUT_DEPENDENCY_BUILD_TAG}" =~ ${build_tag_pattern} ]]; then
+            echo "Invalid dependency_build_tag '${INPUT_DEPENDENCY_BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT or YYYYMMDD-RUN_ID-RUN_ATTEMPT" >&2
             exit 1
           fi
 

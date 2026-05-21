@@ -18,7 +18,6 @@ on:
           - simulator
           - universe
           - universe-cuda
-          - carla-interface
       ros_distro:
         description: ROS distribution
         required: true
@@ -65,12 +64,6 @@ on:
         description: Dependency image build tag for universe dependencies. Required when dependency_image_source is build_tag.
         required: false
         type: string
-      simulator_image:
-        description: Simulator image to use as the base for carla-interface
-        required: false
-        type: string
-        default: ghcr.io/autowarefoundation/openadkit:simulator-amd64-humble
-
 concurrency:
   group: build-single-image-${{ github.ref }}-${{ inputs.target }}
   cancel-in-progress: true
@@ -79,9 +72,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
   IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
-  IMAGE_PREFIX_TOOL: ghcr.io/${{ github.repository_owner }}/openadkit-tools
   BAKE_FILE: components/docker-bake.hcl
-  BAKE_FILE_TOOLS: tools/docker-bake.hcl
   ROS_HUMBLE_BASE_IMAGE: ros:humble-ros-base-jammy@sha256:5417e56962ff6e15d4cf9b2f78a71a78f3901f47cd78696b575b7eecdb54eb78
   ROS_JAZZY_BASE_IMAGE: ros:jazzy-ros-base-noble@sha256:eac11a5285beeb1e1884e71f7091c610e08452e823bfb3f43afaa334375325f6
 
@@ -105,8 +96,6 @@ jobs:
       platforms: ${{ steps.prepare.outputs.platforms }}
       create_manifest: ${{ steps.prepare.outputs.create_manifest }}
       needs_cuda_common: ${{ steps.prepare.outputs.needs_cuda_common }}
-      is_tool_target: ${{ steps.prepare.outputs.is_tool_target }}
-      simulator_image: ${{ steps.prepare.outputs.simulator_image }}
     steps:
       - name: Resolve build inputs
         id: prepare
@@ -119,33 +108,8 @@ jobs:
           INPUT_COMMON_BUILD_TAG: ${{ inputs.common_build_tag }}
           INPUT_DEPENDENCY_IMAGE_SOURCE: ${{ inputs.dependency_image_source }}
           INPUT_DEPENDENCY_BUILD_TAG: ${{ inputs.dependency_build_tag }}
-          INPUT_SIMULATOR_IMAGE: ${{ inputs.simulator_image }}
         run: |
           set -euo pipefail
-
-          is_tool_target="false"
-          if [ "${INPUT_TARGET}" = "carla-interface" ]; then
-            is_tool_target="true"
-
-            if [ "${INPUT_PLATFORM}" != "linux/amd64" ]; then
-              echo "carla-interface only supports linux/amd64 platform." >&2
-              exit 1
-            fi
-
-            if [ "${INPUT_ROS_DISTRO}" != "humble" ]; then
-              echo "carla-interface currently only supports ROS humble." >&2
-              exit 1
-            fi
-
-            if [ -z "${INPUT_SIMULATOR_IMAGE}" ]; then
-              echo "simulator_image is required for carla-interface." >&2
-              exit 1
-            fi
-
-            INPUT_REBUILD_COMMON="false"
-            INPUT_COMMON_IMAGE_SOURCE="stable"
-            INPUT_DEPENDENCY_IMAGE_SOURCE="stable"
-          fi
 
           if [[ "${INPUT_TARGET}" == *cuda* ]] && [ "${INPUT_PLATFORM}" != "linux/amd64" ]; then
             echo "CUDA targets (${INPUT_TARGET}) only support linux/amd64 platform." >&2
@@ -253,14 +217,12 @@ jobs:
             echo "platforms=${platforms}"
             echo "create_manifest=${create_manifest}"
             echo "needs_cuda_common=${needs_cuda_common}"
-            echo "is_tool_target=${is_tool_target}"
-            echo "simulator_image=${INPUT_SIMULATOR_IMAGE}"
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
   build-common:
     needs: prepare
-    if: needs.prepare.outputs.rebuild_common == 'true' && needs.prepare.outputs.is_tool_target != 'true'
+    if: needs.prepare.outputs.rebuild_common == 'true'
     runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && (matrix.platform == 'linux/amd64' && 'depot-ubuntu-24.04-16' || 'depot-ubuntu-24.04-arm-16') || github.repository_owner == 'oguzkaganozt' && (matrix.platform == 'linux/amd64' && 'ubicloud-standard-16-ubuntu-2204' || 'ubicloud-standard-16-arm-ubuntu-2204') || (matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm') }}
     permissions:
       contents: read
@@ -400,7 +362,7 @@ jobs:
 
   build-target:
     needs: [prepare, build-common]
-    if: always() && needs.prepare.result == 'success' && needs.prepare.outputs.is_tool_target != 'true' && (needs.build-common.result == 'success' || needs.build-common.result == 'skipped')
+    if: always() && needs.prepare.result == 'success' && (needs.build-common.result == 'success' || needs.build-common.result == 'skipped')
     runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && (matrix.platform == 'linux/amd64' && 'depot-ubuntu-24.04-16' || 'depot-ubuntu-24.04-arm-16') || github.repository_owner == 'oguzkaganozt' && (matrix.platform == 'linux/amd64' && 'ubicloud-standard-16-ubuntu-2204' || 'ubicloud-standard-16-arm-ubuntu-2204') || (matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm') }}
     permissions:
       contents: read
@@ -536,59 +498,6 @@ jobs:
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ needs.prepare.outputs.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }}
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ needs.prepare.outputs.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
 
-  build-tool:
-    needs: prepare
-    if: needs.prepare.outputs.is_tool_target == 'true'
-    runs-on: ${{ github.repository_owner == 'oz-openadkit-labs' && 'depot-ubuntu-24.04-16' || github.repository_owner == 'oguzkaganozt' && 'ubicloud-standard-16-ubuntu-2204' || 'ubuntu-22.04' }}
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Free Disk Space (Ubuntu)
-        uses: ./.github/actions/free-disk-space
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for ${{ needs.prepare.outputs.target }}
-        id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
-        with:
-          images: ${{ env.IMAGE_PREFIX_TOOL }}
-          bake-target: docker-metadata-action-${{ needs.prepare.outputs.target }}
-          tags: |
-            type=raw,value=${{ needs.prepare.outputs.target }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Build and push tool image
-        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
-        with:
-          files: |
-            ${{ env.BAKE_FILE_TOOLS }}
-            ${{ steps.meta.outputs.bake-file }}
-          targets: ${{ needs.prepare.outputs.target }}
-          push: true
-          set: |
-            *.platform=linux/amd64
-            *.args.SIMULATOR_IMAGE=${{ needs.prepare.outputs.simulator_image }}
-            *.labels.org.opencontainers.image.build-tag=${{ needs.prepare.outputs.build_tag }}
-            *.labels.org.opencontainers.image.run-id=${{ github.run_id }}
-            *.labels.org.opencontainers.image.revision=${{ github.sha }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:tool-${{ needs.prepare.outputs.target }}-amd64-${{ needs.prepare.outputs.ros_distro }}-main
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:tool-${{ needs.prepare.outputs.target }}-amd64-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }}
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:tool-${{ needs.prepare.outputs.target }}-amd64-${{ needs.prepare.outputs.ros_distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
-
   create-manifest:
     needs: [prepare, build-target]
     if: needs.prepare.outputs.create_manifest == 'true'
@@ -666,30 +575,5 @@ jobs:
             fi
             echo ""
             echo "Stable tags are not updated by this workflow. Use **release** to promote a full build set."
-          } >> "$GITHUB_STEP_SUMMARY"
-        shell: bash
-
-  summarize-tool:
-    needs: [prepare, build-tool]
-    if: always() && needs.prepare.result == 'success' && needs.build-tool.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Write job summary
-        env:
-          TARGET: ${{ needs.prepare.outputs.target }}
-          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
-          SIMULATOR_IMAGE: ${{ needs.prepare.outputs.simulator_image }}
-          IMAGE: ${{ env.IMAGE_PREFIX_TOOL }}
-        run: |
-          {
-            echo "## Tool Build Complete"
-            echo "| Key | Value |"
-            echo "|-----|-------|"
-            echo "| **target** | \`${TARGET}\` |"
-            echo "| **build_tag** | \`${BUILD_TAG}\` |"
-            echo "| **simulator_image** | \`${SIMULATOR_IMAGE}\` |"
-            echo ""
-            echo "### Published image reference"
-            echo "- \`${IMAGE}:${TARGET}-${BUILD_TAG}\`"
           } >> "$GITHUB_STEP_SUMMARY"
         shell: bash

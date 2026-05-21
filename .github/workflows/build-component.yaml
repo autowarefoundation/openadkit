@@ -79,7 +79,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
   IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
-  IMAGE_PREFIX_TOOL: ghcr.io/${{ github.repository_owner }}/autoware-tools
+  IMAGE_PREFIX_TOOL: ghcr.io/${{ github.repository_owner }}/openadkit-tools
   BAKE_FILE: components/docker-bake.hcl
   BAKE_FILE_TOOLS: tools/docker-bake.hcl
   ROS_HUMBLE_BASE_IMAGE: ros:humble-ros-base-jammy@sha256:5417e56962ff6e15d4cf9b2f78a71a78f3901f47cd78696b575b7eecdb54eb78

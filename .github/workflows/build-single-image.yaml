@@ -1,10 +1,10 @@
-name: build-component
+name: build-single-image
 
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: Component image to build
+        description: Image to build
         required: true
         type: choice
         options:
@@ -37,7 +37,7 @@ on:
           - linux/arm64
           - both
       rebuild_common:
-        description: Rebuild common-base and common-devel before the component (recommended on feature branches)
+        description: Rebuild common-base and common-devel before the target image (recommended on feature branches)
         required: true
         type: boolean
         default: true
@@ -54,7 +54,7 @@ on:
         required: false
         type: string
       dependency_image_source:
-        description: Which component images universe targets should copy from
+        description: Which dependency images universe targets should copy from
         required: true
         type: choice
         default: stable
@@ -62,7 +62,7 @@ on:
           - stable
           - build_tag
       dependency_build_tag:
-        description: Component image build tag for universe dependencies. Required when dependency_image_source is build_tag.
+        description: Dependency image build tag for universe dependencies. Required when dependency_image_source is build_tag.
         required: false
         type: string
       simulator_image:
@@ -72,7 +72,7 @@ on:
         default: ghcr.io/autowarefoundation/openadkit:simulator-amd64-humble
 
 concurrency:
-  group: build-component-${{ github.ref }}-${{ inputs.target }}
+  group: build-single-image-${{ github.ref }}-${{ inputs.target }}
   cancel-in-progress: true
 
 env:
@@ -506,7 +506,7 @@ jobs:
           echo "Using COMMON_BASE_IMAGE=${IMAGE_PREFIX_COMMON}:base-${arch}-${DISTRO}${common_suffix}"
         shell: bash
 
-      - name: Build and push component image
+      - name: Build and push target image
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         with:
           files: |
@@ -643,7 +643,7 @@ jobs:
           IMAGE: ${{ env.IMAGE_PREFIX_COMPONENT }}
         run: |
           {
-            echo "## Component Build Complete"
+            echo "## Image Build Complete"
             echo "| Key | Value |"
             echo "|-----|-------|"
             echo "| **target** | \`${TARGET}\` |"

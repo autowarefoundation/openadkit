@@ -1,3 +1,6 @@
+# Scans selected OpenADKit images from the exact successful build-all-images run.
+# Scheduled and manual runs use the latest successful main-branch build.
+
 name: scan-images
 
 on:
@@ -27,10 +30,23 @@ jobs:
         ros-distro: [humble, jazzy]
         target: [universe, sensing-perception, localization-mapping, planning-control]
     steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Resolve image reference
         id: image
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_PREFIX_COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
+          ROS_DISTRO: ${{ matrix.ros-distro }}
+          TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -euo pipefail
@@ -38,28 +54,37 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             run_id="${{ github.event.workflow_run.id }}"
             run_attempt="${{ github.event.workflow_run.run_attempt }}"
+            created_at="${{ github.event.workflow_run.created_at }}"
           else
             runs_json=$(gh api "repos/${{ github.repository }}/actions/workflows/build-all-images.yaml/runs?branch=main&status=completed&per_page=100")
-            run_info=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | if . == null then empty else "\(.id) \(.run_attempt)" end')
-            if [ -z "$run_info" ]; then
+            run_id=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | .id // empty')
+            run_attempt=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | .run_attempt // empty')
+            created_at=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | .created_at // empty')
+            if [ -z "$run_id" ] || [ -z "$run_attempt" ]; then
               echo "Could not find a successful build-all-images run on main" >&2
               exit 1
             fi
-
-            set -- $run_info
-            run_id="$1"
-            run_attempt="$2"
           fi
 
           build_tag="${run_id}-${run_attempt}"
-          echo "image_ref=${{ env.IMAGE_PREFIX_COMPONENT }}:${{ matrix.target }}-${{ matrix.ros-distro }}-${build_tag}" >> "$GITHUB_OUTPUT"
+          image_refs=("${IMAGE_PREFIX_COMPONENT}:${TARGET}-${ROS_DISTRO}-${build_tag}")
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          if [ -n "$created_at" ]; then
+            legacy_date=$(date -u -d "$created_at" +%Y%m%d)
+            image_refs+=("${IMAGE_PREFIX_COMPONENT}:${TARGET}-${ROS_DISTRO}-${legacy_date}-${build_tag}")
+          fi
+
+          for image_ref in "${image_refs[@]}"; do
+            if docker buildx imagetools inspect "$image_ref" >/dev/null 2>&1; then
+              echo "Resolved image_ref=${image_ref}"
+              echo "image_ref=${image_ref}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          printf 'Could not resolve image ref. Tried:\n' >&2
+          printf '  %s\n' "${image_refs[@]}" >&2
+          exit 1
 
       - name: Scan ${{ matrix.target }}-${{ matrix.ros-distro }}
         uses: aquasecurity/trivy-action@0.30.0

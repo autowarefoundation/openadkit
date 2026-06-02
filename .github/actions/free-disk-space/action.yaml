@@ -1,5 +1,5 @@
 name: free-disk-space
-description: ""
+description: Free disk space on GitHub-hosted Ubuntu runners
 
 runs:
   using: composite

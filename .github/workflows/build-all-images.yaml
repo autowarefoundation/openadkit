@@ -183,6 +183,8 @@ jobs:
             *.platform=${{ matrix.platform }}
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
             *.args.BASE_IMAGE=ros:${{ matrix.ros-distro }}-ros-base-${{ matrix.ros-distro == 'jazzy' && 'noble' || 'jammy' }}
+            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
+            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ matrix.ros-distro }}-main,mode=max
 
@@ -282,6 +284,8 @@ jobs:
             *.args.COMMON_BASE_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.args.COMMON_DEVEL_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
+            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
@@ -445,7 +449,7 @@ jobs:
             echo "To release this build:"
             echo "1. Go to **Actions → release → Run workflow**"
             echo "2. Set \`build_tag\` to \`${{ needs.prepare.outputs.build_tag }}\`"
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"
 
   notify-failure:
     runs-on: ubuntu-latest

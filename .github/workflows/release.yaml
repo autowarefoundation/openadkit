@@ -1,3 +1,6 @@
+# Manually promotes images from a build-all-images run to a release version.
+# This workflow does not rebuild images; it only re-tags existing manifests.
+
 name: release
 
 on:
@@ -33,29 +36,41 @@ jobs:
       sha: ${{ steps.get-sha.outputs.sha }}
     steps:
       - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          echo "${{ inputs.version }}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-            || (echo "Invalid version format '${{ inputs.version }}': must be vX.Y.Z" && exit 1)
+          set -euo pipefail
+          if ! printf '%s\n' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid version format '${VERSION}': must be vX.Y.Z"
+            exit 1
+          fi
 
       - name: Validate build_tag format
+        env:
+          BUILD_TAG: ${{ inputs.build_tag }}
         run: |
-          echo "${{ inputs.build_tag }}" | grep -E '^[0-9]+-[0-9]+$' \
-            || (echo "Invalid build_tag format '${{ inputs.build_tag }}': must be RUN_ID-RUN_ATTEMPT" && exit 1)
+          set -euo pipefail
+          if ! printf '%s\n' "$BUILD_TAG" | grep -Eq '^[0-9]+-[0-9]+$'; then
+            echo "Invalid build_tag format '${BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT"
+            exit 1
+          fi
 
       - name: Check release runs from main branch
         run: |
-          [ "${{ github.ref }}" = "refs/heads/main" ] \
-            || (echo "Release must be triggered from main branch (got ${{ github.ref }})" && exit 1)
+          set -euo pipefail
+          [ "$GITHUB_REF" = "refs/heads/main" ] \
+            || (echo "Release must be triggered from main branch (got ${GITHUB_REF})" && exit 1)
 
       - name: Validate source build run
         id: get-sha
         env:
+          BUILD_TAG: ${{ inputs.build_tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          run_id=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f1)
-          run_attempt=$(echo "${{ inputs.build_tag }}" | cut -d'-' -f2)
-          run_json=$(gh api repos/${{ github.repository }}/actions/runs/${run_id}/attempts/${run_attempt})
+          run_id="${BUILD_TAG%%-*}"
+          run_attempt="${BUILD_TAG##*-}"
+          run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/attempts/${run_attempt}")
 
           workflow_name=$(printf '%s' "$run_json" | jq -r '.name')
           workflow_path=$(printf '%s' "$run_json" | jq -r '.path')
@@ -76,9 +91,11 @@ jobs:
       - name: Check git tag does not already exist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
         run: |
-          if gh api repos/${{ github.repository }}/git/refs/tags/${{ inputs.version }} 2>/dev/null; then
-            echo "Tag ${{ inputs.version }} already exists — aborting to prevent duplicate release"
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" 2>/dev/null; then
+            echo "Tag ${VERSION} already exists - aborting to prevent duplicate release"
             exit 1
           fi
 
@@ -89,14 +106,43 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify build_tag exists in registry
+      - name: Verify build_tag images exist in registry
+        env:
+          BUILD_TAG: ${{ inputs.build_tag }}
+          COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
+          COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
         run: |
-          docker buildx imagetools inspect \
-            ${{ env.IMAGE_PREFIX_COMMON }}:base-humble-${{ inputs.build_tag }} \
-            || (echo "build_tag '${{ inputs.build_tag }}' not found in registry" && exit 1)
+          set -euo pipefail
+
+          DISTROS="humble jazzy"
+          COMMON_VARIANTS="base base-cuda devel devel-cuda"
+          COMPONENT_TARGETS="sensing-perception sensing-perception-cuda localization-mapping planning-control vehicle-system api visualizer simulator universe universe-cuda"
+
+          missing=0
+          for distro in ${DISTROS}; do
+            for variant in ${COMMON_VARIANTS}; do
+              image_ref="${COMMON}:${variant}-${distro}-${BUILD_TAG}"
+              if ! docker buildx imagetools inspect "$image_ref" >/dev/null 2>&1; then
+                echo "Missing source image: ${image_ref}" >&2
+                missing=1
+              fi
+            done
+            for target in ${COMPONENT_TARGETS}; do
+              image_ref="${COMPONENT}:${target}-${distro}-${BUILD_TAG}"
+              if ! docker buildx imagetools inspect "$image_ref" >/dev/null 2>&1; then
+                echo "Missing source image: ${image_ref}" >&2
+                missing=1
+              fi
+            done
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "build_tag '${BUILD_TAG}' is incomplete in registry" >&2
+            exit 1
+          fi
 
   # =============================================================================
   # Stage 2: Promote all images to release tag
@@ -115,16 +161,17 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Promote all images to ${{ inputs.version }}
+      - name: Promote all images
+        env:
+          BUILD_TAG: ${{ inputs.build_tag }}
+          VERSION: ${{ inputs.version }}
+          COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
+          COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
         run: |
           set -euo pipefail
-          BUILD_TAG="${{ inputs.build_tag }}"
-          VERSION="${{ inputs.version }}"
-          COMMON="${{ env.IMAGE_PREFIX_COMMON }}"
-          COMPONENT="${{ env.IMAGE_PREFIX_COMPONENT }}"
 
           DISTROS="humble jazzy"
           COMMON_VARIANTS="base base-cuda devel devel-cuda"
@@ -159,20 +206,24 @@ jobs:
 
       - name: Create git tag
         uses: actions/github-script@v7
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.sha }}
         with:
           script: |
             await github.rest.git.createRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: 'refs/tags/${{ inputs.version }}',
-              sha: '${{ needs.validate.outputs.sha }}'
+              ref: `refs/tags/${process.env.VERSION}`,
+              sha: process.env.RELEASE_SHA
             })
-            console.log('Created tag ${{ inputs.version }} at ${{ needs.validate.outputs.sha }}')
+            console.log(`Created tag ${process.env.VERSION} at ${process.env.RELEASE_SHA}`)
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
         run: |
-          gh release create "${{ inputs.version }}" \
-            --title "OpenADKit ${{ inputs.version }}" \
+          gh release create "$VERSION" \
+            --title "OpenADKit $VERSION" \
             --generate-notes

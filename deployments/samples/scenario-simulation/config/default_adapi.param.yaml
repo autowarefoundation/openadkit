@@ -1,4 +1,4 @@
-# Scenario simulation: publish AD API diagnostics more frequently to avoid STALE flicker.
+# Scenario simulation: shorten diagnostic_updater.period to avoid STALE flicker.
 /**:
   ros__parameters:
     diagnostic_updater:

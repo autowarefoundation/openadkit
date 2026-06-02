@@ -28,7 +28,7 @@ Edit `scenario-simulation.env` to customize the scenario simulator:
 
 | Variable | Description |
 | --- | --- |
-| `SCENARIO` | Scenario file path inside the container |
+| `SCENARIO` | Scenario file path inside the container. Leave empty to use the bundled sample scenario. |
 | `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` |
 | `OUTPUT_HOST_PATH` | Host directory for simulation results |
 | `OUTPUT_DIRECTORY` | Container path for simulation results |

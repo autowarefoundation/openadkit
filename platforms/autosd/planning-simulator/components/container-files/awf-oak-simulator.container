@@ -19,4 +19,5 @@ Environment=ROS_DOMAIN_ID=26
 Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 Environment=ROSBAG2_STORAGE_DEFAULT_URI=/var/log/awf
 Volume=/var/log/awf:/var/log/awf:Z
+# The sample scenario path is tied to the pinned Tier IV runtime image tag in image.aib.yml.
 Exec=ros2 launch scenario_test_runner scenario_test_runner.launch.py architecture_type:=awf/universe/20250130 global_frame_rate:=30 global_timeout:=180 initialize_duration:=90 launch_autoware:=false launch_rviz:=false launch_visualization:=false output_directory:=/var/log/awf record:=false scenario:=/home/ubuntu/Desktop/scenario_simulator_ws/install/scenario_test_runner/share/scenario_test_runner/scenario/sample.yaml sensor_model:=sample_sensor_kit use_custom_centerline:=true use_sim_time:=false vehicle_model:=sample_vehicle

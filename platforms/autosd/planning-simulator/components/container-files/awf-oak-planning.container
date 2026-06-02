@@ -12,7 +12,7 @@ Pod=awf-oak.pod
 ContainerName=awf-oak-planning
 Image=localhost/autoware:latest
 Network=bridge
-Environment=ROS_DOMAIN=26
+Environment=ROS_DOMAIN_ID=26
 Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 Environment=ROSBAG2_STORAGE_DEFAULT_URI=/var/log/awd
 Volume=/opt/tier4/scenario_simulator_v2/map/kashiwanoha_map/map:/etc/awf/map:Z

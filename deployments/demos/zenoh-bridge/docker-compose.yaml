@@ -23,6 +23,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
     volumes:
+      # Relies on Docker's initial named-volume copy from the pinned Tier IV runtime image.
       - autoware_map:/home/ubuntu/Desktop/scenario_simulator_ws/install/kashiwanoha_map/share/kashiwanoha_map/map
     command: >
       ros2 launch scenario_test_runner scenario_test_runner.launch.py

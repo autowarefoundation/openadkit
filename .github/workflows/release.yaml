@@ -112,6 +112,7 @@ jobs:
       - name: Verify build_tag images exist in registry
         env:
           BUILD_TAG: ${{ inputs.build_tag }}
+          VERSION: ${{ inputs.version }}
           COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
           COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
         run: |
@@ -122,25 +123,40 @@ jobs:
           COMPONENT_TARGETS="sensing-perception sensing-perception-cuda localization-mapping planning-control vehicle-system api visualizer simulator universe universe-cuda"
 
           missing=0
+          existing=0
           for distro in ${DISTROS}; do
             for variant in ${COMMON_VARIANTS}; do
-              image_ref="${COMMON}:${variant}-${distro}-${BUILD_TAG}"
-              if ! docker buildx imagetools inspect "$image_ref" >/dev/null 2>&1; then
-                echo "Missing source image: ${image_ref}" >&2
+              source_ref="${COMMON}:${variant}-${distro}-${BUILD_TAG}"
+              release_ref="${COMMON}:${variant}-${distro}-${VERSION}"
+              if ! docker buildx imagetools inspect "$source_ref" >/dev/null 2>&1; then
+                echo "Missing source image: ${source_ref}" >&2
                 missing=1
+              fi
+              if docker buildx imagetools inspect "$release_ref" >/dev/null 2>&1; then
+                echo "Release image tag already exists: ${release_ref}" >&2
+                existing=1
               fi
             done
             for target in ${COMPONENT_TARGETS}; do
-              image_ref="${COMPONENT}:${target}-${distro}-${BUILD_TAG}"
-              if ! docker buildx imagetools inspect "$image_ref" >/dev/null 2>&1; then
-                echo "Missing source image: ${image_ref}" >&2
+              source_ref="${COMPONENT}:${target}-${distro}-${BUILD_TAG}"
+              release_ref="${COMPONENT}:${target}-${distro}-${VERSION}"
+              if ! docker buildx imagetools inspect "$source_ref" >/dev/null 2>&1; then
+                echo "Missing source image: ${source_ref}" >&2
                 missing=1
+              fi
+              if docker buildx imagetools inspect "$release_ref" >/dev/null 2>&1; then
+                echo "Release image tag already exists: ${release_ref}" >&2
+                existing=1
               fi
             done
           done
 
           if [ "$missing" -ne 0 ]; then
             echo "build_tag '${BUILD_TAG}' is incomplete in registry" >&2
+            exit 1
+          fi
+          if [ "$existing" -ne 0 ]; then
+            echo "Release image tags for '${VERSION}' already exist" >&2
             exit 1
           fi
 

@@ -1,4 +1,4 @@
-# Scans selected OpenADKit images from the exact successful build-all-images run.
+# Scans OpenADKit images from the exact successful build-all-images run.
 # Scheduled and manual runs use the latest successful main-branch build.
 
 name: scan-images
@@ -13,6 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
   IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
 
 jobs:
@@ -26,9 +27,24 @@ jobs:
       security-events: write
     strategy:
       fail-fast: false
+      max-parallel: 6
       matrix:
         ros-distro: [humble, jazzy]
-        target: [universe, sensing-perception, localization-mapping, planning-control]
+        target:
+          - base
+          - base-cuda
+          - devel
+          - devel-cuda
+          - sensing-perception
+          - sensing-perception-cuda
+          - localization-mapping
+          - planning-control
+          - vehicle-system
+          - api
+          - visualizer
+          - simulator
+          - universe
+          - universe-cuda
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,6 +60,7 @@ jobs:
         id: image
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_PREFIX_COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
           IMAGE_PREFIX_COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
           ROS_DISTRO: ${{ matrix.ros-distro }}
           TARGET: ${{ matrix.target }}
@@ -67,11 +84,20 @@ jobs:
           fi
 
           build_tag="${run_id}-${run_attempt}"
-          image_refs=("${IMAGE_PREFIX_COMPONENT}:${TARGET}-${ROS_DISTRO}-${build_tag}")
+          case "$TARGET" in
+            base|base-cuda|devel|devel-cuda)
+              image_prefix="$IMAGE_PREFIX_COMMON"
+              ;;
+            *)
+              image_prefix="$IMAGE_PREFIX_COMPONENT"
+              ;;
+          esac
+
+          image_refs=("${image_prefix}:${TARGET}-${ROS_DISTRO}-${build_tag}")
 
           if [ -n "$created_at" ]; then
             legacy_date=$(date -u -d "$created_at" +%Y%m%d)
-            image_refs+=("${IMAGE_PREFIX_COMPONENT}:${TARGET}-${ROS_DISTRO}-${legacy_date}-${build_tag}")
+            image_refs+=("${image_prefix}:${TARGET}-${ROS_DISTRO}-${legacy_date}-${build_tag}")
           fi
 
           for image_ref in "${image_refs[@]}"; do

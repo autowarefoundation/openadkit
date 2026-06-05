@@ -37,3 +37,55 @@ The `vehicle-system` image packages both the vehicle interface and system-level 
 ### API
 
 The API component is responsible for providing [AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-interfaces/ad-api/) interface for the vehicle's state. API component can be configured to enable or disable various interfaces. For more details, see the [Autoware Interface design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/).
+
+## Building from source
+
+Open AD Kit images are built with `docker buildx bake` using
+[`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl).
+The build graph is:
+
+```
+upstream autoware:core-devel / core / base-cuda-{devel,runtime}
+        │
+        ▼
+universe-common  (openadkit-owned thin intermediate)
+        │
+        ▼
+seven non-CUDA component images (sensing-perception,
+localization-mapping, planning-control, vehicle-system,
+api, visualizer, simulator)
+```
+
+`sensing-perception-cuda` is a parallel CUDA branch: it inherits from
+upstream `base-cuda-{devel,runtime}` and additionally grafts in the
+`universe-common` install tree (so it has both CUDA toolkit access and the
+universe-common compiled packages).
+
+The `universe-common` layer compiles only the universe-common slice of
+Autoware on top of upstream `core-devel`/`core`; everything below
+`universe-common` (base OS, ROS, core) is owned and built by upstream.
+
+### Bake groups
+
+| Group | Targets |
+|-------|---------|
+| `default` | everything: `universe-common` + `component` |
+| `universe-common` | `universe-common-devel`, `universe-common` |
+| `component` | the seven non-CUDA component images plus `sensing-perception-cuda` |
+
+### Upstream pin
+
+The `UPSTREAM_TAG` bake variable pins the upstream Autoware release the
+images are built against. CI sets it from a repository Variable; leaving it
+empty uses upstream's plain `<name>-<distro>` multi-arch tag.
+
+## CI pipeline
+
+`build-all-images.yaml` builds the universe-common graph on pushes,
+schedules, and manual dispatch. It walks the `{humble, jazzy} × {amd64,
+arm64}` matrix through staged jobs — `prepare`, then `build-common` and
+`build-components` — so each layer is pushed before the
+layer that depends on it. A final `create-manifests` job stitches the
+per-arch tags into multi-arch manifests via the `combine-multi-arch-images`
+composite action. `release-all-images.yaml` runs on a schedule to track
+Autoware release tags and build the matching single-arch release images.

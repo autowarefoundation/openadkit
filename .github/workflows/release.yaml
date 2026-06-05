@@ -22,6 +22,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
   IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+  DEFAULT_ROS_DISTRO: humble
 
 jobs:
   validate:
@@ -270,23 +271,52 @@ jobs:
       - name: Promote image digests
         env:
           VERSION: ${{ inputs.version }}
+          DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
         run: |
           set -euo pipefail
 
-          while IFS=$'\t' read -r repo target distro digest; do
-            release_ref="${repo}:${target}-${distro}-${VERSION}"
-            if existing_json=$(docker buildx imagetools inspect "${release_ref}" --format '{{json .}}' 2>/dev/null); then
+          stable_release=false
+          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            stable_release=true
+          fi
+
+          promote_tag() {
+            local ref="$1"
+            local repo="$2"
+            local digest="$3"
+            local mode="$4"
+
+            if existing_json=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}' 2>/dev/null); then
               existing_digest=$(printf '%s' "${existing_json}" | jq -r '.manifest.digest')
               if [ "${existing_digest}" = "${digest}" ]; then
-                echo "${release_ref} already points to ${digest}; skipping"
-                continue
+                echo "${ref} already points to ${digest}; skipping"
+                return
               fi
-              echo "Release tag conflict: ${release_ref} points to ${existing_digest}, expected ${digest}" >&2
-              exit 1
+              if [ "${mode}" = "immutable" ]; then
+                echo "Release tag conflict: ${ref} points to ${existing_digest}, expected ${digest}" >&2
+                exit 1
+              fi
+              echo "Updating ${ref}: ${existing_digest} -> ${digest}"
+            else
+              echo "Promoting ${repo}@${digest} -> ${ref}"
             fi
 
-            echo "Promoting ${repo}@${digest} -> ${release_ref}"
-            docker buildx imagetools create -t "${release_ref}" "${repo}@${digest}"
+            docker buildx imagetools create -t "${ref}" "${repo}@${digest}"
+          }
+
+          while IFS=$'\t' read -r repo target distro digest; do
+            release_ref="${repo}:${target}-${distro}-${VERSION}"
+            promote_tag "${release_ref}" "${repo}" "${digest}" immutable
+
+            if [ "${stable_release}" = "true" ]; then
+              promote_tag "${repo}:${target}-${distro}" "${repo}" "${digest}" alias
+              promote_tag "${repo}:${target}-${distro}-latest" "${repo}" "${digest}" alias
+
+              if [ "${distro}" = "${DEFAULT_ROS_DISTRO}" ]; then
+                promote_tag "${repo}:${target}" "${repo}" "${digest}" alias
+                promote_tag "${repo}:${target}-latest" "${repo}" "${digest}" alias
+              fi
+            fi
           done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
         shell: bash
 
@@ -307,14 +337,22 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
         run: |
           set -euo pipefail
+
+          stable_release=false
+          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            stable_release=true
+          fi
+          tab=$(printf "\t")
 
           jq \
             --arg version "${VERSION}" \
             --arg release_sha "${RELEASE_SHA}" \
+            --arg default_ros_distro "${DEFAULT_ROS_DISTRO}" \
             --slurpfile scan release-input/scan/scan-metadata.json \
-            '. + {openadkit_version: $version, release_sha: $release_sha, scan: $scan[0]}' \
+            ". + {openadkit_version: \$version, release_sha: \$release_sha, default_ros_distro: \$default_ros_distro, scan: \$scan[0]}" \
             release-input/build/build-metadata.json > release-metadata.json
 
           autoware_input_ref=$(jq -r '.autoware_input_ref' release-metadata.json)
@@ -337,7 +375,22 @@ jobs:
             echo "| Autoware base version | \`${autoware_base_version}\` |"
             echo ""
             echo "## Images"
-            jq -r --arg version "${VERSION}" '.images[] | "- `\(.repo):\(.target)-\(.ros_distro)-\($version)` -> `\(.digest)`"' release-metadata.json
+            while IFS="${tab}" read -r repo target distro digest; do
+              printf -- "- \`%s:%s-%s-%s\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${VERSION}" "${digest}"
+            done < <(jq -r ".images[] | [.repo, .target, .ros_distro, .digest] | @tsv" release-metadata.json)
+
+            if [ "${stable_release}" = "true" ]; then
+              echo ""
+              echo "## Stable Aliases"
+              while IFS="${tab}" read -r repo target distro digest; do
+                printf -- "- \`%s:%s-%s\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${digest}"
+                printf -- "- \`%s:%s-%s-latest\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${digest}"
+                if [ "${distro}" = "${DEFAULT_ROS_DISTRO}" ]; then
+                  printf -- "- \`%s:%s\` -> \`%s\`\n" "${repo}" "${target}" "${digest}"
+                  printf -- "- \`%s:%s-latest\` -> \`%s\`\n" "${repo}" "${target}" "${digest}"
+                fi
+              done < <(jq -r ".images[] | [.repo, .target, .ros_distro, .digest] | @tsv" release-metadata.json)
+            fi
           } > release-notes.md
         shell: bash
 
@@ -371,15 +424,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          release_flags=()
+          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            release_flags+=(--latest)
+          else
+            release_flags+=(--prerelease --latest=false)
+          fi
+
           if gh release view "${VERSION}" >/dev/null 2>&1; then
             gh release edit "${VERSION}" \
               --title "OpenADKit ${VERSION}" \
-              --notes-file release-notes.md
+              --notes-file release-notes.md \
+              "${release_flags[@]}"
           else
             gh release create "${VERSION}" \
               --target "${RELEASE_SHA}" \
               --title "OpenADKit ${VERSION}" \
-              --notes-file release-notes.md
+              --notes-file release-notes.md \
+              "${release_flags[@]}"
           fi
           gh release upload "${VERSION}" release-metadata.json --clobber
         shell: bash

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'OpenADKit release version (e.g. v1.0.0)'
+        description: 'OpenADKit release version (e.g. v1.0.0 or v1.0.0-rc.1)'
         required: true
       build_tag:
         description: 'Build tag to promote (e.g. 123456789-1)'
@@ -52,8 +52,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Invalid version format '${VERSION}': must be vX.Y.Z" >&2
+          if ! printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+            echo "Invalid version format '${VERSION}': must be vX.Y.Z or vX.Y.Z-prerelease" >&2
             exit 1
           fi
           if ! printf '%s\n' "${BUILD_TAG}" | grep -Eq '^[0-9]+-[0-9]+$'; then
@@ -107,6 +107,8 @@ jobs:
           jq -e --arg build_tag "${BUILD_TAG}" '
             .build_tag == $build_tag and
             (.openadkit_sha | length) > 0 and
+            (.autoware_input_ref | length) > 0 and
+            (.autoware_ref_type | length) > 0 and
             (.autoware_ref | length) > 0 and
             (.autoware_base_version | length) > 0 and
             (.images | length) > 0
@@ -115,6 +117,28 @@ jobs:
           metadata_sha=$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)
           [ "${metadata_sha}" = "${release_sha}" ] \
             || (echo "Build metadata SHA ${metadata_sha} does not match workflow SHA ${release_sha}" >&2 && exit 1)
+
+          autoware_input_ref=$(jq -r '.autoware_input_ref' release-input/build/build-metadata.json)
+          autoware_ref_type=$(jq -r '.autoware_ref_type' release-input/build/build-metadata.json)
+          autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
+          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "Stable releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})" >&2
+              exit 1
+            fi
+            if [ "${autoware_base_version}" != "${autoware_input_ref}" ]; then
+              echo "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}" >&2
+              exit 1
+            fi
+          else
+            if [ "${autoware_ref_type}" = "tag" ] && ! printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "Pre-release Autoware tags must use X.Y.Z format (got ${autoware_input_ref})" >&2
+              exit 1
+            elif [ "${autoware_ref_type}" != "tag" ] && [ "${autoware_ref_type}" != "sha" ]; then
+              echo "Pre-releases must be built from an Autoware release tag or full SHA (got ${autoware_ref_type}:${autoware_input_ref})" >&2
+              exit 1
+            fi
+          fi
 
           jq -e --arg build_tag "${BUILD_TAG}" '
             .build_tag == $build_tag and .scan_scope == "all" and .scan_status == "passed"
@@ -231,6 +255,7 @@ jobs:
             release-input/build/build-metadata.json > release-metadata.json
 
           autoware_input_ref=$(jq -r '.autoware_input_ref' release-metadata.json)
+          autoware_ref_type=$(jq -r '.autoware_ref_type' release-metadata.json)
           autoware_ref=$(jq -r '.autoware_ref' release-metadata.json)
           autoware_base_version=$(jq -r '.autoware_base_version' release-metadata.json)
           openadkit_sha=$(jq -r '.openadkit_sha' release-metadata.json)
@@ -244,6 +269,7 @@ jobs:
             echo "| OpenADKit SHA | \`${openadkit_sha}\` |"
             echo "| Build tag | \`${build_tag}\` |"
             echo "| Autoware input ref | \`${autoware_input_ref}\` |"
+            echo "| Autoware ref type | \`${autoware_ref_type}\` |"
             echo "| Autoware resolved SHA | \`${autoware_ref}\` |"
             echo "| Autoware base version | \`${autoware_base_version}\` |"
             echo ""

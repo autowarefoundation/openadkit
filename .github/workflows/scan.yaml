@@ -1,0 +1,182 @@
+# Full image scan workflow for an existing build-all-images run.
+# It runs automatically only when the build requested scanning, or manually for
+# any build_tag. A successful scan metadata artifact makes a build promotable.
+
+name: scan-images
+
+on:
+  workflow_run:
+    workflows: [build-all-images]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      build_tag:
+        description: 'Build tag to scan (e.g. 123456789-1)'
+        required: true
+
+concurrency:
+  group: scan-images-${{ github.event_name == 'workflow_dispatch' && inputs.build_tag || format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  prepare:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      should_scan: ${{ steps.prepare.outputs.should_scan }}
+    steps:
+      - name: Resolve build metadata
+        id: prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BUILD_TAG: ${{ inputs.build_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            run_id="${{ github.event.workflow_run.id }}"
+            run_attempt="${{ github.event.workflow_run.run_attempt }}"
+            build_tag="${run_id}-${run_attempt}"
+          else
+            build_tag="${DISPATCH_BUILD_TAG}"
+            if ! printf '%s\n' "${build_tag}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+              echo "Invalid build_tag '${build_tag}': must be RUN_ID-RUN_ATTEMPT" >&2
+              exit 1
+            fi
+            run_id="${build_tag%%-*}"
+          fi
+
+          mkdir -p build-metadata
+          gh run download "${run_id}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "build-metadata-${build_tag}" \
+            --dir build-metadata
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            should_scan=$(jq -r '.scan_requested' build-metadata/build-metadata.json)
+          else
+            should_scan=true
+          fi
+
+          matrix=$(
+            jq -c '{include: [.images[] as $image | $image.platforms[] | {
+              repo: $image.repo,
+              target: $image.target,
+              ros_distro: $image.ros_distro,
+              digest: $image.digest,
+              image_ref: ($image.repo + "@" + $image.digest),
+              platform: .,
+              platform_label: (gsub("/"; "-"))
+            }]}' build-metadata/build-metadata.json
+          )
+
+          {
+            echo "build_tag=${build_tag}"
+            echo "should_scan=${should_scan}"
+            echo "matrix=${matrix}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  scan:
+    needs: prepare
+    if: needs.prepare.outputs.should_scan == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan ${{ matrix.target }}-${{ matrix.ros_distro }} (${{ matrix.platform }})
+        uses: aquasecurity/trivy-action@0.30.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          image-ref: ${{ matrix.image_ref }}
+          format: sarif
+          output: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
+
+      - name: Upload scan results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
+          category: ${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}
+
+  publish-metadata:
+    needs: [prepare, scan]
+    if: always() && needs.prepare.outputs.should_scan == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Write scan metadata
+        env:
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          SCAN_RESULT: ${{ needs.scan.result }}
+          SCAN_MATRIX: ${{ needs.prepare.outputs.matrix }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p scan-metadata
+          status="failed"
+          if [ "${SCAN_RESULT}" = "success" ]; then
+            status="passed"
+          fi
+
+          jq -n \
+            --arg build_tag "${BUILD_TAG}" \
+            --arg scan_status "${status}" \
+            --arg scan_result "${SCAN_RESULT}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --argjson scan_matrix "${SCAN_MATRIX}" \
+            '{
+              build_tag: $build_tag,
+              scan_scope: "all",
+              scan_status: $scan_status,
+              scan_result: $scan_result,
+              run_id: $run_id,
+              run_attempt: $run_attempt,
+              scanned_images: ($scan_matrix.include | map({
+                repo,
+                target,
+                ros_distro,
+                digest,
+                platform,
+                image_ref
+              }))
+            }' > scan-metadata/scan-metadata.json
+        shell: bash
+
+      - name: Upload scan metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-metadata-${{ needs.prepare.outputs.build_tag }}
+          path: scan-metadata/scan-metadata.json
+          retention-days: 90
+
+      - name: Fail if full scan failed
+        if: needs.scan.result != 'success'
+        run: exit 1

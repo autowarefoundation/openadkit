@@ -1,0 +1,610 @@
+# Manually promotes an existing build-all-images run to an OpenADKit release.
+# The build records provenance; this workflow only assigns the OpenADKit version
+# after validating build metadata, full scan metadata, and registry digests.
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'OpenADKit release version (e.g. v1.0.0 or v1.0.0-rc.1)'
+        required: true
+      build_tag:
+        description: 'Build tag to promote (e.g. 123456789-1)'
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
+  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+  DEFAULT_ROS_DISTRO: humble
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    outputs:
+      release_sha: ${{ steps.validate.outputs.release_sha }}
+      publish_latest_aliases: ${{ steps.validate.outputs.publish_latest_aliases }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release inputs and metadata
+        id: validate
+        env:
+          BUILD_TAG: ${{ inputs.build_tag }}
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          openadkit_semver_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z]*)(\.((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z]*))*)?$'
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          autoware_stable_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+
+          if ! printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_semver_re}"; then
+            echo "Invalid version format '${VERSION}': must be strict SemVer vX.Y.Z or vX.Y.Z-prerelease" >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "${BUILD_TAG}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+            echo "Invalid build_tag format '${BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT" >&2
+            exit 1
+          fi
+          [ "${GITHUB_REF}" = "refs/heads/main" ] \
+            || (echo "Release must be triggered from main branch (got ${GITHUB_REF})" >&2 && exit 1)
+
+          publish_latest_aliases=false
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            existing_tag_refs=$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
+                --jq '.[].ref | sub("^refs/tags/"; "")'
+            )
+            existing_stable_tags=$(
+              printf '%s\n' "${existing_tag_refs}" | grep -E "${openadkit_stable_re}" || true
+            )
+            highest_stable=$(
+              {
+                printf '%s\n' "${VERSION}"
+                printf '%s\n' "${existing_stable_tags}"
+              } | grep -E "${openadkit_stable_re}" | sort -V | tail -n 1
+            )
+            if [ "${highest_stable}" = "${VERSION}" ]; then
+              publish_latest_aliases=true
+            else
+              echo "Stable aliases will not be updated: ${highest_stable} is newer than ${VERSION}"
+            fi
+          fi
+
+          run_id="${BUILD_TAG%%-*}"
+          run_attempt="${BUILD_TAG##*-}"
+          run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/attempts/${run_attempt}")
+
+          workflow_name=$(printf '%s' "${run_json}" | jq -r '.name')
+          workflow_path=$(printf '%s' "${run_json}" | jq -r '.path')
+          head_branch=$(printf '%s' "${run_json}" | jq -r '.head_branch')
+          status=$(printf '%s' "${run_json}" | jq -r '.status')
+          conclusion=$(printf '%s' "${run_json}" | jq -r '.conclusion')
+          release_sha=$(printf '%s' "${run_json}" | jq -r '.head_sha')
+          created_at=$(printf '%s' "${run_json}" | jq -r '.created_at')
+
+          [ "${workflow_name}" = "build-all-images" ] || (echo "Expected build-all-images run, got '${workflow_name}'" >&2 && exit 1)
+          [ "${workflow_path}" = ".github/workflows/build-all-images.yaml" ] || (echo "Unexpected workflow path '${workflow_path}'" >&2 && exit 1)
+          [ "${head_branch}" = "main" ] || (echo "Source build must come from main branch (got '${head_branch}')" >&2 && exit 1)
+          [ "${status}" = "completed" ] || (echo "Source build must be completed (got '${status}')" >&2 && exit 1)
+          [ "${conclusion}" = "success" ] || (echo "Source build must succeed (got '${conclusion}')" >&2 && exit 1)
+
+          created_epoch=$(date -u -d "${created_at}" +%s)
+          now_epoch=$(date -u +%s)
+          max_age_seconds=$((90 * 24 * 60 * 60))
+          if [ $((now_epoch - created_epoch)) -gt "${max_age_seconds}" ]; then
+            echo "Build ${BUILD_TAG} is older than 90 days and is no longer promotable" >&2
+            exit 1
+          fi
+
+          mkdir -p release-input/build release-input/scan
+          gh run download "${run_id}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "build-metadata-${BUILD_TAG}" \
+            --dir release-input/build
+
+          scan_artifact_ids=$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=scan-metadata-${BUILD_TAG}" \
+              --jq '.artifacts[] | select(.expired == false) | [.id, .created_at] | @tsv' \
+              | sort -k2,2r \
+              | cut -f1
+          )
+          [ -n "${scan_artifact_ids}" ] || (echo "No non-expired full scan metadata found for ${BUILD_TAG}" >&2 && exit 1)
+
+          selected_scan_artifact_id=""
+          selected_scan_run_id=""
+          selected_scan_run_attempt=""
+          selected_scan_status=""
+          selected_scan_conclusion=""
+          while IFS= read -r scan_artifact_id; do
+            [ -n "${scan_artifact_id}" ] || continue
+
+            rm -rf release-input/scan
+            mkdir -p release-input/scan
+            rm -f scan-metadata.zip
+
+            artifact_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}")
+            artifact_run_id=$(printf '%s' "${artifact_json}" | jq -r '.workflow_run.id // empty')
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}/zip" > scan-metadata.zip
+            unzip -q scan-metadata.zip -d release-input/scan
+
+            if ! jq -e --arg build_tag "${BUILD_TAG}" '
+              .build_tag == $build_tag and
+              .scan_scope == "all" and
+              (.scan_status == "passed" or .scan_status == "failed") and
+              (.run_id | test("^[0-9]+$")) and
+              (.run_attempt | test("^[0-9]+$")) and
+              (.scanned_images | type == "array" and length > 0) and
+              all(.scanned_images[];
+                (.repo | type == "string" and length > 0) and
+                (.target | type == "string" and length > 0) and
+                (.ros_distro | type == "string" and length > 0) and
+                (.digest | test("^sha256:[0-9a-f]{64}$")) and
+                (.platform | test("^linux/(amd64|arm64)$")) and
+                (.image_ref == (.repo + "@" + .digest))
+              )
+            ' release-input/scan/scan-metadata.json >/dev/null 2>&1; then
+              echo "Ignoring scan artifact ${scan_artifact_id}: metadata is not full scan metadata for ${BUILD_TAG}" >&2
+              continue
+            fi
+
+            scan_run_id=$(jq -r '.run_id' release-input/scan/scan-metadata.json)
+            scan_run_attempt=$(jq -r '.run_attempt' release-input/scan/scan-metadata.json)
+            if [ "${artifact_run_id}" != "${scan_run_id}" ]; then
+              echo "Ignoring scan artifact ${scan_artifact_id}: artifact run ${artifact_run_id} does not match metadata run ${scan_run_id}" >&2
+              continue
+            fi
+
+            if ! scan_run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${scan_run_id}/attempts/${scan_run_attempt}" 2>/dev/null); then
+              echo "Ignoring scan artifact ${scan_artifact_id}: could not read scan run ${scan_run_id}-${scan_run_attempt}" >&2
+              continue
+            fi
+
+            scan_workflow_name=$(printf '%s' "${scan_run_json}" | jq -r '.name')
+            scan_workflow_path=$(printf '%s' "${scan_run_json}" | jq -r '.path')
+            scan_head_branch=$(printf '%s' "${scan_run_json}" | jq -r '.head_branch')
+            scan_status=$(printf '%s' "${scan_run_json}" | jq -r '.status')
+            scan_conclusion=$(printf '%s' "${scan_run_json}" | jq -r '.conclusion')
+
+            if [ "${scan_workflow_name}" != "scan-images" ] || \
+              [ "${scan_workflow_path}" != ".github/workflows/scan.yaml" ] || \
+              [ "${scan_head_branch}" != "main" ] || \
+              [ "${scan_status}" != "completed" ]; then
+              echo "Ignoring scan artifact ${scan_artifact_id}: scan run ${scan_run_id}-${scan_run_attempt} is not a completed scan-images run on main" >&2
+              continue
+            fi
+
+            selected_scan_artifact_id="${scan_artifact_id}"
+            selected_scan_run_id="${scan_run_id}"
+            selected_scan_run_attempt="${scan_run_attempt}"
+            selected_scan_status=$(jq -r '.scan_status' release-input/scan/scan-metadata.json)
+            selected_scan_conclusion="${scan_conclusion}"
+            break
+          done <<< "${scan_artifact_ids}"
+
+          [ -n "${selected_scan_artifact_id}" ] || (echo "No validated full scan metadata found for ${BUILD_TAG}" >&2 && exit 1)
+          if [ "${selected_scan_status}" != "passed" ] || [ "${selected_scan_conclusion}" != "success" ]; then
+            echo "Latest full scan for ${BUILD_TAG} did not pass: scan run ${selected_scan_run_id}-${selected_scan_run_attempt} has metadata status '${selected_scan_status}' and conclusion '${selected_scan_conclusion}'" >&2
+            exit 1
+          fi
+
+          if ! jq -e \
+            --arg build_tag "${BUILD_TAG}" \
+            --arg run_id "${run_id}" \
+            --arg run_attempt "${run_attempt}" '
+            .build_tag == $build_tag and
+            .run_id == $run_id and
+            .run_attempt == $run_attempt and
+            (.openadkit_sha | test("^[0-9a-f]{40}$")) and
+            (.autoware_input_ref | type == "string" and length > 0) and
+            (.autoware_ref_type as $type | ["branch", "tag", "sha", "ref"] | index($type) != null) and
+            (.autoware_ref | test("^[0-9a-f]{40}$")) and
+            (.autoware_base_version | test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")) and
+            (.autoware_lock_sha256 | test("^[0-9a-f]{64}$")) and
+            (.image_inventory_sha256 | test("^[0-9a-f]{64}$")) and
+            (.scan_requested | type == "boolean") and
+            (.images | type == "array" and length > 0) and
+            all(.images[];
+              (.repo | type == "string" and length > 0) and
+              (.target | type == "string" and length > 0) and
+              (.ros_distro | type == "string" and length > 0) and
+              (.digest | test("^sha256:[0-9a-f]{64}$")) and
+              (.ref == (.repo + ":" + .target + "-" + .ros_distro + "-" + $build_tag)) and
+              (.platforms | type == "array" and length > 0) and
+              all(.platforms[]; test("^linux/(amd64|arm64)$"))
+            )
+          ' release-input/build/build-metadata.json >/dev/null; then
+            echo "Build metadata failed schema validation" >&2
+            exit 1
+          fi
+
+          if [ ! -f release-input/build/autoware-lock.repos ]; then
+            echo "Build metadata is missing autoware-lock.repos" >&2
+            exit 1
+          fi
+          metadata_lock_sha=$(jq -r '.autoware_lock_sha256' release-input/build/build-metadata.json)
+          actual_lock_sha=$(sha256sum release-input/build/autoware-lock.repos | cut -d ' ' -f1)
+          [ "${actual_lock_sha}" = "${metadata_lock_sha}" ] \
+            || (echo "Autoware lock SHA ${actual_lock_sha} does not match metadata SHA ${metadata_lock_sha}" >&2 && exit 1)
+
+          if [ ! -f release-input/build/image-inventory.json ]; then
+            echo "Build metadata is missing image-inventory.json" >&2
+            exit 1
+          fi
+          metadata_inventory_sha=$(jq -r '.image_inventory_sha256' release-input/build/build-metadata.json)
+          actual_inventory_sha=$(sha256sum release-input/build/image-inventory.json | cut -d ' ' -f1)
+          [ "${actual_inventory_sha}" = "${metadata_inventory_sha}" ] \
+            || (echo "Image inventory SHA ${actual_inventory_sha} does not match metadata SHA ${metadata_inventory_sha}" >&2 && exit 1)
+
+          expected_inventory=$(mktemp)
+          actual_inventory=$(mktemp)
+          jq -r \
+            --arg common_repo "${IMAGE_PREFIX_COMMON}" \
+            --arg component_repo "${IMAGE_PREFIX_COMPONENT}" '
+            def repo_for($kind): if $kind == "common" then $common_repo elif $kind == "component" then $component_repo else error("unsupported repo kind") end;
+            .ros_distros[] as $distro |
+            .images[] |
+            [repo_for(.repo), .target, $distro, (.platforms | sort | join(","))] |
+            @tsv
+          ' release-input/build/image-inventory.json | sort -u > "${expected_inventory}"
+          jq -r '
+            .images[] |
+            [.repo, .target, .ros_distro, (.platforms | sort | join(","))] |
+            @tsv
+          ' release-input/build/build-metadata.json | sort -u > "${actual_inventory}"
+
+          expected_count=$(wc -l < "${expected_inventory}" | tr -d ' ')
+          actual_count=$(jq -r '.images | length' release-input/build/build-metadata.json)
+          actual_unique_count=$(wc -l < "${actual_inventory}" | tr -d ' ')
+          missing_inventory=$(comm -23 "${expected_inventory}" "${actual_inventory}" || true)
+          extra_inventory=$(comm -13 "${expected_inventory}" "${actual_inventory}" || true)
+          rm -f "${expected_inventory}" "${actual_inventory}"
+          if [ "${actual_count}" != "${actual_unique_count}" ]; then
+            echo "Build metadata contains duplicate image entries" >&2
+            exit 1
+          fi
+          if [ "${actual_count}" != "${expected_count}" ]; then
+            echo "Build metadata image count ${actual_count} does not match inventory count ${expected_count}" >&2
+            exit 1
+          fi
+          if [ -n "${missing_inventory}" ]; then
+            echo "Build metadata is missing inventory entries:" >&2
+            printf '%s\n' "${missing_inventory}" >&2
+            exit 1
+          fi
+          if [ -n "${extra_inventory}" ]; then
+            echo "Build metadata contains entries outside inventory:" >&2
+            printf '%s\n' "${extra_inventory}" >&2
+            exit 1
+          fi
+
+          build_coverage=$(mktemp)
+          scan_coverage=$(mktemp)
+          jq -r '
+            .images[] as $image |
+            $image.platforms[] |
+            [$image.repo, $image.target, $image.ros_distro, $image.digest, .] |
+            @tsv
+          ' release-input/build/build-metadata.json | sort -u > "${build_coverage}"
+          jq -r '
+            .scanned_images[] |
+            [.repo, .target, .ros_distro, .digest, .platform] |
+            @tsv
+          ' release-input/scan/scan-metadata.json | sort -u > "${scan_coverage}"
+
+          missing_coverage=$(comm -23 "${build_coverage}" "${scan_coverage}" || true)
+          extra_coverage=$(comm -13 "${build_coverage}" "${scan_coverage}" || true)
+          rm -f "${build_coverage}" "${scan_coverage}"
+          if [ -n "${missing_coverage}" ]; then
+            echo "Scan metadata is missing build digest/platform coverage:" >&2
+            printf '%s\n' "${missing_coverage}" >&2
+            exit 1
+          fi
+          if [ -n "${extra_coverage}" ]; then
+            echo "Scan metadata contains digest/platform entries outside build metadata:" >&2
+            printf '%s\n' "${extra_coverage}" >&2
+            exit 1
+          fi
+
+          metadata_sha=$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)
+          [ "${metadata_sha}" = "${release_sha}" ] \
+            || (echo "Build metadata SHA ${metadata_sha} does not match workflow SHA ${release_sha}" >&2 && exit 1)
+
+          autoware_input_ref=$(jq -r '.autoware_input_ref' release-input/build/build-metadata.json)
+          autoware_ref_type=$(jq -r '.autoware_ref_type' release-input/build/build-metadata.json)
+          autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
+              echo "Stable releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})" >&2
+              exit 1
+            fi
+            if [ "${autoware_base_version}" != "${autoware_input_ref}" ]; then
+              echo "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}" >&2
+              exit 1
+            fi
+          else
+            if [ "${autoware_ref_type}" = "tag" ] && ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
+              echo "Pre-release Autoware tags must use X.Y.Z format (got ${autoware_input_ref})" >&2
+              exit 1
+            elif [ "${autoware_ref_type}" != "tag" ] && [ "${autoware_ref_type}" != "sha" ]; then
+              echo "Pre-releases must be built from an Autoware release tag or full SHA (got ${autoware_ref_type}:${autoware_input_ref})" >&2
+              exit 1
+            fi
+          fi
+
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null || true)
+          if [ -n "${tag_sha}" ] && [ "${tag_sha}" != "${release_sha}" ]; then
+            echo "Tag ${VERSION} already exists at ${tag_sha}, expected ${release_sha}" >&2
+            exit 1
+          fi
+
+          conflicts=0
+          while IFS=$'\t' read -r repo target distro ref digest; do
+            source_digest=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}' | jq -r '.manifest.digest')
+            if [ "${source_digest}" != "${digest}" ]; then
+              echo "Source digest mismatch for ${ref}: ${source_digest} != ${digest}" >&2
+              conflicts=1
+            fi
+
+            release_ref="${repo}:${target}-${distro}-${VERSION}"
+            if existing_json=$(docker buildx imagetools inspect "${release_ref}" --format '{{json .}}' 2>/dev/null); then
+              existing_digest=$(printf '%s' "${existing_json}" | jq -r '.manifest.digest')
+              if [ "${existing_digest}" != "${digest}" ]; then
+                echo "Release tag conflict: ${release_ref} points to ${existing_digest}, expected ${digest}" >&2
+                conflicts=1
+              fi
+            fi
+          done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .ref, .digest] | @tsv' release-input/build/build-metadata.json)
+
+          [ "${conflicts}" -eq 0 ] || exit 1
+          echo "release_sha=${release_sha}" >> "$GITHUB_OUTPUT"
+          echo "publish_latest_aliases=${publish_latest_aliases}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Upload validated release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-release-${{ inputs.build_tag }}
+          path: release-input
+          retention-days: 7
+          overwrite: true
+
+  release-images:
+    runs-on: ubuntu-22.04
+    needs: validate
+    environment: release
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    steps:
+      - name: Download validated release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-release-${{ inputs.build_tag }}
+          path: release-input
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote image digests
+        env:
+          VERSION: ${{ inputs.version }}
+          DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+        run: |
+          set -euo pipefail
+
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          stable_release=false
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            stable_release=true
+          fi
+
+          promote_tag() {
+            local ref="$1"
+            local repo="$2"
+            local digest="$3"
+            local mode="$4"
+
+            if existing_json=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}' 2>/dev/null); then
+              existing_digest=$(printf '%s' "${existing_json}" | jq -r '.manifest.digest')
+              if [ "${existing_digest}" = "${digest}" ]; then
+                echo "${ref} already points to ${digest}; skipping"
+                return
+              fi
+              if [ "${mode}" = "immutable" ]; then
+                echo "Release tag conflict: ${ref} points to ${existing_digest}, expected ${digest}" >&2
+                exit 1
+              fi
+              echo "Updating ${ref}: ${existing_digest} -> ${digest}"
+            else
+              echo "Promoting ${repo}@${digest} -> ${ref}"
+            fi
+
+            docker buildx imagetools create -t "${ref}" "${repo}@${digest}"
+          }
+
+          while IFS=$'\t' read -r repo target distro digest; do
+            release_ref="${repo}:${target}-${distro}-${VERSION}"
+            promote_tag "${release_ref}" "${repo}" "${digest}" immutable
+
+            if [ "${stable_release}" = "true" ] && [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
+              promote_tag "${repo}:${target}-${distro}" "${repo}" "${digest}" alias
+              promote_tag "${repo}:${target}-${distro}-latest" "${repo}" "${digest}" alias
+
+              if [ "${distro}" = "${DEFAULT_ROS_DISTRO}" ]; then
+                promote_tag "${repo}:${target}" "${repo}" "${digest}" alias
+                promote_tag "${repo}:${target}-latest" "${repo}" "${digest}" alias
+              fi
+            fi
+          done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
+        shell: bash
+
+  release-github:
+    runs-on: ubuntu-22.04
+    needs: [validate, release-images]
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download validated release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-release-${{ inputs.build_tag }}
+          path: release-input
+
+      - name: Create release metadata and notes
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+        run: |
+          set -euo pipefail
+
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          stable_release=false
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            stable_release=true
+          fi
+          tab=$(printf "\t")
+
+          jq \
+            --arg version "${VERSION}" \
+            --arg release_sha "${RELEASE_SHA}" \
+            --arg default_ros_distro "${DEFAULT_ROS_DISTRO}" \
+            --argjson publish_latest_aliases "${PUBLISH_LATEST_ALIASES}" \
+            --slurpfile scan release-input/scan/scan-metadata.json \
+            ". + {openadkit_version: \$version, release_sha: \$release_sha, default_ros_distro: \$default_ros_distro, latest_aliases_updated: \$publish_latest_aliases, scan: \$scan[0]}" \
+            release-input/build/build-metadata.json > release-metadata.json
+
+          autoware_input_ref=$(jq -r '.autoware_input_ref' release-metadata.json)
+          autoware_ref_type=$(jq -r '.autoware_ref_type' release-metadata.json)
+          autoware_ref=$(jq -r '.autoware_ref' release-metadata.json)
+          autoware_base_version=$(jq -r '.autoware_base_version' release-metadata.json)
+          autoware_lock_sha256=$(jq -r '.autoware_lock_sha256' release-metadata.json)
+          openadkit_sha=$(jq -r '.openadkit_sha' release-metadata.json)
+          build_tag=$(jq -r '.build_tag' release-metadata.json)
+
+          {
+            echo "## Provenance"
+            echo "| Key | Value |"
+            echo "|-----|-------|"
+            echo "| OpenADKit version | \`${VERSION}\` |"
+            echo "| OpenADKit SHA | \`${openadkit_sha}\` |"
+            echo "| Build tag | \`${build_tag}\` |"
+            echo "| Autoware input ref | \`${autoware_input_ref}\` |"
+            echo "| Autoware ref type | \`${autoware_ref_type}\` |"
+            echo "| Autoware resolved SHA | \`${autoware_ref}\` |"
+            echo "| Autoware base version | \`${autoware_base_version}\` |"
+            echo "| Autoware lock SHA256 | \`${autoware_lock_sha256}\` |"
+            echo ""
+            echo "## Images"
+            while IFS="${tab}" read -r repo target distro digest; do
+              printf -- "- \`%s:%s-%s-%s\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${VERSION}" "${digest}"
+            done < <(jq -r ".images[] | [.repo, .target, .ros_distro, .digest] | @tsv" release-metadata.json)
+
+            if [ "${stable_release}" = "true" ] && [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
+              echo ""
+              echo "## Stable Aliases"
+              while IFS="${tab}" read -r repo target distro digest; do
+                printf -- "- \`%s:%s-%s\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${digest}"
+                printf -- "- \`%s:%s-%s-latest\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${digest}"
+                if [ "${distro}" = "${DEFAULT_ROS_DISTRO}" ]; then
+                  printf -- "- \`%s:%s\` -> \`%s\`\n" "${repo}" "${target}" "${digest}"
+                  printf -- "- \`%s:%s-latest\` -> \`%s\`\n" "${repo}" "${target}" "${digest}"
+                fi
+              done < <(jq -r ".images[] | [.repo, .target, .ros_distro, .digest] | @tsv" release-metadata.json)
+            elif [ "${stable_release}" = "true" ]; then
+              echo ""
+              echo "## Stable Aliases"
+              echo "Not updated because a newer stable OpenADKit release already exists."
+            fi
+          } > release-notes.md
+        shell: bash
+
+      - name: Create or verify git tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null || true)
+          if [ -z "${tag_sha}" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${VERSION}" \
+              -f sha="${RELEASE_SHA}" >/dev/null
+            echo "Created tag ${VERSION} at ${RELEASE_SHA}"
+          elif [ "${tag_sha}" = "${RELEASE_SHA}" ]; then
+            echo "Tag ${VERSION} already exists at ${RELEASE_SHA}; continuing"
+          else
+            echo "Tag ${VERSION} exists at ${tag_sha}, expected ${RELEASE_SHA}" >&2
+            exit 1
+          fi
+        shell: bash
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+        run: |
+          set -euo pipefail
+
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          release_flags=()
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            if [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
+              release_flags+=(--latest)
+            else
+              release_flags+=(--latest=false)
+            fi
+          else
+            release_flags+=(--prerelease --latest=false)
+          fi
+
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release edit "${VERSION}" \
+              --title "OpenADKit ${VERSION}" \
+              --notes-file release-notes.md \
+              "${release_flags[@]}"
+          else
+            gh release create "${VERSION}" \
+              --target "${RELEASE_SHA}" \
+              --title "OpenADKit ${VERSION}" \
+              --notes-file release-notes.md \
+              "${release_flags[@]}"
+          fi
+          gh release upload "${VERSION}" release-metadata.json release-input/build/autoware-lock.repos --clobber
+        shell: bash

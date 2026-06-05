@@ -25,6 +25,30 @@ The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Archite
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
 - **[Contributing](https://autowarefoundation.github.io/openadkit/contributing/)**
 
+## Container Image Tags
+
+Open AD Kit publishes build-specific, release, latest-stable, and CI development image tags to GitHub Container Registry.
+
+- Stable release tags are immutable and use `<target>-<ros_distro>-vX.Y.Z`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble-v1.0.0`.
+- Latest stable aliases use `<target>-<ros_distro>` and `<target>-<ros_distro>-latest`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble` and `ghcr.io/autowarefoundation/openadkit:planning-control-humble-latest`.
+- Default ROS distro aliases use `<target>` and `<target>-latest`, for example `ghcr.io/autowarefoundation/openadkit:planning-control` and `ghcr.io/autowarefoundation/openadkit:planning-control-latest`. The current default ROS distro is Humble.
+- Immutable build tags use `<target>-<ros_distro>-<build_tag>`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble-123456789-1`.
+- CI development aliases are mutable per-platform tags and use `<target>-<arch>-<ros_distro>`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-amd64-humble`. Do not use them for pinned deployments.
+- Pre-release tags use `<target>-<ros_distro>-vX.Y.Z-prerelease`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble-v1.0.0-rc.1`; pre-releases do not update latest aliases.
+
+Use stable release tags for fully pinned deployments. Sample compose files use default ROS distro aliases for convenience. CUDA image aliases are amd64-only.
+
+## Release Flow
+
+Maintainers promote an existing build instead of rebuilding during release:
+
+1. Run `build-all-images` from `main`. Stable Open AD Kit releases must use an Autoware `X.Y.Z` tag; pre-releases may use an Autoware `X.Y.Z` tag or full 40-character SHA.
+2. Keep the build summary's `build_tag`, formatted as `RUN_ID-RUN_ATTEMPT`.
+3. Ensure `scan-images` completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise run `scan-images` manually.
+4. Run the `release` workflow with the Open AD Kit `version` and the validated `build_tag`.
+
+The build metadata, scan metadata, and `.github/image-inventory.json` are the source of truth for release validation.
+
 ## Key Features
 
 ### Modular Components

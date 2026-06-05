@@ -1,0 +1,19 @@
+{
+  "ros_distros": ["humble", "jazzy"],
+  "images": [
+    {"repo": "common", "target": "base", "stage": "common", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "common", "target": "base-cuda", "stage": "common", "platforms": ["linux/amd64"]},
+    {"repo": "common", "target": "devel", "stage": "common", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "common", "target": "devel-cuda", "stage": "common", "platforms": ["linux/amd64"]},
+    {"repo": "component", "target": "sensing-perception", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "sensing-perception-cuda", "stage": "component", "platforms": ["linux/amd64"]},
+    {"repo": "component", "target": "localization-mapping", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "planning-control", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "vehicle-system", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "api", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "visualizer", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "simulator", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "universe", "stage": "universe", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"repo": "component", "target": "universe-cuda", "stage": "universe", "platforms": ["linux/amd64"]}
+  ]
+}

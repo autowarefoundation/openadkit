@@ -8,7 +8,7 @@ on:
       - '.github/image-inventory.json'
       - '.github/workflows/build-all-images.yaml'
       - 'components/docker-bake.hcl'
-      - 'components/common/**'
+      - 'components/universe-common/**'
       - 'components/sensing-perception/**'
       - 'components/localization-mapping/**'
       - 'components/planning-control/**'
@@ -266,7 +266,7 @@ jobs:
           retention-days: 90
 
   # =============================================================================
-  # Stage 1: Build common images
+  # Stage 1: Build universe-common images (on upstream Autoware core bases)
   # =============================================================================
   build-common:
     needs: prepare
@@ -312,7 +312,7 @@ jobs:
             mkdir -p autoware/src
             vcs import --shallow autoware/src < autoware-lock/autoware-lock.repos
             # Some Autoware refs do not provide middleware sources, but
-            # components/common/Dockerfile bind-mounts this path.
+            # components/universe-common/Dockerfile bind-mounts this path.
             mkdir -p autoware/src/middleware/external
             touch autoware/src/middleware/external/.keep
         shell: bash
@@ -327,69 +327,69 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for openadkit-common:base
-        id: meta-common-base
+      - name: Extract metadata for openadkit-common:universe-common-devel
+        id: meta-universe-common-devel
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
-          bake-target: docker-metadata-action-common-base
+          bake-target: docker-metadata-action-universe-common-devel
           tags: |
-            type=raw,value=base-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=base-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            type=raw,value=universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
           flavor: |
             latest=false
 
-      - name: Extract metadata for openadkit-common:base-cuda
-        id: meta-common-base-cuda
+      - name: Extract metadata for openadkit-common:universe-common
+        id: meta-universe-common
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
-          bake-target: docker-metadata-action-common-base-cuda
+          bake-target: docker-metadata-action-universe-common
           tags: |
-            type=raw,value=base-cuda-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=base-cuda-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            type=raw,value=universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
           flavor: |
             latest=false
 
-      - name: Extract metadata for openadkit-common:devel
-        id: meta-common-devel
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_PREFIX_COMMON }}
-          bake-target: docker-metadata-action-common-devel
-          tags: |
-            type=raw,value=devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
+      - name: Ensure upstream Autoware base images exist
+        env:
+          ROS_DISTRO: ${{ matrix.ros-distro }}
+          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+        run: |
+          set -euo pipefail
+          refs=$(docker buildx bake -f "${BAKE_FILE}" --print universe-common 2>/dev/null \
+            | jq -r '[.target[].contexts // {} | to_entries[].value]
+                     | map(select(startswith("docker-image://ghcr.io/autowarefoundation/autoware:")))
+                     | unique[]' | sed 's#^docker-image://##')
+          if [ -z "${refs}" ]; then echo "No upstream refs to verify."; exit 0; fi
+          fail=0
+          while IFS= read -r ref; do
+            [ -z "${ref}" ] && continue
+            if docker buildx imagetools inspect "${ref}" >/dev/null 2>&1; then
+              echo "OK: ${ref}"
+            else
+              echo "::error::Missing upstream image: ${ref}"; fail=1
+            fi
+          done <<< "${refs}"
+          [ "${fail}" -eq 0 ]
+        shell: bash
 
-      - name: Extract metadata for openadkit-common:devel-cuda
-        id: meta-common-devel-cuda
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_PREFIX_COMMON }}
-          bake-target: docker-metadata-action-common-devel-cuda
-          tags: |
-            type=raw,value=devel-cuda-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=devel-cuda-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Build and push common images (non-CUDA)
+      - name: Build and push universe-common images
         uses: docker/bake-action@v5
+        env:
+          ROS_DISTRO: ${{ matrix.ros-distro }}
+          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
         with:
           files: |
             ${{ env.BAKE_FILE }}
-            ${{ steps.meta-common-base.outputs.bake-file }}
-            ${{ steps.meta-common-devel.outputs.bake-file }}
+            ${{ steps.meta-universe-common-devel.outputs.bake-file }}
+            ${{ steps.meta-universe-common.outputs.bake-file }}
           targets: |
-            common-base
-            common-devel
+            universe-common-devel
+            universe-common
           push: true
           set: |
             *.platform=${{ matrix.platform }}
-            *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            *.args.BASE_IMAGE=ros:${{ matrix.ros-distro }}-ros-base-${{ matrix.ros-distro == 'jazzy' && 'noble' || 'jammy' }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
@@ -397,34 +397,8 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
-
-      - name: Build and push common images (CUDA, amd64 only)
-        if: matrix.platform == 'linux/amd64'
-        uses: docker/bake-action@v5
-        with:
-          files: |
-            ${{ env.BAKE_FILE }}
-            ${{ steps.meta-common-base-cuda.outputs.bake-file }}
-            ${{ steps.meta-common-devel-cuda.outputs.bake-file }}
-          targets: |
-            common-base-cuda
-            common-devel-cuda
-          push: true
-          set: |
-            *.platform=${{ matrix.platform }}
-            *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            *.args.BASE_IMAGE=ros:${{ matrix.ros-distro }}-ros-base-${{ matrix.ros-distro == 'jazzy' && 'noble' || 'jammy' }}
-            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
-            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
-            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
-            *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
-            *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
-            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ matrix.ros-distro }}-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
   # =============================================================================
   # Stage 2: Build component images (parallel)
@@ -498,6 +472,9 @@ jobs:
 
       - name: Build and push ${{ matrix.target }}
         uses: docker/bake-action@v5
+        env:
+          ROS_DISTRO: ${{ matrix.ros-distro }}
+          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -507,10 +484,8 @@ jobs:
           set: |
             *.platform=${{ matrix.platform }}
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            *.args.COMMON_BASE_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.COMMON_BASE_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.COMMON_DEVEL_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}

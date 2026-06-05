@@ -7,37 +7,19 @@ Detailed instructions on how to deploy the components can be found in the [Open 
 ## Build Pipeline
 
 ```mermaid
-block-beta
-    columns 7
+flowchart TB
+    ROS["ros:humble-ros-base-jammy<br/>ros:jazzy-ros-base-noble"] --> CB["common-base"]
+    CB --> CD["common-devel"]
 
-    space:2 ROS["ros:humble-ros-base-jammy<br/>ros:jazzy-ros-base-noble"]:3 space:2
+    CD --> SP["sensing-perception"]
+    CD --> LM["localization-mapping"]
+    CD --> PC["planning-control"]
+    CD --> VS["vehicle-system"]
+    CD --> API["api"]
+    CD --> VIZ["visualizer"]
+    CD --> SIM["simulator"]
 
-    space:7
-
-    space:2 CB["common-base"]:3 space:2
-
-    space:7
-
-    space:2 CD["common-devel"]:3 space:2
-
-    space:7
-
-    SP["sensing-perception"] LM["localization-mapping"] PC["planning-control"] VS["vehicle-system"] API["api"] VIZ["visualizer"] SIM["simulator"]
-
-    space:7
-
-    space:2 UNI["universe"]:3 space:2
-
-    ROS --> CB
-    CB --> CD
-    CD --> SP
-    CD --> LM
-    CD --> PC
-    CD --> VS
-    CD --> API
-    CD --> VIZ
-    CD --> SIM
-    SP --> UNI
+    SP --> UNI["universe"]
     LM --> UNI
     PC --> UNI
     VS --> UNI
@@ -45,17 +27,15 @@ block-beta
     VIZ --> UNI
     SIM --> UNI
 
-    style ROS fill:#334155,stroke:#64748b,color:#e2e8f0
-    style CB fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe
-    style CD fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe
-    style SP fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style LM fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style PC fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style VS fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style API fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style VIZ fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style SIM fill:#14532d,stroke:#22c55e,color:#bbf7d0
-    style UNI fill:#4c1d95,stroke:#a855f7,color:#e9d5ff
+    classDef ros fill:#334155,stroke:#64748b,color:#fff
+    classDef common fill:#1e3a5f,stroke:#3b82f6,color:#fff
+    classDef component fill:#14532d,stroke:#22c55e,color:#fff
+    classDef universe fill:#4c1d95,stroke:#a855f7,color:#fff
+
+    class ROS ros
+    class CB,CD common
+    class SP,LM,PC,VS,API,VIZ,SIM component
+    class UNI universe
 ```
 
 ### Build Groups

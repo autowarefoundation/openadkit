@@ -14,6 +14,10 @@ on:
         description: 'Build tag to scan (e.g. 123456789-1)'
         required: true
 
+concurrency:
+  group: scan-images-${{ github.event_name == 'workflow_dispatch' && inputs.build_tag || format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
 

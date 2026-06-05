@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
+      - '.github/image-inventory.json'
       - '.github/workflows/build-all-images.yaml'
       - 'components/docker-bake.hcl'
       - 'components/common/**'
@@ -53,7 +54,15 @@ jobs:
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       scan_requested: ${{ steps.prepare.outputs.scan_requested }}
+      common_matrix: ${{ steps.inventory.outputs.common_matrix }}
+      component_matrix: ${{ steps.inventory.outputs.component_matrix }}
+      universe_matrix: ${{ steps.inventory.outputs.universe_matrix }}
+      ros_distro_matrix: ${{ steps.inventory.outputs.ros_distro_matrix }}
+      manifest_targets: ${{ steps.inventory.outputs.manifest_targets }}
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
       - name: Resolve shared build inputs
         id: prepare
         env:
@@ -105,6 +114,81 @@ jobs:
             echo "scan_requested=${scan_requested}"
           } >> "$GITHUB_OUTPUT"
         shell: bash
+
+      - name: Resolve image inventory
+        id: inventory
+        run: |
+          set -euo pipefail
+          mkdir -p image-inventory
+          cp .github/image-inventory.json image-inventory/image-inventory.json
+          python3 <<'PY'
+          import json
+          import os
+          import pathlib
+
+          inventory = json.loads(pathlib.Path(".github/image-inventory.json").read_text())
+          distros = inventory["ros_distros"]
+          images = inventory["images"]
+
+          def platform_label(platform):
+              if platform == "linux/amd64":
+                  return "amd64"
+              if platform == "linux/arm64":
+                  return "arm64"
+              raise ValueError(f"unsupported platform: {platform}")
+
+          def matrix_for(stage):
+              include = []
+              for image in images:
+                  if image["stage"] != stage:
+                      continue
+                  for distro in distros:
+                      for platform in image["platforms"]:
+                          include.append({
+                              "platform": platform,
+                              "platform-label": platform_label(platform),
+                              "ros-distro": distro,
+                              "target": image["target"],
+                          })
+              return {"include": include}
+
+          common_pairs = sorted({
+              (platform, distro)
+              for image in images if image["stage"] == "common"
+              for distro in distros
+              for platform in image["platforms"]
+          })
+          common_matrix = {
+              "include": [
+                  {"platform": platform, "platform-label": platform_label(platform), "ros-distro": distro}
+                  for platform, distro in common_pairs
+              ]
+          }
+          ros_distro_matrix = {"include": [{"ros-distro": distro} for distro in distros]}
+          manifest_targets = " ".join(image["target"] for image in images if image["repo"] == "component")
+
+          outputs = {
+              "common_matrix": common_matrix,
+              "component_matrix": matrix_for("component"),
+              "universe_matrix": matrix_for("universe"),
+              "ros_distro_matrix": ros_distro_matrix,
+              "manifest_targets": manifest_targets,
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              for key, value in outputs.items():
+                  if isinstance(value, str):
+                      output.write(f"{key}={value}\n")
+                  else:
+                      output.write(f"{key}={json.dumps(value, separators=(',', ':'))}\n")
+          PY
+        shell: bash
+
+      - name: Upload image inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-inventory-${{ steps.prepare.outputs.build_tag }}
+          path: image-inventory/image-inventory.json
+          retention-days: 90
 
       - name: Install YAML parser
         run: |
@@ -197,9 +281,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 8
-      matrix:
-        platform: [linux/amd64, linux/arm64]
-        ros-distro: [humble, jazzy]
+      matrix: ${{ fromJson(needs.prepare.outputs.common_matrix) }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
@@ -360,25 +442,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 8
-      matrix:
-        platform: [linux/amd64, linux/arm64]
-        ros-distro: [humble, jazzy]
-        target:
-          - sensing-perception
-          - localization-mapping
-          - planning-control
-          - vehicle-system
-          - api
-          - visualizer
-          - simulator
-        include:
-          # CUDA variant only on amd64
-          - platform: linux/amd64
-            ros-distro: humble
-            target: sensing-perception-cuda
-          - platform: linux/amd64
-            ros-distro: jazzy
-            target: sensing-perception-cuda
+      matrix: ${{ fromJson(needs.prepare.outputs.component_matrix) }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
@@ -473,18 +537,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 8
-      matrix:
-        platform: [linux/amd64, linux/arm64]
-        ros-distro: [humble, jazzy]
-        target: [universe]
-        include:
-          # CUDA variant only on amd64
-          - platform: linux/amd64
-            ros-distro: humble
-            target: universe-cuda
-          - platform: linux/amd64
-            ros-distro: jazzy
-            target: universe-cuda
+      matrix: ${{ fromJson(needs.prepare.outputs.universe_matrix) }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
@@ -585,8 +638,7 @@ jobs:
       packages: write
     strategy:
       fail-fast: false
-      matrix:
-        ros-distro: [humble, jazzy]
+      matrix: ${{ fromJson(needs.prepare.outputs.ros_distro_matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -602,17 +654,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           image-prefix-common: ${{ env.IMAGE_PREFIX_COMMON }}
           image-prefix-component: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          component-targets: >-
-            sensing-perception
-            sensing-perception-cuda
-            localization-mapping
-            planning-control
-            vehicle-system
-            api
-            visualizer
-            simulator
-            universe
-            universe-cuda
+          component-targets: ${{ needs.prepare.outputs.manifest_targets }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   capture-metadata:
@@ -627,6 +669,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: autoware-lock-${{ needs.prepare.outputs.build_tag }}
+          path: build-metadata
+
+      - name: Download image inventory
+        uses: actions/download-artifact@v4
+        with:
+          name: image-inventory-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
       - name: Set up Docker Buildx
@@ -658,6 +706,7 @@ jobs:
           autoware_lock_sha256=$(sha256sum build-metadata/autoware-lock.repos | cut -d ' ' -f1)
           [ "${autoware_lock_sha256}" = "${PREPARED_LOCK_SHA256}" ] \
             || (echo "Autoware lock SHA ${autoware_lock_sha256} does not match prepare output ${PREPARED_LOCK_SHA256}" >&2 && exit 1)
+          image_inventory_sha256=$(sha256sum build-metadata/image-inventory.json | cut -d ' ' -f1)
           images_file="build-metadata/images.json"
           jq -n '[]' > "${images_file}"
 
@@ -688,14 +737,22 @@ jobs:
             mv "${tmp}" "${images_file}"
           }
 
-          for distro in humble jazzy; do
-            for target in base base-cuda devel devel-cuda; do
-              add_image "${COMMON}" "${target}" "${distro}"
-            done
-            for target in sensing-perception sensing-perception-cuda localization-mapping planning-control vehicle-system api visualizer simulator universe universe-cuda; do
-              add_image "${COMPONENT}" "${target}" "${distro}"
-            done
-          done
+          while IFS=$'\t' read -r repo_kind target distro; do
+            if [ "${repo_kind}" = "common" ]; then
+              repo="${COMMON}"
+            elif [ "${repo_kind}" = "component" ]; then
+              repo="${COMPONENT}"
+            else
+              echo "Unsupported image inventory repo kind: ${repo_kind}" >&2
+              exit 1
+            fi
+            add_image "${repo}" "${target}" "${distro}"
+          done < <(jq -r '
+            .ros_distros[] as $distro |
+            .images[] |
+            [.repo, .target, $distro] |
+            @tsv
+          ' build-metadata/image-inventory.json)
 
           jq -n \
             --arg build_tag "${BUILD_TAG}" \
@@ -707,6 +764,7 @@ jobs:
             --arg autoware_ref "${AUTOWARE_REF}" \
             --arg autoware_base_version "${AUTOWARE_BASE_VERSION}" \
             --arg autoware_lock_sha256 "${autoware_lock_sha256}" \
+            --arg image_inventory_sha256 "${image_inventory_sha256}" \
             --argjson scan_requested "${SCAN_REQUESTED}" \
             --slurpfile images "${images_file}" \
             '{
@@ -719,6 +777,7 @@ jobs:
               autoware_ref: $autoware_ref,
               autoware_base_version: $autoware_base_version,
               autoware_lock_sha256: $autoware_lock_sha256,
+              image_inventory_sha256: $image_inventory_sha256,
               scan_requested: $scan_requested,
               images: $images[0]
             }' > build-metadata/build-metadata.json
@@ -731,6 +790,7 @@ jobs:
           path: |
             build-metadata/build-metadata.json
             build-metadata/autoware-lock.repos
+            build-metadata/image-inventory.json
           retention-days: 90
 
   summarize:

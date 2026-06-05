@@ -208,25 +208,7 @@ jobs:
             exit 1
           fi
 
-          if ! jq -e \
-            --arg build_tag "${BUILD_TAG}" \
-            --arg common_repo "${IMAGE_PREFIX_COMMON}" \
-            --arg component_repo "${IMAGE_PREFIX_COMPONENT}" '
-            def common_targets: ["base", "base-cuda", "devel", "devel-cuda"];
-            def component_targets: ["sensing-perception", "sensing-perception-cuda", "localization-mapping", "planning-control", "vehicle-system", "api", "visualizer", "simulator", "universe", "universe-cuda"];
-            def distros: ["humble", "jazzy"];
-            def expected_platforms($target): if ($target | contains("cuda")) then ["linux/amd64"] else ["linux/amd64", "linux/arm64"] end;
-            def valid_repo_target($image):
-              (($image.repo == $common_repo and (common_targets | index($image.target) != null)) or
-              ($image.repo == $component_repo and (component_targets | index($image.target) != null)));
-            def valid_image:
-              . as $image |
-              valid_repo_target($image) and
-              (distros | index($image.ros_distro) != null) and
-              ($image.digest | test("^sha256:[0-9a-f]{64}$")) and
-              ($image.ref == ($image.repo + ":" + $image.target + "-" + $image.ros_distro + "-" + $build_tag)) and
-              ($image.platforms | type == "array") and
-              (($image.platforms | sort) == expected_platforms($image.target));
+          if ! jq -e --arg build_tag "${BUILD_TAG}" '
             .build_tag == $build_tag and
             (.run_id | test("^[0-9]+$")) and
             (.run_attempt | test("^[0-9]+$")) and
@@ -236,10 +218,18 @@ jobs:
             (.autoware_ref | test("^[0-9a-f]{40}$")) and
             (.autoware_base_version | test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")) and
             (.autoware_lock_sha256 | test("^[0-9a-f]{64}$")) and
+            (.image_inventory_sha256 | test("^[0-9a-f]{64}$")) and
             (.scan_requested | type == "boolean") and
-            (.images | type == "array" and length == 28) and
-            ([.images[] | [.repo, .target, .ros_distro] | @tsv] | unique | length == 28) and
-            all(.images[]; valid_image)
+            (.images | type == "array" and length > 0) and
+            all(.images[];
+              (.repo | type == "string" and length > 0) and
+              (.target | type == "string" and length > 0) and
+              (.ros_distro | type == "string" and length > 0) and
+              (.digest | test("^sha256:[0-9a-f]{64}$")) and
+              (.ref == (.repo + ":" + .target + "-" + .ros_distro + "-" + $build_tag)) and
+              (.platforms | type == "array" and length > 0) and
+              all(.platforms[]; test("^linux/(amd64|arm64)$"))
+            )
           ' release-input/build/build-metadata.json >/dev/null; then
             echo "Build metadata failed schema validation" >&2
             exit 1
@@ -253,6 +243,57 @@ jobs:
           actual_lock_sha=$(sha256sum release-input/build/autoware-lock.repos | cut -d ' ' -f1)
           [ "${actual_lock_sha}" = "${metadata_lock_sha}" ] \
             || (echo "Autoware lock SHA ${actual_lock_sha} does not match metadata SHA ${metadata_lock_sha}" >&2 && exit 1)
+
+          if [ ! -f release-input/build/image-inventory.json ]; then
+            echo "Build metadata is missing image-inventory.json" >&2
+            exit 1
+          fi
+          metadata_inventory_sha=$(jq -r '.image_inventory_sha256' release-input/build/build-metadata.json)
+          actual_inventory_sha=$(sha256sum release-input/build/image-inventory.json | cut -d ' ' -f1)
+          [ "${actual_inventory_sha}" = "${metadata_inventory_sha}" ] \
+            || (echo "Image inventory SHA ${actual_inventory_sha} does not match metadata SHA ${metadata_inventory_sha}" >&2 && exit 1)
+
+          expected_inventory=$(mktemp)
+          actual_inventory=$(mktemp)
+          jq -r \
+            --arg common_repo "${IMAGE_PREFIX_COMMON}" \
+            --arg component_repo "${IMAGE_PREFIX_COMPONENT}" '
+            def repo_for($kind): if $kind == "common" then $common_repo elif $kind == "component" then $component_repo else error("unsupported repo kind") end;
+            .ros_distros[] as $distro |
+            .images[] |
+            [repo_for(.repo), .target, $distro, (.platforms | sort | join(","))] |
+            @tsv
+          ' release-input/build/image-inventory.json | sort -u > "${expected_inventory}"
+          jq -r '
+            .images[] |
+            [.repo, .target, .ros_distro, (.platforms | sort | join(","))] |
+            @tsv
+          ' release-input/build/build-metadata.json | sort -u > "${actual_inventory}"
+
+          expected_count=$(wc -l < "${expected_inventory}" | tr -d ' ')
+          actual_count=$(jq -r '.images | length' release-input/build/build-metadata.json)
+          actual_unique_count=$(wc -l < "${actual_inventory}" | tr -d ' ')
+          missing_inventory=$(comm -23 "${expected_inventory}" "${actual_inventory}" || true)
+          extra_inventory=$(comm -13 "${expected_inventory}" "${actual_inventory}" || true)
+          rm -f "${expected_inventory}" "${actual_inventory}"
+          if [ "${actual_count}" != "${actual_unique_count}" ]; then
+            echo "Build metadata contains duplicate image entries" >&2
+            exit 1
+          fi
+          if [ "${actual_count}" != "${expected_count}" ]; then
+            echo "Build metadata image count ${actual_count} does not match inventory count ${expected_count}" >&2
+            exit 1
+          fi
+          if [ -n "${missing_inventory}" ]; then
+            echo "Build metadata is missing inventory entries:" >&2
+            printf '%s\n' "${missing_inventory}" >&2
+            exit 1
+          fi
+          if [ -n "${extra_inventory}" ]; then
+            echo "Build metadata contains entries outside inventory:" >&2
+            printf '%s\n' "${extra_inventory}" >&2
+            exit 1
+          fi
 
           build_coverage=$(mktemp)
           scan_coverage=$(mktemp)
@@ -343,6 +384,7 @@ jobs:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
           retention-days: 7
+          overwrite: true
 
   release-images:
     runs-on: ubuntu-22.04

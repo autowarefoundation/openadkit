@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+          if ! printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
             echo "Invalid version format '${VERSION}': must be vX.Y.Z or vX.Y.Z-prerelease" >&2
             exit 1
           fi
@@ -95,14 +95,81 @@ jobs:
             --name "build-metadata-${BUILD_TAG}" \
             --dir release-input/build
 
-          scan_artifacts=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=scan-metadata-${BUILD_TAG}")
-          scan_artifact_id=$(
-            printf '%s' "${scan_artifacts}" \
-              | jq -r '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | first | .id // empty'
+          scan_artifact_ids=$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=scan-metadata-${BUILD_TAG}" \
+              --jq '.artifacts[] | select(.expired == false) | [.id, .created_at] | @tsv' \
+              | sort -k2,2r \
+              | cut -f1
           )
-          [ -n "${scan_artifact_id}" ] || (echo "No non-expired full scan metadata found for ${BUILD_TAG}" >&2 && exit 1)
-          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}/zip" > scan-metadata.zip
-          unzip -q scan-metadata.zip -d release-input/scan
+          [ -n "${scan_artifact_ids}" ] || (echo "No non-expired full scan metadata found for ${BUILD_TAG}" >&2 && exit 1)
+
+          selected_scan_artifact_id=""
+          selected_scan_run_id=""
+          selected_scan_run_attempt=""
+          selected_scan_status=""
+          selected_scan_conclusion=""
+          while IFS= read -r scan_artifact_id; do
+            [ -n "${scan_artifact_id}" ] || continue
+
+            rm -rf release-input/scan
+            mkdir -p release-input/scan
+            rm -f scan-metadata.zip
+
+            artifact_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}")
+            artifact_run_id=$(printf '%s' "${artifact_json}" | jq -r '.workflow_run.id // empty')
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}/zip" > scan-metadata.zip
+            unzip -q scan-metadata.zip -d release-input/scan
+
+            if ! jq -e --arg build_tag "${BUILD_TAG}" '
+              .build_tag == $build_tag and
+              .scan_scope == "all" and
+              (.scan_status == "passed" or .scan_status == "failed") and
+              (.run_id | test("^[0-9]+$")) and
+              (.run_attempt | test("^[0-9]+$"))
+            ' release-input/scan/scan-metadata.json >/dev/null 2>&1; then
+              echo "Ignoring scan artifact ${scan_artifact_id}: metadata is not full scan metadata for ${BUILD_TAG}" >&2
+              continue
+            fi
+
+            scan_run_id=$(jq -r '.run_id' release-input/scan/scan-metadata.json)
+            scan_run_attempt=$(jq -r '.run_attempt' release-input/scan/scan-metadata.json)
+            if [ "${artifact_run_id}" != "${scan_run_id}" ]; then
+              echo "Ignoring scan artifact ${scan_artifact_id}: artifact run ${artifact_run_id} does not match metadata run ${scan_run_id}" >&2
+              continue
+            fi
+
+            if ! scan_run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${scan_run_id}/attempts/${scan_run_attempt}" 2>/dev/null); then
+              echo "Ignoring scan artifact ${scan_artifact_id}: could not read scan run ${scan_run_id}-${scan_run_attempt}" >&2
+              continue
+            fi
+
+            scan_workflow_name=$(printf '%s' "${scan_run_json}" | jq -r '.name')
+            scan_workflow_path=$(printf '%s' "${scan_run_json}" | jq -r '.path')
+            scan_head_branch=$(printf '%s' "${scan_run_json}" | jq -r '.head_branch')
+            scan_status=$(printf '%s' "${scan_run_json}" | jq -r '.status')
+            scan_conclusion=$(printf '%s' "${scan_run_json}" | jq -r '.conclusion')
+
+            if [ "${scan_workflow_name}" != "scan-images" ] || \
+              [ "${scan_workflow_path}" != ".github/workflows/scan.yaml" ] || \
+              [ "${scan_head_branch}" != "main" ] || \
+              [ "${scan_status}" != "completed" ]; then
+              echo "Ignoring scan artifact ${scan_artifact_id}: scan run ${scan_run_id}-${scan_run_attempt} is not a completed scan-images run on main" >&2
+              continue
+            fi
+
+            selected_scan_artifact_id="${scan_artifact_id}"
+            selected_scan_run_id="${scan_run_id}"
+            selected_scan_run_attempt="${scan_run_attempt}"
+            selected_scan_status=$(jq -r '.scan_status' release-input/scan/scan-metadata.json)
+            selected_scan_conclusion="${scan_conclusion}"
+            break
+          done <<< "${scan_artifact_ids}"
+
+          [ -n "${selected_scan_artifact_id}" ] || (echo "No validated full scan metadata found for ${BUILD_TAG}" >&2 && exit 1)
+          if [ "${selected_scan_status}" != "passed" ] || [ "${selected_scan_conclusion}" != "success" ]; then
+            echo "Latest full scan for ${BUILD_TAG} did not pass: scan run ${selected_scan_run_id}-${selected_scan_run_attempt} has metadata status '${selected_scan_status}' and conclusion '${selected_scan_conclusion}'" >&2
+            exit 1
+          fi
 
           jq -e --arg build_tag "${BUILD_TAG}" '
             .build_tag == $build_tag and
@@ -139,10 +206,6 @@ jobs:
               exit 1
             fi
           fi
-
-          jq -e --arg build_tag "${BUILD_TAG}" '
-            .build_tag == $build_tag and .scan_scope == "all" and .scan_status == "passed"
-          ' release-input/scan/scan-metadata.json >/dev/null
 
           tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null || true)
           if [ -n "${tag_sha}" ] && [ "${tag_sha}" != "${release_sha}" ]; then

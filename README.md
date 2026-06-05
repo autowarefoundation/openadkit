@@ -25,6 +25,17 @@ The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Archite
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
 - **[Contributing](https://autowarefoundation.github.io/openadkit/contributing/)**
 
+## Container Image Tags
+
+Open AD Kit publishes development, build-specific, and release image tags to GitHub Container Registry.
+
+- Sample development tags use `<target>`, for example `ghcr.io/autowarefoundation/openadkit:planning-control`.
+- Immutable build tags use `<target>-<ros_distro>-<build_tag>`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble-123456789-1`.
+- Stable release tags use `<target>-<ros_distro>-vX.Y.Z`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble-v1.0.0`.
+- Pre-release tags use `<target>-<ros_distro>-vX.Y.Z-prerelease`, for example `ghcr.io/autowarefoundation/openadkit:planning-control-humble-v1.0.0-rc.1`.
+
+Sample compose files use moving development tags for convenience. Use release tags for reproducible deployments.
+
 ## Key Features
 
 ### Modular Components

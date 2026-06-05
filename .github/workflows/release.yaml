@@ -33,6 +33,7 @@ jobs:
       packages: read
     outputs:
       release_sha: ${{ steps.validate.outputs.release_sha }}
+      publish_latest_aliases: ${{ steps.validate.outputs.publish_latest_aliases }}
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -63,6 +64,28 @@ jobs:
           fi
           [ "${GITHUB_REF}" = "refs/heads/main" ] \
             || (echo "Release must be triggered from main branch (got ${GITHUB_REF})" >&2 && exit 1)
+
+          publish_latest_aliases=false
+          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            existing_tag_refs=$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
+                --jq '.[].ref | sub("^refs/tags/"; "")'
+            )
+            existing_stable_tags=$(
+              printf '%s\n' "${existing_tag_refs}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true
+            )
+            highest_stable=$(
+              {
+                printf '%s\n' "${VERSION}"
+                printf '%s\n' "${existing_stable_tags}"
+              } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1
+            )
+            if [ "${highest_stable}" = "${VERSION}" ]; then
+              publish_latest_aliases=true
+            else
+              echo "Stable aliases will not be updated: ${highest_stable} is newer than ${VERSION}"
+            fi
+          fi
 
           run_id="${BUILD_TAG%%-*}"
           run_attempt="${BUILD_TAG##*-}"
@@ -126,7 +149,16 @@ jobs:
               .scan_scope == "all" and
               (.scan_status == "passed" or .scan_status == "failed") and
               (.run_id | test("^[0-9]+$")) and
-              (.run_attempt | test("^[0-9]+$"))
+              (.run_attempt | test("^[0-9]+$")) and
+              (.scanned_images | type == "array" and length > 0) and
+              all(.scanned_images[];
+                (.repo | type == "string" and length > 0) and
+                (.target | type == "string" and length > 0) and
+                (.ros_distro | type == "string" and length > 0) and
+                (.digest | test("^sha256:[0-9a-f]{64}$")) and
+                (.platform | test("^linux/(amd64|arm64)$")) and
+                (.image_ref == (.repo + "@" + .digest))
+              )
             ' release-input/scan/scan-metadata.json >/dev/null 2>&1; then
               echo "Ignoring scan artifact ${scan_artifact_id}: metadata is not full scan metadata for ${BUILD_TAG}" >&2
               continue
@@ -182,6 +214,34 @@ jobs:
             (.images | length) > 0
           ' release-input/build/build-metadata.json >/dev/null
 
+          build_coverage=$(mktemp)
+          scan_coverage=$(mktemp)
+          jq -r '
+            .images[] as $image |
+            $image.platforms[] |
+            [$image.repo, $image.target, $image.ros_distro, $image.digest, .] |
+            @tsv
+          ' release-input/build/build-metadata.json | sort -u > "${build_coverage}"
+          jq -r '
+            .scanned_images[] |
+            [.repo, .target, .ros_distro, .digest, .platform] |
+            @tsv
+          ' release-input/scan/scan-metadata.json | sort -u > "${scan_coverage}"
+
+          missing_coverage=$(comm -23 "${build_coverage}" "${scan_coverage}" || true)
+          extra_coverage=$(comm -13 "${build_coverage}" "${scan_coverage}" || true)
+          rm -f "${build_coverage}" "${scan_coverage}"
+          if [ -n "${missing_coverage}" ]; then
+            echo "Scan metadata is missing build digest/platform coverage:" >&2
+            printf '%s\n' "${missing_coverage}" >&2
+            exit 1
+          fi
+          if [ -n "${extra_coverage}" ]; then
+            echo "Scan metadata contains digest/platform entries outside build metadata:" >&2
+            printf '%s\n' "${extra_coverage}" >&2
+            exit 1
+          fi
+
           metadata_sha=$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)
           [ "${metadata_sha}" = "${release_sha}" ] \
             || (echo "Build metadata SHA ${metadata_sha} does not match workflow SHA ${release_sha}" >&2 && exit 1)
@@ -234,6 +294,7 @@ jobs:
 
           [ "${conflicts}" -eq 0 ] || exit 1
           echo "release_sha=${release_sha}" >> "$GITHUB_OUTPUT"
+          echo "publish_latest_aliases=${publish_latest_aliases}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Upload validated release metadata
@@ -272,6 +333,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
         run: |
           set -euo pipefail
 
@@ -308,7 +370,7 @@ jobs:
             release_ref="${repo}:${target}-${distro}-${VERSION}"
             promote_tag "${release_ref}" "${repo}" "${digest}" immutable
 
-            if [ "${stable_release}" = "true" ]; then
+            if [ "${stable_release}" = "true" ] && [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
               promote_tag "${repo}:${target}-${distro}" "${repo}" "${digest}" alias
               promote_tag "${repo}:${target}-${distro}-latest" "${repo}" "${digest}" alias
 
@@ -338,6 +400,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
         run: |
           set -euo pipefail
 
@@ -351,8 +414,9 @@ jobs:
             --arg version "${VERSION}" \
             --arg release_sha "${RELEASE_SHA}" \
             --arg default_ros_distro "${DEFAULT_ROS_DISTRO}" \
+            --argjson publish_latest_aliases "${PUBLISH_LATEST_ALIASES}" \
             --slurpfile scan release-input/scan/scan-metadata.json \
-            ". + {openadkit_version: \$version, release_sha: \$release_sha, default_ros_distro: \$default_ros_distro, scan: \$scan[0]}" \
+            ". + {openadkit_version: \$version, release_sha: \$release_sha, default_ros_distro: \$default_ros_distro, latest_aliases_updated: \$publish_latest_aliases, scan: \$scan[0]}" \
             release-input/build/build-metadata.json > release-metadata.json
 
           autoware_input_ref=$(jq -r '.autoware_input_ref' release-metadata.json)
@@ -379,7 +443,7 @@ jobs:
               printf -- "- \`%s:%s-%s-%s\` -> \`%s\`\n" "${repo}" "${target}" "${distro}" "${VERSION}" "${digest}"
             done < <(jq -r ".images[] | [.repo, .target, .ros_distro, .digest] | @tsv" release-metadata.json)
 
-            if [ "${stable_release}" = "true" ]; then
+            if [ "${stable_release}" = "true" ] && [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
               echo ""
               echo "## Stable Aliases"
               while IFS="${tab}" read -r repo target distro digest; do
@@ -390,6 +454,10 @@ jobs:
                   printf -- "- \`%s:%s-latest\` -> \`%s\`\n" "${repo}" "${target}" "${digest}"
                 fi
               done < <(jq -r ".images[] | [.repo, .target, .ros_distro, .digest] | @tsv" release-metadata.json)
+            elif [ "${stable_release}" = "true" ]; then
+              echo ""
+              echo "## Stable Aliases"
+              echo "Not updated because a newer stable OpenADKit release already exists."
             fi
           } > release-notes.md
         shell: bash
@@ -421,12 +489,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
         run: |
           set -euo pipefail
 
           release_flags=()
           if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            release_flags+=(--latest)
+            if [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
+              release_flags+=(--latest)
+            else
+              release_flags+=(--latest=false)
+            fi
           else
             release_flags+=(--prerelease --latest=false)
           fi

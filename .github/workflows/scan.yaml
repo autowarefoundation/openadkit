@@ -64,9 +64,11 @@ jobs:
 
           matrix=$(
             jq -c '{include: [.images[] as $image | $image.platforms[] | {
-              image_ref: $image.ref,
+              repo: $image.repo,
               target: $image.target,
               ros_distro: $image.ros_distro,
+              digest: $image.digest,
+              image_ref: ($image.repo + "@" + $image.digest),
               platform: .,
               platform_label: (gsub("/"; "-"))
             }]}' build-metadata/build-metadata.json
@@ -129,6 +131,7 @@ jobs:
         env:
           BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
           SCAN_RESULT: ${{ needs.scan.result }}
+          SCAN_MATRIX: ${{ needs.prepare.outputs.matrix }}
         run: |
           set -euo pipefail
 
@@ -144,13 +147,22 @@ jobs:
             --arg scan_result "${SCAN_RESULT}" \
             --arg run_id "${GITHUB_RUN_ID}" \
             --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --argjson scan_matrix "${SCAN_MATRIX}" \
             '{
               build_tag: $build_tag,
               scan_scope: "all",
               scan_status: $scan_status,
               scan_result: $scan_result,
               run_id: $run_id,
-              run_attempt: $run_attempt
+              run_attempt: $run_attempt,
+              scanned_images: ($scan_matrix.include | map({
+                repo,
+                target,
+                ros_distro,
+                digest,
+                platform,
+                image_ref
+              }))
             }' > scan-metadata/scan-metadata.json
         shell: bash
 

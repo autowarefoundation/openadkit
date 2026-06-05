@@ -1,5 +1,6 @@
-# Scans OpenADKit images from the exact successful build-all-images run.
-# Scheduled and manual runs use the latest successful main-branch build.
+# Full image scan workflow for an existing build-all-images run.
+# It runs automatically only when the build requested scanning, or manually for
+# any build_tag. A successful scan metadata artifact makes a build promotable.
 
 name: scan-images
 
@@ -7,48 +8,90 @@ on:
   workflow_run:
     workflows: [build-all-images]
     types: [completed]
-  schedule:
-    - cron: '0 6 * * 1'
   workflow_dispatch:
+    inputs:
+      build_tag:
+        description: 'Build tag to scan (e.g. 123456789-1)'
+        required: true
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
-  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
 
 jobs:
-  scan:
+  prepare:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       actions: read
+      contents: read
+    outputs:
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      should_scan: ${{ steps.prepare.outputs.should_scan }}
+    steps:
+      - name: Resolve build metadata
+        id: prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BUILD_TAG: ${{ inputs.build_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            run_id="${{ github.event.workflow_run.id }}"
+            run_attempt="${{ github.event.workflow_run.run_attempt }}"
+            build_tag="${run_id}-${run_attempt}"
+          else
+            build_tag="${DISPATCH_BUILD_TAG}"
+            if ! printf '%s\n' "${build_tag}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+              echo "Invalid build_tag '${build_tag}': must be RUN_ID-RUN_ATTEMPT" >&2
+              exit 1
+            fi
+            run_id="${build_tag%%-*}"
+          fi
+
+          mkdir -p build-metadata
+          gh run download "${run_id}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "build-metadata-${build_tag}" \
+            --dir build-metadata
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            should_scan=$(jq -r '.scan_requested' build-metadata/build-metadata.json)
+          else
+            should_scan=true
+          fi
+
+          matrix=$(
+            jq -c '{include: [.images[] as $image | $image.platforms[] | {
+              image_ref: $image.ref,
+              target: $image.target,
+              ros_distro: $image.ros_distro,
+              platform: .,
+              platform_label: (gsub("/"; "-"))
+            }]}' build-metadata/build-metadata.json
+          )
+
+          {
+            echo "build_tag=${build_tag}"
+            echo "should_scan=${should_scan}"
+            echo "matrix=${matrix}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  scan:
+    needs: prepare
+    if: needs.prepare.outputs.should_scan == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
       contents: read
       packages: read
       security-events: write
     strategy:
       fail-fast: false
       max-parallel: 6
-      matrix:
-        ros-distro: [humble, jazzy]
-        target:
-          - base
-          - base-cuda
-          - devel
-          - devel-cuda
-          - sensing-perception
-          - sensing-perception-cuda
-          - localization-mapping
-          - planning-control
-          - vehicle-system
-          - api
-          - visualizer
-          - simulator
-          - universe
-          - universe-cuda
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
@@ -56,73 +99,67 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve image reference
-        id: image
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IMAGE_PREFIX_COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
-          IMAGE_PREFIX_COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          ROS_DISTRO: ${{ matrix.ros-distro }}
-          TARGET: ${{ matrix.target }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            run_id="${{ github.event.workflow_run.id }}"
-            run_attempt="${{ github.event.workflow_run.run_attempt }}"
-            created_at="${{ github.event.workflow_run.created_at }}"
-          else
-            runs_json=$(gh api "repos/${{ github.repository }}/actions/workflows/build-all-images.yaml/runs?branch=main&status=completed&per_page=100")
-            run_id=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | .id // empty')
-            run_attempt=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | .run_attempt // empty')
-            created_at=$(printf '%s' "$runs_json" | jq -r '.workflow_runs | map(select(.conclusion == "success")) | first | .created_at // empty')
-            if [ -z "$run_id" ] || [ -z "$run_attempt" ]; then
-              echo "Could not find a successful build-all-images run on main" >&2
-              exit 1
-            fi
-          fi
-
-          build_tag="${run_id}-${run_attempt}"
-          case "$TARGET" in
-            base|base-cuda|devel|devel-cuda)
-              image_prefix="$IMAGE_PREFIX_COMMON"
-              ;;
-            *)
-              image_prefix="$IMAGE_PREFIX_COMPONENT"
-              ;;
-          esac
-
-          image_refs=("${image_prefix}:${TARGET}-${ROS_DISTRO}-${build_tag}")
-
-          if [ -n "$created_at" ]; then
-            legacy_date=$(date -u -d "$created_at" +%Y%m%d)
-            image_refs+=("${image_prefix}:${TARGET}-${ROS_DISTRO}-${legacy_date}-${build_tag}")
-          fi
-
-          for image_ref in "${image_refs[@]}"; do
-            if docker buildx imagetools inspect "$image_ref" >/dev/null 2>&1; then
-              echo "Resolved image_ref=${image_ref}"
-              echo "image_ref=${image_ref}" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-
-          printf 'Could not resolve image ref. Tried:\n' >&2
-          printf '  %s\n' "${image_refs[@]}" >&2
-          exit 1
-
-      - name: Scan ${{ matrix.target }}-${{ matrix.ros-distro }}
+      - name: Scan ${{ matrix.target }}-${{ matrix.ros_distro }} (${{ matrix.platform }})
         uses: aquasecurity/trivy-action@0.30.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
-          image-ref: ${{ steps.image.outputs.image_ref }}
+          image-ref: ${{ matrix.image_ref }}
           format: sarif
-          output: trivy-${{ matrix.target }}-${{ matrix.ros-distro }}.sarif
-          exit-code: '0'
+          output: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
+          exit-code: '1'
           severity: CRITICAL,HIGH
 
       - name: Upload scan results to GitHub Security
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros-distro }}.sarif
-          category: ${{ matrix.target }}-${{ matrix.ros-distro }}
+          sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
+          category: ${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}
+
+  publish-metadata:
+    needs: [prepare, scan]
+    if: always() && needs.prepare.outputs.should_scan == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Write scan metadata
+        env:
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          SCAN_RESULT: ${{ needs.scan.result }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p scan-metadata
+          status="failed"
+          if [ "${SCAN_RESULT}" = "success" ]; then
+            status="passed"
+          fi
+
+          jq -n \
+            --arg build_tag "${BUILD_TAG}" \
+            --arg scan_status "${status}" \
+            --arg scan_result "${SCAN_RESULT}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            '{
+              build_tag: $build_tag,
+              scan_scope: "all",
+              scan_status: $scan_status,
+              scan_result: $scan_result,
+              run_id: $run_id,
+              run_attempt: $run_attempt
+            }' > scan-metadata/scan-metadata.json
+        shell: bash
+
+      - name: Upload scan metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-metadata-${{ needs.prepare.outputs.build_tag }}
+          path: scan-metadata/scan-metadata.json
+          retention-days: 90
+
+      - name: Fail if full scan failed
+        if: needs.scan.result != 'success'
+        run: exit 1

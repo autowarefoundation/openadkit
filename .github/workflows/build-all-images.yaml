@@ -3,6 +3,9 @@ name: build-all-images
 on:
   push:
     paths:
+      - '.github/actions/combine-multi-arch-images/**'
+      - '.github/actions/free-disk-space/**'
+      - '.github/workflows/build-all-images.yaml'
       - 'components/docker-bake.hcl'
       - 'components/common/**'
       - 'components/sensing-perception/**'
@@ -14,8 +17,18 @@ on:
       - 'components/simulator/**'
       - 'components/universe/**'
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 0 * * 0'
   workflow_dispatch:
+    inputs:
+      autoware_ref:
+        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to main.'
+        required: false
+        default: main
+      run_scan:
+        description: 'Run a full image scan after this build completes.'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: build-all-images-${{ github.ref }}
@@ -33,17 +46,56 @@ jobs:
     permissions:
       contents: read
     outputs:
+      autoware_input_ref: ${{ steps.prepare.outputs.autoware_input_ref }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
+      autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
+      scan_requested: ${{ steps.prepare.outputs.scan_requested }}
     steps:
       - name: Resolve shared build inputs
         id: prepare
+        env:
+          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || 'main' }}
+          RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
         run: |
           set -euo pipefail
-          autoware_ref=$(git ls-remote https://github.com/autowarefoundation/autoware refs/heads/main | cut -f1)
+
+          autoware_input_ref="${AUTOWARE_REF_INPUT:-main}"
           build_tag="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "autoware_ref=${autoware_ref}" >> "$GITHUB_OUTPUT"
-          echo "build_tag=${build_tag}" >> "$GITHUB_OUTPUT"
+
+          scan_requested=false
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            scan_requested=true
+          elif [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${RUN_SCAN_INPUT}" = "true" ]; then
+            scan_requested=true
+          fi
+
+          git init autoware-metadata
+          git -C autoware-metadata remote add origin https://github.com/autowarefoundation/autoware
+
+          fetch_ref="${autoware_input_ref}"
+          if git -C autoware-metadata ls-remote --exit-code origin "refs/heads/${autoware_input_ref}" >/dev/null 2>&1; then
+            fetch_ref="refs/heads/${autoware_input_ref}"
+          elif git -C autoware-metadata ls-remote --exit-code origin "refs/tags/${autoware_input_ref}" >/dev/null 2>&1; then
+            fetch_ref="refs/tags/${autoware_input_ref}"
+          fi
+
+          git -C autoware-metadata fetch --filter=blob:none --tags --force origin "${fetch_ref}"
+          git -C autoware-metadata checkout --detach FETCH_HEAD
+
+          autoware_ref=$(git -C autoware-metadata rev-parse HEAD)
+          autoware_base_version=$(
+            git -C autoware-metadata describe --tags --match '[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || true
+          )
+          [ -n "${autoware_base_version}" ] || (echo "Could not infer Autoware base version from ${autoware_input_ref}" && exit 1)
+
+          {
+            echo "autoware_input_ref=${autoware_input_ref}"
+            echo "autoware_ref=${autoware_ref}"
+            echo "autoware_base_version=${autoware_base_version}"
+            echo "build_tag=${build_tag}"
+            echo "scan_requested=${scan_requested}"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
 
   # =============================================================================
@@ -164,7 +216,10 @@ jobs:
             *.args.BASE_IMAGE=ros:${{ matrix.ros-distro }}-ros-base-${{ matrix.ros-distro == 'jazzy' && 'noble' || 'jammy' }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
+            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
+            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
+            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
@@ -186,7 +241,10 @@ jobs:
             *.args.BASE_IMAGE=ros:${{ matrix.ros-distro }}-ros-base-${{ matrix.ros-distro == 'jazzy' && 'noble' || 'jammy' }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
+            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
+            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
+            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:common-cuda-${{ matrix.ros-distro }}-main,mode=max
 
@@ -288,7 +346,10 @@ jobs:
             *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
+            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
+            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
+            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
@@ -391,7 +452,10 @@ jobs:
             *.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
+            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
+            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
+            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
@@ -436,9 +500,109 @@ jobs:
             universe-cuda
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  capture-metadata:
+    runs-on: ubuntu-22.04
+    needs: [prepare, create-manifests]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Capture build metadata
+        env:
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          OPENADKIT_SHA: ${{ github.sha }}
+          AUTOWARE_INPUT_REF: ${{ needs.prepare.outputs.autoware_input_ref }}
+          AUTOWARE_REF: ${{ needs.prepare.outputs.autoware_ref }}
+          AUTOWARE_BASE_VERSION: ${{ needs.prepare.outputs.autoware_base_version }}
+          SCAN_REQUESTED: ${{ needs.prepare.outputs.scan_requested }}
+          COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
+          COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p build-metadata
+          images_file="build-metadata/images.json"
+          jq -n '[]' > "${images_file}"
+
+          add_image() {
+            local repo="$1"
+            local target="$2"
+            local distro="$3"
+            local ref="${repo}:${target}-${distro}-${BUILD_TAG}"
+            local inspect_json digest platforms
+
+            inspect_json=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}')
+            digest=$(printf '%s' "${inspect_json}" | jq -r '.manifest.digest')
+            platforms=$(
+              printf '%s' "${inspect_json}" \
+                | jq -c '[.manifest.manifests[] | select(.platform.os != "unknown") | "\(.platform.os)/\(.platform.architecture)"] | unique'
+            )
+
+            tmp=$(mktemp)
+            jq \
+              --arg repo "${repo}" \
+              --arg target "${target}" \
+              --arg distro "${distro}" \
+              --arg ref "${ref}" \
+              --arg digest "${digest}" \
+              --argjson platforms "${platforms}" \
+              '. + [{repo: $repo, target: $target, ros_distro: $distro, ref: $ref, digest: $digest, platforms: $platforms}]' \
+              "${images_file}" > "${tmp}"
+            mv "${tmp}" "${images_file}"
+          }
+
+          for distro in humble jazzy; do
+            for target in base base-cuda devel devel-cuda; do
+              add_image "${COMMON}" "${target}" "${distro}"
+            done
+            for target in sensing-perception sensing-perception-cuda localization-mapping planning-control vehicle-system api visualizer simulator universe universe-cuda; do
+              add_image "${COMPONENT}" "${target}" "${distro}"
+            done
+          done
+
+          jq -n \
+            --arg build_tag "${BUILD_TAG}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg openadkit_sha "${OPENADKIT_SHA}" \
+            --arg autoware_input_ref "${AUTOWARE_INPUT_REF}" \
+            --arg autoware_ref "${AUTOWARE_REF}" \
+            --arg autoware_base_version "${AUTOWARE_BASE_VERSION}" \
+            --argjson scan_requested "${SCAN_REQUESTED}" \
+            --slurpfile images "${images_file}" \
+            '{
+              build_tag: $build_tag,
+              run_id: $run_id,
+              run_attempt: $run_attempt,
+              openadkit_sha: $openadkit_sha,
+              autoware_input_ref: $autoware_input_ref,
+              autoware_ref: $autoware_ref,
+              autoware_base_version: $autoware_base_version,
+              scan_requested: $scan_requested,
+              images: $images[0]
+            }' > build-metadata/build-metadata.json
+        shell: bash
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-metadata-${{ needs.prepare.outputs.build_tag }}
+          path: build-metadata/build-metadata.json
+          retention-days: 90
+
   summarize:
     runs-on: ubuntu-latest
-    needs: [prepare, create-manifests]
+    needs: [prepare, capture-metadata]
     if: success()
     steps:
       - name: Write job summary
@@ -448,7 +612,10 @@ jobs:
             echo "| Key | Value |"
             echo "|-----|-------|"
             echo "| **build_tag** | \`${{ needs.prepare.outputs.build_tag }}\` |"
+            echo "| **autoware_input_ref** | \`${{ needs.prepare.outputs.autoware_input_ref }}\` |"
             echo "| **autoware_ref** | \`${{ needs.prepare.outputs.autoware_ref }}\` |"
+            echo "| **autoware_base_version** | \`${{ needs.prepare.outputs.autoware_base_version }}\` |"
+            echo "| **scan_requested** | \`${{ needs.prepare.outputs.scan_requested }}\` |"
             echo ""
             echo "To release this build:"
             echo "1. Go to **Actions → release → Run workflow**"
@@ -457,7 +624,7 @@ jobs:
 
   notify-failure:
     runs-on: ubuntu-latest
-    needs: [prepare, build-common, build-components, build-universe, create-manifests]
+    needs: [prepare, build-common, build-components, build-universe, create-manifests, capture-metadata]
     if: failure() && github.event_name == 'schedule'
     permissions:
       issues: write

@@ -54,8 +54,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
-            echo "Invalid version format '${VERSION}': must be vX.Y.Z or vX.Y.Z-prerelease" >&2
+          openadkit_semver_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z]*)(\.((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z]*))*)?$'
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          autoware_stable_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+
+          if ! printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_semver_re}"; then
+            echo "Invalid version format '${VERSION}': must be strict SemVer vX.Y.Z or vX.Y.Z-prerelease" >&2
             exit 1
           fi
           if ! printf '%s\n' "${BUILD_TAG}" | grep -Eq '^[0-9]+-[0-9]+$'; then
@@ -66,19 +70,19 @@ jobs:
             || (echo "Release must be triggered from main branch (got ${GITHUB_REF})" >&2 && exit 1)
 
           publish_latest_aliases=false
-          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
             existing_tag_refs=$(
               gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
                 --jq '.[].ref | sub("^refs/tags/"; "")'
             )
             existing_stable_tags=$(
-              printf '%s\n' "${existing_tag_refs}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true
+              printf '%s\n' "${existing_tag_refs}" | grep -E "${openadkit_stable_re}" || true
             )
             highest_stable=$(
               {
                 printf '%s\n' "${VERSION}"
                 printf '%s\n' "${existing_stable_tags}"
-              } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1
+              } | grep -E "${openadkit_stable_re}" | sort -V | tail -n 1
             )
             if [ "${highest_stable}" = "${VERSION}" ]; then
               publish_latest_aliases=true
@@ -204,15 +208,51 @@ jobs:
             exit 1
           fi
 
-          jq -e --arg build_tag "${BUILD_TAG}" '
+          if ! jq -e \
+            --arg build_tag "${BUILD_TAG}" \
+            --arg common_repo "${IMAGE_PREFIX_COMMON}" \
+            --arg component_repo "${IMAGE_PREFIX_COMPONENT}" '
+            def common_targets: ["base", "base-cuda", "devel", "devel-cuda"];
+            def component_targets: ["sensing-perception", "sensing-perception-cuda", "localization-mapping", "planning-control", "vehicle-system", "api", "visualizer", "simulator", "universe", "universe-cuda"];
+            def distros: ["humble", "jazzy"];
+            def expected_platforms($target): if ($target | contains("cuda")) then ["linux/amd64"] else ["linux/amd64", "linux/arm64"] end;
+            def valid_repo_target($image):
+              (($image.repo == $common_repo and (common_targets | index($image.target) != null)) or
+              ($image.repo == $component_repo and (component_targets | index($image.target) != null)));
+            def valid_image:
+              . as $image |
+              valid_repo_target($image) and
+              (distros | index($image.ros_distro) != null) and
+              ($image.digest | test("^sha256:[0-9a-f]{64}$")) and
+              ($image.ref == ($image.repo + ":" + $image.target + "-" + $image.ros_distro + "-" + $build_tag)) and
+              ($image.platforms | type == "array") and
+              (($image.platforms | sort) == expected_platforms($image.target));
             .build_tag == $build_tag and
-            (.openadkit_sha | length) > 0 and
-            (.autoware_input_ref | length) > 0 and
-            (.autoware_ref_type | length) > 0 and
-            (.autoware_ref | length) > 0 and
-            (.autoware_base_version | length) > 0 and
-            (.images | length) > 0
-          ' release-input/build/build-metadata.json >/dev/null
+            (.run_id | test("^[0-9]+$")) and
+            (.run_attempt | test("^[0-9]+$")) and
+            (.openadkit_sha | test("^[0-9a-f]{40}$")) and
+            (.autoware_input_ref | type == "string" and length > 0) and
+            (.autoware_ref_type as $type | ["branch", "tag", "sha", "ref"] | index($type) != null) and
+            (.autoware_ref | test("^[0-9a-f]{40}$")) and
+            (.autoware_base_version | test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")) and
+            (.autoware_lock_sha256 | test("^[0-9a-f]{64}$")) and
+            (.scan_requested | type == "boolean") and
+            (.images | type == "array" and length == 28) and
+            ([.images[] | [.repo, .target, .ros_distro] | @tsv] | unique | length == 28) and
+            all(.images[]; valid_image)
+          ' release-input/build/build-metadata.json >/dev/null; then
+            echo "Build metadata failed schema validation" >&2
+            exit 1
+          fi
+
+          if [ ! -f release-input/build/autoware-lock.repos ]; then
+            echo "Build metadata is missing autoware-lock.repos" >&2
+            exit 1
+          fi
+          metadata_lock_sha=$(jq -r '.autoware_lock_sha256' release-input/build/build-metadata.json)
+          actual_lock_sha=$(sha256sum release-input/build/autoware-lock.repos | cut -d ' ' -f1)
+          [ "${actual_lock_sha}" = "${metadata_lock_sha}" ] \
+            || (echo "Autoware lock SHA ${actual_lock_sha} does not match metadata SHA ${metadata_lock_sha}" >&2 && exit 1)
 
           build_coverage=$(mktemp)
           scan_coverage=$(mktemp)
@@ -249,8 +289,8 @@ jobs:
           autoware_input_ref=$(jq -r '.autoware_input_ref' release-input/build/build-metadata.json)
           autoware_ref_type=$(jq -r '.autoware_ref_type' release-input/build/build-metadata.json)
           autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
-          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
               echo "Stable releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})" >&2
               exit 1
             fi
@@ -259,7 +299,7 @@ jobs:
               exit 1
             fi
           else
-            if [ "${autoware_ref_type}" = "tag" ] && ! printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            if [ "${autoware_ref_type}" = "tag" ] && ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
               echo "Pre-release Autoware tags must use X.Y.Z format (got ${autoware_input_ref})" >&2
               exit 1
             elif [ "${autoware_ref_type}" != "tag" ] && [ "${autoware_ref_type}" != "sha" ]; then
@@ -337,8 +377,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
           stable_release=false
-          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
             stable_release=true
           fi
 
@@ -404,8 +445,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
           stable_release=false
-          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
             stable_release=true
           fi
           tab=$(printf "\t")
@@ -423,6 +465,7 @@ jobs:
           autoware_ref_type=$(jq -r '.autoware_ref_type' release-metadata.json)
           autoware_ref=$(jq -r '.autoware_ref' release-metadata.json)
           autoware_base_version=$(jq -r '.autoware_base_version' release-metadata.json)
+          autoware_lock_sha256=$(jq -r '.autoware_lock_sha256' release-metadata.json)
           openadkit_sha=$(jq -r '.openadkit_sha' release-metadata.json)
           build_tag=$(jq -r '.build_tag' release-metadata.json)
 
@@ -437,6 +480,7 @@ jobs:
             echo "| Autoware ref type | \`${autoware_ref_type}\` |"
             echo "| Autoware resolved SHA | \`${autoware_ref}\` |"
             echo "| Autoware base version | \`${autoware_base_version}\` |"
+            echo "| Autoware lock SHA256 | \`${autoware_lock_sha256}\` |"
             echo ""
             echo "## Images"
             while IFS="${tab}" read -r repo target distro digest; do
@@ -493,8 +537,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
           release_flags=()
-          if printf '%s\n' "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
             if [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
               release_flags+=(--latest)
             else
@@ -516,5 +561,5 @@ jobs:
               --notes-file release-notes.md \
               "${release_flags[@]}"
           fi
-          gh release upload "${VERSION}" release-metadata.json --clobber
+          gh release upload "${VERSION}" release-metadata.json release-input/build/autoware-lock.repos --clobber
         shell: bash

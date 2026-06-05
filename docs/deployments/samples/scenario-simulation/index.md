@@ -1,6 +1,6 @@
 # Autoware Open AD Kit Scenario Simulation
 
-This sample deployment demonstrates the Open AD Kit scenario simulation workflow with the official [Tier IV Scenario Simulator container](https://github.com/tier4/scenario_simulator_v2/pkgs/container/scenario_simulator_v2).
+This sample deployment demonstrates the Open AD Kit scenario simulation workflow with the official [TIER IV Scenario Simulator container](https://github.com/tier4/scenario_simulator_v2/pkgs/container/scenario_simulator_v2).
 
 ## Source of Truth
 

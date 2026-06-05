@@ -1,12 +1,12 @@
 # Autoware Open AD Kit Scenario Simulation
 
-This sample deployment runs Autoware Open AD Kit **scenario simulation** with the [Tier IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2/pkgs/container/scenario_simulator_v2) container.
+This sample deployment runs Autoware Open AD Kit **scenario simulation** with the [TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2/pkgs/container/scenario_simulator_v2) container.
 
 Autoware runs as component containers. The scenario simulator connects to that stack over ROS 2 DDS on the host network.
 
 ## Requirements
 
-The default `sample.yaml` scenario uses the **Kashiwanoha** map bundled in the Tier IV scenario simulator image. Autoware must load the same map.
+The default `sample.yaml` scenario uses the **Kashiwanoha** map bundled in the TIER IV scenario simulator image. Autoware must load the same map.
 
 On first startup, the `map-init` service extracts that map to `~/autoware_map/kashiwanoha_map` automatically. No manual download is required.
 
@@ -32,7 +32,7 @@ Edit `scenario-simulation.env` to customize the scenario simulator:
 | `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` |
 | `OUTPUT_HOST_PATH` | Host directory for simulation results |
 | `OUTPUT_DIRECTORY` | Container path for simulation results |
-| `SCENARIO_SIMULATOR_IMAGE` | Tier IV scenario simulator image tag |
+| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image tag |
 
 Example custom scenario:
 

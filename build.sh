@@ -12,7 +12,7 @@ print_help() {
 	echo "  --platform      Specify the platform (linux/amd64 or linux/arm64, default: current platform)"
 	echo "  --ros-distro    Specify ROS distribution (humble or jazzy, default: humble)"
 	echo "  --no-cuda       Do not build CUDA images (default: false)"
-	echo "  --target        Specify the target images to build (common, components, universe, default: components)"
+	echo "  --target        Specify the target images to build (common, components, default: components)"
 }
 
 # Parse arguments
@@ -59,11 +59,15 @@ set_ros_distro() {
 
 # Set build options
 set_build_options() {
-	if [ -n "$option_target" ]; then
-		target="$option_target"
-	else
-		target="components"
-	fi
+	target="${option_target:-components}"
+	case "$target" in
+	common | components) ;;
+	*)
+		echo "Invalid target: $target"
+		print_help
+		exit 1
+		;;
+	esac
 }
 
 # Set platform
@@ -179,50 +183,6 @@ build_images() {
 			--set "*.args.COMMON_DEVEL_CUDA_IMAGE=${image_common}:devel-cuda" \
 			--set "sensing-perception-cuda.tags=${image_component}:sensing-perception-cuda" \
 			sensing-perception-cuda
-	fi
-
-	if [ "$target" = "components" ]; then
-		set +x
-		return
-	fi
-
-	# =========================================================================
-	# Stage 3: Universe images
-	# =========================================================================
-	docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
-		--set "*.context=$WORKSPACE_ROOT" \
-		--set "*.ssh=default" \
-		--set "*.platform=$platform" \
-		--set "*.args.ROS_DISTRO=$ros_distro" \
-		--set "*.args.COMMON_BASE_IMAGE=${image_common}:base" \
-		--set "*.args.COMMON_DEVEL_IMAGE=${image_common}:devel" \
-		--set "*.args.SENSING_PERCEPTION_IMAGE=${image_component}:sensing-perception" \
-		--set "*.args.LOCALIZATION_MAPPING_IMAGE=${image_component}:localization-mapping" \
-		--set "*.args.PLANNING_CONTROL_IMAGE=${image_component}:planning-control" \
-		--set "*.args.VEHICLE_SYSTEM_IMAGE=${image_component}:vehicle-system" \
-		--set "*.args.API_IMAGE=${image_component}:api" \
-		--set "*.args.VISUALIZER_IMAGE=${image_component}:visualizer" \
-		--set "*.args.SIMULATOR_IMAGE=${image_component}:simulator" \
-		--set "universe.tags=${image_component}:universe" \
-		universe
-
-	if [ "$option_no_cuda" != "true" ]; then
-		docker buildx bake --allow=ssh --load --progress=plain -f "$bake_file" \
-			--set "*.context=$WORKSPACE_ROOT" \
-			--set "*.ssh=default" \
-			--set "*.platform=$platform" \
-			--set "*.args.ROS_DISTRO=$ros_distro" \
-			--set "*.args.COMMON_BASE_CUDA_IMAGE=${image_common}:base-cuda" \
-			--set "*.args.COMMON_DEVEL_CUDA_IMAGE=${image_common}:devel-cuda" \
-			--set "*.args.SENSING_PERCEPTION_CUDA_IMAGE=${image_component}:sensing-perception-cuda" \
-			--set "*.args.LOCALIZATION_MAPPING_IMAGE=${image_component}:localization-mapping" \
-			--set "*.args.PLANNING_CONTROL_IMAGE=${image_component}:planning-control" \
-			--set "*.args.VEHICLE_SYSTEM_IMAGE=${image_component}:vehicle-system" \
-			--set "*.args.API_IMAGE=${image_component}:api" \
-			--set "*.args.VISUALIZER_IMAGE=${image_component}:visualizer" \
-			--set "*.args.SIMULATOR_IMAGE=${image_component}:simulator" \
-			--set "universe-cuda.tags=${image_component}:universe-cuda" \
-			universe-cuda
 	fi
 
 	set +x

@@ -12,8 +12,6 @@
     {"repo": "component", "target": "vehicle-system", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
     {"repo": "component", "target": "api", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
     {"repo": "component", "target": "visualizer", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "simulator", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "universe", "stage": "universe", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "universe-cuda", "stage": "universe", "platforms": ["linux/amd64"]}
+    {"repo": "component", "target": "simulator", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]}
   ]
 }

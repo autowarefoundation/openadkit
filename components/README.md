@@ -19,23 +19,13 @@ flowchart TB
     CD --> VIZ["visualizer"]
     CD --> SIM["simulator"]
 
-    SP --> UNI["universe"]
-    LM --> UNI
-    PC --> UNI
-    VS --> UNI
-    API --> UNI
-    VIZ --> UNI
-    SIM --> UNI
-
     classDef ros fill:#334155,stroke:#64748b,color:#fff
     classDef common fill:#1e3a5f,stroke:#3b82f6,color:#fff
     classDef component fill:#14532d,stroke:#22c55e,color:#fff
-    classDef universe fill:#4c1d95,stroke:#a855f7,color:#fff
 
     class ROS ros
     class CB,CD common
     class SP,LM,PC,VS,API,VIZ,SIM component
-    class UNI universe
 ```
 
 ### Build Groups
@@ -44,4 +34,3 @@ flowchart TB
 |-------|-------------|---------|
 | `common` | Common images | base, devel |
 | `component` | Component images | sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator |
-| `universe` | Universe images | universe, universe-cuda |

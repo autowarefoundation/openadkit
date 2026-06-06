@@ -257,7 +257,7 @@ services:
       - USE_SIM_TIME=${USE_SIM_TIME}
   
   rosbag:
-    image: ghcr.io/autowarefoundation/openadkit:universe
+    image: ghcr.io/autowarefoundation/autoware:universe
     container_name: autoware-rosbag
     network_mode: host
     init: true

@@ -18,7 +18,7 @@ inputs:
     description: Image prefix for component images
     required: true
   component-targets:
-    description: 'Space-separated list of component and universe image targets (e.g., "sensing-perception localization-mapping universe")'
+    description: 'Space-separated list of component image targets (e.g., "sensing-perception localization-mapping")'
     required: true
   token:
     description: GitHub token for registry access

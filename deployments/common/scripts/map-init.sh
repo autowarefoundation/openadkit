@@ -78,7 +78,7 @@ if [ "$needs_extract" = true ]; then
       esac
     fi
 
-    rm -rf "$volume_path"/* "$volume_path"/.[!.]* "$volume_path"/..?*
+    rm -rf "${volume_path:?}"/* "${volume_path:?}"/.[!.]* "${volume_path:?}"/..?*
     cp -a "$tmp_dir/." "$volume_path/"
   fi
 

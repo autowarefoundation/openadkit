@@ -4,7 +4,7 @@ This sample deployment demonstrates the Open AD Kit scenario simulation workflow
 
 ## Source of Truth
 
-The complete operational instructions for this deployment live alongside the deployment assets in [`deployments/samples/scenario-simulation/README.md`](https://github.com/autowarefoundation/openadkit/blob/main/deployments/samples/scenario-simulation/README.md).
+The complete operational instructions for this deployment live alongside the deployment assets in `deployments/samples/scenario-simulation/README.md`.
 
 ## Quick Start
 
@@ -19,6 +19,8 @@ Open the visualizer at:
 ```text
 http://localhost:6080/vnc.html
 ```
+
+For remote servers, use `http://<server-ip>:6080/vnc.html` and allow inbound access to port `6080`.
 
 To stop the deployment:
 

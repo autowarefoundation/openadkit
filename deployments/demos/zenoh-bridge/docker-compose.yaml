@@ -1,8 +1,79 @@
 services:
+  map-init:
+    image: ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+    volumes:
+      - autoware_map:/autoware_map
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        image="ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime"
+        marker=/autoware_map/.scenario-simulator-image
+        required_files="lanelet2_map.osm pointcloud_map.pcd"
+        needs_extract=false
+        marker_matches=false
+
+        if [ -f "$$marker" ] && [ "$$(cat "$$marker")" = "$$image" ]; then
+          marker_matches=true
+        fi
+
+        if [ -f "$$marker" ] && [ "$$marker_matches" = false ]; then
+          needs_extract=true
+        fi
+
+        if [ ! -f "$$marker" ]; then
+          needs_extract=true
+        fi
+
+        for file in $$required_files; do
+          if [ ! -f "/autoware_map/$$file" ]; then
+            needs_extract=true
+          fi
+        done
+
+        if [ "$$needs_extract" = true ]; then
+          echo "Extracting kashiwanoha map from $$image..."
+          map_dir="$$(ros2 pkg prefix --share kashiwanoha_map)/map"
+          if [ ! -d "$$map_dir" ]; then
+            echo "ERROR: Kashiwanoha map not found in $$image." >&2
+            exit 1
+          fi
+          tmp_dir="$$(mktemp -d)"
+          trap 'rm -rf "$$tmp_dir"' EXIT
+          cp -a "$$map_dir/." "$$tmp_dir/"
+          for file in $$required_files; do
+            if [ ! -f "$$tmp_dir/$$file" ]; then
+              echo "ERROR: Extracted map is missing $$file." >&2
+              exit 1
+            fi
+          done
+
+          if [ ! -f "$$marker" ]; then
+            needs_extract=false
+            for file in $$required_files; do
+              if [ ! -f "/autoware_map/$$file" ] || ! cmp -s "$$tmp_dir/$$file" "/autoware_map/$$file"; then
+                needs_extract=true
+              fi
+            done
+          fi
+
+          if [ "$$needs_extract" = true ]; then
+            rm -rf /autoware_map/* /autoware_map/.[!.]* /autoware_map/..?*
+            cp -a "$$tmp_dir/." /autoware_map/
+          fi
+          echo "$$image" > "$$marker"
+          rm -rf "$$tmp_dir"
+          trap - EXIT
+        else
+          echo "Using validated kashiwanoha map volume"
+        fi
+    restart: "no"
+
   autoware:
     image: ghcr.io/autowarefoundation/autoware:universe
     volumes:
-      - autoware_map:/autoware_map
+      - autoware_map:/autoware_map:ro
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
@@ -14,17 +85,17 @@ services:
       sensor_model:=sample_sensor_kit
       scenario_simulation:=${SCENARIO_SIMULATION:-true}
       rviz:=false"
-    depends_on: 
-      - edge_zenoh_bridge
+    depends_on:
+      map-init:
+        condition: service_completed_successfully
+      edge_zenoh_bridge:
+        condition: service_started
 
   scenario_simulator:
     image: ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
-    volumes:
-      # Relies on Docker's initial named-volume copy from the pinned TIER IV runtime image.
-      - autoware_map:/home/ubuntu/Desktop/scenario_simulator_ws/install/kashiwanoha_map/share/kashiwanoha_map/map
     command: >
       ros2 launch scenario_test_runner scenario_test_runner.launch.py
       architecture_type:=awf/universe/20250130
@@ -42,7 +113,12 @@ services:
       use_sim_time:=false
       vehicle_model:=sample_vehicle
     depends_on:
-      - edge_zenoh_bridge
+      map-init:
+        condition: service_completed_successfully
+      autoware:
+        condition: service_started
+      edge_zenoh_bridge:
+        condition: service_started
 
   edge_zenoh_bridge:
     image:  eclipse/zenoh-bridge-ros2dds:latest

@@ -8,7 +8,7 @@ Autoware runs as component containers. The scenario simulator connects to that s
 
 The default `sample.yaml` scenario uses the **Kashiwanoha** map bundled in the TIER IV scenario simulator image. Autoware must load the same map.
 
-On first startup, the `map-init` service extracts that map to `~/autoware_map/kashiwanoha_map` automatically. No manual download is required.
+On first startup, the `map-init` service extracts that map to `~/autoware_map/kashiwanoha_map` automatically. It re-extracts the map if required files are missing or the configured TIER IV image tag changes. No manual download is required.
 
 > **Note**: Do not use `sample-map-planning` here. It is a different map and will cause `setMap() for invalid version map`, missing route/localization, and repeated MRM transitions.
 
@@ -18,9 +18,9 @@ On first startup, the `map-init` service extracts that map to `~/autoware_map/ka
 docker compose --env-file scenario-simulation.env up -d
 ```
 
-Open the visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`).
+Open the visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`). If the deployment runs on a remote server, use `http://<server-ip>:6080/vnc.html` and ensure port `6080` is reachable.
 
-Wait about 90 seconds for Autoware and the scenario simulator to initialize.
+Wait about 90 seconds for Autoware and the scenario simulator to initialize. Before launching the one-shot scenario, the runner waits up to `SCENARIO_READY_TIMEOUT` seconds for required Autoware map and API endpoints.
 
 ## Configuration
 
@@ -33,6 +33,9 @@ Edit `scenario-simulation.env` to customize the scenario simulator:
 | `OUTPUT_HOST_PATH` | Host directory for simulation results |
 | `OUTPUT_DIRECTORY` | Container path for simulation results |
 | `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image tag |
+| `SCENARIO_READY_TIMEOUT` | Maximum seconds to wait for Autoware readiness before launching the scenario |
+| `AUTO_EXTRACT_MAP` | Extract Kashiwanoha from `SCENARIO_SIMULATOR_IMAGE` when `true`; validate the host map only when `false` |
+| `MAP_PATH` | Host map directory mounted into Autoware and the scenario simulator at `/autoware_map` |
 
 Example custom scenario:
 
@@ -41,6 +44,8 @@ SCENARIO=/scenarios/my-scenario.yaml
 ```
 
 Place scenario files under the host path configured by `SCENARIO_HOST_DIR` (default: `./scenarios/`). Simulation results are saved to `OUTPUT_HOST_PATH` (default: `./output/`).
+
+Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, set `AUTO_EXTRACT_MAP=false`, update `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE`, and ensure the files exist under `MAP_PATH` before starting the deployment. The same host map is mounted in the simulator container at `/autoware_map`.
 
 ## Stop the Deployment
 

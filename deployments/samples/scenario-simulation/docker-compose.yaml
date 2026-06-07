@@ -8,15 +8,70 @@ services:
       - -lc
       - |
         set -e
-        if [ ! -f /autoware_map/lanelet2_map.osm ]; then
-          echo "Extracting kashiwanoha map from ${SCENARIO_SIMULATOR_IMAGE}..."
-          if [ ! -d "$(ros2 pkg prefix --share kashiwanoha_map)/map" ]; then
+        image="${SCENARIO_SIMULATOR_IMAGE}"
+        marker=/autoware_map/.scenario-simulator-image
+        required_files="${LANELET2_MAP_FILE} ${POINTCLOUD_MAP_FILE}"
+        auto_extract="${AUTO_EXTRACT_MAP:-true}"
+        needs_extract=false
+        marker_matches=false
+
+        if [ -f "$$marker" ] && [ "$$(cat "$$marker")" = "$$image" ]; then
+          marker_matches=true
+        fi
+
+        if [ -f "$$marker" ] && [ "$$marker_matches" = false ]; then
+          needs_extract=true
+        fi
+
+        if [ "$$auto_extract" = true ] && [ ! -f "$$marker" ]; then
+          needs_extract=true
+        fi
+
+        for file in $$required_files; do
+          if [ ! -f "/autoware_map/$$file" ]; then
+            needs_extract=true
+          fi
+        done
+
+        if [ "$$needs_extract" = true ]; then
+          if [ "$$auto_extract" != true ]; then
+            echo "ERROR: Map at ${MAP_PATH} is missing required files and AUTO_EXTRACT_MAP is false." >&2
+            exit 1
+          fi
+          echo "Extracting kashiwanoha map from $$image..."
+          map_dir="$$(ros2 pkg prefix --share kashiwanoha_map)/map"
+          if [ ! -d "$$map_dir" ]; then
             echo "ERROR: Kashiwanoha map not found in ${SCENARIO_SIMULATOR_IMAGE}; check that the image contains the kashiwanoha_map package." >&2
             exit 1
           fi
-          cp -a "$(ros2 pkg prefix --share kashiwanoha_map)/map/." /autoware_map/
+          tmp_dir="$$(mktemp -d)"
+          trap 'rm -rf "$$tmp_dir"' EXIT
+          cp -a "$$map_dir/." "$$tmp_dir/"
+          for file in $$required_files; do
+            if [ ! -f "$$tmp_dir/$$file" ]; then
+              echo "ERROR: Extracted map is missing $$file." >&2
+              exit 1
+            fi
+          done
+
+          if [ ! -f "$$marker" ]; then
+            needs_extract=false
+            for file in $$required_files; do
+              if [ ! -f "/autoware_map/$$file" ] || ! cmp -s "$$tmp_dir/$$file" "/autoware_map/$$file"; then
+                needs_extract=true
+              fi
+            done
+          fi
+
+          if [ "$$needs_extract" = true ]; then
+            rm -rf /autoware_map/* /autoware_map/.[!.]* /autoware_map/..?*
+            cp -a "$$tmp_dir/." /autoware_map/
+          fi
+          echo "$$image" > "$$marker"
+          rm -rf "$$tmp_dir"
+          trap - EXIT
         else
-          echo "Using existing map at ${MAP_PATH}"
+          echo "Using validated map at ${MAP_PATH}"
         fi
     restart: "no"
 
@@ -211,6 +266,7 @@ services:
     volumes:
       - ${OUTPUT_HOST_PATH}:${OUTPUT_DIRECTORY}
       - ${SCENARIO_HOST_DIR}:/scenarios:ro
+      - ${MAP_PATH}:/autoware_map:ro
     depends_on:
       - api
       - control
@@ -224,6 +280,44 @@ services:
       - -lc
       - |
         set -e
+        ready_timeout="${SCENARIO_READY_TIMEOUT:-300}"
+        case "$$ready_timeout" in
+          ''|*[!0-9]*)
+            echo "ERROR: SCENARIO_READY_TIMEOUT must be a non-negative integer." >&2
+            exit 1
+            ;;
+        esac
+        deadline=$$(( $$(date +%s) + $$ready_timeout ))
+
+        wait_for_topic() {
+          name="$$1"
+          echo "Waiting for ROS topic $$name..."
+          until ros2 topic list 2>/dev/null | grep -Fxq "$$name"; do
+            if [ "$$(date +%s)" -ge "$$deadline" ]; then
+              echo "ERROR: Timed out waiting for ROS topic $$name." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+        }
+
+        wait_for_service() {
+          name="$$1"
+          echo "Waiting for ROS service $$name..."
+          until ros2 service list 2>/dev/null | grep -Fxq "$$name"; do
+            if [ "$$(date +%s)" -ge "$$deadline" ]; then
+              echo "ERROR: Timed out waiting for ROS service $$name." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+        }
+
+        wait_for_topic /map/pointcloud_map
+        wait_for_topic /api/autoware/get/engage
+        wait_for_service /api/autoware/set/engage
+        wait_for_service /api/operation_mode/change_to_autonomous
+
         set -- "${SCENARIO}"
         if [ -z "$1" ]; then
           set -- "$(ros2 pkg prefix --share scenario_test_runner)/scenario/sample.yaml"

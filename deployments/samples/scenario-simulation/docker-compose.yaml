@@ -3,84 +3,14 @@ services:
     image: ${SCENARIO_SIMULATOR_IMAGE}
     volumes:
       - ${MAP_PATH}:/autoware_map
-    command:
-      - bash
-      - -lc
-      - |
-        set -e
-        image="${SCENARIO_SIMULATOR_IMAGE}"
-        marker=/autoware_map/.scenario-simulator-image
-        required_files="${LANELET2_MAP_FILE} ${POINTCLOUD_MAP_FILE}"
-        auto_extract="${AUTO_EXTRACT_MAP:-true}"
-        needs_extract=false
-        marker_matches=false
-
-        if [ -f "$$marker" ] && [ "$$(cat "$$marker")" = "$$image" ]; then
-          marker_matches=true
-        fi
-
-        if [ -f "$$marker" ] && [ "$$marker_matches" = false ]; then
-          needs_extract=true
-        fi
-
-        if [ "$$auto_extract" = true ] && [ ! -f "$$marker" ]; then
-          needs_extract=true
-        fi
-
-        for file in $$required_files; do
-          if [ ! -f "/autoware_map/$$file" ]; then
-            needs_extract=true
-          fi
-        done
-
-        if [ "$$needs_extract" = true ]; then
-          if [ "$$auto_extract" != true ]; then
-            echo "ERROR: Map at ${MAP_PATH} is missing required files and AUTO_EXTRACT_MAP is false." >&2
-            exit 1
-          fi
-          echo "Extracting kashiwanoha map from $$image..."
-          source /opt/ros/humble/setup.bash
-          map_dir="$$(ros2 pkg prefix --share kashiwanoha_map)/map"
-          if [ ! -d "$$map_dir" ]; then
-            echo "ERROR: Kashiwanoha map not found in ${SCENARIO_SIMULATOR_IMAGE}; check that the image contains the kashiwanoha_map package." >&2
-            exit 1
-          fi
-          tmp_dir="$$(mktemp -d)"
-          trap 'rm -rf "$$tmp_dir"' EXIT
-          cp -a "$$map_dir/." "$$tmp_dir/"
-          for file in $$required_files; do
-            if [ ! -f "$$tmp_dir/$$file" ]; then
-              echo "ERROR: Extracted map is missing $$file." >&2
-              exit 1
-            fi
-          done
-
-          if [ ! -f "$$marker" ]; then
-            needs_extract=false
-            for file in $$required_files; do
-              if [ ! -f "/autoware_map/$$file" ] || ! cmp -s "$$tmp_dir/$$file" "/autoware_map/$$file"; then
-                needs_extract=true
-              fi
-            done
-          fi
-
-          if [ "$$needs_extract" = true ]; then
-            case "${MAP_PATH}" in
-              */autoware_map/*|*/kashiwanoha_map) ;;
-              *)
-                echo "ERROR: MAP_PATH must be a dedicated map directory (contains 'autoware_map' or 'kashiwanoha_map')." >&2
-                exit 1
-                ;;
-            esac
-            rm -rf /autoware_map/* /autoware_map/.[!.]* /autoware_map/..?*
-            cp -a "$$tmp_dir/." /autoware_map/
-          fi
-          echo "$$image" > "$$marker"
-          rm -rf "$$tmp_dir"
-          trap - EXIT
-        else
-          echo "Using validated map at ${MAP_PATH}"
-        fi
+      - ../../common/scripts/map-init.sh:/map-init.sh:ro
+    command: /map-init.sh
+    environment:
+      - SCENARIO_SIMULATOR_IMAGE=${SCENARIO_SIMULATOR_IMAGE}
+      - MAP_VOLUME_PATH=/autoware_map
+      - REQUIRED_FILES=${LANELET2_MAP_FILE} ${POINTCLOUD_MAP_FILE}
+      - AUTO_EXTRACT_MAP=${AUTO_EXTRACT_MAP:-true}
+      - MAP_PATH=${MAP_PATH}
     restart: "no"
 
   map:

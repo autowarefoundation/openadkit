@@ -39,6 +39,7 @@ services:
             exit 1
           fi
           echo "Extracting kashiwanoha map from $$image..."
+          source /opt/ros/humble/setup.bash
           map_dir="$$(ros2 pkg prefix --share kashiwanoha_map)/map"
           if [ ! -d "$$map_dir" ]; then
             echo "ERROR: Kashiwanoha map not found in ${SCENARIO_SIMULATOR_IMAGE}; check that the image contains the kashiwanoha_map package." >&2
@@ -64,6 +65,13 @@ services:
           fi
 
           if [ "$$needs_extract" = true ]; then
+            case "${MAP_PATH}" in
+              */autoware_map/*|*/kashiwanoha_map) ;;
+              *)
+                echo "ERROR: MAP_PATH must be a dedicated map directory (contains 'autoware_map' or 'kashiwanoha_map')." >&2
+                exit 1
+                ;;
+            esac
             rm -rf /autoware_map/* /autoware_map/.[!.]* /autoware_map/..?*
             cp -a "$$tmp_dir/." /autoware_map/
           fi
@@ -292,7 +300,7 @@ services:
         wait_for_topic() {
           name="$$1"
           echo "Waiting for ROS topic $$name..."
-          until ros2 topic list 2>/dev/null | grep -Fxq "$$name"; do
+          until timeout 5 ros2 topic list 2>/dev/null | grep -Fxq "$$name"; do
             if [ "$$(date +%s)" -ge "$$deadline" ]; then
               echo "ERROR: Timed out waiting for ROS topic $$name." >&2
               exit 1
@@ -304,7 +312,7 @@ services:
         wait_for_service() {
           name="$$1"
           echo "Waiting for ROS service $$name..."
-          until ros2 service list 2>/dev/null | grep -Fxq "$$name"; do
+          until timeout 5 ros2 service list 2>/dev/null | grep -Fxq "$$name"; do
             if [ "$$(date +%s)" -ge "$$deadline" ]; then
               echo "ERROR: Timed out waiting for ROS service $$name." >&2
               exit 1

@@ -1,6 +1,8 @@
+x-scenario-simulator-image: &scenario-simulator-image ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+
 services:
   map-init:
-    image: ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+    image: *scenario-simulator-image
     volumes:
       - autoware_map:/autoware_map
     command:
@@ -34,6 +36,7 @@ services:
 
         if [ "$$needs_extract" = true ]; then
           echo "Extracting kashiwanoha map from $$image..."
+          source /opt/ros/humble/setup.bash
           map_dir="$$(ros2 pkg prefix --share kashiwanoha_map)/map"
           if [ ! -d "$$map_dir" ]; then
             echo "ERROR: Kashiwanoha map not found in $$image." >&2
@@ -92,7 +95,7 @@ services:
         condition: service_started
 
   scenario_simulator:
-    image: ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+    image: *scenario-simulator-image
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0

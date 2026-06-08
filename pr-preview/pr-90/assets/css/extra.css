@@ -1,0 +1,479 @@
+/* --------------------------------------------------------------------------
+   Announcement banner
+   -------------------------------------------------------------------------- */
+.md-banner {
+  background-color: #1a1a2e;
+  color: #fff;
+}
+
+.md-banner a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.md-banner a:hover {
+  text-decoration: underline;
+}
+
+.md-banner strong {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Open AD Kit Documentation — Elegant Refinements
+   Aligned with Autoware Documentation aesthetic
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+.md-typeset h1 {
+  font-weight: 300;
+  letter-spacing: -0.015em;
+  margin-bottom: 1.2em;
+  line-height: 1.25;
+}
+
+.md-typeset h2 {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin-top: 2.5em;
+  margin-bottom: 0.8em;
+  line-height: 1.3;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #eee;
+}
+
+.md-typeset h3 {
+  font-weight: 500;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+  line-height: 1.35;
+}
+
+.md-typeset h4 {
+  font-weight: 500;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+  margin-top: 1.8em;
+  margin-bottom: 0.5em;
+}
+
+.md-typeset p {
+  line-height: 1.7;
+}
+
+.md-typeset a {
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.md-typeset a:hover {
+  border-bottom-color: var(--md-accent-fg-color);
+}
+
+/* --------------------------------------------------------------------------
+   Admonitions — Thin left border, minimal background
+   -------------------------------------------------------------------------- */
+.md-typeset .admonition,
+.md-typeset details {
+  border-left-width: 3px;
+  border-radius: 0 4px 4px 0;
+  box-shadow: none;
+  background: transparent;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+}
+
+.md-typeset .admonition {
+  padding: 0.8rem 1rem;
+}
+
+.md-typeset .admonition .admonition-title,
+.md-typeset details summary {
+  background: transparent;
+  border-bottom: none;
+  padding-left: 2.4rem;
+}
+
+.md-typeset .admonition .admonition-title::before,
+.md-typeset details summary::before {
+  left: 0.6rem;
+}
+
+/* --------------------------------------------------------------------------
+   Tables — Clean and minimal
+   -------------------------------------------------------------------------- */
+.md-typeset table:not([class]) {
+  border: none;
+  box-shadow: none;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: #1a1a2e;
+  color: #fff;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 0.8em;
+  padding: 0.8rem 1rem;
+  border: none;
+}
+
+.md-typeset table:not([class]) td {
+  border: none;
+  border-bottom: 1px solid #eee;
+  padding: 0.8rem 1rem;
+  vertical-align: top;
+}
+
+.md-typeset table:not([class]) tr:last-child td {
+  border-bottom: none;
+}
+
+.md-typeset table:not([class]) tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.md-typeset table:not([class]) tbody tr:hover {
+  background-color: rgba(79, 142, 247, 0.04);
+}
+
+/* --------------------------------------------------------------------------
+   Code blocks
+   -------------------------------------------------------------------------- */
+.md-typeset pre {
+  border-radius: 6px;
+  padding: 1rem;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+.md-typeset code {
+  border-radius: 3px;
+  padding: 0.15em 0.4em;
+  font-size: 0.9em;
+}
+
+/* --------------------------------------------------------------------------
+   Landing Page
+   -------------------------------------------------------------------------- */
+.md-typeset h1:has(+ .oak-hero-lead) {
+  font-size: 2.6rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 0.6rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.oak-hero-lead {
+  font-size: 1.15rem;
+  line-height: 1.65;
+  color: #555;
+  max-width: 42rem;
+  margin: 0 0 1.5rem;
+}
+
+.oak-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.md-typeset h1:has(+ .oak-hero-lead) + .oak-hero-lead + .oak-hero-actions + .admonition {
+  margin: 1.5rem 0 2.5rem;
+}
+
+.md-typeset h2#explore,
+.md-typeset h2#why-open-ad-kit {
+  margin-top: 2.5rem;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.oak-nav-grid .oak-nav-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.oak-nav-grid .oak-nav-card p {
+  flex-grow: 1;
+}
+
+.oak-nav-grid .oak-nav-card .md-button {
+  margin-top: 1rem;
+  align-self: flex-start;
+}
+
+[data-md-color-scheme="slate"] .oak-hero-lead {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h2#explore,
+[data-md-color-scheme="slate"] .md-typeset h2#why-open-ad-kit {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+@media screen and (max-width: 768px) {
+  .md-typeset h1:has(+ .oak-hero-lead) {
+    font-size: 2rem;
+  }
+
+  .oak-hero-lead {
+    font-size: 1.05rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Feature / Component Cards — Light and elegant
+   -------------------------------------------------------------------------- */
+.oak-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.2rem;
+  margin: 1.5rem 0;
+}
+
+.oak-card {
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+  background: #fff;
+}
+
+.oak-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+  border-color: #d0d0d0;
+}
+
+.oak-card h3 {
+  margin-top: 0;
+  font-weight: 500;
+  font-size: 1.05em;
+}
+
+.oak-card p {
+  font-size: 0.92em;
+  color: #666;
+  line-height: 1.55;
+  margin-bottom: 0;
+}
+
+.oak-card .oak-card-icon {
+  font-size: 1.6em;
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Component Grid
+   -------------------------------------------------------------------------- */
+.oak-component-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1.2rem 0;
+}
+
+.oak-component-item {
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 1.2rem;
+  transition: all 0.15s ease;
+}
+
+.oak-component-item:hover {
+  border-color: var(--md-accent-fg-color);
+  background-color: rgba(79, 142, 247, 0.03);
+}
+
+.oak-component-item strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 500;
+}
+
+.oak-component-item span {
+  font-size: 0.9em;
+  color: #666;
+}
+
+/* --------------------------------------------------------------------------
+   Status Badges
+   -------------------------------------------------------------------------- */
+.oak-badge {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  border-radius: 12px;
+  font-size: 0.72em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  margin-right: 0.3em;
+}
+
+.oak-badge--verified {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.oak-badge--testing {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.oak-badge--planned {
+  background-color: rgba(139, 139, 139, 0.08);
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.oak-badge--supported {
+  background-color: rgba(79, 142, 247, 0.1);
+  color: #1d4ed8;
+  border: 1px solid rgba(79, 142, 247, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   Step Flow
+   -------------------------------------------------------------------------- */
+.oak-steps {
+  counter-reset: oak-step;
+  list-style: none;
+  padding-left: 0;
+}
+
+.oak-steps li {
+  position: relative;
+  padding-left: 2.8rem;
+  margin-bottom: 1.2rem;
+  min-height: 2rem;
+}
+
+.oak-steps li::before {
+  counter-increment: oak-step;
+  content: counter(oak-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--md-accent-fg-color);
+  color: white;
+  font-weight: 500;
+  font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.oak-steps li strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.oak-steps li p {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+/* --------------------------------------------------------------------------
+   Inline Callouts
+   -------------------------------------------------------------------------- */
+.oak-callout {
+  border-left: 3px solid var(--md-accent-fg-color);
+  background-color: rgba(79, 142, 247, 0.04);
+  padding: 1rem 1.2rem;
+  border-radius: 0 6px 6px 0;
+  margin: 1.5rem 0;
+}
+
+.oak-callout p:first-child {
+  margin-top: 0;
+}
+
+.oak-callout p:last-child {
+  margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Dark Mode Overrides
+   -------------------------------------------------------------------------- */
+[data-md-color-scheme="slate"] .md-typeset h4 {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+[data-md-color-scheme="slate"] .oak-card p {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+[data-md-color-scheme="slate"] .oak-component-item span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+[data-md-color-scheme="slate"] .oak-badge--verified {
+  color: #4ade80;
+}
+
+[data-md-color-scheme="slate"] .oak-badge--testing {
+  color: #fbbf24;
+}
+
+[data-md-color-scheme="slate"] .oak-badge--planned {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+[data-md-color-scheme="slate"] .oak-badge--supported {
+  color: #60a5fa;
+}
+
+[data-md-color-scheme="slate"] .oak-card {
+  background-color: #1e1e2e;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-md-color-scheme="slate"] .oak-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-md-color-scheme="slate"] .oak-component-item {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: #252535;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Adjustments
+   -------------------------------------------------------------------------- */
+@media screen and (max-width: 768px) {
+  .oak-card-grid,
+  .oak-component-grid {
+    grid-template-columns: 1fr;
+  }
+}

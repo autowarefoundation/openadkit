@@ -1,0 +1,12 @@
+[Install]
+WantedBy=default.target
+
+[Unit]
+Description=Open AD Kit Kashiwanoha Map Extractor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bash /usr/local/libexec/awf-oak-extract-map.sh

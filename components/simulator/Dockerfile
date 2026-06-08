@@ -26,6 +26,7 @@ RUN --mount=type=cache,target="${CCACHE_DIR}" \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions,target=/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/control/autoware_external_cmd_selector,target=/autoware/src/universe/autoware_universe/control/autoware_external_cmd_selector \
   --mount=type=bind,source=/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter,target=/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \
+  --mount=type=bind,source=/autoware/src/universe/autoware_universe/system/autoware_dummy_infrastructure,target=/autoware/src/universe/autoware_universe/system/autoware_dummy_infrastructure \
   apt-get update \
   && source /opt/ros/"$ROS_DISTRO"/setup.bash \
   && source /opt/autoware/setup.bash \

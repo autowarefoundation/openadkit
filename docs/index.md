@@ -36,9 +36,9 @@ These images communicate through ROS 2 middleware, and some deployments bridge i
 
 ## Tools
 
-In addition to the **Autoware components**, Open AD Kit provides essential tools for development, simulation, and visualization. These tools are also containerized and can be integrated into deployments as needed.
+In addition to the **Autoware components**, Open AD Kit integrates essential containerized tools for development, simulation, and visualization.
 
-- **Scenario Simulator**: Runs scenario-based simulations for validation, CI, and local development.
+- **TIER IV Scenario Simulator**: Runs scenario-based simulations for validation, CI, and local development.
 
 For more details, see the [Tools](./tools/index.md).
 

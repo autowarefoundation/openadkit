@@ -11,28 +11,33 @@ image:
 
 content:
   rpms:
-    - git
     - podman
   container_images:
     - source: ghcr.io/autowarefoundation/autoware
       tag: universe-0.45.1-amd64
       name: localhost/autoware:latest
-    - source: ghcr.io/autowarefoundation/autoware-tools
-      tag: scenario-simulator
-      name: localhost/autoware-tools:scenario-simulator
+    - source: ghcr.io/tier4/scenario_simulator_v2
+      tag: humble-25.0.20-runtime
+      name: localhost/scenario_simulator_v2:runtime
   make_dirs:
     - path: /var/log/awf
       mode: 0755
       exist_ok: true
       parents: true
-    - path: /opt/tier4
+    - path: /opt/tier4/kashiwanoha_map
+      mode: 0755
+      exist_ok: true
+      parents: true
+    - path: /usr/local/libexec
       mode: 0755
       exist_ok: true
       parents: true
   add_files:
-    # systemd unit that fetches the tier4 git repository
-    - source_path: ../components/systemd/awf-oak-git.service
-      path: /etc/systemd/system/awf-oak-git.service
+    # systemd unit that extracts the map from the pinned simulator image
+    - source_path: ../components/systemd/awf-oak-map.service
+      path: /etc/systemd/system/awf-oak-map.service
+    - source_path: ../components/scripts/awf-oak-extract-map.sh
+      path: /usr/local/libexec/awf-oak-extract-map.sh
     # awf oak pod
     - source_path: ../components/container-files/awf-oak.pod
       path: /etc/containers/systemd/awf-oak.pod
@@ -44,7 +49,7 @@ content:
       path: /etc/containers/systemd/awf-oak-simulator.container
   systemd:
     enabled_services:
-      - awf-oak-git.service
+      - awf-oak-map.service
 
 auth:
   root_password: $6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.

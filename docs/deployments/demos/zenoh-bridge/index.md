@@ -183,6 +183,7 @@ Ensure the following software is installed:
 
 1. **Check Container Status**:
    Run `docker ps` or `docker-compose ps` to ensure all containers are running:
+   - `map-init` should have exited successfully before `autoware` starts
    - `autoware`
    - `scenario_simulator`
    - `visualizer`
@@ -214,7 +215,7 @@ Ensure the following software is installed:
    # Stop All and remove volumes (Recommended for full cleanup)
    docker compose down -v
    ```
-   - The `-v` flag also removes the `autoware_map` volume. Omit it if you wish to preserve the downloaded map data for future use.
+   - The `-v` flag also removes the `autoware_map` volume. Omit it if you wish to preserve the extracted map data for future use. On the next startup, `map-init` validates the volume and refreshes it if the pinned simulator image tag changes or required map files are missing.
 
 ## 4. Troubleshooting
 

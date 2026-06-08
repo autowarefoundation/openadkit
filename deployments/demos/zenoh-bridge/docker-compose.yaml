@@ -1,8 +1,22 @@
+x-scenario-simulator-image: &scenario-simulator-image ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+
 services:
+  map-init:
+    image: *scenario-simulator-image
+    volumes:
+      - autoware_map:/autoware_map
+      - ../../common/scripts/map-init.sh:/map-init.sh:ro
+    command: /map-init.sh
+    environment:
+      - SCENARIO_SIMULATOR_IMAGE=ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
+      - MAP_VOLUME_PATH=/autoware_map
+      - REQUIRED_FILES=lanelet2_map.osm pointcloud_map.pcd
+    restart: "no"
+
   autoware:
     image: ghcr.io/autowarefoundation/autoware:universe
     volumes:
-      - autoware_map:/autoware_map
+      - autoware_map:/autoware_map:ro
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
@@ -14,18 +28,44 @@ services:
       sensor_model:=sample_sensor_kit
       scenario_simulation:=${SCENARIO_SIMULATION:-true}
       rviz:=false"
-    depends_on: 
-      - edge_zenoh_bridge
+    depends_on:
+      map-init:
+        condition: service_completed_successfully
+      edge_zenoh_bridge:
+        condition: service_started
 
   scenario_simulator:
-    image: ghcr.io/autowarefoundation/autoware-tools:scenario-simulator
+    image: *scenario-simulator-image
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
-    volumes:
-      - autoware_map:/opt/autoware/share/kashiwanoha_map/map
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        exec ros2 launch scenario_test_runner scenario_test_runner.launch.py \
+          architecture_type:=awf/universe/20250130 \
+          global_frame_rate:=30 \
+          global_timeout:=180 \
+          initialize_duration:=90 \
+          launch_autoware:=false \
+          launch_rviz:=false \
+          launch_visualization:=false \
+          output_directory:=/autoware/scenario-sim/output \
+          record:=false \
+          scenario:="$(ros2 pkg prefix --share scenario_test_runner)/scenario/sample.yaml" \
+          sensor_model:=sample_sensor_kit \
+          use_custom_centerline:=true \
+          use_sim_time:=false \
+          vehicle_model:=sample_vehicle
     depends_on:
-      - edge_zenoh_bridge
+      map-init:
+        condition: service_completed_successfully
+      autoware:
+        condition: service_started
+      edge_zenoh_bridge:
+        condition: service_started
 
   edge_zenoh_bridge:
     image:  eclipse/zenoh-bridge-ros2dds:latest

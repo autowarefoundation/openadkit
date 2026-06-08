@@ -36,6 +36,8 @@ We recommend using the Split Topology mode from this directory:
 
 Then access the visualizer at `http://localhost:6081`.
 
+The edge stack runs `map-init` before Autoware. It extracts the Kashiwanoha map from the pinned TIER IV scenario simulator image and refreshes the `autoware_map` volume when the image tag changes or required map files are missing.
+
 
 
 ## Distributed Deployment (Multi-Machine)

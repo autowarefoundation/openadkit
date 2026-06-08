@@ -58,6 +58,25 @@ RUN --mount=type=ssh \
   && pipx uninstall ansible \
   && /scripts/cleanup_apt.sh true
 
+# CUDA 13 moved Thrust, CUB, and the libcudacxx `cuda/` headers under
+# /usr/local/cuda/include/cccl/. Downstream consumers that still use the
+# legacy unprefixed includes (e.g. `#include <thrust/sort.h>` in
+# autoware_universe's bevdet_vendor) need both:
+#   (a) `<thrust/...>` and `<cub/...>` to resolve — handled by relative
+#       symlinks below;
+#   (b) Thrust's INTERNAL chain to find `<cuda/__cccl_config>` etc., which
+#       live at .../include/cccl/cuda/ — handled by adding the cccl include
+#       root to CPATH so both nvcc and gcc/g++ pick it up transparently.
+# Both are no-ops on CUDA 12.x: the cccl/ subdir doesn't exist there, the
+# `for d` loop runs but creates nothing, and an unmatched CPATH entry is
+# silently ignored by the compiler driver.
+RUN for d in thrust cub; do \
+      if [ -d "/usr/local/cuda/include/cccl/${d}" ] && [ ! -e "/usr/local/cuda/include/${d}" ]; then \
+        ln -s "cccl/${d}" "/usr/local/cuda/include/${d}"; \
+      fi; \
+    done
+ENV CPATH="/usr/local/cuda/include/cccl${CPATH:+:$CPATH}"
+
 # =============================================================================
 # Stage: common-devel
 # Common development image with ROS and autoware-universe common packages
@@ -129,3 +148,12 @@ RUN --mount=type=ssh \
   ./setup-dev-env.sh -y --module all --no-cuda-drivers --ros-distro "$ROS_DISTRO" openadkit  \
   && pipx uninstall ansible \
   && /scripts/cleanup_apt.sh true
+
+# Bridge CUDA 13's cccl/ subdir to legacy thrust/cub/cuda includes.
+# No-op on CUDA 12.x.
+RUN for d in thrust cub; do \
+      if [ -d "/usr/local/cuda/include/cccl/${d}" ] && [ ! -e "/usr/local/cuda/include/${d}" ]; then \
+        ln -s "cccl/${d}" "/usr/local/cuda/include/${d}"; \
+      fi; \
+    done
+ENV CPATH="/usr/local/cuda/include/cccl${CPATH:+:$CPATH}"

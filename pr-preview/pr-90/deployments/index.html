@@ -1917,13 +1917,17 @@
 <li><strong>Docker Compose</strong> orchestrates containers on a single host</li>
 <li><strong>Optional: Zenoh bridge</strong> connects distributed ROS 2 domains for remote operation</li>
 </ol>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Deployment Topology Overview diagram
-     Style: Clean layout showing two columns: Samples (single machine, all containers on one host) vs Demos (distributed, edge + cloud)
-     Use minimal icons, black/gray text, blue-green accent on connection lines
-     Dimensions: 800x350px, SVG preferred
--->
+<pre class="mermaid"><code>graph LR
+    subgraph Samples["Samples (Single Machine)"]
+        S1[Planning Simulation]
+        S2[Scenario Simulation]
+        S3[Logging Simulation]
+    end
 
+    subgraph Demos["Demos (Distributed)"]
+        D1[Edge: Autoware + Simulator]
+        D2[Cloud: Visualizer + Bridge]
+    end</code></pre>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="samples/planning-simulation/">Run your first sample deployment</a></li>
@@ -2007,7 +2011,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2036,7 +2040,7 @@
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -2064,12 +2064,11 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
 <li><a href="../../../components/">Components Overview</a> — Learn about the sensing and perception stack</li>
 <li><a href="../../../getting-started/">Getting Started</a> — Environment setup and artifact download</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Logging Simulation Data Flow diagram
-     Style: Horizontal flow showing: Rosbag file → sensing-perception container → localization-mapping → planning-control → visualizer
-     Highlight the sensing-perception step with blue-green accent (GPU-accelerated)
-     Dimensions: 900x300px, SVG preferred
--->
+<pre class="mermaid"><code>flowchart LR
+    Rosbag[Rosbag File] --&gt; SP[sensing-perception]
+    SP --&gt; LM[localization-mapping]
+    LM --&gt; PC[planning-control]
+    PC --&gt; Viz[visualizer]</code></pre>
 
 
 
@@ -2147,7 +2146,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2176,7 +2175,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

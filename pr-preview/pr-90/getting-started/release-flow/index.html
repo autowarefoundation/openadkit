@@ -2000,12 +2000,10 @@
 <li><a href="../image-tags/">Container Image Tags</a> — Understanding the tag schema</li>
 <li><a href="../">Getting Started</a> — Quick start guide</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Release Timeline diagram
-     Style: Horizontal 4-step timeline with clean nodes: Build → Scan → Promote → Tag
-     Use minimal circles connected by a line, blue-green gradient on the active step highlight
-     Dimensions: 900x200px, SVG preferred
--->
+<pre class="mermaid"><code>flowchart LR
+    A[Build All Images] --&gt; B[Scan Images]
+    B --&gt; C[Promote &amp; Tag]
+    C --&gt; D[Update Aliases]</code></pre>
 
 
 
@@ -2083,7 +2081,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2112,7 +2110,7 @@
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

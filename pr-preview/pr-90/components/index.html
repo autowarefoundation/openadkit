@@ -2014,14 +2014,25 @@
 <p>Open AD Kit is a component-based project designed to run on a variety of platforms with containerized services. Each <strong>Autoware function</strong> remains independently deployable, while the published images group closely related functions together to keep the runtime layout simpler.</p>
 <h2 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">#</a></h2>
 <p>Autoware uses a <strong>Core / Universe</strong> architecture. <strong>Core</strong> contains rigorously reviewed base functionality required for safe autonomous driving. <strong>Universe</strong> contains community extensions and research features that build on the Core foundation. Open AD Kit packages these into focused container images that can be composed into complete AD systems.</p>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Core vs Universe Architecture diagram
-     Style: Two-tier stack. Core layer (dark navy #0a0e27) at bottom with sensing, localization, planning, control, vehicle
-     Universe layer (lighter navy #141b3a) above with perception extensions, research features, simulator, visualizer
-     Blue-green gradient separator between layers
-     Dimensions: 800x400px, SVG preferred
--->
+<pre class="mermaid"><code>graph TB
+    subgraph Universe["Universe Layer"]
+        direction LR
+        U1[Perception Extensions]
+        U2[Research Features]
+        U3[Simulator]
+        U4[Visualizer]
+    end
 
+    subgraph Core["Core Layer"]
+        direction LR
+        C1[Sensing]
+        C2[Localization]
+        C3[Planning]
+        C4[Control]
+        C5[Vehicle]
+    end
+
+    Universe --&gt; Core</code></pre>
 <h2 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart TB
     ROS["ros:humble-ros-base-jammy&lt;br/&gt;ros:jazzy-ros-base-noble"] --&gt; CB["common-base"]
@@ -2235,21 +2246,22 @@
 <li><a href="../getting-started/">Getting Started</a> — Quick start guide</li>
 <li><a href="../platforms/">Supported Platforms</a> — Where to deploy</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Interface Layers Stack diagram
-     Style: 3-layer horizontal stack with blue-green gradient accent on the Component Interface layer
-     Top: AD API (external, HTTP/MQTT)
-     Middle: Component Interface (ROS 2 topics/services, highlighted)
-     Bottom: Local Interface (intra-component)
-     Dimensions: 800x250px, SVG preferred
--->
+<pre class="mermaid"><code>graph LR
+    subgraph AD_API["AD API (External)"]
+        A1[HTTP / MQTT]
+    end
 
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Build Pipeline Overview diagram
-     Style: Horizontal flow showing ROS base → common → component images → universe aggregate
-     Use color coding matching the Mermaid diagram (blue for common, green for components, purple for universe)
-     Dimensions: 900x300px, SVG preferred
--->
+    subgraph Component_Interface["Component Interface"]
+        C1[ROS 2 Topics]
+        C2[ROS 2 Services]
+    end
+
+    subgraph Local_Interface["Local Interface"]
+        L1[Intra-component Communication]
+    end
+
+    AD_API --&gt; Component_Interface
+    Component_Interface --&gt; Local_Interface</code></pre>
 
 
 
@@ -2327,7 +2339,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2356,7 +2368,7 @@
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

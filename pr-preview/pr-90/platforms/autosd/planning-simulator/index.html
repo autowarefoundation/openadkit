@@ -1879,12 +1879,12 @@
 <li><a href="../../../deployments/">Open AD Kit Deployments</a></li>
 <li><a href="../../../components/">Components Overview</a></li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: AutoSD Planning-Simulator Container Topology
-     Style: Shows AutoSD host with systemd/Quadlet spawning Podman containers: planning-control, simulator, visualizer
-     Blue-green accent on the Quadlet → container orchestration arrows
-     Dimensions: 800x350px, SVG preferred
--->
+<pre class="mermaid"><code>graph LR
+    Host[AutoSD Host] --&gt; Systemd[Systemd + Quadlet]
+    Systemd --&gt; Podman[Podman]
+    Podman --&gt; PC[planning-control]
+    Podman --&gt; SIM[simulator]
+    Podman --&gt; VIZ[visualizer]</code></pre>
 
 
 
@@ -1962,7 +1962,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -1991,7 +1991,7 @@
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

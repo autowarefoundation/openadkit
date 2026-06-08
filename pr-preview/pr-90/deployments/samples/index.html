@@ -1936,12 +1936,12 @@
 </tr>
 </tbody>
 </table>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Sample Deployment Lifecycle diagram
-     Style: Circular or horizontal flow showing: Download → Configure → Start → Visualize → Interact → Stop
-     Use minimal icons, clean arrows, blue-green accent on the active step highlight
-     Dimensions: 900x200px, SVG preferred
--->
+<pre class="mermaid"><code>flowchart LR
+    A[Download Assets] --&gt; B[Configure Environment]
+    B --&gt; C[Start Deployment]
+    C --&gt; D[Open Visualizer]
+    D --&gt; E[Interact with Simulation]
+    E --&gt; F[Stop Deployment]</code></pre>
 
 
 
@@ -2019,7 +2019,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2048,7 +2048,7 @@
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

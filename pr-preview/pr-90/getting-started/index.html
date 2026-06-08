@@ -1936,12 +1936,10 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
 <li><a href="../components/">Learn about components</a> — Understand the Open AD Kit architecture</li>
 <li><a href="../platforms/">Choose a platform</a> — Deploy to AutoSD, EWAOL, or your local machine</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Installation Flow diagram
-     Style: 3-step horizontal visual flow: Clone → Setup (with optional --no-nvidia branch) → Verify
-     Use minimal icons, clean arrows, blue-green accent on the active step
-     Dimensions: 800x200px, SVG preferred
--->
+<pre class="mermaid"><code>flowchart LR
+    A[Clone Repository] --&gt; B[Run setup.sh]
+    B --&gt; C[Verify Installation]
+    B -.-&gt;|Optional| D[--no-nvidia Flag]</code></pre>
 
 
 
@@ -2019,7 +2017,7 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2048,7 +2046,7 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

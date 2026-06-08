@@ -2020,12 +2020,14 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
 <li><a href="../logging-simulation/">Logging Simulation</a> — Replay recorded sensor data</li>
 <li><a href="../../../components/">Components Overview</a> — Learn about the planning and control stack</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Planning Simulation Architecture diagram
-     Style: Single-machine container layout showing: planning-control container, visualizer container, shared map volume
-     Blue-green accent on the planning-control component
-     Dimensions: 800x300px, SVG preferred
--->
+<pre class="mermaid"><code>graph LR
+    subgraph Host["Single Host"]
+        PC[planning-control]
+        VIZ[visualizer]
+    end
+
+    Map[~/autoware_map] --&gt; PC
+    PC &lt;--&gt;|ROS 2 DDS| VIZ</code></pre>
 
 
 
@@ -2103,7 +2105,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2132,7 +2134,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

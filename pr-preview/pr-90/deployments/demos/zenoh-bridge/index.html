@@ -2368,12 +2368,14 @@ sleep<span class="w"> </span><span class="m">15</span>
 <li><a href="https://autoware.org/driving-autoware-with-zenoh/">Driving Autoware with Zenoh</a></li>
 <li><a href="../../samples/">Sample Deployments</a> — Single-machine simulations</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Zenoh Multi-Vehicle Namespace diagram
-     Style: Star topology with cloud visualizer/FMS at center, multiple edge vehicles connected via Zenoh namespaces (/bot1, /bot2, /bot3)
-     Use blue-green gradient on connection lines, dark navy background for the cloud node
-     Dimensions: 800x400px, SVG preferred
--->
+<pre class="mermaid"><code>graph TD
+    Cloud[Cloud Visualizer / FMS] --&gt; Bridge1[Zenoh Bridge /bot1]
+    Cloud --&gt; Bridge2[Zenoh Bridge /bot2]
+    Cloud --&gt; Bridge3[Zenoh Bridge /bot3]
+
+    Bridge1 --&gt; V1[Vehicle 1]
+    Bridge2 --&gt; V2[Vehicle 2]
+    Bridge3 --&gt; V3[Vehicle 3]</code></pre>
 
 
 
@@ -2451,7 +2453,7 @@ sleep<span class="w"> </span><span class="m">15</span>
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2480,7 +2482,7 @@ sleep<span class="w"> </span><span class="m">15</span>
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -2050,14 +2050,20 @@
 <li><a href="https://sigs.centos.org/automotive/latest/features-and-concepts/">AutoSD Features and Concepts</a></li>
 <li><a href="../">Supported Platforms overview</a></li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: AutoSD Mixed Criticality Architecture diagram
-     Style: Dark navy background (#0a0e27), two partition boxes (Root and QM) with Open AD Kit components mapped inside each
-     Root box: planning, control, vehicle-system (green accent)
-     QM box: visualizer, simulator (blue accent)
-     OSTree layer beneath both
-     Dimensions: 800x450px, SVG preferred
--->
+<pre class="mermaid"><code>graph TB
+    subgraph Root["Root Partition (Safety-Critical)"]
+        R1[Planning]
+        R2[Control]
+        R3[Vehicle System]
+    end
+
+    subgraph QM["QM Partition (Non-Critical)"]
+        Q1[Visualizer]
+        Q2[Simulator]
+    end
+
+    OSTree[OSTree / Bootc&lt;br/&gt;Atomic Updates] --&gt; Root
+    OSTree --&gt; QM</code></pre>
 
 
 
@@ -2135,7 +2141,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2164,7 +2170,7 @@
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

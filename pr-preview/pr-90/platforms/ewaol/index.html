@@ -1947,12 +1947,12 @@ kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
 <li><a href="../">Supported Platforms overview</a></li>
 <li><a href="../autosd/">AutoSD platform</a></li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: EWAOL Build Pipeline diagram
-     Style: Dark navy background (#0a0e27), geometric nodes, blue-green gradient connectors on active paths
-     Content: Yocto kas configuration → build → flash AVA → boot → K3s cluster → Autoware containers
-     Dimensions: 800x400px, SVG preferred
--->
+<pre class="mermaid"><code>flowchart LR
+    A[kas Configuration] --&gt; B[Yocto Build]
+    B --&gt; C[Flash AVA]
+    C --&gt; D[Boot]
+    D --&gt; E[K3s Cluster]
+    E --&gt; F[Autoware Containers]</code></pre>
 
 
 
@@ -2030,7 +2030,7 @@ kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2059,7 +2059,7 @@ kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

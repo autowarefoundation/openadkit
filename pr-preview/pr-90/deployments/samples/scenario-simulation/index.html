@@ -2073,12 +2073,17 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
 <li><a href="../planning-simulation/">Planning Simulation</a> — Simpler single-map simulation</li>
 <li><a href="../logging-simulation/">Logging Simulation</a> — Replay recorded sensor data</li>
 </ul>
-<!-- DIAGRAM PLACEHOLDER:
-     Description: Scenario Simulation Architecture diagram
-     Style: Single-machine layout showing: autoware containers, scenario_simulator container, map-init service, visualizer
-     Highlight the scenario_simulator → autoware ROS 2 DDS connection with blue-green accent
-     Dimensions: 800x350px, SVG preferred
--->
+<pre class="mermaid"><code>graph LR
+    subgraph Host["Single Host"]
+        A[autoware]
+        S[scenario_simulator]
+        M[map-init]
+        V[visualizer]
+    end
+
+    M --&gt; A
+    S &lt;--&gt;|ROS 2 DDS| A
+    A &lt;--&gt;|ROS 2 DDS| V</code></pre>
 
 
 
@@ -2156,7 +2161,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 The Autoware Foundation
+      Copyright &copy; 2026 The Autoware Foundation
     </div>
   
   
@@ -2185,7 +2190,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
     
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

@@ -2135,24 +2135,14 @@
 </ul>
 <h3 id="architecture-diagram">Architecture Diagram<a class="headerlink" href="#architecture-diagram" title="Permanent link">#</a></h3>
 <pre class="mermaid"><code>graph TD
-    classDef machine fill:#f9f9f9,stroke:#333,stroke-width:2px,stroke-dasharray:5 5
-    classDef network fill:#e6f3ff,stroke:#0066cc,stroke-width:1.5px
-    classDef component fill:#ffffff,stroke:#333
-    classDef bridge fill:#fffbe6,stroke:#f0ad4e
-    classDef invisible stroke:none,fill:none
-
     subgraph CloudSide["Cloud Side (User Machine)"]
         direction LR
-        class CloudSide machine
 
         subgraph CloudNet[cloud_net Network]
             direction TB
-            class CloudNet network
 
             visualizer["**Visualizer**&lt;br&gt;&lt;br&gt;RViz2 via noVNC&lt;br&gt;Browser Remote Desktop"]
             cloud_bridge["**Cloud Zenoh Bridge**&lt;br&gt;&lt;br&gt;Router&lt;br&gt;Listens on TCP"]
-            class visualizer component
-            class cloud_bridge bridge
 
             visualizer --&gt;|"ROS 2 DDS"| cloud_bridge
         end
@@ -2160,17 +2150,13 @@
 
     subgraph EdgeSide["Edge Side (Vehicle/Server)"]
         direction LR
-        class EdgeSide machine
 
         subgraph EdgeNet[edge_net Network]
             direction TB
-            class EdgeNet network
 
             autoware["**Autoware**&lt;br&gt;&lt;br&gt;Perception, Planning, Control"]
             scenario_simulator["**Scenario Simulator**&lt;br&gt;&lt;br&gt;Virtual Environment&lt;br&gt;Sensor Data"]
             edge_bridge["**Edge Zenoh Bridge**&lt;br&gt;&lt;br&gt;Client&lt;br&gt;Converts DDS ↔ Zenoh"]
-            class autoware,scenario_simulator component
-            class edge_bridge bridge
 
             autoware &lt;--&gt;|"ROS 2 DDS"| scenario_simulator
             autoware --&gt;|"ROS 2 DDS"| edge_bridge

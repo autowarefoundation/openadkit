@@ -1733,10 +1733,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#folder-structure" class="md-nav__link">
+  <a href="#repository-location" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Folder Structure
+        Repository Location
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quadlet-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quadlet Services
       
     </span>
   </a>
@@ -1748,6 +1770,17 @@
     <span class="md-ellipsis">
       
         Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Outcome
       
     </span>
   </a>
@@ -1794,7 +1827,8 @@
 <div class="admonition abstract">
 <p>This deployment demonstrates how to run and validate Autoware planning and simulation workflows inside AutoSD using systemd-managed containers (Quadlet) and Podman.</p>
 </div>
-<h2 id="folder-structure">Folder Structure<a class="headerlink" href="#folder-structure" title="Permanent link">#</a></h2>
+<h2 id="repository-location">Repository Location<a class="headerlink" href="#repository-location" title="Permanent link">#</a></h2>
+<p>Runnable assets live under <a href="https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/planning-simulator"><code>platforms/autosd/planning-simulator/</code></a> in the Open AD Kit repository.</p>
 <table>
 <thead>
 <tr>
@@ -1804,37 +1838,95 @@
 </thead>
 <tbody>
 <tr>
-<td><code>aib</code></td>
-<td>Automotive Image Builder manifest files to build an AutoSD OS image</td>
+<td><code>aib/</code></td>
+<td>Automotive Image Builder manifest files (<code>image.aib.yml</code>, <code>vars.yml</code>) to build an AutoSD OS image</td>
 </tr>
 <tr>
-<td><code>components</code></td>
-<td>Quadlet service files to run Open AD Kit containers inside AutoSD</td>
+<td><code>components/container-files/</code></td>
+<td>Quadlet unit files for Podman containers and the shared pod</td>
 </tr>
 <tr>
-<td><code>docs</code></td>
-<td>Architecture diagrams and supplementary documentation</td>
+<td><code>components/systemd/</code></td>
+<td>systemd oneshot service for map extraction</td>
+</tr>
+<tr>
+<td><code>components/scripts/</code></td>
+<td>Helper scripts installed into the AutoSD image</td>
 </tr>
 </tbody>
 </table>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
+<p>Before using this deployment, build and boot an AutoSD image following the <a href="../">AutoSD Platform Overview</a> guide. You need:</p>
+<ul>
+<li>Docker or Podman and QEMU (for the containerized image builder workflow)</li>
+<li>An RPM-based host if running Automotive Image Builder directly on the host</li>
+</ul>
+<h2 id="quadlet-services">Quadlet Services<a class="headerlink" href="#quadlet-services" title="Permanent link">#</a></h2>
+<p>After boot, systemd starts the following services defined under <code>components/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>awf-oak-map.service</code></td>
+<td>Oneshot</td>
+<td>Extracts the bundled Kashiwanoha map to <code>/opt/tier4/kashiwanoha_map</code></td>
+</tr>
+<tr>
+<td><code>awf-oak-planning.container</code></td>
+<td>Container</td>
+<td>Runs the Autoware planning stack with scenario simulation enabled</td>
+</tr>
+<tr>
+<td><code>awf-oak-simulator.container</code></td>
+<td>Container</td>
+<td>Runs the TIER IV Scenario Simulator with the bundled sample scenario</td>
+</tr>
+<tr>
+<td><code>awf-oak.pod</code></td>
+<td>Pod</td>
+<td>Shared Podman pod for co-located planning and simulator containers</td>
+</tr>
+</tbody>
+</table>
+<p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code>. The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario.</p>
 <h2 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">#</a></h2>
 <ol>
-<li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code></li>
+<li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code> (see <a href="../#building-an-autosd-image">AutoSD build instructions</a>)</li>
 <li>Boot the image on QEMU or target hardware</li>
-<li>The Quadlet service definitions in <code>components/</code> automatically start the Open AD Kit planning and simulator containers via Podman</li>
-<li>Access the visualizer via the exposed noVNC endpoint</li>
+<li>Confirm the Quadlet services are active:
+   <div class="highlight"><pre><span></span><code>systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-map.service
+systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-planning.service
+systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator.service
+</code></pre></div></li>
+<li>Access the visualizer via the exposed noVNC endpoint and run the planning simulation workflow</li>
 </ol>
+<h2 id="expected-outcome">Expected Outcome<a class="headerlink" href="#expected-outcome" title="Permanent link">#</a></h2>
+<p>Once all services are running, you can:</p>
+<ul>
+<li>Set initial and goal poses in the noVNC RViz interface</li>
+<li>Observe the Autoware planning stack responding to the scenario simulator environment</li>
+<li>Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware</li>
+</ul>
+<p>For a Docker Compose equivalent on a development laptop, see the <a href="../../../deployments/samples/planning-simulation/">Planning Simulation sample deployment</a>.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="../">AutoSD Platform Overview</a></li>
+<li><a href="../../../deployments/samples/planning-simulation/">Planning Simulation sample deployment</a></li>
 <li><a href="../../../deployments/">Open AD Kit Deployments</a></li>
 <li><a href="../../../components/">Components Overview</a></li>
 </ul>
 <pre class="mermaid"><code>graph LR
-    Host[AutoSD Host] --&gt; Systemd[Systemd + Quadlet]
-    Systemd --&gt; Podman[Podman]
-    Podman --&gt; PC[planning-control]
-    Podman --&gt; SIM[simulator]
+    Host[AutoSD Host] --&gt; MapSvc[awf-oak-map.service]
+    MapSvc --&gt; Systemd[Systemd + Quadlet]
+    Systemd --&gt; Podman[Podman Pod]
+    Podman --&gt; PC[awf-oak-planning]
+    Podman --&gt; SIM[awf-oak-simulator]
     Podman --&gt; VIZ[visualizer]</code></pre>
 
 

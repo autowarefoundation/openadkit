@@ -14,7 +14,7 @@ A **deployment** is a running instance of Open AD Kit, a specific combination of
 
 Deployments are defined using container orchestration files (e.g., `docker-compose.yaml`). This makes them portable and easy to reproduce across different environments, from a developer's laptop to edge devices in a vehicle. This container-based approach is a cornerstone of the Open AD Kit's cloud-native and platform-agnostic philosophy, aligning with standards like SOAFEE.
 
-This modular structure allows users to start with a minimal deployment and incrementally add components and tools as their system evolves.
+This modular structure allows users to start with a minimal deployment and incrementally add components as their system evolves.
 
 For more details, see the [Deployments](./deployments/index.md).
 
@@ -33,14 +33,6 @@ The primary images include:
 - **Visualizer**: Provides a browser-accessible RViz environment for remote inspection.
 
 These images communicate through ROS 2 middleware, and some deployments bridge isolated environments with Zenoh. For more details, see the [Autoware components](./components/index.md).
-
-## Tools
-
-In addition to the **Autoware components**, Open AD Kit integrates essential containerized tools for development, simulation, and visualization.
-
-- **TIER IV Scenario Simulator**: Runs scenario-based simulations for validation, CI, and local development.
-
-For more details, see the [Tools](./tools/index.md).
 
 ## Supported Platforms
 

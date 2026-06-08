@@ -14,4 +14,4 @@ Sample deployment configurations to help you get started. Recommended for **lear
 
 Demo deployment configurations that are specific to certain **use case scenarios**.
 
-- [Zenoh-bridge](demos/zenoh-bridge/index.md) - Demonstrates a "Cloud-Edge" deployment model by seamlessly bridging two isolated ROS 2 environments, decoupling compute-intensive components from lightweight visualization tools.
+- [Zenoh-bridge](demos/zenoh-bridge/index.md) - Demonstrates a "Cloud-Edge" deployment model by seamlessly bridging two isolated ROS 2 environments, decoupling compute-intensive components from lightweight visualization components.

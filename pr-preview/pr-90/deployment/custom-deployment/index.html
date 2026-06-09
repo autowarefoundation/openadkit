@@ -2582,12 +2582,12 @@
 <tbody>
 <tr>
 <td><code>visualizer</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/visualizer</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:visualizer</code></td>
 <td>Browser-accessible RViz</td>
 </tr>
 <tr>
 <td><code>planning-control</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/planning-control</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:planning-control</code></td>
 <td>Planning and control logic</td>
 </tr>
 </tbody>
@@ -2605,17 +2605,17 @@
 <tbody>
 <tr>
 <td><code>visualizer</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/visualizer</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:visualizer</code></td>
 <td>Browser-accessible RViz</td>
 </tr>
 <tr>
 <td><code>planning-control</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/planning-control</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:planning-control</code></td>
 <td>Planning and control logic</td>
 </tr>
 <tr>
 <td><code>simulator</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/simulator</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:simulator</code></td>
 <td>Virtual vehicle and environment</td>
 </tr>
 </tbody>
@@ -2633,32 +2633,32 @@
 <tbody>
 <tr>
 <td><code>visualizer</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/visualizer</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:visualizer</code></td>
 <td>Browser-accessible RViz</td>
 </tr>
 <tr>
 <td><code>sensing-perception</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/sensing-perception</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:sensing-perception</code></td>
 <td>Sensor preprocessing and perception</td>
 </tr>
 <tr>
 <td><code>localization-mapping</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/localization-mapping</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:localization-mapping</code></td>
 <td>Localization and map serving</td>
 </tr>
 <tr>
 <td><code>planning-control</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/planning-control</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:planning-control</code></td>
 <td>Planning and control logic</td>
 </tr>
 <tr>
 <td><code>vehicle-system</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/vehicle-system</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:vehicle-system</code></td>
 <td>Vehicle interface and system services</td>
 </tr>
 <tr>
 <td><code>api</code></td>
-<td><code>ghcr.io/autowarefoundation/openadkit/api</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:api</code></td>
 <td>External API services</td>
 </tr>
 </tbody>
@@ -2671,7 +2671,7 @@
 <p>Here is a minimal <code>docker-compose.yaml</code> for a Planning Simulation-like stack:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">planning-control</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit/planning-control</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit:planning-control</span>
 <span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/autoware_map:/autoware_map:ro</span>
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
@@ -2680,7 +2680,7 @@
 <span class="w">      </span><span class="no">ros2 launch tier4_planning_component tier4_planning_component.launch.xml</span>
 
 <span class="w">  </span><span class="nt">visualizer</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit/visualizer</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit:visualizer</span>
 <span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;6080:6080&quot;</span>
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span>

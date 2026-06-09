@@ -2850,6 +2850,7 @@ sleep<span class="w"> </span><span class="m">15</span>
 <p><strong>Solution:</strong> Verify the <code>config</code> directory and file exist. On Linux/macOS, check file permissions to ensure Docker can read them.</p>
 <h2 id="known-limitations">Known Limitations<a class="headerlink" href="#known-limitations" title="Permanent link">#</a></h2>
 <p>The <code>autoware</code> service in this deployment uses the upstream <code>ghcr.io/autowarefoundation/autoware:universe</code> image rather than an Open AD Kit component image. This is a temporary monolithic fallback while Open AD Kit migrates from monolithic to component-based architecture. OAK component images for the full monolithic stack will be available in a future release.</p>
+<p>This demo also depends on third-party images that are <strong>not</strong> pinned to immutable tags: <code>eclipse/zenoh-bridge-ros2dds:latest</code> and the community <code>ghcr.io/evshary/autoware_manual_control</code> teleop image. They may change upstream without notice — pin them to a specific digest if you need a fully reproducible demo.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds">Zenoh Plugin ROS2 DDS</a></li>

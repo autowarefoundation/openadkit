@@ -2250,17 +2250,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#customization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Customization
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#continuous-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2430,17 +2419,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#customization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Customization
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#continuous-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2535,52 +2513,55 @@
 </tbody>
 </table>
 <h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">#</a></h2>
+<p>Use the repository's <a href="https://github.com/autowarefoundation/openadkit/blob/main/build.sh"><code>build.sh</code></a> wrapper — it checks out the Autoware source tree (<code>git clone</code> + <code>vcs import</code> of <code>autoware.repos</code>) and then invokes Docker Bake with the right build context, base image, and tags. Building Bake directly will not work without that source tree (see the note below).</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Clone the repository</span>
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
 <span class="nb">cd</span><span class="w"> </span>openadkit
 
-<span class="c1"># Build everything (default group = common + component)</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl
+<span class="c1"># Build the component images (default target)</span>
+./build.sh
 
-<span class="c1"># Build a single group</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>common
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component
-
-<span class="c1"># Build a single target</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>planning-control
+<span class="c1"># Build only the common base/devel images</span>
+./build.sh<span class="w"> </span>--target<span class="w"> </span>common
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Component images depend on common images</p>
-<p>Component targets build <code>FROM</code> the common images (via the <code>COMMON_BASE_IMAGE</code> / <code>COMMON_DEVEL_IMAGE</code> build args, which default to <code>ghcr.io/autowarefoundation/openadkit-common</code>). Either build the <code>common</code> group first, or let the default group build both. To use locally built common images, override those args with <code>--set</code>.</p>
-</div>
-<h2 id="customization">Customization<a class="headerlink" href="#customization" title="Permanent link">#</a></h2>
-<p>Build variables are Dockerfile <code>ARG</code>s and are overridden through Bake's <code>--set</code> flag, scoped per target (<code>*.args.&lt;NAME&gt;</code>):</p>
 <table>
 <thead>
 <tr>
-<th>Variable</th>
+<th>Flag</th>
 <th>Description</th>
 <th>Default</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>ROS_DISTRO</code></td>
-<td>ROS 2 distribution</td>
+<td><code>--target</code></td>
+<td><code>common</code> or <code>components</code></td>
+<td><code>components</code></td>
+</tr>
+<tr>
+<td><code>--ros-distro</code></td>
+<td><code>humble</code> or <code>jazzy</code></td>
 <td><code>humble</code></td>
 </tr>
 <tr>
-<td><code>BASE_IMAGE</code></td>
-<td>Base ROS image</td>
-<td><code>ros:humble-ros-base-jammy</code></td>
+<td><code>--platform</code></td>
+<td><code>linux/amd64</code> or <code>linux/arm64</code></td>
+<td>current architecture</td>
+</tr>
+<tr>
+<td><code>--no-cuda</code></td>
+<td>Skip building the CUDA images</td>
+<td>CUDA enabled</td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><span class="c1"># Build for ROS 2 Jazzy instead of Humble</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span><span class="s1">&#39;*.args.ROS_DISTRO=jazzy&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span><span class="s1">&#39;*.args.BASE_IMAGE=ros:jazzy-ros-base-noble&#39;</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build for ROS 2 Jazzy, amd64, without CUDA</span>
+./build.sh<span class="w"> </span>--ros-distro<span class="w"> </span>jazzy<span class="w"> </span>--platform<span class="w"> </span>linux/amd64<span class="w"> </span>--no-cuda
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Why a wrapper instead of raw <code>docker buildx bake</code></p>
+<p>The component Dockerfiles bind-mount parts of the Autoware source tree (<code>autoware/src/...</code>), so the source must be present before building. <code>build.sh</code> handles the <code>git clone</code> + <code>vcs import</code>, sets the Bake <code>context</code>, <code>BASE_IMAGE</code>, and image tags, and builds the <code>common</code> images before the <code>component</code> images (which build <code>FROM</code> them). The <code>docker-bake.hcl</code> targets themselves carry no context/tags defaults — CI supplies those the same way <code>build.sh</code> does.</p>
+</div>
 <h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">#</a></h2>
 <p>CI builds every target automatically via <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml"><code>.github/workflows/build-all-images.yaml</code></a>, which invokes the same Bake file across a build matrix. The matrix (targets, platforms, ROS distros) is driven by <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json"><code>.github/image-inventory.json</code></a> — the source of truth for what gets built and on which architectures.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>

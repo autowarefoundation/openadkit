@@ -2482,6 +2482,14 @@
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 <p>Wait approximately 10 seconds for the containers to initialize.</p>
+<div class="admonition tip">
+<p class="admonition-title">GPU acceleration (recommended)</p>
+<p>To run sensing and perception on an NVIDIA GPU, layer the GPU compose overlay and its env file on top of the base ones (both <code>--env-file</code> flags apply, the later overriding the former):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yaml<span class="w"> </span>-f<span class="w"> </span>docker-compose.gpu.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.gpu.env<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>This swaps in the <code>sensing-perception-cuda</code> image and reserves the GPU for the <code>sensing</code> and <code>perception</code> services. It requires the NVIDIA Container Toolkit (installed by <code>setup.sh</code> by default).</p>
+</div>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html

@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/components/simulator/">
+        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/deployment/samples/scenario-simulation/">
       
       
-        <link rel="prev" href="../api/">
+        <link rel="prev" href="../planning-simulation/">
       
       
-        <link rel="next" href="../visualizer/">
+        <link rel="next" href="../logging-simulation/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/autoware-foundation.png">
+      <link rel="icon" href="../../../assets/images/autoware-foundation.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Simulator - Autoware Open AD Kit</title>
+        <title>Scenario Simulation - Autoware Open AD Kit</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,11 +53,11 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/css/extra.css">
+      <link rel="stylesheet" href="../../../assets/css/extra.css">
     
       <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#simulator" class="md-skip">
+        <a href="#scenario-simulation" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
               </button>
             
             
-  <a href="../../getting-started/">
+  <a href="../../../getting-started/">
     🚀 New here? Follow the <strong>Getting Started</strong> guide to run your first deployment
   </a>
 
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Autoware Open AD Kit" class="md-header__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
+    <a href="../../.." title="Autoware Open AD Kit" class="md-header__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M135.2 117.4 109.1 192h293.8l-26.1-74.6c-4.5-12.8-16.6-21.4-30.2-21.4H165.4c-13.6 0-25.7 8.6-30.2 21.4m-95.6 79.4L74.8 96.3C88.3 57.8 124.6 32 165.4 32h181.2c40.8 0 77.1 25.8 90.6 64.3l35.2 100.5c23.2 9.6 39.6 32.5 39.6 59.2v192c0 17.7-14.3 32-32 32h-32c-17.7 0-32-14.3-32-32v-32H96v32c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32V256c0-26.7 16.4-49.6 39.6-59.2M128 304a32 32 0 1 0-64 0 32 32 0 1 0 64 0m288 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64"/></svg>
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Simulator
+              Scenario Simulation
             
           </span>
         </div>
@@ -246,7 +246,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../.." class="md-tabs__link">
+        <a href="../../.." class="md-tabs__link">
           
   
   
@@ -268,7 +268,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../getting-started/" class="md-tabs__link">
+        <a href="../../../getting-started/" class="md-tabs__link">
           
   
   
@@ -286,11 +286,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../deployment/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
           
   
   
@@ -308,13 +310,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../../components/" class="md-tabs__link">
           
   
   
@@ -336,7 +336,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../platforms/" class="md-tabs__link">
+        <a href="../../../platforms/" class="md-tabs__link">
           
   
   
@@ -358,7 +358,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../development/" class="md-tabs__link">
+        <a href="../../../development/" class="md-tabs__link">
           
   
   
@@ -378,7 +378,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../releases" class="md-tabs__link">
+      <a href="../../../releases" class="md-tabs__link">
         
   
   
@@ -419,7 +419,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Autoware Open AD Kit" class="md-nav__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
+    <a href="../../.." title="Autoware Open AD Kit" class="md-nav__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M135.2 117.4 109.1 192h293.8l-26.1-74.6c-4.5-12.8-16.6-21.4-30.2-21.4H165.4c-13.6 0-25.7 8.6-30.2 21.4m-95.6 79.4L74.8 96.3C88.3 57.8 124.6 32 165.4 32h181.2c40.8 0 77.1 25.8 90.6 64.3l35.2 100.5c23.2 9.6 39.6 32.5 39.6 59.2v192c0 17.7-14.3 32-32 32h-32c-17.7 0-32-14.3-32-32v-32H96v32c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32V256c0-26.7 16.4-49.6 39.6-59.2M128 304a32 32 0 1 0-64 0 32 32 0 1 0 64 0m288 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64"/></svg>
@@ -476,7 +476,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../.." class="md-nav__link ">
+            <a href="../../.." class="md-nav__link ">
               
   
   
@@ -520,7 +520,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../introduction/overview.md" class="md-nav__link">
+      <a href="../../../introduction/overview.md" class="md-nav__link">
         
   
   
@@ -586,7 +586,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../getting-started/" class="md-nav__link ">
+            <a href="../../../getting-started/" class="md-nav__link ">
               
   
   
@@ -630,7 +630,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../../getting-started/image-tags/" class="md-nav__link">
         
   
   
@@ -658,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/release-flow/" class="md-nav__link">
+      <a href="../../../getting-started/release-flow/" class="md-nav__link">
         
   
   
@@ -686,7 +686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../../../getting-started/troubleshooting/" class="md-nav__link">
         
   
   
@@ -718,6 +718,8 @@
       
   
   
+    
+  
   
   
     
@@ -737,22 +739,23 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -770,13 +773,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -793,6 +796,8 @@
                 
   
   
+    
+  
   
   
     
@@ -814,20 +819,21 @@
       
       
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
+          
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -845,13 +851,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -896,7 +902,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/planning-simulation/" class="md-nav__link ">
+            <a href="../planning-simulation/" class="md-nav__link ">
               
   
   
@@ -940,6 +946,8 @@
                 
   
   
+    
+  
   
   
     
@@ -958,17 +966,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/scenario-simulation/" class="md-nav__link ">
+            <a href="./" class="md-nav__link md-nav__link--active">
               
   
   
@@ -987,7 +993,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1040,7 +1046,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/logging-simulation/" class="md-nav__link ">
+            <a href="../logging-simulation/" class="md-nav__link ">
               
   
   
@@ -1109,10 +1115,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -1122,7 +1131,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/demos/" class="md-nav__link ">
+            <a href="../../demos/" class="md-nav__link ">
               
   
   
@@ -1140,7 +1149,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1191,7 +1200,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/demos/zenoh-bridge/" class="md-nav__link ">
+            <a href="../../demos/zenoh-bridge/" class="md-nav__link ">
               
   
   
@@ -1246,7 +1255,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deployment/custom-deployment/" class="md-nav__link">
+      <a href="../../custom-deployment/" class="md-nav__link">
         
   
   
@@ -1278,8 +1287,6 @@
       
   
   
-    
-  
   
   
     
@@ -1315,23 +1322,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../../components/" class="md-nav__link ">
               
   
   
@@ -1349,13 +1355,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1375,7 +1381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sensing/" class="md-nav__link">
+      <a href="../../../components/sensing/" class="md-nav__link">
         
   
   
@@ -1403,7 +1409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../perception/" class="md-nav__link">
+      <a href="../../../components/perception/" class="md-nav__link">
         
   
   
@@ -1431,7 +1437,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mapping/" class="md-nav__link">
+      <a href="../../../components/mapping/" class="md-nav__link">
         
   
   
@@ -1459,7 +1465,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../localization/" class="md-nav__link">
+      <a href="../../../components/localization/" class="md-nav__link">
         
   
   
@@ -1487,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../planning/" class="md-nav__link">
+      <a href="../../../components/planning/" class="md-nav__link">
         
   
   
@@ -1515,7 +1521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control/" class="md-nav__link">
+      <a href="../../../components/control/" class="md-nav__link">
         
   
   
@@ -1543,7 +1549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vehicle-system/" class="md-nav__link">
+      <a href="../../../components/vehicle-system/" class="md-nav__link">
         
   
   
@@ -1571,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/" class="md-nav__link">
+      <a href="../../../components/api/" class="md-nav__link">
         
   
   
@@ -1596,37 +1602,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Simulator
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../components/simulator/" class="md-nav__link">
         
   
   
@@ -1642,70 +1621,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-this-image-contains" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What This Image Contains
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#used-in" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Used In
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1718,7 +1633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../visualizer/" class="md-nav__link">
+      <a href="../../../components/visualizer/" class="md-nav__link">
         
   
   
@@ -1746,7 +1661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../carla-interface/" class="md-nav__link">
+      <a href="../../../components/carla-interface/" class="md-nav__link">
         
   
   
@@ -1812,7 +1727,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../platforms/" class="md-nav__link ">
+            <a href="../../../platforms/" class="md-nav__link ">
               
   
   
@@ -1883,7 +1798,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../platforms/autosd/" class="md-nav__link ">
+            <a href="../../../platforms/autosd/" class="md-nav__link ">
               
   
   
@@ -1952,7 +1867,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../platforms/autosd/planning-simulator/" class="md-nav__link ">
+            <a href="../../../platforms/autosd/planning-simulator/" class="md-nav__link ">
               
   
   
@@ -2032,7 +1947,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../platforms/ewaol/" class="md-nav__link ">
+            <a href="../../../platforms/ewaol/" class="md-nav__link ">
               
   
   
@@ -2104,7 +2019,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../platforms/hardware/" class="md-nav__link ">
+            <a href="../../../platforms/hardware/" class="md-nav__link ">
               
   
   
@@ -2187,7 +2102,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../development/" class="md-nav__link ">
+            <a href="../../../development/" class="md-nav__link ">
               
   
   
@@ -2231,7 +2146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/build-from-source/" class="md-nav__link">
+      <a href="../../../development/build-from-source/" class="md-nav__link">
         
   
   
@@ -2259,7 +2174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/contributing/" class="md-nav__link">
+      <a href="../../../development/contributing/" class="md-nav__link">
         
   
   
@@ -2294,7 +2209,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../releases" class="md-nav__link">
+      <a href="../../../releases" class="md-nav__link">
         
   
   
@@ -2341,10 +2256,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#what-you-will-see" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        What You Will See
       
     </span>
   </a>
@@ -2352,10 +2267,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-this-image-contains" class="md-nav__link">
+  <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What This Image Contains
+        Requirements
       
     </span>
   </a>
@@ -2363,10 +2278,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#used-in" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Used In
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Scenarios
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#start-the-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start the Deployment
       
     </span>
   </a>
@@ -2374,10 +2317,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
+  <a href="#access-the-visualizer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related
+        Access the Visualizer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stop-the-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop the Deployment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
       
     </span>
   </a>
@@ -2401,7 +2388,7 @@
 
 
   
-    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/components/simulator.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/deployment/samples/scenario-simulation/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2409,46 +2396,168 @@
   
 
 
-<h1 id="simulator">Simulator<a class="headerlink" href="#simulator" title="Permanent link">#</a></h1>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">#</a></h2>
-<p>The <code>simulator</code> image is a <strong>standalone component</strong> for simulation workloads in the Open AD Kit ecosystem. It packages the Autoware simulation modules, providing a virtual environment for testing the autonomous driving stack without requiring real-world sensors or vehicles. The simulator enables closed-loop validation by emulating vehicle dynamics, sensor outputs, and traffic scenarios so that planning, control, and perception logic can be exercised safely on a development workstation or in CI pipelines.</p>
-<h2 id="what-this-image-contains">What This Image Contains<a class="headerlink" href="#what-this-image-contains" title="Permanent link">#</a></h2>
-<p>The <code>simulator</code> image bundles the following capabilities:</p>
+<h1 id="scenario-simulation">Scenario Simulation<a class="headerlink" href="#scenario-simulation" title="Permanent link">#</a></h1>
+<div class="admonition abstract">
+<p>The Scenario Simulation sample runs the Autoware stack alongside the official <a href="https://github.com/tier4/scenario_simulator_v2">TIER IV Scenario Simulator</a> container. It enables you to execute predefined traffic scenarios to validate planning and behavior under specific conditions — ideal for CI pipelines and regression testing.</p>
+</div>
+<h2 id="what-you-will-see">What You Will See<a class="headerlink" href="#what-you-will-see" title="Permanent link">#</a></h2>
+<p>After starting the deployment, the scenario simulator generates a virtual traffic environment around the ego vehicle. You can:</p>
 <ul>
-<li><strong>Closed-loop vehicle simulation</strong> — Simple planning simulator that computes vehicle motion from control commands using configurable kinematic/dynamic models (ideal, delay, actuation-based, and learned models)</li>
-<li><strong>Dummy perception</strong> — Simulated object detection and recognition pipeline for scenarios where real sensor data is unavailable</li>
-<li><strong>Dummy vehicle interface</strong> — Emulated vehicle state reporting and actuation feedback</li>
-<li><strong>Dummy doors and infrastructure</strong> — Simulated door status and traffic infrastructure for end-to-end stack testing</li>
-<li><strong>Scenario simulator v2 adapter</strong> — Integration layer for the TIER IV Scenario Simulator v2, enabling predefined scenario execution</li>
-<li><strong>Localization simulation mode</strong> — Direct map-to-odometry TF publishing for simulation contexts where localization modules are bypassed</li>
-<li><strong>Point cloud preprocessing</strong> — Point cloud filtering and container management for simulated LiDAR data</li>
-<li><strong>Object tracking and shape estimation</strong> — Multi-object tracker and shape estimation for perceived obstacles</li>
-<li><strong>Occupancy grid mapping</strong> — Probabilistic occupancy grid generation from simulated sensor data</li>
-<li><strong>Map-based prediction</strong> — Predictive modeling of agent behavior based on map topology</li>
-<li><strong>Elevation map loading</strong> — Ground elevation data handling for simulated environments</li>
-<li><strong>Vehicle command conversion</strong> — Raw vehicle command conversion and external command selection for simulation-specific control paths</li>
-<li><strong>Launch file available</strong>: <code>tier4_simulator_component.launch.xml</code></li>
+<li>Watch the ego vehicle navigate predefined scenarios in the noVNC visualizer</li>
+<li>Observe behavior planning decisions (lane changes, intersection handling, obstacle avoidance)</li>
+<li>Review simulation results and metrics after scenario completion</li>
+<li>Define and run your own custom scenarios</li>
 </ul>
-<p>Typical resource usage:</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
 <ul>
-<li><strong>CPU</strong>: Low to moderate (depends on model complexity and sensor emulation)</li>
-<li><strong>GPU</strong>: Not required (CPU-only simulation)</li>
-<li><strong>Memory</strong>: ~1–2 GB</li>
+<li>Docker Engine</li>
+<li>Open AD Kit repository cloned and environment set up</li>
 </ul>
-<h2 id="used-in">Used In<a class="headerlink" href="#used-in" title="Permanent link">#</a></h2>
+<div class="admonition info">
+<p class="admonition-title">No Manual Map Download Required</p>
+<p>The default <code>sample.yaml</code> scenario uses the <strong>Kashiwanoha</strong> map bundled inside the TIER IV scenario simulator image. On first startup, the <code>map-init</code> service automatically extracts this map to <code>~/autoware_map/kashiwanoha_map</code>. It re-extracts the map if required files are missing or the configured TIER IV image tag changes.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Use the Correct Map</p>
+<p>Do <strong>not</strong> use the <code>sample-map-planning</code> map with this deployment. The Kashiwanoha map is required. Using a different map will cause <code>setMap() for invalid version map</code>, missing route/localization, and repeated MRM transitions.</p>
+</div>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
+<p>Edit <code>scenario-simulation.env</code> to customize the deployment:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SCENARIO</code></td>
+<td>Scenario file path inside the container</td>
+<td>(bundled sample)</td>
+</tr>
+<tr>
+<td><code>SCENARIO_HOST_DIR</code></td>
+<td>Host directory mounted at <code>/scenarios</code></td>
+<td><code>./scenarios/</code></td>
+</tr>
+<tr>
+<td><code>OUTPUT_HOST_PATH</code></td>
+<td>Host directory for simulation results</td>
+<td><code>./output/</code></td>
+</tr>
+<tr>
+<td><code>OUTPUT_DIRECTORY</code></td>
+<td>Container path for simulation results</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>SCENARIO_SIMULATOR_IMAGE</code></td>
+<td>TIER IV scenario simulator image tag</td>
+<td>(pinned in <code>.env</code>)</td>
+</tr>
+<tr>
+<td><code>SCENARIO_READY_TIMEOUT</code></td>
+<td>Max seconds to wait for Autoware readiness</td>
+<td>120</td>
+</tr>
+<tr>
+<td><code>AUTO_EXTRACT_MAP</code></td>
+<td>Extract Kashiwanoha map from simulator image</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>MAP_PATH</code></td>
+<td>Host map directory mounted into containers</td>
+<td><code>~/autoware_map</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="custom-scenarios">Custom Scenarios<a class="headerlink" href="#custom-scenarios" title="Permanent link">#</a></h3>
+<p>To run your own scenario:</p>
+<ol>
+<li>Place your scenario YAML files under the <code>SCENARIO_HOST_DIR</code> (default: <code>./scenarios/</code>)</li>
+<li>
+<p>Set the scenario path in the environment file:
+   <div class="highlight"><pre><span></span><code><span class="nv">SCENARIO</span><span class="o">=</span>/scenarios/my-scenario.yaml
+</code></pre></div></p>
+</li>
+<li>
+<p>Simulation results are saved to <code>OUTPUT_HOST_PATH</code> (default: <code>./output/</code>)</p>
+</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Custom Maps</p>
+<p>Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, set <code>AUTO_EXTRACT_MAP=false</code>, update <code>MAP_PATH</code>, <code>LANELET2_MAP_FILE</code>, and <code>POINTCLOUD_MAP_FILE</code>, and ensure the files exist under <code>MAP_PATH</code> before starting.</p>
+</div>
+<h2 id="start-the-deployment">Start the Deployment<a class="headerlink" href="#start-the-deployment" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>deployments/samples/scenario-simulation
+docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>scenario-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>Wait approximately <strong>90 seconds</strong> for Autoware and the scenario simulator to initialize. The scenario runner waits up to <code>SCENARIO_READY_TIMEOUT</code> seconds for required Autoware map and API endpoints before launching.</p>
+<h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
+<p>Open your browser and navigate to:</p>
+<div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html
+</code></pre></div>
+<p>Use the default password <strong><code>openadkit</code></strong>. If running on a remote server, use the server's IP address and ensure port <code>6080</code> is reachable:</p>
+<div class="highlight"><pre><span></span><code>http://&lt;server-ip&gt;:6080/vnc.html
+</code></pre></div>
+<h2 id="stop-the-deployment">Stop the Deployment<a class="headerlink" href="#stop-the-deployment" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>scenario-simulation.env<span class="w"> </span>down
+</code></pre></div>
+<h2 id="expected-behavior">Expected Behavior<a class="headerlink" href="#expected-behavior" title="Permanent link">#</a></h2>
 <ul>
-<li><a href="../../deployment/samples/planning-simulation/">Planning Simulation</a> — Provides the simulated vehicle and environment for planning and control testing</li>
-<li><a href="../../deployment/samples/scenario-simulation/">Scenario Simulation</a> — Feeds the stack with scenario-driven simulated data and acts as the ego vehicle interface</li>
-<li><a href="../../deployment/samples/logging-simulation/">Logging Simulation</a> — Supports simulated localization and vehicle states during rosbag replay</li>
+<li>The <code>map-init</code> service extracts the Kashiwanoha map on first run</li>
+<li>Autoware containers initialize and wait for the map</li>
+<li>The scenario simulator container starts and waits for Autoware readiness</li>
+<li>Once ready, the scenario executes automatically</li>
+<li>Results are written to the configured output directory</li>
 </ul>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scenario does not start</td>
+<td>Check that <code>map-init</code> completed successfully (required files in <code>~/autoware_map</code>)</td>
+</tr>
+<tr>
+<td><code>setMap() for invalid version map</code></td>
+<td>You are using the wrong map. Ensure Kashiwanoha is extracted, not <code>sample-map-planning</code></td>
+</tr>
+<tr>
+<td>Visualizer blank</td>
+<td>Wait up to 90 seconds for full initialization; containers depend on each other sequentially</td>
+</tr>
+<tr>
+<td>Missing results</td>
+<td>Verify <code>OUTPUT_HOST_PATH</code> exists and is writable</td>
+</tr>
+</tbody>
+</table>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">#</a></h2>
 <ul>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/node-diagram/">Autoware node diagram</a> — Overall architecture diagram showing simulation nodes</li>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/">Autoware interface design document</a> — How simulators access AD API and component interfaces</li>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/planning-sim/">Planning simulation demos</a> — Official Autoware planning simulation guides</li>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/">Scenario simulation demos</a> — Official Autoware scenario simulation guides</li>
-<li><a href="../../deployment/">Deployments</a> — How the simulator container is composed with other components</li>
+<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/">Scenario test simulation</a> — Official Autoware scenario simulation guide</li>
+<li><a href="../planning-simulation/">Planning Simulation</a> — Simpler single-map simulation</li>
+<li><a href="../logging-simulation/">Logging Simulation</a> — Replay recorded sensor data</li>
 </ul>
+<pre class="mermaid"><code>graph LR
+    subgraph Host["Single Host"]
+        A[autoware]
+        S[scenario_simulator]
+        M[map-init]
+        V[visualizer]
+    end
+
+    M --&gt; A
+    S &lt;--&gt;|ROS 2 DDS| A
+    A &lt;--&gt;|ROS 2 DDS| V</code></pre>
 
 
 
@@ -2486,7 +2595,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../api/" class="md-footer__link md-footer__link--prev" aria-label="Previous: API">
+          <a href="../planning-simulation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Planning Simulation">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2496,20 +2605,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                API
+                Planning Simulation
               </div>
             </div>
           </a>
         
         
           
-          <a href="../visualizer/" class="md-footer__link md-footer__link--next" aria-label="Next: Visualizer">
+          <a href="../logging-simulation/" class="md-footer__link md-footer__link--next" aria-label="Next: Logging Simulation">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Visualizer
+                Logging Simulation
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -2550,14 +2659,14 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
-        <script src="../../assets/js/pipeline-diagram.js"></script>
+        <script src="../../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

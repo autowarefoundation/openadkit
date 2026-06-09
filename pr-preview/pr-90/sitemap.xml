@@ -53,35 +53,47 @@
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/contributing/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/custom-deployment/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/demos/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/demos/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/demos/zenoh-bridge/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/samples/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/samples/logging-simulation/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/logging-simulation/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/samples/planning-simulation/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/planning-simulation/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployments/samples/scenario-simulation/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/scenario-simulation/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://autowarefoundation.github.io/openadkit/development/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://autowarefoundation.github.io/openadkit/development/build-from-source/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://autowarefoundation.github.io/openadkit/development/contributing/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
@@ -97,7 +109,11 @@
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/hardware/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/getting-started/troubleshooting/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://autowarefoundation.github.io/openadkit/introduction/overview/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
     <url>
@@ -114,6 +130,10 @@
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/platforms/ewaol/</loc>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://autowarefoundation.github.io/openadkit/platforms/hardware/</loc>
          <lastmod>2026-06-09</lastmod>
     </url>
 </urlset>

@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/hardware/">
+        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/deployment/demos/">
       
       
-        <link rel="prev" href="../platforms/ewaol/">
+        <link rel="prev" href="../samples/logging-simulation/">
       
       
-        <link rel="next" href="../contributing/">
+        <link rel="next" href="zenoh-bridge/">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/autoware-foundation.png">
+      <link rel="icon" href="../../assets/images/autoware-foundation.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Hardware - Autoware Open AD Kit</title>
+        <title>Demos - Autoware Open AD Kit</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,11 +53,11 @@
       
     
     
-      <link rel="stylesheet" href="../assets/css/extra.css">
+      <link rel="stylesheet" href="../../assets/css/extra.css">
     
       <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#hardware" class="md-skip">
+        <a href="#demos" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
               </button>
             
             
-  <a href="../getting-started/">
+  <a href="../../getting-started/">
     🚀 New here? Follow the <strong>Getting Started</strong> guide to run your first deployment
   </a>
 
@@ -117,7 +117,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="Autoware Open AD Kit" class="md-header__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
+    <a href="../.." title="Autoware Open AD Kit" class="md-header__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M135.2 117.4 109.1 192h293.8l-26.1-74.6c-4.5-12.8-16.6-21.4-30.2-21.4H165.4c-13.6 0-25.7 8.6-30.2 21.4m-95.6 79.4L74.8 96.3C88.3 57.8 124.6 32 165.4 32h181.2c40.8 0 77.1 25.8 90.6 64.3l35.2 100.5c23.2 9.6 39.6 32.5 39.6 59.2v192c0 17.7-14.3 32-32 32h-32c-17.7 0-32-14.3-32-32v-32H96v32c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32V256c0-26.7 16.4-49.6 39.6-59.2M128 304a32 32 0 1 0-64 0 32 32 0 1 0 64 0m288 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64"/></svg>
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Hardware
+              Demos
             
           </span>
         </div>
@@ -243,17 +243,20 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href=".." class="md-tabs__link">
-        
+    
+    
+      <li class="md-tabs__item">
+        <a href="../.." class="md-tabs__link">
+          
   
   
     
   
   Introduction
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -265,7 +268,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../getting-started/" class="md-tabs__link">
+        <a href="../../getting-started/" class="md-tabs__link">
           
   
   
@@ -283,17 +286,19 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../deployments/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
     
   
-  Deployments
+  Deployment
 
         </a>
       </li>
@@ -309,7 +314,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../components/" class="md-tabs__link">
+        <a href="../../components/" class="md-tabs__link">
           
   
   
@@ -331,7 +336,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../platforms/" class="md-tabs__link">
+        <a href="../../platforms/" class="md-tabs__link">
           
   
   
@@ -349,19 +354,17 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../development/" class="md-tabs__link">
           
   
   
     
   
-  Hardware
+  Development
 
         </a>
       </li>
@@ -375,7 +378,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../releases" class="md-tabs__link">
+      <a href="../../releases" class="md-tabs__link">
         
   
   
@@ -385,28 +388,6 @@
 
       </a>
     </li>
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../contributing/" class="md-tabs__link">
-          
-  
-  
-    
-  
-  Contributing
-
-        </a>
-      </li>
-    
   
 
       
@@ -438,7 +419,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="Autoware Open AD Kit" class="md-nav__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
+    <a href="../.." title="Autoware Open AD Kit" class="md-nav__button md-logo" aria-label="Autoware Open AD Kit" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M135.2 117.4 109.1 192h293.8l-26.1-74.6c-4.5-12.8-16.6-21.4-30.2-21.4H165.4c-13.6 0-25.7 8.6-30.2 21.4m-95.6 79.4L74.8 96.3C88.3 57.8 124.6 32 165.4 32h181.2c40.8 0 77.1 25.8 90.6 64.3l35.2 100.5c23.2 9.6 39.6 32.5 39.6 59.2v192c0 17.7-14.3 32-32 32h-32c-17.7 0-32-14.3-32-32v-32H96v32c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32V256c0-26.7 16.4-49.6 39.6-59.2M128 304a32 32 0 1 0-64 0 32 32 0 1 0 64 0m288 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64"/></svg>
@@ -467,9 +448,36 @@
   
   
   
-    <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+    
+    
+      
         
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../.." class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -483,7 +491,59 @@
   
   
 
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Introduction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../introduction/overview.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -499,6 +559,8 @@
       
         
           
+        
+      
         
       
         
@@ -524,7 +586,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../getting-started/" class="md-nav__link ">
+            <a href="../../getting-started/" class="md-nav__link ">
               
   
   
@@ -568,7 +630,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../getting-started/image-tags/" class="md-nav__link">
         
   
   
@@ -596,7 +658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/release-flow/" class="md-nav__link">
+      <a href="../../getting-started/release-flow/" class="md-nav__link">
         
   
   
@@ -604,6 +666,34 @@
     
   
     Release Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
   
 
     
@@ -628,6 +718,8 @@
       
   
   
+    
+  
   
   
     
@@ -641,33 +733,36 @@
       
         
       
+        
+      
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Deployments
+    Deployment
   
 
     
@@ -678,18 +773,18 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Deployments
+    Deployment
   
 
           </label>
@@ -722,10 +817,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -735,7 +833,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/samples/" class="md-nav__link ">
+            <a href="../samples/" class="md-nav__link ">
               
   
   
@@ -753,7 +851,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_2" id="__nav_3_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -804,7 +902,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/samples/planning-simulation/" class="md-nav__link ">
+            <a href="../samples/planning-simulation/" class="md-nav__link ">
               
   
   
@@ -876,7 +974,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/samples/scenario-simulation/" class="md-nav__link ">
+            <a href="../samples/scenario-simulation/" class="md-nav__link ">
               
   
   
@@ -948,7 +1046,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/samples/logging-simulation/" class="md-nav__link ">
+            <a href="../samples/logging-simulation/" class="md-nav__link ">
               
   
   
@@ -1000,6 +1098,8 @@
                 
   
   
+    
+  
   
   
     
@@ -1017,20 +1117,21 @@
       
       
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
+          
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/demos/" class="md-nav__link ">
+            <a href="./" class="md-nav__link md-nav__link--active">
               
   
   
@@ -1048,13 +1149,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+              <label class="md-nav__link md-nav__link--active" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1099,7 +1200,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployments/demos/zenoh-bridge/" class="md-nav__link ">
+            <a href="zenoh-bridge/" class="md-nav__link ">
               
   
   
@@ -1142,6 +1243,34 @@
           </ul>
         </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1208,7 +1337,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../components/" class="md-nav__link ">
+            <a href="../../components/" class="md-nav__link ">
               
   
   
@@ -1252,7 +1381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/sensing/" class="md-nav__link">
+      <a href="../../components/sensing/" class="md-nav__link">
         
   
   
@@ -1280,7 +1409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/perception/" class="md-nav__link">
+      <a href="../../components/perception/" class="md-nav__link">
         
   
   
@@ -1308,7 +1437,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/mapping/" class="md-nav__link">
+      <a href="../../components/mapping/" class="md-nav__link">
         
   
   
@@ -1336,7 +1465,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/localization/" class="md-nav__link">
+      <a href="../../components/localization/" class="md-nav__link">
         
   
   
@@ -1364,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/planning/" class="md-nav__link">
+      <a href="../../components/planning/" class="md-nav__link">
         
   
   
@@ -1392,7 +1521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/control/" class="md-nav__link">
+      <a href="../../components/control/" class="md-nav__link">
         
   
   
@@ -1420,7 +1549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/vehicle-system/" class="md-nav__link">
+      <a href="../../components/vehicle-system/" class="md-nav__link">
         
   
   
@@ -1448,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/api/" class="md-nav__link">
+      <a href="../../components/api/" class="md-nav__link">
         
   
   
@@ -1476,7 +1605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/simulator/" class="md-nav__link">
+      <a href="../../components/simulator/" class="md-nav__link">
         
   
   
@@ -1504,7 +1633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/visualizer/" class="md-nav__link">
+      <a href="../../components/visualizer/" class="md-nav__link">
         
   
   
@@ -1532,7 +1661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/carla-interface/" class="md-nav__link">
+      <a href="../../components/carla-interface/" class="md-nav__link">
         
   
   
@@ -1577,6 +1706,8 @@
       
         
       
+        
+      
     
     
     
@@ -1596,7 +1727,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../platforms/" class="md-nav__link ">
+            <a href="../../platforms/" class="md-nav__link ">
               
   
   
@@ -1667,7 +1798,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../platforms/autosd/" class="md-nav__link ">
+            <a href="../../platforms/autosd/" class="md-nav__link ">
               
   
   
@@ -1736,7 +1867,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../platforms/autosd/planning-simulator/" class="md-nav__link ">
+            <a href="../../platforms/autosd/planning-simulator/" class="md-nav__link ">
               
   
   
@@ -1816,7 +1947,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../platforms/ewaol/" class="md-nav__link ">
+            <a href="../../platforms/ewaol/" class="md-nav__link ">
               
   
   
@@ -1856,116 +1987,8 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-          
-        
-      
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
-        
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="./" class="md-nav__link md-nav__link--active">
               
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hardware
-  
-
-    
-  </span>
-  
-  
-
-            </a>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Hardware
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../releases" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Releases
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
+                
   
   
   
@@ -1992,12 +2015,167 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../contributing/" class="md-nav__link ">
+            <a href="../../platforms/hardware/" class="md-nav__link ">
               
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hardware
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hardware
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../development/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/build-from-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build from Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/contributing/" class="md-nav__link">
+        
   
   
   <span class="md-ellipsis">
@@ -2011,26 +2189,42 @@
   
   
 
-            </a>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Contributing
+      </a>
+    </li>
   
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
             
           </ul>
         </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2062,33 +2256,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#available-demos" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Available Demos
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Requirements">
+    <nav class="md-nav" aria-label="Available Demos">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#local-development-simulation" class="md-nav__link">
+  <a href="#zenoh-bridge" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Local Development &amp; Simulation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#verified-edge-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verified Edge Deployment
+        Zenoh Bridge
       
     </span>
   </a>
@@ -2101,10 +2284,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tested-hardware" class="md-nav__link">
+  <a href="#demo-vs-sample" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tested Hardware
+        Demo vs Sample
       
     </span>
   </a>
@@ -2112,10 +2295,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tests-ongoing" class="md-nav__link">
+  <a href="#architecture-patterns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tests Ongoing
+        Architecture Patterns
       
     </span>
   </a>
@@ -2123,32 +2306,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#planned-validation" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Planned Validation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-hosts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Hosts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
+        Next Steps
       
     </span>
   </a>
@@ -2172,7 +2333,7 @@
 
 
   
-    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/hardware/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/deployment/demos/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2180,168 +2341,63 @@
   
 
 
-<h1 id="hardware">Hardware<a class="headerlink" href="#hardware" title="Permanent link">#</a></h1>
-<p>This section provides information about the hardware requirements for Open AD Kit deployments, as well as the tested and planned hardware platforms.</p>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
-<p>Open AD Kit supports both <strong>amd64</strong> and <strong>arm64</strong> architectures. Requirements vary depending on whether you are running local development/simulation or deploying to a verified edge platform.</p>
-<h3 id="local-development-simulation">Local Development &amp; Simulation<a class="headerlink" href="#local-development-simulation" title="Permanent link">#</a></h3>
-<p>For running sample deployments, simulations, and development workloads on a workstation or cloud instance:</p>
-<table>
-<thead>
-<tr>
-<th>Resource</th>
-<th>Minimum</th>
-<th>Recommended</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>CPU</td>
-<td>8 cores</td>
-<td>16 cores</td>
-</tr>
-<tr>
-<td>RAM</td>
-<td>16 GB</td>
-<td>32 GB</td>
-</tr>
-<tr>
-<td>GPU</td>
-<td>—</td>
-<td>NVIDIA with 4 GB+ VRAM (for sensing/perception)</td>
-</tr>
-<tr>
-<td>Storage</td>
-<td>50 GB</td>
-<td>100 GB+ SSD</td>
-</tr>
-</tbody>
-</table>
-<div class="admonition tip">
-<p class="admonition-title">GPU Recommendation</p>
-<p>An NVIDIA GPU is highly recommended for sensing and perception tasks. Without a GPU, CUDA-accelerated components will fall back to CPU execution, which significantly impacts performance.</p>
+<h1 id="demos">Demos<a class="headerlink" href="#demos" title="Permanent link">#</a></h1>
+<p>Demo deployments showcase <strong>advanced use cases and distributed architectures</strong> that go beyond single-machine simulations. They demonstrate how Open AD Kit components can be orchestrated across multiple machines, networks, and environments.</p>
+<h2 id="available-demos">Available Demos<a class="headerlink" href="#available-demos" title="Permanent link">#</a></h2>
+<div class="oak-card-grid">
+<div class="oak-card">
+<p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 1c-1.11 0-2 .89-2 2v4c0 1.11.89 2 2 2H1v2h12V9h-3c1.11 0 2-.89 2-2V3c0-1.11-.89-2-2-2zm0 2h6v4H4zM3 13v7h7v-2H5v-5zm11 0c-1.11 0-2 .89-2 2v4c0 1.11.89 2 2 2h-3v2h12v-2h-3c1.11 0 2-.89 2-2v-4c0-1.11-.89-2-2-2zm0 2h6v4h-6z"/></svg></span></p>
+<h3 id="zenoh-bridge">Zenoh Bridge<a class="headerlink" href="#zenoh-bridge" title="Permanent link">#</a></h3>
+<p>Distributed cloud-edge visualization. Run compute-intensive Autoware components on an edge server while remotely visualizing and controlling the stack from a lightweight cloud machine using Zenoh protocol bridging.</p>
+<p><span class="oak-badge oak-badge--neutral">Multi-Machine</span> <span class="oak-badge oak-badge--neutral">Advanced</span></p>
+<p><a href="zenoh-bridge/" class="md-button">Explore Zenoh Bridge Demo</a></p>
 </div>
-<h3 id="verified-edge-deployment">Verified Edge Deployment<a class="headerlink" href="#verified-edge-deployment" title="Permanent link">#</a></h3>
-<p>For running a full Autoware stack on a verified edge platform, the requirements are higher:</p>
-<table>
-<thead>
-<tr>
-<th>Resource</th>
-<th>Specification</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>CPU</td>
-<td>40-core Arm Neoverse N1 equivalent (or better)</td>
-</tr>
-<tr>
-<td>RAM</td>
-<td>32 GB</td>
-</tr>
-<tr>
-<td>GPU</td>
-<td>NVIDIA with CUDA support (for sensing/perception)</td>
-</tr>
-<tr>
-<td>Architecture</td>
-<td>arm64</td>
-</tr>
-</tbody>
-</table>
-<div class="admonition info">
-<p class="admonition-title">Why the difference?</p>
-<p>The 40-core Neoverse N1 requirement reflects the verified Open AD Kit v3.0 platform (ADLINK AADP-AVA), which runs the full Autoware stack with real-time constraints. Local development with sample simulations has lower requirements.</p>
 </div>
-<h2 id="tested-hardware">Tested Hardware<a class="headerlink" href="#tested-hardware" title="Permanent link">#</a></h2>
+<h2 id="demo-vs-sample">Demo vs Sample<a class="headerlink" href="#demo-vs-sample" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
-<th>Platform</th>
-<th>Architecture</th>
-<th>Status</th>
-<th>Notes</th>
+<th>Aspect</th>
+<th>Samples</th>
+<th>Demos</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ADLINK AADP-AVA</td>
-<td>arm64 (Ampere Altra, Neoverse N1)</td>
-<td><span class="oak-badge oak-badge--verified">Verified</span></td>
-<td>Primary verified platform for Open AD Kit v3.0 edge deployment</td>
+<td><strong>Scope</strong></td>
+<td>Single workflow on one machine</td>
+<td>Distributed architecture across machines</td>
 </tr>
 <tr>
-<td>ADLINK ADM-AL30</td>
-<td>arm64</td>
-<td><span class="oak-badge oak-badge--verified">Verified</span></td>
-<td>Used in Zenoh multi-vehicle fleet management demos</td>
+<td><strong>Purpose</strong></td>
+<td>Learn a specific Autoware feature</td>
+<td>Validate production deployment patterns</td>
+</tr>
+<tr>
+<td><strong>Complexity</strong></td>
+<td>Low — run a few commands</td>
+<td>Medium-High — network configuration, multi-machine orchestration</td>
+</tr>
+<tr>
+<td><strong>Hardware</strong></td>
+<td>Laptop or workstation</td>
+<td>Edge server + cloud/client machine</td>
 </tr>
 </tbody>
 </table>
-<h2 id="tests-ongoing">Tests Ongoing<a class="headerlink" href="#tests-ongoing" title="Permanent link">#</a></h2>
-<table>
-<thead>
-<tr>
-<th>Platform</th>
-<th>Architecture</th>
-<th>Status</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>NVIDIA Jetson Orin</td>
-<td>arm64</td>
-<td><span class="oak-badge oak-badge--testing">Tests Ongoing</span></td>
-<td>JetPack 6 validation in progress. Not yet fully verified for production use.</td>
-</tr>
-</tbody>
-</table>
-<h2 id="planned-validation">Planned Validation<a class="headerlink" href="#planned-validation" title="Permanent link">#</a></h2>
-<table>
-<thead>
-<tr>
-<th>Platform</th>
-<th>Architecture</th>
-<th>Status</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>AWS EC2 G5.4XLarge</td>
-<td>amd64</td>
-<td><span class="oak-badge oak-badge--planned">Planned</span></td>
-<td>GPU-enabled cloud instance for simulation workloads</td>
-</tr>
-</tbody>
-</table>
-<h2 id="development-hosts">Development Hosts<a class="headerlink" href="#development-hosts" title="Permanent link">#</a></h2>
-<p>The following operating systems are supported for local development:</p>
+<h2 id="architecture-patterns">Architecture Patterns<a class="headerlink" href="#architecture-patterns" title="Permanent link">#</a></h2>
+<p>Demos illustrate real-world deployment patterns:</p>
 <ul>
-<li><strong>Ubuntu 22.04 LTS</strong> (primary)</li>
-<li><strong>Ubuntu 24.04 LTS</strong></li>
+<li><strong>Cloud-Edge Separation</strong> — Compute-intensive perception and planning run on vehicle or edge hardware; lightweight visualization and control run remotely</li>
+<li><strong>Network Bridging</strong> — Zenoh bridges isolated ROS 2 domains over TCP, enabling secure cross-network communication</li>
+<li><strong>Mixed Criticality</strong> — Safety-critical components on certified hardware, monitoring on standard platforms</li>
 </ul>
-<p>Other Linux distributions may work but are not actively tested.</p>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">#</a></h2>
 <ul>
-<li><a href="../platforms/">Supported Platforms</a></li>
-<li><a href="../getting-started/">Getting Started</a></li>
+<li><a href="zenoh-bridge/">Zenoh Bridge Demo</a> — Learn distributed deployment with ROS 2 bridging</li>
+<li><a href="../samples/">Sample Deployments</a> — Start with single-machine simulations</li>
+<li><a href="../../getting-started/image-tags/">Container Image Tags</a> — Choose the right image for your deployment</li>
 </ul>
-<pre class="mermaid"><code>graph LR
-    subgraph Local_Dev["Local Development"]
-        L1[Ubuntu 22.04/24.04]
-    end
-
-    subgraph Edge["Edge Deployment"]
-        E1[ADLINK AADP-AVA]
-        E2[ADLINK ADM-AL30]
-        E3[NVIDIA Jetson Orin]
-    end
-
-    subgraph Cloud["Cloud Simulation"]
-        C1[AWS EC2 G5.4XLarge]
-    end</code></pre>
 
 
 
@@ -2379,7 +2435,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../platforms/ewaol/" class="md-footer__link md-footer__link--prev" aria-label="Previous: EWAOL">
+          <a href="../samples/logging-simulation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Logging Simulation">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2389,20 +2445,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                EWAOL
+                Logging Simulation
               </div>
             </div>
           </a>
         
         
           
-          <a href="../contributing/" class="md-footer__link md-footer__link--next" aria-label="Next: Contributing">
+          <a href="zenoh-bridge/" class="md-footer__link md-footer__link--next" aria-label="Next: Zenoh Bridge Demo">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Contributing
+                Zenoh Bridge Demo
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -2443,14 +2499,14 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
-        <script src="../assets/js/pipeline-diagram.js"></script>
+        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

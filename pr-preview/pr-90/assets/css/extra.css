@@ -91,6 +91,11 @@
 
 .md-typeset .admonition {
   padding: 0.8rem 1rem;
+  font-size: inherit;
+}
+
+.md-typeset .admonition p {
+  font-size: inherit;
 }
 
 .md-typeset .admonition .admonition-title,
@@ -180,17 +185,6 @@
   color: #555;
   max-width: 42rem;
   margin: 0 0 1.5rem;
-}
-
-.oak-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-}
-
-.md-typeset h1:has(+ .oak-hero-lead) + .oak-hero-lead + .oak-hero-actions + .admonition {
-  margin: 1.5rem 0 2.5rem;
 }
 
 .md-typeset h2#explore,

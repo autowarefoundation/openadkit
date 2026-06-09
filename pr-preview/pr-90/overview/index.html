@@ -2489,12 +2489,12 @@
 
 <h1 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">#</a></h1>
 <p class="oak-hero-lead">
-A modular, container-based distribution of <a href="https://github.com/autowarefoundation/autoware">Autoware</a> for building autonomous driving systems — from development laptops to vehicle edge deployment.
+A modular, container-based distribution of <a href="https://github.com/autowarefoundation/autoware">Autoware</a> for building autonomous driving systems from simulation and development through to in-vehicle deployment.
 </p>
 
 <h2 id="what-is-open-ad-kit">What is Open AD Kit<a class="headerlink" href="#what-is-open-ad-kit" title="Permanent link">#</a></h2>
 <p>Open AD Kit packages the <a href="https://github.com/autowarefoundation/autoware">Autoware</a> autonomous driving stack as a set of focused, independently deployable container images. Rather than shipping one monolithic image, it splits the stack along the AD pipeline — sensing, perception, localization, mapping, planning, control, and supporting services — so you can run only what a given workload needs.</p>
-<p>Its mission is <strong>containerization</strong>: taking what Autoware produces upstream and delivering it as clean, composable, production-ready images that run consistently everywhere — from a development laptop, to cloud simulation, to a vehicle's edge compute. The autonomy algorithms come from Autoware; Open AD Kit owns how they are built, packaged, tested, and deployed.</p>
+<p>Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packages upstream software into composable container images, defines deployment configurations, integrates with target platforms and vehicle systems, and maintains the build, test, and release tooling needed to run consistently from simulation through in-vehicle deployment.</p>
 <div class="admonition abstract">
 <p class="admonition-title">SOAFEE Blueprint</p>
 <p>The first <a href="https://soafee.io/">SOAFEE</a> blueprint for the software-defined vehicle, co-developed with the <a href="https://www.esyncalliance.com/">eSync Alliance</a>. Learn more on the <a href="../platforms/">Platforms</a> page.</p>
@@ -2514,7 +2514,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 <div class="oak-card">
 <p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.03 18c.05.7.21 1.38.47 2h-7c-1.5 0-2.81-.5-3.89-1.57C1.54 17.38 1 16.09 1 14.58q0-1.95 1.17-3.48C3.34 9.57 4 9.43 5.25 9.15c.42-1.53 1.25-2.77 2.5-3.72S10.42 4 12 4c1.95 0 3.6.68 4.96 2.04S19 9.05 19 11h.1c-.74.07-1.45.23-2.1.5V11c0-1.38-.5-2.56-1.46-3.54C14.56 6.5 13.38 6 12 6s-2.56.5-3.54 1.46C7.5 8.44 7 9.62 7 11h-.5c-.97 0-1.79.34-2.47 1.03-.69.68-1.03 1.5-1.03 2.47s.34 1.79 1.03 2.5c.68.66 1.5 1 2.47 1zM19 13.5V12l-2.25 2.25L19 16.5V15a2.5 2.5 0 0 1 2.5 2.5c0 .4-.09.78-.26 1.12l1.09 1.09c.42-.63.67-1.39.67-2.21 0-2.21-1.79-4-4-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5c0-.4.09-.78.26-1.12l-1.09-1.09c-.42.63-.67 1.39-.67 2.21 0 2.21 1.79 4 4 4V23l2.25-2.25L19 18.5z"/></svg></span></p>
 <h3 id="cloud-native">Cloud Native<a class="headerlink" href="#cloud-native" title="Permanent link">#</a></h3>
-<p>Scale from laptop to edge with Docker Compose, Docker Bake, and platform integrations.</p>
+<p>Scale from simulation to the edge with Docker Compose, Docker Bake, and platform integrations.</p>
 </div>
 <div class="oak-card">
 <p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.6 6.62C21.58 6.62 24 9 24 12c0 2.96-2.42 5.37-5.4 5.37-1.45 0-2.8-.56-3.82-1.57L12 13.34l-2.83 2.51c-.97.97-2.33 1.53-3.77 1.53C2.42 17.38 0 14.96 0 12s2.42-5.38 5.4-5.38c1.44 0 2.8.56 3.82 1.58L12 10.66l2.83-2.51c.97-.97 2.33-1.53 3.77-1.53M7.8 14.39 10.5 12 7.84 9.65c-.68-.68-1.53-1.03-2.44-1.03C3.53 8.62 2 10.13 2 12s1.53 3.38 3.4 3.38c.91 0 1.76-.35 2.4-.99m8.4-4.78L13.5 12l2.66 2.35c.68.68 1.54 1.03 2.44 1.03 1.87 0 3.4-1.51 3.4-3.38s-1.53-3.38-3.4-3.38c-.91 0-1.76.35-2.4.99"/></svg></span></p>

@@ -377,17 +377,20 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../../releases" class="md-tabs__link">
-        
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../releases/" class="md-tabs__link">
+          
   
   
     
   
   Releases
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -2211,9 +2214,34 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../../releases" class="md-nav__link">
+    
+    
+      
         
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../releases/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -2227,7 +2255,26 @@
   
   
 
-      </a>
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2425,12 +2472,16 @@
 <ol>
 <li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code> (see <a href="../#building-an-autosd-image">AutoSD build instructions</a>)</li>
 <li>Boot the image on QEMU or target hardware</li>
-<li>Confirm the Quadlet services are active:
-   <div class="highlight"><pre><span></span><code>systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-map.service
+<li>
+<p>Confirm the Quadlet services are active:</p>
+<div class="highlight"><pre><span></span><code>systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-map.service
 systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-planning.service
 systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator.service
-</code></pre></div></li>
-<li>Access the visualizer via the exposed noVNC endpoint and run the planning simulation workflow</li>
+</code></pre></div>
+</li>
+<li>
+<p>Access the visualizer via the exposed noVNC endpoint and run the planning simulation workflow</p>
+</li>
 </ol>
 <h2 id="expected-outcome">Expected Outcome<a class="headerlink" href="#expected-outcome" title="Permanent link">#</a></h2>
 <p>Once all services are running, you can:</p>

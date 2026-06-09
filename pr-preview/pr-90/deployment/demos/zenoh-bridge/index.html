@@ -377,17 +377,20 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../../releases" class="md-tabs__link">
-        
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../releases/" class="md-tabs__link">
+          
   
   
     
   
   Releases
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -2208,9 +2211,34 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../../releases" class="md-nav__link">
+    
+    
+      
         
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../releases/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -2224,7 +2252,26 @@
   
   
 
-      </a>
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2388,6 +2435,17 @@
     <span class="md-ellipsis">
       
         3. Verify Directory Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-configure-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Configure Environment Variables
       
     </span>
   </a>
@@ -2762,6 +2820,40 @@
     └── zenoh-bridge-ros2dds.json5
 </code></pre></div>
 <p>Modify <code>config/zenoh-bridge-ros2dds.json5</code> to filter topics as needed.</p>
+<h3 id="4-configure-environment-variables">4. Configure Environment Variables<a class="headerlink" href="#4-configure-environment-variables" title="Permanent link">#</a></h3>
+<p>Edit the <code>.env</code> file to customize your deployment. Key variables:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CLOUD_IP</code></td>
+<td>IP address or hostname of the cloud machine (used by edge bridge to connect)</td>
+<td><code>cloud_zenoh_bridge</code> (Docker DNS, single-host only)</td>
+</tr>
+<tr>
+<td><code>MAP_PATH</code></td>
+<td>Host path to the map directory</td>
+<td><code>$HOME/autoware_map/kashiwanoha_map</code></td>
+</tr>
+<tr>
+<td><code>REMOTE_PASSWORD</code></td>
+<td>Password for noVNC visualizer (port 6080/6081). <strong>Required — must be set before starting.</strong></td>
+<td>(none)</td>
+</tr>
+<tr>
+<td><code>SCENARIO_SIMULATION</code></td>
+<td>Enable scenario simulator (<code>true</code>/<code>false</code>)</td>
+<td><code>true</code></td>
+</tr>
+</tbody>
+</table>
+<p>For <strong>split topology</strong> (multi-machine), you must set <code>CLOUD_IP</code> to the actual IP of the cloud machine. See <a href="#option-a-split-topology-recommended">Option A: Split Topology</a> below.</p>
 <h2 id="starting-the-system">Starting the System<a class="headerlink" href="#starting-the-system" title="Permanent link">#</a></h2>
 <h3 id="option-a-split-topology-recommended">Option A: Split Topology (Recommended)<a class="headerlink" href="#option-a-split-topology-recommended" title="Permanent link">#</a></h3>
 <p>Separate Edge and Cloud components to simulate a real-world distributed environment.</p>
@@ -2806,7 +2898,7 @@
 <p>Open a web browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6081
 </code></pre></div>
-<p>Use the default password <strong><code>openadkit</code></strong>.</p>
+<p>Log in with the password you set as <code>REMOTE_PASSWORD</code> in <code>.env</code>.</p>
 <h3 id="3-verify-operation">3. Verify Operation<a class="headerlink" href="#3-verify-operation" title="Permanent link">#</a></h3>
 <ul>
 <li>The noVNC interface should display RViz2.</li>
@@ -2830,16 +2922,16 @@ docker<span class="w"> </span>compose<span class="w"> </span>down
 <p><strong>Solutions:</strong></p>
 <ol>
 <li>
-<p><strong>Restart:</strong>
-   <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>restart
-</code></pre></div></p>
+<p><strong>Restart:</strong></p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>restart
+</code></pre></div>
 </li>
 <li>
-<p><strong>Staged Startup:</strong> Start the cloud side first, wait, then start the edge side.
-   <div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>up<span class="w"> </span>-d
+<p><strong>Staged Startup:</strong> Start the cloud side first, wait, then start the edge side.</p>
+<div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>up<span class="w"> </span>-d
 sleep<span class="w"> </span><span class="m">15</span>
 ./edge.sh<span class="w"> </span>up<span class="w"> </span>-d
-</code></pre></div></p>
+</code></pre></div>
 </li>
 </ol>
 <h3 id="port-conflict-port-is-already-allocated">Port Conflict (Port is already allocated)<a class="headerlink" href="#port-conflict-port-is-already-allocated" title="Permanent link">#</a></h3>

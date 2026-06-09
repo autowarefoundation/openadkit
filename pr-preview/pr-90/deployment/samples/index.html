@@ -377,17 +377,20 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../releases" class="md-tabs__link">
-        
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../releases/" class="md-tabs__link">
+          
   
   
     
   
   Releases
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -2208,9 +2211,34 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../releases" class="md-nav__link">
+    
+    
+      
         
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../releases/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -2224,7 +2252,26 @@
   
   
 
-      </a>
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2394,6 +2441,7 @@
 <ol>
 <li><strong>Docker Engine</strong> installed and running (set up via <code>setup.sh</code>)</li>
 <li><strong>NVIDIA Container Toolkit</strong> (optional but recommended for GPU acceleration)</li>
+<li><strong>Autoware Data</strong> — perception model weights and sample sensor data. Download with <code>setup.sh --download-artifacts</code> (required for logging-simulation; optional for planning/scenario simulation)</li>
 </ol>
 <p>No <code>git clone</code> is needed — each sample is downloaded as a self-contained bundle from the <a href="https://github.com/autowarefoundation/openadkit/releases/latest">latest release</a>.</p>
 <div class="admonition tip">

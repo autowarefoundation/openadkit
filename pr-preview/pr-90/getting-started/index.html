@@ -377,17 +377,20 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../releases" class="md-tabs__link">
-        
+    
+    
+      <li class="md-tabs__item">
+        <a href="../releases/" class="md-tabs__link">
+          
   
   
     
   
   Releases
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -2202,9 +2205,34 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../releases" class="md-nav__link">
+    
+    
+      
         
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../releases/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -2218,7 +2246,26 @@
   
   
 
-      </a>
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2370,7 +2417,7 @@
 </div>
 <div class="admonition info">
 <p class="admonition-title">Autoware artifacts</p>
-<p>For sensing/perception samples (e.g. <a href="../deployment/samples/logging-simulation/">Logging Simulation</a>) that mount <code>${HOME}/autoware_data</code>, add <code>-s -- --download-artifacts</code>.</p>
+<p>For sensing/perception samples (e.g. <a href="../deployment/samples/logging-simulation/">Logging Simulation</a>) that mount <code>${HOME}/autoware_data</code>, add <code>-s -- --download-artifacts</code>. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run <code>setup.sh --download-artifacts</code> directly (no <code>-s</code> needed).</p>
 </div>
 <p>Each sample/demo is then downloaded as a self-contained bundle — see <a href="../deployment/samples/">Sample Deployments</a>. You do <strong>not</strong> clone the repository to run deployments.</p>
 <h2 id="verify-your-installation">Verify Your Installation<a class="headerlink" href="#verify-your-installation" title="Permanent link">#</a></h2>

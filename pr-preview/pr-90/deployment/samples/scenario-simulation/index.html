@@ -377,17 +377,20 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../../releases" class="md-tabs__link">
-        
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../releases/" class="md-tabs__link">
+          
   
   
     
   
   Releases
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -2208,9 +2211,34 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../../releases" class="md-nav__link">
+    
+    
+      
         
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../releases/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -2224,7 +2252,26 @@
   
   
 
-      </a>
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2535,9 +2582,9 @@
 <ol>
 <li>Place your scenario YAML files under the <code>SCENARIO_HOST_DIR</code> (default: <code>./scenarios/</code>)</li>
 <li>
-<p>Set the scenario path in the environment file:
-   <div class="highlight"><pre><span></span><code><span class="nv">SCENARIO</span><span class="o">=</span>/scenarios/my-scenario.yaml
-</code></pre></div></p>
+<p>Set the scenario path in the environment file:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">SCENARIO</span><span class="o">=</span>/scenarios/my-scenario.yaml
+</code></pre></div>
 </li>
 <li>
 <p>Simulation results are saved to <code>OUTPUT_HOST_PATH</code> (default: <code>./output/</code>)</p>

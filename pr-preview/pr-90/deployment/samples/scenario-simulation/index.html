@@ -2278,6 +2278,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before You Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before You Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-set-up-the-environment-one-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Set up the environment (one-time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-download-the-deployment-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Download the deployment bundle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-download-the-kashiwanoha-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Download the Kashiwanoha map
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2410,17 +2460,28 @@
 </ul>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
 <ul>
-<li>Docker Engine</li>
-<li>Open AD Kit repository cloned and environment set up</li>
+<li>Docker Engine (set up via <code>setup.sh</code>, below)</li>
 </ul>
-<div class="admonition info">
-<p class="admonition-title">No Manual Map Download Required</p>
-<p>The default <code>sample.yaml</code> scenario uses the <strong>Kashiwanoha</strong> map bundled inside the TIER IV scenario simulator image. On first startup, the <code>map-init</code> service automatically extracts this map to <code>~/autoware_map/kashiwanoha_map</code>. It re-extracts the map if required files are missing or the configured TIER IV image tag changes.</p>
-</div>
 <div class="admonition warning">
 <p class="admonition-title">Use the Correct Map</p>
 <p>Do <strong>not</strong> use the <code>sample-map-planning</code> map with this deployment. The Kashiwanoha map is required. Using a different map will cause <code>setMap() for invalid version map</code>, missing route/localization, and repeated MRM transitions.</p>
 </div>
+<h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
+<p>No <code>git clone</code> required.</p>
+<h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+</code></pre></div>
+<h3 id="2-download-the-deployment-bundle">2. Download the deployment bundle<a class="headerlink" href="#2-download-the-deployment-bundle" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
+<span class="nb">cd</span><span class="w"> </span>scenario-simulation
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Releases</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/samples/scenario-simulation/</code> folder from a cloned repository instead.</p>
+</div>
+<h3 id="3-download-the-kashiwanoha-map">3. Download the Kashiwanoha map<a class="headerlink" href="#3-download-the-kashiwanoha-map" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>./fetch-sample-data.sh<span class="w"> </span>scenario-simulation
+</code></pre></div>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
 <p>Edit <code>scenario-simulation.env</code> to customize the deployment:</p>
 <table>
@@ -2460,17 +2521,12 @@
 <tr>
 <td><code>SCENARIO_READY_TIMEOUT</code></td>
 <td>Max seconds to wait for Autoware readiness</td>
-<td>120</td>
-</tr>
-<tr>
-<td><code>AUTO_EXTRACT_MAP</code></td>
-<td>Extract Kashiwanoha map from simulator image</td>
-<td><code>true</code></td>
+<td>300</td>
 </tr>
 <tr>
 <td><code>MAP_PATH</code></td>
 <td>Host map directory mounted into containers</td>
-<td><code>~/autoware_map</code></td>
+<td><code>~/autoware_map/kashiwanoha_map</code></td>
 </tr>
 </tbody>
 </table>
@@ -2489,11 +2545,11 @@
 </ol>
 <div class="admonition tip">
 <p class="admonition-title">Custom Maps</p>
-<p>Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, set <code>AUTO_EXTRACT_MAP=false</code>, update <code>MAP_PATH</code>, <code>LANELET2_MAP_FILE</code>, and <code>POINTCLOUD_MAP_FILE</code>, and ensure the files exist under <code>MAP_PATH</code> before starting.</p>
+<p>Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, update <code>MAP_PATH</code>, <code>LANELET2_MAP_FILE</code>, and <code>POINTCLOUD_MAP_FILE</code>, and ensure the files exist under <code>MAP_PATH</code> before starting.</p>
 </div>
 <h2 id="start-the-deployment">Start the Deployment<a class="headerlink" href="#start-the-deployment" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>deployments/samples/scenario-simulation
-docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>scenario-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
+<p>From the <code>scenario-simulation</code> directory, start the containers:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>scenario-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 <p>Wait approximately <strong>90 seconds</strong> for Autoware and the scenario simulator to initialize. The scenario runner waits up to <code>SCENARIO_READY_TIMEOUT</code> seconds for required Autoware map and API endpoints before launching.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
@@ -2508,8 +2564,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
 </code></pre></div>
 <h2 id="expected-behavior">Expected Behavior<a class="headerlink" href="#expected-behavior" title="Permanent link">#</a></h2>
 <ul>
-<li>The <code>map-init</code> service extracts the Kashiwanoha map on first run</li>
-<li>Autoware containers initialize and wait for the map</li>
+<li>Autoware containers initialize and load the mounted Kashiwanoha map</li>
 <li>The scenario simulator container starts and waits for Autoware readiness</li>
 <li>Once ready, the scenario executes automatically</li>
 <li>Results are written to the configured output directory</li>
@@ -2525,7 +2580,7 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
 <tbody>
 <tr>
 <td>Scenario does not start</td>
-<td>Check that <code>map-init</code> completed successfully (required files in <code>~/autoware_map</code>)</td>
+<td>Ensure the map was fetched: re-run <code>./fetch-sample-data.sh scenario-simulation</code></td>
 </tr>
 <tr>
 <td><code>setMap() for invalid version map</code></td>
@@ -2551,11 +2606,10 @@ docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span cla
     subgraph Host["Single Host"]
         A[autoware]
         S[scenario_simulator]
-        M[map-init]
         V[visualizer]
     end
 
-    M --&gt; A
+    Map[~/autoware_map] --&gt; A
     S &lt;--&gt;|ROS 2 DDS| A
     A &lt;--&gt;|ROS 2 DDS| V</code></pre>
 

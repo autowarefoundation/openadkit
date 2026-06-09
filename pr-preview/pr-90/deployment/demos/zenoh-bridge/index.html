@@ -2362,10 +2362,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-clone-the-repository" class="md-nav__link">
+  <a href="#1-set-up-the-environment-one-time" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Clone the Repository
+        1. Set up the environment (one-time)
       
     </span>
   </a>
@@ -2373,10 +2373,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-verify-directory-structure" class="md-nav__link">
+  <a href="#2-download-the-deployment-bundle-and-sample-map" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Verify Directory Structure
+        2. Download the deployment bundle and sample map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verify-directory-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Verify Directory Structure
       
     </span>
   </a>
@@ -2725,17 +2736,23 @@
 <p>This allows a single cloud visualizer or fleet management station to connect to multiple vehicles without reconfiguring ROS nodes on each vehicle. The <code>zenoh_autoware_fms</code> prototype demonstrates this pattern on ADLINK ADM-AL30 hardware.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Docker Engine</li>
-<li>Docker Compose (included with Docker Desktop or installed separately)</li>
-<li>Git</li>
+<li>Docker Engine + Docker Compose (set up via <code>setup.sh</code>, below)</li>
 <li>Stable internet connection for pulling images</li>
 </ul>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
-<h3 id="1-clone-the-repository">1. Clone the Repository<a class="headerlink" href="#1-clone-the-repository" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit
-<span class="nb">cd</span><span class="w"> </span>openadkit/deployments/demos/zenoh-bridge
+<h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
-<h3 id="2-verify-directory-structure">2. Verify Directory Structure<a class="headerlink" href="#2-verify-directory-structure" title="Permanent link">#</a></h3>
+<h3 id="2-download-the-deployment-bundle-and-sample-map">2. Download the deployment bundle and sample map<a class="headerlink" href="#2-download-the-deployment-bundle-and-sample-map" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
+<span class="nb">cd</span><span class="w"> </span>zenoh-bridge
+./fetch-sample-data.sh<span class="w"> </span>zenoh-bridge
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Releases</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/demos/zenoh-bridge/</code> folder from a cloned repository instead.</p>
+</div>
+<h3 id="3-verify-directory-structure">3. Verify Directory Structure<a class="headerlink" href="#3-verify-directory-structure" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>.
 ├── README.md
 ├── docker-compose.yaml
@@ -2779,7 +2796,6 @@
 <h3 id="1-check-container-status">1. Check Container Status<a class="headerlink" href="#1-check-container-status" title="Permanent link">#</a></h3>
 <p>Run <code>docker ps</code> or <code>docker compose ps</code> to verify all containers are running:</p>
 <ul>
-<li><code>map-init</code> — Should have exited successfully before <code>autoware</code> starts</li>
 <li><code>autoware</code></li>
 <li><code>scenario_simulator</code></li>
 <li><code>visualizer</code></li>
@@ -2804,10 +2820,10 @@
 <span class="c1"># Stop Edge</span>
 ./edge.sh<span class="w"> </span>down
 
-<span class="c1"># Stop All and remove volumes (recommended for full cleanup)</span>
-docker<span class="w"> </span>compose<span class="w"> </span>down<span class="w"> </span>-v
+<span class="c1"># Stop everything</span>
+docker<span class="w"> </span>compose<span class="w"> </span>down
 </code></pre></div>
-<p>The <code>-v</code> flag removes the <code>autoware_map</code> volume. Omit it to preserve extracted map data. On the next startup, <code>map-init</code> validates the volume and refreshes it if the pinned simulator image tag changes or required files are missing.</p>
+<p>The map is mounted read-only from <code>~/autoware_map/kashiwanoha_map</code> on the host, so stopping the stack leaves it untouched. Re-fetch it any time with <code>./fetch-sample-data.sh zenoh-bridge</code>.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
 <h3 id="visualizer-shows-global-status-warning-or-blank-screen">Visualizer Shows "Global Status: Warning" or Blank Screen<a class="headerlink" href="#visualizer-shows-global-status-warning-or-blank-screen" title="Permanent link">#</a></h3>
 <p><strong>Cause:</strong> Race condition where ROS 2 nodes start before the Zenoh bridge connection is fully established. <code>depends_on</code> helps but does not guarantee readiness.</p>

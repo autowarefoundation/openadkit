@@ -2392,10 +2392,10 @@
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
 <p>All sample deployments require:</p>
 <ol>
-<li><strong>Docker Engine</strong> installed and running</li>
+<li><strong>Docker Engine</strong> installed and running (set up via <code>setup.sh</code>)</li>
 <li><strong>NVIDIA Container Toolkit</strong> (optional but recommended for GPU acceleration)</li>
-<li><strong>Open AD Kit repository cloned</strong> and environment set up via <code>setup.sh</code></li>
 </ol>
+<p>No <code>git clone</code> is needed — each sample is downloaded as a self-contained bundle from the <a href="https://github.com/autowarefoundation/openadkit/releases/latest">latest release</a>.</p>
 <div class="admonition tip">
 <p class="admonition-title">GPU Recommendation</p>
 <p>While planning and scenario simulations can run on CPU-only machines, the logging simulation benefits significantly from a GPU for sensing and perception tasks.</p>
@@ -2403,8 +2403,10 @@
 <h2 id="common-workflow">Common Workflow<a class="headerlink" href="#common-workflow" title="Permanent link">#</a></h2>
 <div class="oak-steps">
 
-- **Download assets** — Maps, rosbags, or artifacts as required by the specific sample
-- **Configure environment** — Edit the `.env` file for your setup
+- **Set up the environment** — `curl -fsSL …/setup.sh | sudo bash` (one-time)
+- **Get the deployment** — Download and extract the sample's `<sample>.tar.gz` bundle, then `cd <sample>`
+- **Download assets** — `./fetch-sample-data.sh <sample>` (maps/rosbags as required)
+- **Configure environment** — Edit the `.env` file for your setup (optional)
 - **Start the deployment** — Run `docker compose --env-file <sample>.env up -d`
 - **Open the visualizer** — Access RViz via noVNC at `http://localhost:6080/vnc.html`
 - **Interact with the simulation** — Set poses, launch scenarios, or play rosbags
@@ -2430,7 +2432,7 @@
 <tr>
 <td><code>file not found</code> on startup</td>
 <td>Map or rosbag not downloaded</td>
-<td>Follow the asset download steps in the sample guide</td>
+<td>Run <code>./fetch-sample-data.sh &lt;sample&gt;</code></td>
 </tr>
 <tr>
 <td>Port already in use</td>
@@ -2445,7 +2447,7 @@
 </tbody>
 </table>
 <pre class="mermaid"><code>flowchart LR
-    A[Download Assets] --&gt; B[Configure Environment]
+    A[Get Bundle] --&gt; B[Fetch Assets]
     B --&gt; C[Start Deployment]
     C --&gt; D[Open Visualizer]
     D --&gt; E[Interact with Simulation]

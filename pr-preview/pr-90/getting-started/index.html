@@ -2261,10 +2261,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
+  <a href="#set-up-your-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installation
+        Set Up Your Environment
       
     </span>
   </a>
@@ -2345,43 +2345,34 @@
 <tr>
 <td><strong>Docker Engine</strong></td>
 <td>All deployments</td>
-<td><code>sudo ./setup.sh</code></td>
+<td><code>setup.sh</code> (below)</td>
 </tr>
 <tr>
 <td><strong>NVIDIA Container Toolkit</strong></td>
 <td>GPU-accelerated sensing and perception</td>
-<td>Included by default; use <code>--no-nvidia</code> to skip</td>
+<td>Included by default; add <code>--no-nvidia</code> to skip</td>
 </tr>
 <tr>
 <td><strong>Autoware artifacts</strong></td>
 <td>Sensing and perception samples (for example, <a href="../deployment/samples/logging-simulation/">Logging Simulation</a>)</td>
-<td><code>sudo ./setup.sh --download-artifacts</code></td>
+<td><code>setup.sh --download-artifacts</code></td>
 </tr>
 </tbody>
 </table>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h2>
-<div class="oak-steps">
-
-- **Clone the repository**
-  <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit
-<span class="nb">cd</span><span class="w"> </span>openadkit
+<h2 id="set-up-your-environment">Set Up Your Environment<a class="headerlink" href="#set-up-your-environment" title="Permanent link">#</a></h2>
+<p><code>setup.sh</code> is self-contained — no <code>git clone</code> required. Run it directly:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
-
-- **Set up the runtime environment**
-  <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>./setup.sh
-</code></pre></div>
-  This installs Docker, NVIDIA Container Toolkit, and other dependencies. It requires sudo privileges.
-
-  !!! tip "Skip NVIDIA Toolkit"
-      Use the `--no-nvidia` flag if you do not have an NVIDIA GPU. Otherwise, the toolkit is **highly recommended** for sensing and perception performance.
-
-- **Download Autoware artifacts (if needed)**
-  <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>./setup.sh<span class="w"> </span>--download-artifacts
-</code></pre></div>
-  Required for deployments that mount `${HOME}/autoware_data`, including the Logging Simulation sample.
-
+<p>This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requires sudo).</p>
+<div class="admonition tip">
+<p class="admonition-title">Skip NVIDIA Toolkit</p>
+<p>Append <code>-s -- --no-nvidia</code> (i.e. <code>… | sudo bash -s -- --no-nvidia</code>) if you do not have an NVIDIA GPU. Otherwise the toolkit is <strong>highly recommended</strong> for sensing and perception performance.</p>
 </div>
-
+<div class="admonition info">
+<p class="admonition-title">Autoware artifacts</p>
+<p>For sensing/perception samples (e.g. <a href="../deployment/samples/logging-simulation/">Logging Simulation</a>) that mount <code>${HOME}/autoware_data</code>, add <code>-s -- --download-artifacts</code>.</p>
+</div>
+<p>Each sample/demo is then downloaded as a self-contained bundle — see <a href="../deployment/samples/">Sample Deployments</a>. You do <strong>not</strong> clone the repository to run deployments.</p>
 <h2 id="verify-your-installation">Verify Your Installation<a class="headerlink" href="#verify-your-installation" title="Permanent link">#</a></h2>
 <p>After running <code>setup.sh</code>, confirm your environment is ready:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Check Docker</span>
@@ -2410,9 +2401,8 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
 <li><a href="../platforms/">Choose a platform</a> — Deploy to AutoSD, EWAOL, or your local machine</li>
 </ul>
 <pre class="mermaid"><code>flowchart LR
-    A[Clone Repository] --&gt; B[Run setup.sh]
-    B --&gt; C[Verify Installation]
-    B -.-&gt;|Optional| D[--no-nvidia Flag]</code></pre>
+    A[Run setup.sh] --&gt; B[Verify Installation] --&gt; C[Download a deployment]
+    A -.-&gt;|Optional| D[--no-nvidia]</code></pre>
 
 
 

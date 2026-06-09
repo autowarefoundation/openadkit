@@ -16,7 +16,6 @@ on:
       - 'components/api/**'
       - 'components/visualizer/**'
       - 'components/simulator/**'
-      - 'components/universe/**'
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
@@ -56,7 +55,6 @@ jobs:
       scan_requested: ${{ steps.prepare.outputs.scan_requested }}
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
-      universe_matrix: ${{ steps.inventory.outputs.universe_matrix }}
       ros_distro_matrix: ${{ steps.inventory.outputs.ros_distro_matrix }}
       manifest_targets: ${{ steps.inventory.outputs.manifest_targets }}
     steps:
@@ -170,7 +168,6 @@ jobs:
           outputs = {
               "common_matrix": common_matrix,
               "component_matrix": matrix_for("component"),
-              "universe_matrix": matrix_for("universe"),
               "ros_distro_matrix": ros_distro_matrix,
               "manifest_targets": manifest_targets,
           }
@@ -525,114 +522,11 @@ jobs:
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
   # =============================================================================
-  # Stage 3: Build universe and universe-cuda images (parallel)
-  # =============================================================================
-  build-universe:
-    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
-    needs: [prepare, build-common, build-components]
-    permissions:
-      actions: read
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      max-parallel: 8
-      matrix: ${{ fromJson(needs.prepare.outputs.universe_matrix) }}
-    steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@v6
-
-      - name: Free Disk Space (Ubuntu)
-        uses: ./.github/actions/free-disk-space
-
-      - name: Install jq and vcs2l
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq pipx
-          pipx install vcs2l
-        shell: bash
-
-      - name: Checkout Autoware repository
-        uses: actions/checkout@v6
-        with:
-          repository: autowarefoundation/autoware
-          ref: ${{ needs.prepare.outputs.autoware_ref }}
-          path: autoware
-          fetch-depth: 1
-
-      - name: Download Autoware dependency lockfile
-        uses: actions/download-artifact@v4
-        with:
-          name: autoware-lock-${{ needs.prepare.outputs.build_tag }}
-          path: autoware-lock
-
-      - name: Pull Autoware Source
-        run: |
-            mkdir -p autoware/src
-            vcs import --shallow autoware/src < autoware-lock/autoware-lock.repos
-        shell: bash
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for ${{ matrix.target }}
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          bake-target: docker-metadata-action-${{ matrix.target }}
-          tags: |
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Build and push ${{ matrix.target }}
-        uses: docker/bake-action@v5
-        with:
-          files: |
-            ${{ env.BAKE_FILE }}
-            ${{ steps.meta.outputs.bake-file }}
-          targets: ${{ matrix.target }}
-          push: true
-          set: |
-            *.platform=${{ matrix.platform }}
-            *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            *.args.COMMON_BASE_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.COMMON_BASE_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.COMMON_DEVEL_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.SENSING_PERCEPTION_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:sensing-perception-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.SENSING_PERCEPTION_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:sensing-perception-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.LOCALIZATION_MAPPING_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:localization-mapping-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.PLANNING_CONTROL_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:planning-control-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.VEHICLE_SYSTEM_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:vehicle-system-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.API_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:api-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.VISUALIZER_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:visualizer-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
-            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
-            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
-            *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
-            *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
-            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
-
-  # =============================================================================
-  # Stage 4: Create multi-arch manifests
+  # Stage 3: Create multi-arch manifests
   # =============================================================================
   create-manifests:
     runs-on: ubuntu-22.04
-    needs: [prepare, build-common, build-components, build-universe]
+    needs: [prepare, build-common, build-components]
     permissions:
       contents: read
       packages: write
@@ -843,7 +737,7 @@ jobs:
 
   notify-failure:
     runs-on: ubuntu-latest
-    needs: [prepare, build-common, build-components, build-universe, create-manifests, capture-metadata]
+    needs: [prepare, build-common, build-components, create-manifests, capture-metadata]
     if: failure() && github.event_name == 'schedule'
     permissions:
       issues: write

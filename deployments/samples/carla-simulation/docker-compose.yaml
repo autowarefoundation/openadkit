@@ -38,6 +38,8 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ./sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
     depends_on:
       - carla
     command: >
@@ -47,6 +49,7 @@ services:
       timeout:=${CARLA_LOAD_TIMEOUT}
       carla_map:=${CARLA_WORLD}
       sensor_kit_name:=carla_sensor_kit_description
+      sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
     restart: on-failure
 
   map:

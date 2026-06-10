@@ -20,6 +20,18 @@ The default runtime uses the official CARLA Ubuntu 22 container image. It does n
 - A working host X display, usually `DISPLAY=:0`
 - Host X access for local Docker containers, for example `xhost +SI:localuser:root`
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
+- Large kernel UDP buffers for DDS (the start script raises them via `sudo sysctl`):
+
+```bash
+sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
+  net.core.rmem_default=134217728 net.core.wmem_default=134217728
+```
+
+With the stock 208 KiB limits the kernel drops fragments of the large
+PointCloud2 messages exchanged between the host-networked containers:
+subscribers receive lidar at ~4 Hz instead of 10 Hz, localization never
+initializes, and the drive check fails. Make the values persistent across
+reboots with an `/etc/sysctl.d/` entry if you run the demo regularly.
 
 ## Start
 
@@ -96,6 +108,21 @@ For start-only behavior with an explicit no-drive flag:
 ```bash
 ./start-carla-e2e-demo.sh --no-drive
 ```
+
+## Sensor Configuration
+
+The CARLA interface container uses the sample-local `sensor_mapping.yaml`
+(mounted and passed via the `sensor_mapping_file` launch argument) instead of
+the package default. It enables LiDAR, IMU, and GNSS only.
+
+The 6 cameras defined by the sensor kit are intentionally not enabled:
+perception runs in lidar mode with traffic light recognition disabled, so no
+node consumes camera images, while each camera adds CARLA render work inside
+every synchronous simulation tick plus multi-megabyte reliable image publishes
+inside the bridge loop. On hosts without high single-core CPU clocks this slows
+the simulation clock until Autoware's data-freshness gates reject autonomous
+engagement. To experiment with cameras, uncomment them under `enabled_sensors`
+in `sensor_mapping.yaml`.
 
 ## Command Path
 

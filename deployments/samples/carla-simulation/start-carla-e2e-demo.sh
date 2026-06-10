@@ -95,6 +95,52 @@ load_env() {
   fi
 }
 
+# CycloneDDS needs large kernel UDP buffers to carry PointCloud2 messages
+# between the host-networked containers. With the stock 208 KiB limits the
+# kernel drops message fragments: subscribers receive lidar at ~4 Hz instead
+# of 10 Hz and localization never initializes.
+UDP_MEM_MAX_REQUIRED=2147483647
+UDP_MEM_DEFAULT_REQUIRED=134217728
+
+ensure_udp_buffers() {
+  printf '+ ensure kernel UDP buffer sizes for DDS\n'
+  if [[ "$DRY_RUN" == true ]]; then
+    return 0
+  fi
+
+  local rmem_max wmem_max rmem_default wmem_default
+  rmem_max=$(sysctl -n net.core.rmem_max)
+  wmem_max=$(sysctl -n net.core.wmem_max)
+  rmem_default=$(sysctl -n net.core.rmem_default)
+  wmem_default=$(sysctl -n net.core.wmem_default)
+  if ((rmem_max >= UDP_MEM_MAX_REQUIRED && wmem_max >= UDP_MEM_MAX_REQUIRED \
+    && rmem_default >= UDP_MEM_DEFAULT_REQUIRED && wmem_default >= UDP_MEM_DEFAULT_REQUIRED)); then
+    return 0
+  fi
+
+  local sysctl_args=(
+    "net.core.rmem_max=$UDP_MEM_MAX_REQUIRED"
+    "net.core.wmem_max=$UDP_MEM_MAX_REQUIRED"
+    "net.core.rmem_default=$UDP_MEM_DEFAULT_REQUIRED"
+    "net.core.wmem_default=$UDP_MEM_DEFAULT_REQUIRED"
+  )
+  local sudo_cmd=()
+  if [[ $EUID -ne 0 ]]; then
+    if [[ -t 0 ]]; then
+      sudo_cmd=(sudo)
+    else
+      sudo_cmd=(sudo -n)
+    fi
+  fi
+  if run "${sudo_cmd[@]}" sysctl -qw "${sysctl_args[@]}"; then
+    return 0
+  fi
+
+  printf 'Failed to raise kernel UDP buffer limits. Run this and retry:\n' >&2
+  printf '  sudo sysctl -w %s %s %s %s\n' "${sysctl_args[@]}" >&2
+  return 1
+}
+
 prepare_map() {
   if [[ "$DRY_RUN" == true ]]; then
     printf '+ prepare CARLA Town01 map at %s\n' "$CARLA_E2E_MAP_PATH"
@@ -306,6 +352,7 @@ verify_autonomous_drive() {
 main() {
   cd "$SCRIPT_DIR"
   load_env
+  ensure_udp_buffers
   prepare_map
   build_image
   start_container_carla

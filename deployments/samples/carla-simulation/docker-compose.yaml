@@ -1,0 +1,290 @@
+services:
+  carla:
+    image: ${CARLA_CONTAINER_IMAGE}
+    container_name: ${CARLA_CONTAINER_NAME}
+    network_mode: host
+    init: true
+    ipc: host
+    gpus: all
+    environment:
+      - DISPLAY=${CARLA_DISPLAY}
+      - SDL_VIDEODRIVER=x11
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,display
+      - VK_ICD_FILENAMES=${CARLA_VK_ICD_CONTAINER_PATH}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${CARLA_VK_ICD_HOST_PATH}:${CARLA_VK_ICD_CONTAINER_PATH}:ro
+    command: >
+      /bin/bash ./CarlaUE4.sh
+      -windowed
+      -vulkan
+      -nosound
+      -ResX=${CARLA_RESX}
+      -ResY=${CARLA_RESY}
+      -quality-level=${CARLA_QUALITY}
+      -carla-rpc-port=${CARLA_RPC_PORT}
+      -world-port=${CARLA_WORLD_PORT}
+      -stdout
+      -FullStdOutLogOutput
+    restart: on-failure
+
+  carla-interface:
+    image: ${CARLA_INTERFACE_IMAGE}
+    container_name: ${CARLA_INTERFACE_CONTAINER}
+    network_mode: host
+    init: true
+    ipc: host
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - carla
+    command: >
+      ros2 launch autoware_carla_interface autoware_carla_interface.launch.xml
+      host:=${CARLA_RPC_HOST}
+      port:=${CARLA_RPC_PORT}
+      timeout:=${CARLA_LOAD_TIMEOUT}
+      carla_map:=${CARLA_WORLD}
+      sensor_kit_name:=carla_sensor_kit_description
+    restart: on-failure
+
+  map:
+    image: ghcr.io/autowarefoundation/openadkit:localization-mapping
+    container_name: autoware-map
+    network_mode: host
+    init: true
+    ipc: host
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ${MAP_PATH}:/autoware_map:ro
+    command: >
+      ros2 launch autoware_launch tier4_map_component.launch.xml
+      lanelet2_map_file:=${LANELET2_MAP_FILE}
+      map_path:=/autoware_map
+      pointcloud_map_file:=${POINTCLOUD_MAP_FILE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  system:
+    image: ghcr.io/autowarefoundation/openadkit:vehicle-system
+    container_name: autoware-system
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+    command: >
+      ros2 launch autoware_launch tier4_system_component.launch.xml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
+      launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
+      launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
+      sensor_model:=${SENSOR_MODEL}
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+    restart: on-failure
+
+  sensing:
+    image: ${SENSING_PERCEPTION_IMAGE}
+    container_name: autoware-sensing
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    gpus: all
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    depends_on:
+      - map
+      - carla-interface
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_sensing_component.launch.xml
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_SENSING}
+      launch_sensing_driver:=${LAUNCH_SENSING_DRIVER}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  perception:
+    image: ${SENSING_PERCEPTION_IMAGE}
+    container_name: autoware-perception
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    gpus: all
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ${DATA_PATH}:/autoware_data:rw
+    depends_on:
+      - map
+      - sensing
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_perception_component.launch.xml
+      data_path:=/autoware_data
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
+      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
+      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
+      perception_mode:=${PERCEPTION_MODE}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_empty_dynamic_object_publisher:=${AUTOWARE_E2E_EMPTY_OBJECTS}
+      use_sim_time:=${USE_SIM_TIME}
+      use_traffic_light_recognition:=${AUTOWARE_E2E_USE_TRAFFIC_LIGHT_RECOGNITION}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  localization:
+    image: ghcr.io/autowarefoundation/openadkit:localization-mapping
+    container_name: autoware-localization
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+      - sensing
+      - perception
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_localization_component.launch.xml
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  planning:
+    image: ghcr.io/autowarefoundation/openadkit:planning-control
+    container_name: autoware-planning
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+      - localization
+      - perception
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_planning_component.launch.xml
+      component_wise_launch:=true
+      enable_all_modules_auto_mode:=${ENABLE_ALL_MODULES_AUTO_MODE}
+      is_simulation:=${IS_SIMULATION_MODE}
+      module_preset:=${PLANNING_MODULE_PRESET}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  vehicle:
+    image: ghcr.io/autowarefoundation/openadkit:vehicle-system
+    container_name: autoware-vehicle
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+      - carla-interface
+    command: >
+      ros2 launch tier4_vehicle_launch vehicle.launch.xml
+      launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE}
+      raw_vehicle_cmd_converter_param_path:=/opt/autoware/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_id:=${VEHICLE_ID}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  control:
+    image: ghcr.io/autowarefoundation/openadkit:planning-control
+    container_name: autoware-control
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+      - planning
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_control_component.launch.xml
+      check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT}
+      component_wise_launch:=true
+      lateral_controller_mode:=${LATERAL_CONTROLLER_MODE}
+      longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE}
+      module_preset:=${CONTROL_MODULE_PRESET}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_id:=${VEHICLE_ID}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  api:
+    image: ghcr.io/autowarefoundation/openadkit:api
+    container_name: autoware-api
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    depends_on:
+      - map
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_autoware_api_component.launch.xml
+      component_wise_launch:=true
+      scenario_simulation:=${SCENARIO_SIMULATION}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  visualizer:
+    image: ghcr.io/autowarefoundation/openadkit:visualizer
+    container_name: autoware-e2e-visualizer
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - RVIZ_CONFIG=${RVIZ_CONFIG}
+      - USE_SIM_TIME=${USE_SIM_TIME}
+    depends_on:
+      - map
+      - api
+      - planning
+      - control
+      - carla-interface
+    restart: on-failure

@@ -262,8 +262,10 @@ jobs:
             --arg common_repo "${IMAGE_PREFIX_COMMON}" \
             --arg component_repo "${IMAGE_PREFIX_COMPONENT}" '
             def repo_for($kind): if $kind == "common" then $common_repo elif $kind == "component" then $component_repo else error("unsupported repo kind") end;
-            .ros_distros[] as $distro |
+            def image_distros($global): (.ros_distros // $global)[];
+            .ros_distros as $global |
             .images[] |
+            image_distros($global)[] as $distro |
             [repo_for(.repo), .target, $distro, (.platforms | sort | join(","))] |
             @tsv
           ' release-input/build/image-inventory.json | sort -u > "${expected_inventory}"

@@ -18,6 +18,7 @@ flowchart TB
     CD --> API["api"]
     CD --> VIZ["visualizer"]
     CD --> SIM["simulator"]
+    CD --> CARLA["carla-interface"]
 
     classDef ros fill:#334155,stroke:#64748b,color:#fff
     classDef common fill:#1e3a5f,stroke:#3b82f6,color:#fff
@@ -25,7 +26,8 @@ flowchart TB
 
     class ROS ros
     class CB,CD common
-    class SP,LM,PC,VS,API,VIZ,SIM component
+    class SP,LM,PC,VS,API,VIZ,SIM,CARLA component
+
 ```
 
 ### Build Groups
@@ -33,4 +35,4 @@ flowchart TB
 | Group | Description | Targets |
 |-------|-------------|---------|
 | `common` | Common images | base, devel |
-| `component` | Component images | sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator |
+| `component` | Component images | sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator, carla-interface |

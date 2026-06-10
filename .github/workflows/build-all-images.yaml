@@ -16,6 +16,8 @@ on:
       - 'components/api/**'
       - 'components/visualizer/**'
       - 'components/simulator/**'
+      - 'components/carla-interface/**'
+
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
@@ -57,6 +59,8 @@ jobs:
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
       ros_distro_matrix: ${{ steps.inventory.outputs.ros_distro_matrix }}
       manifest_targets: ${{ steps.inventory.outputs.manifest_targets }}
+      component_manifest_targets: ${{ steps.inventory.outputs.component_manifest_targets }}
+      single_arch_component_targets: ${{ steps.inventory.outputs.single_arch_component_targets }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
@@ -128,6 +132,9 @@ jobs:
           distros = inventory["ros_distros"]
           images = inventory["images"]
 
+          def image_distros(image):
+              return image.get("ros_distros", distros)
+
           def platform_label(platform):
               if platform == "linux/amd64":
                   return "amd64"
@@ -140,7 +147,7 @@ jobs:
               for image in images:
                   if image["stage"] != stage:
                       continue
-                  for distro in distros:
+                  for distro in image_distros(image):
                       for platform in image["platforms"]:
                           include.append({
                               "platform": platform,
@@ -153,7 +160,7 @@ jobs:
           common_pairs = sorted({
               (platform, distro)
               for image in images if image["stage"] == "common"
-              for distro in distros
+              for distro in image_distros(image)
               for platform in image["platforms"]
           })
           common_matrix = {
@@ -163,13 +170,28 @@ jobs:
               ]
           }
           ros_distro_matrix = {"include": [{"ros-distro": distro} for distro in distros]}
-          manifest_targets = " ".join(image["target"] for image in images if image["repo"] == "component")
+          component_images = [image for image in images if image["repo"] == "component"]
+          manifest_targets = " ".join(image["target"] for image in component_images)
+          component_manifest_targets = {
+              distro: " ".join(
+                  sorted(image["target"] for image in component_images if distro in image_distros(image))
+              )
+              for distro in distros
+          }
+          single_arch_component_targets = " ".join(
+              sorted(
+                  image["target"] for image in component_images
+                  if "linux/arm64" not in image["platforms"]
+              )
+          )
 
           outputs = {
               "common_matrix": common_matrix,
               "component_matrix": matrix_for("component"),
               "ros_distro_matrix": ros_distro_matrix,
               "manifest_targets": manifest_targets,
+              "component_manifest_targets": component_manifest_targets,
+              "single_arch_component_targets": single_arch_component_targets,
           }
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               for key, value in outputs.items():
@@ -511,6 +533,7 @@ jobs:
             *.args.COMMON_BASE_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:base-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.args.COMMON_DEVEL_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.args.COMMON_DEVEL_CUDA_IMAGE=${{ env.IMAGE_PREFIX_COMMON }}:devel-cuda-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
@@ -548,7 +571,8 @@ jobs:
           registry: ${{ env.REGISTRY }}
           image-prefix-common: ${{ env.IMAGE_PREFIX_COMMON }}
           image-prefix-component: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          component-targets: ${{ needs.prepare.outputs.manifest_targets }}
+          component-targets: ${{ fromJson(needs.prepare.outputs.component_manifest_targets)[matrix.ros-distro] }}
+          single-arch-component-targets: ${{ needs.prepare.outputs.single_arch_component_targets }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   capture-metadata:
@@ -642,8 +666,9 @@ jobs:
             fi
             add_image "${repo}" "${target}" "${distro}"
           done < <(jq -r '
-            .ros_distros[] as $distro |
+            .ros_distros as $global |
             .images[] |
+            ((.ros_distros // $global)[]) as $distro |
             [.repo, .target, $distro] |
             @tsv
           ' build-metadata/image-inventory.json)

@@ -2452,6 +2452,9 @@
 
 <h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">#</a></h1>
 <p>This guide walks you through setting up your environment and running your first Open AD Kit deployment.</p>
+<pre class="mermaid"><code>flowchart LR
+    A[Run setup.sh] --&gt; B[Verify Installation] --&gt; C[Download a deployment]
+    A -.-&gt;|Optional| D[--no-nvidia]</code></pre>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <p>Open AD Kit runs on <strong>Ubuntu</strong> with Docker. Install everything with the included <a href="https://github.com/autowarefoundation/openadkit/blob/main/setup.sh"><code>setup.sh</code></a> script instead of following separate install guides:</p>
 <table>
@@ -2521,9 +2524,6 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
 <li><a href="../components/">Learn about components</a> — Understand the Open AD Kit architecture</li>
 <li><a href="../platforms/">Choose a platform</a> — Deploy to AutoSD, EWAOL, or your local machine</li>
 </ul>
-<pre class="mermaid"><code>flowchart LR
-    A[Run setup.sh] --&gt; B[Verify Installation] --&gt; C[Download a deployment]
-    A -.-&gt;|Optional| D[--no-nvidia]</code></pre>
 
 
 

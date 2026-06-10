@@ -2916,6 +2916,14 @@
 <span class="p">}</span>
 </code></pre></div>
 <p>This allows a single cloud visualizer or fleet management station to connect to multiple vehicles without reconfiguring ROS nodes on each vehicle. The <code>zenoh_autoware_fms</code> prototype demonstrates this pattern on ADLINK ADM-AL30 hardware.</p>
+<pre class="mermaid"><code>graph TD
+    Cloud[Cloud Visualizer / FMS] --&gt; Bridge1[Zenoh Bridge /bot1]
+    Cloud --&gt; Bridge2[Zenoh Bridge /bot2]
+    Cloud --&gt; Bridge3[Zenoh Bridge /bot3]
+
+    Bridge1 --&gt; V1[Vehicle 1]
+    Bridge2 --&gt; V2[Vehicle 2]
+    Bridge3 --&gt; V3[Vehicle 3]</code></pre>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
 <li>Docker Engine + Docker Compose (set up via <code>setup.sh</code>, below)</li>
@@ -2938,8 +2946,14 @@
 <div class="highlight"><pre><span></span><code>.
 ├── README.md
 ├── docker-compose.yaml
+├── .env
 ├── cloud.sh
 ├── edge.sh
+├── common.sh
+├── run_teleop.sh
+├── fetch-sample-data.sh      # included in the release bundle
+├── teleop/
+│   └── teleop_config.yaml
 └── config/
     └── zenoh-bridge-ros2dds.json5
 </code></pre></div>
@@ -3158,14 +3172,6 @@ sleep<span class="w"> </span><span class="m">15</span>
 <li><a href="https://autoware.org/driving-autoware-with-zenoh/">Driving Autoware with Zenoh</a></li>
 <li><a href="../../samples/">Sample Deployments</a> — Single-machine simulations</li>
 </ul>
-<pre class="mermaid"><code>graph TD
-    Cloud[Cloud Visualizer / FMS] --&gt; Bridge1[Zenoh Bridge /bot1]
-    Cloud --&gt; Bridge2[Zenoh Bridge /bot2]
-    Cloud --&gt; Bridge3[Zenoh Bridge /bot3]
-
-    Bridge1 --&gt; V1[Vehicle 1]
-    Bridge2 --&gt; V2[Vehicle 2]
-    Bridge3 --&gt; V3[Vehicle 3]</code></pre>
 
 
 

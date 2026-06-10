@@ -2532,6 +2532,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2717,12 +2728,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">#</a></h2>
-<ul>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/">Scenario test simulation</a> — Official Autoware scenario simulation guide</li>
-<li><a href="../planning-simulation/">Planning Simulation</a> — Simpler single-map simulation</li>
-<li><a href="../logging-simulation/">Logging Simulation</a> — Replay recorded sensor data</li>
-</ul>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>graph LR
     subgraph Host["Single Host"]
         A[autoware]
@@ -2733,6 +2739,12 @@
     Map[~/autoware_map] --&gt; A
     S &lt;--&gt;|ROS 2 DDS| A
     A &lt;--&gt;|ROS 2 DDS| V</code></pre>
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">#</a></h2>
+<ul>
+<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/">Scenario test simulation</a> — Official Autoware scenario simulation guide</li>
+<li><a href="../planning-simulation/">Planning Simulation</a> — Simpler single-map simulation</li>
+<li><a href="../logging-simulation/">Logging Simulation</a> — Replay recorded sensor data</li>
+</ul>
 
 
 

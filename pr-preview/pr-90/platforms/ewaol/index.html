@@ -2507,15 +2507,16 @@
 <li><strong>Cloud-to-edge parity</strong> with Arm Neoverse N1 architecture on both AVA and AWS Graviton</li>
 </ul>
 <h2 id="build-overview">Build Overview<a class="headerlink" href="#build-overview" title="Permanent link">#</a></h2>
-<p>The EWAOL build uses <code>kas</code> to build Yocto images:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Build the image with kas (requires kas configuration files)</span>
-kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
+<p>EWAOL images are built with the Yocto <a href="https://kas.readthedocs.io/"><code>kas</code></a> tool. EWAOL-specific <code>kas</code> configuration files are <strong>not yet available in this repository</strong> — they are being added progressively. Once they land, the build will follow the standard <code>kas</code> pattern:</p>
+<div class="highlight"><pre><span></span><code>kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Configuration files</p>
-<p>The <code>kas/ewaol-ava.yml</code> configuration file is not yet available in this repository. EWAOL-specific deployment assets are being added progressively.</p>
-</div>
-<p>The build produces a bootable image that can be flashed to the AVA platform. After boot, Autoware components run as containerized workloads under K3s.</p>
+<p>The build produces a bootable image that can be flashed to the AVA platform. After boot, Autoware components run as containerized workloads under K3s. Until the repository assets land, follow the upstream EWAOL user guide linked below.</p>
+<pre class="mermaid"><code>flowchart LR
+    A[kas Configuration] --&gt; B[Yocto Build]
+    B --&gt; C[Flash AVA]
+    C --&gt; D[Boot]
+    D --&gt; E[K3s Cluster]
+    E --&gt; F[Autoware Containers]</code></pre>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h2>
 <p>For the EWAOL installation and runtime guide, see the upstream documentation:</p>
 <ul>
@@ -2548,12 +2549,6 @@ kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
 <li><a href="../">Supported Platforms overview</a></li>
 <li><a href="../autosd/">AutoSD platform</a></li>
 </ul>
-<pre class="mermaid"><code>flowchart LR
-    A[kas Configuration] --&gt; B[Yocto Build]
-    B --&gt; C[Flash AVA]
-    C --&gt; D[Boot]
-    D --&gt; E[K3s Cluster]
-    E --&gt; F[Autoware Containers]</code></pre>
 
 
 

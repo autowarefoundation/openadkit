@@ -2551,6 +2551,10 @@
 
 </div>
 
+<pre class="mermaid"><code>flowchart LR
+    A[Build All Images] --&gt; B[Scan Images]
+    B --&gt; C[Promote &amp; Tag]
+    C --&gt; D[Update Aliases]</code></pre>
 <h2 id="source-of-truth">Source of Truth<a class="headerlink" href="#source-of-truth" title="Permanent link">#</a></h2>
 <p>The following artifacts are the canonical reference for release validation:</p>
 <ul>
@@ -2595,10 +2599,6 @@
 <li><a href="../image-tags/">Container Image Tags</a> — Understanding the tag schema</li>
 <li><a href="../">Getting Started</a> — Quick start guide</li>
 </ul>
-<pre class="mermaid"><code>flowchart LR
-    A[Build All Images] --&gt; B[Scan Images]
-    B --&gt; C[Promote &amp; Tag]
-    C --&gt; D[Update Aliases]</code></pre>
 
 
 

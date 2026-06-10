@@ -2557,6 +2557,13 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
 <p>Access the visualizer via the exposed noVNC endpoint and run the planning simulation workflow</p>
 </li>
 </ol>
+<pre class="mermaid"><code>graph LR
+    Host[AutoSD Host] --&gt; MapSvc[awf-oak-map.service]
+    MapSvc --&gt; Systemd[Systemd + Quadlet]
+    Systemd --&gt; Podman[Podman Pod]
+    Podman --&gt; PC[awf-oak-planning]
+    Podman --&gt; SIM[awf-oak-simulator]
+    Podman --&gt; VIZ[visualizer]</code></pre>
 <h2 id="expected-outcome">Expected Outcome<a class="headerlink" href="#expected-outcome" title="Permanent link">#</a></h2>
 <p>Once all services are running, you can:</p>
 <ul>
@@ -2572,13 +2579,6 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
 <li><a href="../../../deployment/">Open AD Kit Deployments</a></li>
 <li><a href="../../../components/">Components Overview</a></li>
 </ul>
-<pre class="mermaid"><code>graph LR
-    Host[AutoSD Host] --&gt; MapSvc[awf-oak-map.service]
-    MapSvc --&gt; Systemd[Systemd + Quadlet]
-    Systemd --&gt; Podman[Podman Pod]
-    Podman --&gt; PC[awf-oak-planning]
-    Podman --&gt; SIM[awf-oak-simulator]
-    Podman --&gt; VIZ[visualizer]</code></pre>
 
 
 

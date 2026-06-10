@@ -2504,6 +2504,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-limitations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2656,6 +2667,12 @@
 </tr>
 </tbody>
 </table>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
+<pre class="mermaid"><code>flowchart LR
+    Rosbag[Rosbag File] --&gt; SP[sensing-perception]
+    SP --&gt; LM[localization-mapping]
+    LM --&gt; PC[planning-control]
+    PC --&gt; Viz[visualizer]</code></pre>
 <h2 id="known-limitations">Known Limitations<a class="headerlink" href="#known-limitations" title="Permanent link">#</a></h2>
 <p>The <code>rosbag</code> service in this deployment uses the upstream <code>ghcr.io/autowarefoundation/autoware:universe</code> image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture. An OAK component image for rosbag playback will be available in a future release.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
@@ -2665,11 +2682,6 @@
 <li><a href="../../../components/">Components Overview</a> — Learn about the sensing and perception stack</li>
 <li><a href="../../../getting-started/">Getting Started</a> — Environment setup and artifact download</li>
 </ul>
-<pre class="mermaid"><code>flowchart LR
-    Rosbag[Rosbag File] --&gt; SP[sensing-perception]
-    SP --&gt; LM[localization-mapping]
-    LM --&gt; PC[planning-control]
-    PC --&gt; Viz[visualizer]</code></pre>
 
 
 

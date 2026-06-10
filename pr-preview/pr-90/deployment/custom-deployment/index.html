@@ -814,6 +814,8 @@
       
         
       
+        
+      
     
     
     
@@ -1074,6 +1076,78 @@
             
   
     Logging simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../samples/carla-simulation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Carla simulation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Carla simulation
   
 
           </label>
@@ -2715,26 +2789,44 @@
 <p>Use the <code>sensing-perception-cuda</code> image instead of <code>sensing-perception</code> for GPU-accelerated inference. This is <strong>amd64-only</strong> and requires NVIDIA Container Toolkit.</p>
 </div>
 <h2 id="example-compose-file">Example Compose File<a class="headerlink" href="#example-compose-file" title="Permanent link">#</a></h2>
-<p>Here is a minimal <code>docker-compose.yaml</code> for a Planning Simulation-like stack:</p>
+<p>Here is a minimal <code>docker-compose.yaml</code> showing the two essential patterns — an Autoware component launched via its <code>autoware_launch</code> per-component launch file, and the visualizer running its built-in noVNC entrypoint:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">planning-control</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">planning</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit:planning-control</span>
-<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/autoware_map:/autoware_map:ro</span>
+<span class="w">    </span><span class="nt">network_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
+<span class="w">    </span><span class="nt">ipc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RMW_IMPLEMENTATION=rmw_cyclonedds_cpp</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROS_DOMAIN_ID=0</span>
 <span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
-<span class="w">      </span><span class="no">ros2 launch tier4_planning_component tier4_planning_component.launch.xml</span>
+<span class="w">      </span><span class="no">ros2 launch autoware_launch tier4_planning_component.launch.xml</span>
+<span class="w">      </span><span class="no">component_wise_launch:=true</span>
+<span class="w">      </span><span class="no">use_sim_time:=true</span>
+<span class="w">      </span><span class="no">vehicle_model:=sample_vehicle</span>
 
 <span class="w">  </span><span class="nt">visualizer</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit:visualizer</span>
-<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;6080:6080&quot;</span>
+<span class="w">    </span><span class="nt">network_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
+<span class="w">    </span><span class="nt">ipc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RMW_IMPLEMENTATION=rmw_cyclonedds_cpp</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROS_DOMAIN_ID=0</span>
-<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
-<span class="w">      </span><span class="no">ros2 launch tier4_visualizer_component tier4_visualizer_component.launch.xml</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">REMOTE_PASSWORD=openadkit</span><span class="w"> </span><span class="c1"># required — the container exits if unset</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">USE_SIM_TIME=true</span>
 </code></pre></div>
+<p>With host networking, the visualizer is reachable directly at <code>http://localhost:6080/vnc.html</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Patterns to keep</p>
+<ul>
+<li>Components are launched with <code>ros2 launch autoware_launch tier4_&lt;component&gt;_component.launch.xml component_wise_launch:=true ...</code> — there are no per-component ROS packages named after the images.</li>
+<li>Do <strong>not</strong> override the visualizer's <code>command</code>: its entrypoint starts the VNC/noVNC stack and RViz.</li>
+<li>All services need the same <code>RMW_IMPLEMENTATION</code> and <code>ROS_DOMAIN_ID</code> for DDS discovery; the samples use <code>network_mode: host</code> with CycloneDDS.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">A runnable stack needs more services</p>
+<p>A planning stack that actually does something also needs map serving, a simulator or vehicle interface, system services, and the API container. Use the <a href="https://github.com/autowarefoundation/openadkit/blob/main/deployments/samples/planning-simulation/docker-compose.yaml">planning-simulation <code>docker-compose.yaml</code></a> as the reference and prune from there.</p>
+</div>
 <h2 id="environment-configuration">Environment Configuration<a class="headerlink" href="#environment-configuration" title="Permanent link">#</a></h2>
 <p>Create a <code>.env</code> file alongside your <code>docker-compose.yaml</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Required</span>

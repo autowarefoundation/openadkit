@@ -811,6 +811,8 @@
       
         
       
+        
+      
     
     
     
@@ -1068,6 +1070,78 @@
             
   
     Logging simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../deployment/samples/carla-simulation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Carla simulation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Carla simulation
   
 
           </label>
@@ -2518,7 +2592,7 @@
 <tbody>
 <tr>
 <td><code>RVIZ_CONFIG</code></td>
-<td><code>/autoware/rviz/autoware.rviz</code></td>
+<td><code>/opt/autoware/share/autoware_launch/rviz/autoware.rviz</code></td>
 <td>Any valid path</td>
 <td>The full path to the RViz configuration file inside the container</td>
 </tr>
@@ -2532,7 +2606,7 @@
 <td><code>REMOTE_PASSWORD</code></td>
 <td>— (required)</td>
 <td>Any string without special characters</td>
-<td>Password for the remote display (only used when <code>REMOTE_DISPLAY=true</code>); the container exits if unset</td>
+<td>Password for the remote display. Required when <code>REMOTE_DISPLAY=true</code> (the default); the container exits if unset</td>
 </tr>
 </tbody>
 </table>

@@ -811,6 +811,8 @@
       
         
       
+        
+      
     
     
     
@@ -1068,6 +1070,78 @@
             
   
     Logging simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../deployment/samples/carla-simulation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Carla simulation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Carla simulation
   
 
           </label>
@@ -2421,6 +2495,7 @@
     CD --&gt; API["api"]:::componentImage
     CD --&gt; VIZ["visualizer"]:::componentImage
     CD --&gt; SIM["simulator"]:::componentImage
+    SIM --&gt; CARLA["carla-interface"]:::componentImage
 
     classDef rosBase fill:#334155,stroke:#64748b,color:#fff
     classDef commonBase fill:#1e3a5f,stroke:#3b82f6,color:#fff
@@ -2444,7 +2519,7 @@
 <tr>
 <td><code>component</code></td>
 <td>Component images</td>
-<td>sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator</td>
+<td>sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator, carla-interface</td>
 </tr>
 </tbody>
 </table>

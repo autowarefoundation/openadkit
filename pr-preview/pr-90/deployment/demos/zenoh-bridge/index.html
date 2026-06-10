@@ -814,6 +814,8 @@
       
         
       
+        
+      
     
     
     
@@ -1074,6 +1076,78 @@
             
   
     Logging simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../samples/carla-simulation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Carla simulation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Carla simulation
   
 
           </label>
@@ -2580,6 +2654,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#teleoperation-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Teleoperation (Optional)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Teleoperation (Optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-start-the-teleop-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Start the Teleop Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-launch-the-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Launch the Interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2777,8 +2901,8 @@
 </ul>
 <h3 id="zenoh-bridge-configuration">Zenoh Bridge Configuration<a class="headerlink" href="#zenoh-bridge-configuration" title="Permanent link">#</a></h3>
 <ul>
-<li><strong><code>cloud_zenoh_bridge</code></strong> — Acts as a <strong>Router</strong>, listening for client connections. In recent versions of <code>zenoh-bridge-ros2dds</code> (v0.11.0+), the default listen port is <strong>TCP 7447</strong>.</li>
-<li><strong><code>edge_zenoh_bridge</code></strong> — Acts as a <strong>Client</strong>, connecting to the cloud router via <code>zenoh_net</code>. It scans ROS 2 topics in <code>edge_net</code>, converts them to Zenoh, and forwards to the router.</li>
+<li><strong><code>cloud_zenoh_bridge</code></strong> — Acts as a <strong>Router</strong>, listening for client connections on <strong>TCP 7448</strong> (configured via <code>-l tcp/0.0.0.0:7448</code> in <code>docker-compose.yaml</code>).</li>
+<li><strong><code>edge_zenoh_bridge</code></strong> — Acts as a <strong>Client</strong>, connecting to the cloud router on port <code>7448</code> via <code>zenoh_net</code> (or <code>${CLOUD_IP}:7448</code> in multi-machine setups). It scans ROS 2 topics in <code>edge_net</code>, converts them to Zenoh, and forwards to the router. Its own local listener uses TCP 7447.</li>
 <li><strong><code>config/zenoh-bridge-ros2dds.json5</code></strong> — Defines bridge mode, endpoints, and topic filtering rules. Filtering allows precise bandwidth control by excluding high-frequency or irrelevant topics.</li>
 </ul>
 <div class="admonition warning">
@@ -2916,6 +3040,90 @@
 docker<span class="w"> </span>compose<span class="w"> </span>down
 </code></pre></div>
 <p>The map is mounted read-only from <code>~/autoware_map/kashiwanoha_map</code> on the host, so stopping the stack leaves it untouched. Re-fetch it any time with <code>./fetch-sample-data.sh zenoh-bridge</code>.</p>
+<h2 id="teleoperation-optional">Teleoperation (Optional)<a class="headerlink" href="#teleoperation-optional" title="Permanent link">#</a></h2>
+<p>A containerized terminal-based teleoperation interface lets you drive the vehicle manually from the cloud side.</p>
+<h3 id="1-start-the-teleop-backend">1. Start the Teleop Backend<a class="headerlink" href="#1-start-the-teleop-backend" title="Permanent link">#</a></h3>
+<p>The teleop service only starts when the cloud side is launched with <code>--with-teleop</code>:</p>
+<div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>up<span class="w"> </span>--with-teleop<span class="w"> </span>-d
+</code></pre></div>
+<p>For the edge side, the default simulation mode works, but pure control testing without scenario interference is cleaner with <code>--no-sim</code>:</p>
+<div class="highlight"><pre><span></span><code>./edge.sh<span class="w"> </span>--no-sim<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<h3 id="2-launch-the-interface">2. Launch the Interface<a class="headerlink" href="#2-launch-the-interface" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>./run_teleop.sh
+</code></pre></div>
+<h3 id="3-controls">3. Controls<a class="headerlink" href="#3-controls" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>W</strong></td>
+<td>Throttle</td>
+<td>Accelerate</td>
+</tr>
+<tr>
+<td><strong>S</strong></td>
+<td>Brake</td>
+<td>Decelerate</td>
+</tr>
+<tr>
+<td><strong>A</strong></td>
+<td>Turn Left</td>
+<td>Steer left</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>Turn Right</td>
+<td>Steer right</td>
+</tr>
+<tr>
+<td><strong>Z</strong></td>
+<td>Auto/Local</td>
+<td><strong>Toggle control mode</strong> (must be in Local/External to drive)</td>
+</tr>
+<tr>
+<td><strong>M</strong></td>
+<td>Switch Mode</td>
+<td>Cycle modes: <code>STOP</code> → <code>PHYSICS</code> → <code>CRUISE</code></td>
+</tr>
+<tr>
+<td><strong>X</strong></td>
+<td>Gear: Drive</td>
+<td>Shift to Drive (D)</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>Gear: Reverse</td>
+<td>Shift to Reverse (R)</td>
+</tr>
+<tr>
+<td><strong>V</strong></td>
+<td>Gear: Park</td>
+<td>Shift to Park (P)</td>
+</tr>
+<tr>
+<td><strong>Space</strong></td>
+<td>Emergency Stop</td>
+<td>Immediate max braking / resume</td>
+</tr>
+<tr>
+<td><strong>R</strong></td>
+<td>Reset Pose</td>
+<td>Reset to initial position</td>
+</tr>
+<tr>
+<td><strong>Q</strong></td>
+<td>Quit</td>
+<td>Exit the interface</td>
+</tr>
+</tbody>
+</table>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
 <h3 id="visualizer-shows-global-status-warning-or-blank-screen">Visualizer Shows "Global Status: Warning" or Blank Screen<a class="headerlink" href="#visualizer-shows-global-status-warning-or-blank-screen" title="Permanent link">#</a></h3>
 <p><strong>Cause:</strong> Race condition where ROS 2 nodes start before the Zenoh bridge connection is fully established. <code>depends_on</code> helps but does not guarantee readiness.</p>
@@ -2935,7 +3143,7 @@ sleep<span class="w"> </span><span class="m">15</span>
 </li>
 </ol>
 <h3 id="port-conflict-port-is-already-allocated">Port Conflict (Port is already allocated)<a class="headerlink" href="#port-conflict-port-is-already-allocated" title="Permanent link">#</a></h3>
-<p><strong>Cause:</strong> Ports <code>6081</code> or <code>7447</code>/<code>7448</code> are in use.</p>
+<p><strong>Cause:</strong> Ports <code>6081</code> (noVNC), <code>7448</code> (cloud Zenoh router), or <code>7447</code> (edge Zenoh bridge) are in use.</p>
 <p><strong>Solution:</strong> Stop the conflicting program, or modify <code>docker-compose.yaml</code>. For example, change <code>6081:6080</code> to <code>8080:6080</code> and access via <code>http://localhost:8080</code>.</p>
 <h3 id="container-fails-to-start-with-file-not-found">Container Fails to Start with <code>file not found</code><a class="headerlink" href="#container-fails-to-start-with-file-not-found" title="Permanent link">#</a></h3>
 <p><strong>Cause:</strong> <code>config/zenoh-bridge-ros2dds.json5</code> is missing or inaccessible.</p>

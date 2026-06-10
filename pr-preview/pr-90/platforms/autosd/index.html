@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1124,7 +1124,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1141,7 +1141,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2660,6 +2660,10 @@
 <span class="w">  </span>-netdev<span class="w"> </span>user,id<span class="o">=</span>n0,net<span class="o">=</span><span class="m">10</span>.0.2.0/24,hostfwd<span class="o">=</span>tcp::2222-:22<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span>disk.qcow2,index<span class="o">=</span><span class="m">0</span>,media<span class="o">=</span>disk,format<span class="o">=</span>qcow2,if<span class="o">=</span>virtio,id<span class="o">=</span>rootdisk,snapshot<span class="o">=</span>off
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Memory sizing</p>
+<p>The <code>-m 2G</code> value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the <a href="../hardware/">hardware requirements</a> (16 GB minimum, 32 GB recommended) and raise <code>-m</code> accordingly.</p>
+</div>
 <h2 id="architecture-on-autosd">Architecture on AutoSD<a class="headerlink" href="#architecture-on-autosd" title="Permanent link">#</a></h2>
 <p>AutoSD's mixed-criticality architecture maps naturally to Open AD Kit's component model:</p>
 <div class="oak-component-grid">
@@ -2813,8 +2817,6 @@
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

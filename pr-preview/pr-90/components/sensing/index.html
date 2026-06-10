@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1124,7 +1124,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1141,7 +1141,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2563,8 +2563,13 @@
 <li><strong>Ultrasonic sensing</strong> — Short-range obstacle detection preprocessing</li>
 <li><strong>GNSS-INS preprocessing</strong> — Global positioning and inertial navigation data fusion</li>
 <li><strong>Point cloud container</strong> — Shared in-memory point cloud processing pipeline for efficient preprocessing</li>
-<li><strong>Launch files available:</strong> <code>tier4_sensing_component.launch.xml</code></li>
-<li><strong>Typical resource usage:</strong> CPU-intensive without GPU; GPU strongly recommended for point cloud preprocessing. 4–8 GB RAM typical.</li>
+<li><strong>Launch file:</strong> <code>tier4_sensing_component.launch.xml</code></li>
+</ul>
+<p>Typical resource usage:</p>
+<ul>
+<li><strong>CPU</strong>: High — point cloud preprocessing is CPU-intensive without a GPU</li>
+<li><strong>GPU</strong>: Strongly recommended for point cloud preprocessing (use the <code>sensing-perception-cuda</code> variant)</li>
+<li><strong>Memory</strong>: ~4–8 GB typical</li>
 </ul>
 <h2 id="cuda-variant">CUDA Variant<a class="headerlink" href="#cuda-variant" title="Permanent link">#</a></h2>
 <p>The <code>sensing-perception-cuda</code> image is an amd64-only, GPU-accelerated variant that offloads point cloud preprocessing and sensor data operations to NVIDIA GPUs. It requires the NVIDIA Container Toolkit and is strongly recommended for <a href="../../deployment/samples/logging-simulation/">Logging Simulation</a> deployments.</p>
@@ -2684,8 +2689,6 @@
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

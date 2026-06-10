@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1124,7 +1124,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1141,7 +1141,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2565,8 +2565,13 @@
 <li><strong>Cluster-based 3D detection</strong> — Unsupervised LiDAR clustering for object detection</li>
 <li><strong>Occupancy grid mapping</strong> — 2D grid-based environment representation for navigation</li>
 <li><strong>Traffic light recognition</strong> — Camera-based traffic signal state detection</li>
-<li><strong>Launch files available:</strong> <code>tier4_perception_component.launch.xml</code></li>
-<li><strong>Typical resource usage:</strong> Heavy GPU workload for neural network inference. 4 GB+ VRAM strongly recommended; falls back to CPU if GPU is unavailable with significantly degraded performance.</li>
+<li><strong>Launch file:</strong> <code>tier4_perception_component.launch.xml</code></li>
+</ul>
+<p>Typical resource usage:</p>
+<ul>
+<li><strong>CPU</strong>: Moderate — used as a fallback when no GPU is available, with significantly degraded performance</li>
+<li><strong>GPU</strong>: Heavy — neural network inference; 4 GB+ VRAM strongly recommended (use the <code>sensing-perception-cuda</code> variant)</li>
+<li><strong>Memory</strong>: Scales with active detection models</li>
 </ul>
 <h2 id="cuda-variant">CUDA Variant<a class="headerlink" href="#cuda-variant" title="Permanent link">#</a></h2>
 <p>The <code>sensing-perception-cuda</code> image is an amd64-only, GPU-accelerated variant that enables CUDA-based neural network inference for object detection and traffic light recognition. It requires the NVIDIA Container Toolkit and is the default choice for <a href="../../deployment/samples/logging-simulation/">Logging Simulation</a> deployments.</p>
@@ -2686,8 +2691,6 @@
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

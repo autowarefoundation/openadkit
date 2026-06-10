@@ -276,7 +276,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -599,7 +599,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -621,7 +621,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1127,7 +1127,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1144,7 +1144,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2403,28 +2403,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2454,7 +2432,7 @@
 <p>This guide walks you through setting up your environment and running your first Open AD Kit deployment.</p>
 <pre class="mermaid"><code>flowchart LR
     A[Run setup.sh] --&gt; B[Verify Installation] --&gt; C[Download a deployment]
-    A -.-&gt;|Optional| D[--no-nvidia]</code></pre>
+    A -.-&gt;|Optional| D["--no-nvidia"]</code></pre>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <p>Open AD Kit runs on <strong>Ubuntu</strong> with Docker. Install everything with the included <a href="https://github.com/autowarefoundation/openadkit/blob/main/setup.sh"><code>setup.sh</code></a> script instead of following separate install guides:</p>
 <table>
@@ -2513,12 +2491,14 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
 <p class="admonition-title">Ready to Deploy</p>
 <p>If all checks pass, you are ready to run a sample deployment. See <a href="../deployment/samples/">Sample Deployments</a>.</p>
 </div>
-<h2 id="reference">Reference<a class="headerlink" href="#reference" title="Permanent link">#</a></h2>
+<h2 class="oak-eyebrow" id="reference">Reference</h2>
+
 <ul>
 <li><a href="image-tags/">Container Image Tags</a> — Understanding the tag schema for choosing the right image</li>
 <li><a href="release-flow/">Release Flow</a> — How Open AD Kit releases are built, scanned, and promoted</li>
 </ul>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">#</a></h2>
+<h2 class="oak-eyebrow" id="next-steps">Next Steps</h2>
+
 <ul>
 <li><a href="../deployment/samples/planning-simulation/">Run your first deployment</a> — Start with the Planning Simulation sample</li>
 <li><a href="../components/">Learn about components</a> — Understand the Open AD Kit architecture</li>
@@ -2631,8 +2611,6 @@ ls<span class="w"> </span>-la<span class="w"> </span>~/autoware_data
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

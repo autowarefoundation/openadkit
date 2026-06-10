@@ -276,7 +276,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -599,7 +599,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -621,7 +621,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -753,17 +753,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
   
 </li>
       
@@ -1246,7 +1235,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1263,7 +1252,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2550,17 +2539,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2670,25 +2648,19 @@
 </code></pre></div>
 <h2 id="choosing-a-tag">Choosing a Tag<a class="headerlink" href="#choosing-a-tag" title="Permanent link">#</a></h2>
 <div class="oak-callout">
-
-**Production / reproducible deployments** — Use a stable release tag (`vX.Y.Z`).
-
-**Development / latest features** — Use a latest stable alias (`<target>-<ros_distro>`).
-
-**Quick start / samples** — Use a default ROS distro alias (`<target>`).
-
-**Never pin to CI development aliases** (`amd64-*`) in committed deployment files — they are mutable and platform-specific.
-
+<p><strong>Production / reproducible deployments</strong> — Use a stable release tag (<code>vX.Y.Z</code>).</p>
+<p><strong>Development / latest features</strong> — Use a latest stable alias (<code>&lt;target&gt;-&lt;ros_distro&gt;</code>).</p>
+<p><strong>Quick start / samples</strong> — Use a default ROS distro alias (<code>&lt;target&gt;</code>).</p>
+<p><strong>Never pin to CI development aliases</strong> (<code>*-amd64-*</code>) — Do not use mutable per-platform tags in committed deployment files.</p>
 </div>
-
 <h3 id="decision-flow">Decision Flow<a class="headerlink" href="#decision-flow" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>Need fully reproducible deployment?
-├── Yes → Use stable release tag (vX.Y.Z)
-└── No → Need specific ROS distro?
-    ├── Yes → Use latest stable alias (&lt;target&gt;-&lt;ros_distro&gt;)
-    └── No → Use default alias (&lt;target&gt;)
-</code></pre></div>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
+<pre class="mermaid"><code>flowchart TD
+    A[Need fully reproducible deployment?] --&gt;|Yes| B[Use stable release tag&lt;br&gt;vX.Y.Z]
+    A --&gt;|No| C[Need specific ROS distro?]
+    C --&gt;|Yes| D[Use latest stable alias&lt;br&gt;&amp;lt;target&amp;gt;-&amp;lt;ros_distro&amp;gt;]
+    C --&gt;|No| E[Use default alias&lt;br&gt;&amp;lt;target&amp;gt;]</code></pre>
+<h2 class="oak-eyebrow" id="related">Related</h2>
+
 <ul>
 <li><a href="../">Getting Started</a> — Environment setup and first deployment</li>
 <li><a href="../release-flow/">Release Flow</a> — How tags are created and promoted</li>
@@ -2800,8 +2772,6 @@
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

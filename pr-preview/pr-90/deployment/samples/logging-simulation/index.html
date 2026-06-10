@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1130,7 +1130,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1147,7 +1147,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2571,7 +2571,7 @@
 <li>Perception outputs (detected objects, lane boundaries) overlaid on the recorded scene</li>
 <li>Localization estimates as the vehicle traverses the logged route</li>
 <li>Planning and control outputs responding to the replayed environment</li>
-<li>Full RViz visualization via the noVNC browser interface</li>
+<li>Full RViz2 visualization via the noVNC browser interface</li>
 </ul>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
 <ul>
@@ -2631,7 +2631,7 @@
 <p>To begin replaying the recorded sensor data, start the rosbag container:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>up<span class="w"> </span>rosbag<span class="w"> </span>-d
 </code></pre></div>
-<p>Watch the RViz display as Autoware processes the replayed data in real time.</p>
+<p>Watch the RViz2 display as Autoware processes the replayed data in real time.</p>
 <h2 id="stop-the-deployment">Stop the Deployment<a class="headerlink" href="#stop-the-deployment" title="Permanent link">#</a></h2>
 <p>To stop all containers including the rosbag profile:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>--profile<span class="w"> </span>rosbag<span class="w"> </span>down
@@ -2674,7 +2674,7 @@
     LM --&gt; PC[planning-control]
     PC --&gt; Viz[visualizer]</code></pre>
 <h2 id="known-limitations">Known Limitations<a class="headerlink" href="#known-limitations" title="Permanent link">#</a></h2>
-<p>The <code>rosbag</code> service in this deployment uses the upstream <code>ghcr.io/autowarefoundation/autoware:universe</code> image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture. An OAK component image for rosbag playback will be available in a future release.</p>
+<p>The <code>rosbag</code> service in this deployment uses the upstream <code>ghcr.io/autowarefoundation/autoware:universe</code> image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture. An Open AD Kit component image for rosbag playback will be available in a future release.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="../planning-simulation/">Planning Simulation</a> — Simpler planning-focused simulation</li>
@@ -2789,8 +2789,6 @@
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

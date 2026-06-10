@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1124,7 +1124,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1141,7 +1141,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2483,24 +2483,17 @@
 <h2 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">#</a></h2>
 <p>Autoware uses a <strong>Core / Universe</strong> architecture. <strong>Core</strong> contains rigorously reviewed base functionality required for safe autonomous driving. <strong>Universe</strong> contains community extensions and research features that build on the Core foundation. Open AD Kit packages Universe components into focused container images that can be composed into complete AD systems.</p>
 <h2 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">#</a></h2>
-<div class="oak-mermaid-dark oak-pipeline-diagram">
 <pre class="mermaid"><code>flowchart TB
-    ROS["ros:humble-ros-base-jammy&lt;br/&gt;ros:jazzy-ros-base-noble"]:::rosBase --&gt; CB["common-base"]:::commonBase
-    CB --&gt; CD["common-devel"]:::commonBase
-
-    CD --&gt; SP["sensing-perception"]:::componentImage
-    CD --&gt; LM["localization-mapping"]:::componentImage
-    CD --&gt; PC["planning-control"]:::componentImage
-    CD --&gt; VS["vehicle-system"]:::componentImage
-    CD --&gt; API["api"]:::componentImage
-    CD --&gt; VIZ["visualizer"]:::componentImage
-    CD --&gt; SIM["simulator"]:::componentImage
-    SIM --&gt; CARLA["carla-interface"]:::componentImage
-
-    classDef rosBase fill:#334155,stroke:#64748b,color:#fff
-    classDef commonBase fill:#1e3a5f,stroke:#3b82f6,color:#fff
-    classDef componentImage fill:#14532d,stroke:#22c55e,color:#fff</code></pre>
-</div>
+    ROS["ros:humble-ros-base-jammy&lt;br/&gt;ros:jazzy-ros-base-noble"] --&gt; CB["common-base"]
+    CB --&gt; CD["common-devel"]
+    CD --&gt; SP["sensing-perception"]
+    CD --&gt; LM["localization-mapping"]
+    CD --&gt; PC["planning-control"]
+    CD --&gt; VS["vehicle-system"]
+    CD --&gt; API["api"]
+    CD --&gt; VIZ["visualizer"]
+    CD --&gt; SIM["simulator"]
+    SIM --&gt; CARLA["carla-interface"]</code></pre>
 <h3 id="build-groups">Build Groups<a class="headerlink" href="#build-groups" title="Permanent link">#</a></h3>
 <table>
 <thead>
@@ -2519,10 +2512,11 @@
 <tr>
 <td><code>component</code></td>
 <td>Component images</td>
-<td>sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator, carla-interface</td>
+<td>sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator</td>
 </tr>
 </tbody>
 </table>
+<p>The <code>carla-interface</code> image is built separately, on top of the <code>simulator</code> image, and is not part of the <code>component</code> bake group.</p>
 <h2 id="interface-layers">Interface Layers<a class="headerlink" href="#interface-layers" title="Permanent link">#</a></h2>
 <p>Autoware defines three formal interface categories that govern how components communicate:</p>
 <div class="oak-component-grid">
@@ -2576,7 +2570,7 @@
 
 <div class="oak-component-item">
 <strong><a href="mapping/">Mapping</a></strong>
-<span>Occupancy grid and point cloud map construction.</span>
+<span>Loads and serves Lanelet2 vector maps and 3D point cloud maps.</span>
 </div>
 
 <div class="oak-component-item">
@@ -2611,7 +2605,7 @@
 
 <div class="oak-component-item">
 <strong><a href="visualizer/">Visualizer</a></strong>
-<span>Browser-accessible RViz via noVNC for remote monitoring.</span>
+<span>Browser-accessible RViz2 via noVNC for remote monitoring.</span>
 </div>
 
 <div class="oak-component-item">
@@ -2746,8 +2740,6 @@
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

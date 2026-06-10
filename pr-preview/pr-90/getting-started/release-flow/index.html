@@ -276,7 +276,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -599,7 +599,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -621,7 +621,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -750,17 +750,6 @@
     <span class="md-ellipsis">
       
         Tag Promotion
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
       
     </span>
   </a>
@@ -1218,7 +1207,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1235,7 +1224,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2494,17 +2483,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2535,24 +2513,27 @@
 <p>Published release details are listed on the <a href="../../releases/">Releases</a> page.</p>
 <h2 id="release-process">Release Process<a class="headerlink" href="#release-process" title="Permanent link">#</a></h2>
 <div class="oak-steps">
-
-- **Build all images**
-  Run `build-all-images` from `main`. Stable releases must use an Autoware `X.Y.Z` tag; pre-releases may use an Autoware tag or full 40-character SHA.
-
-- **Record the build tag**
-  Keep the build summary's `build_tag`, formatted as `RUN_ID-RUN_ATTEMPT`.
-
-- **Scan the images**
-  Ensure `scan-images` completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise run `scan-images` manually.
-  Scans check images for known CVEs.
-
-- **Promote and tag**
-  Run the `release` workflow with the Open AD Kit `version` and the validated `build_tag`. This promotes the scanned images to stable release tags and updates latest aliases.
-
+<ul>
+<li><strong>Build all images</strong>
+  Run <code>build-all-images</code> from <code>main</code>. Stable releases must use an Autoware <code>X.Y.Z</code> tag; pre-releases may use an Autoware tag or full 40-character SHA.</li>
+</ul>
+<ul>
+<li><strong>Record the build tag</strong>
+  Keep the build summary's <code>build_tag</code>, formatted as <code>RUN_ID-RUN_ATTEMPT</code>.</li>
+</ul>
+<ul>
+<li><strong>Scan the images</strong>
+  Ensure <code>scan-images</code> completes successfully for that <code>build_tag</code>. Scheduled builds request scans automatically; otherwise run <code>scan-images</code> manually.
+  Scans check images for known CVEs.</li>
+</ul>
+<ul>
+<li><strong>Promote and tag</strong>
+  Run the <code>release</code> workflow with the Open AD Kit <code>version</code> and the validated <code>build_tag</code>. This promotes the scanned images to stable release tags and updates latest aliases.</li>
+</ul>
 </div>
-
 <pre class="mermaid"><code>flowchart LR
-    A[Build All Images] --&gt; B[Scan Images]
+    A[Build All Images] --&gt; R[Record Build Tag]
+    R --&gt; B[Scan Images]
     B --&gt; C[Promote &amp; Tag]
     C --&gt; D[Update Aliases]</code></pre>
 <h2 id="source-of-truth">Source of Truth<a class="headerlink" href="#source-of-truth" title="Permanent link">#</a></h2>
@@ -2594,7 +2575,8 @@
 <p class="admonition-title">Pre-Releases</p>
 <p>Pre-release tags (e.g., <code>-rc.1</code>) are published but <strong>do not update</strong> latest stable aliases. This prevents prerelease images from being pulled by default aliases.</p>
 </div>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
+<h2 class="oak-eyebrow" id="related">Related</h2>
+
 <ul>
 <li><a href="../image-tags/">Container Image Tags</a> — Understanding the tag schema</li>
 <li><a href="../">Getting Started</a> — Quick start guide</li>
@@ -2706,8 +2688,6 @@
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

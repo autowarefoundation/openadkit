@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1130,7 +1130,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1147,7 +1147,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2538,7 +2538,7 @@
 <li>CARLA sensor data (LiDAR, cameras, IMU, GNSS) translated into Autoware ROS 2 messages</li>
 <li>The full perception, localization, and planning pipeline operating on simulated sensors</li>
 <li>Autoware control commands actuating the CARLA ego vehicle in closed loop</li>
-<li>Full RViz visualization via the noVNC browser interface</li>
+<li>Full RViz2 visualization via the noVNC browser interface</li>
 </ul>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
 <ul>
@@ -2572,10 +2572,10 @@
 <li>Downloads the official CARLA Autoware <code>Town01</code> map assets if missing</li>
 <li>Starts the <code>carlasim/carla:0.9.16</code> server and preloads <code>Town01</code></li>
 <li>Starts the modular Open AD Kit containers (map, system, CARLA interface, sensing, perception, localization, planning, vehicle, control, API)</li>
-<li>Starts the browser RViz/noVNC visualizer</li>
+<li>Starts the browser RViz2/noVNC visualizer</li>
 <li>Verifies localization, CARLA LiDAR data, and the CARLA ego actor</li>
 </ul>
-<p>The default behavior is <strong>no-drive</strong>: set a route and engage manually in RViz.</p>
+<p>The default behavior is <strong>no-drive</strong>: set a route and engage manually in RViz2.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html
@@ -2584,7 +2584,7 @@
 <div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">8080</span>:localhost:6080<span class="w"> </span>&lt;user&gt;@&lt;host&gt;
 <span class="c1"># then open http://localhost:8080/vnc.html</span>
 </code></pre></div>
-<p>In RViz:</p>
+<p>In RViz2:</p>
 <ol>
 <li>Use <strong>2D Goal Pose</strong> to set a route</li>
 <li>Wait for routing and planning to become available</li>
@@ -2737,8 +2737,6 @@
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

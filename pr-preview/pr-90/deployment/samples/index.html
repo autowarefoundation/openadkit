@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1130,7 +1130,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1147,7 +1147,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2524,7 +2524,7 @@
 <p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8.5H7L4 11H3c-1.11 0-2 .89-2 2v3h2.17c.43 1.2 1.56 2 2.83 2s2.4-.8 2.82-2h6.35c.43 1.2 1.56 2 2.83 2s2.4-.8 2.82-2H23v-1c0-1.11-1.03-1.47-2-2zM5.25 12l2.25-2h4l4 2zM6 13.5A1.5 1.5 0 0 1 7.5 15 1.5 1.5 0 0 1 6 16.5 1.5 1.5 0 0 1 4.5 15 1.5 1.5 0 0 1 6 13.5m12 0a1.5 1.5 0 0 1 1.5 1.5 1.5 1.5 0 0 1-1.5 1.5 1.5 1.5 0 0 1-1.5-1.5 1.5 1.5 0 0 1 1.5-1.5"/></svg></span></p>
 <h3 id="carla-simulation">CARLA Simulation<a class="headerlink" href="#carla-simulation" title="Permanent link">#</a></h3>
 <p>Closed-loop end-to-end simulation with the CARLA 0.9.16 simulator. The full Autoware stack perceives and drives a CARLA ego vehicle in a photorealistic world.</p>
-<p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--recommended">GPU Required</span></p>
+<p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--required">GPU Required</span></p>
 <p><a href="carla-simulation/" class="md-button">Run CARLA Simulation</a></p>
 </div>
 </div>
@@ -2532,28 +2532,27 @@
 <p>All sample deployments require:</p>
 <ol>
 <li><strong>Docker Engine</strong> installed and running (set up via <code>setup.sh</code>)</li>
-<li><strong>NVIDIA Container Toolkit</strong> (optional but recommended for GPU acceleration)</li>
+<li><strong>NVIDIA Container Toolkit</strong> — <strong>required</strong> for CARLA Simulation; optional but recommended for the other samples (GPU acceleration)</li>
 <li><strong>Autoware Data</strong> — perception model weights and sample sensor data. Download with <code>setup.sh --download-artifacts</code> (required for logging-simulation; optional for planning/scenario simulation)</li>
 </ol>
 <p>No <code>git clone</code> is needed — each sample is downloaded as a self-contained bundle from the <a href="https://github.com/autowarefoundation/openadkit/releases/latest">latest release</a>.</p>
 <div class="admonition tip">
 <p class="admonition-title">GPU Recommendation</p>
-<p>While planning and scenario simulations can run on CPU-only machines, the logging simulation benefits significantly from a GPU for sensing and perception tasks.</p>
+<p>While planning and scenario simulations can run on CPU-only machines, the logging simulation benefits significantly from a GPU for sensing and perception tasks. <strong>CARLA Simulation requires a GPU</strong> and the NVIDIA Container Toolkit.</p>
 </div>
 <h2 id="common-workflow">Common Workflow<a class="headerlink" href="#common-workflow" title="Permanent link">#</a></h2>
 <div class="oak-steps">
-
-- **Set up the environment** — `curl -fsSL …/setup.sh | sudo bash` (one-time)
-- **Get the deployment** — Download and extract the sample's `<sample>.tar.gz` bundle, then `cd <sample>`
-- **Download assets** — `./fetch-sample-data.sh <sample>` (maps/rosbags as required)
-- **Configure environment** — Edit the `.env` file for your setup (optional)
-- **Start the deployment** — Run `docker compose --env-file <sample>.env up -d`
-- **Open the visualizer** — Access RViz via noVNC at `http://localhost:6080/vnc.html`
-- **Interact with the simulation** — Set poses, launch scenarios, or play rosbags
-- **Stop the deployment** — Run `docker compose --env-file <sample>.env down`
-
+<ul>
+<li><strong>Set up the environment</strong> — <code>curl -fsSL https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh | sudo bash</code> (one-time)</li>
+<li><strong>Get the deployment</strong> — Download and extract the sample's <code>&lt;sample&gt;.tar.gz</code> bundle, then <code>cd &lt;sample&gt;</code></li>
+<li><strong>Download assets</strong> — <code>./fetch-sample-data.sh &lt;sample&gt;</code> (maps/rosbags as required)</li>
+<li><strong>Configure environment</strong> — Edit the <code>.env</code> file for your setup (optional)</li>
+<li><strong>Start the deployment</strong> — Run <code>docker compose --env-file &lt;sample&gt;.env up -d</code></li>
+<li><strong>Open the visualizer</strong> — Access RViz2 via noVNC at <code>http://localhost:6080/vnc.html</code></li>
+<li><strong>Interact with the simulation</strong> — Set poses, launch scenarios, or play rosbags</li>
+<li><strong>Stop the deployment</strong> — Run <code>docker compose --env-file &lt;sample&gt;.env down</code></li>
+</ul>
 </div>
-
 <pre class="mermaid"><code>flowchart LR
     A[Get Bundle] --&gt; B[Fetch Assets]
     B --&gt; C[Start Deployment]
@@ -2699,8 +2698,6 @@
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1130,7 +1130,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1147,7 +1147,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2704,7 +2704,7 @@
 <tr>
 <td><code>visualizer</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit:visualizer</code></td>
-<td>Browser-accessible RViz</td>
+<td>Browser-accessible RViz2</td>
 </tr>
 <tr>
 <td><code>planning-control</code></td>
@@ -2727,7 +2727,7 @@
 <tr>
 <td><code>visualizer</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit:visualizer</code></td>
-<td>Browser-accessible RViz</td>
+<td>Browser-accessible RViz2</td>
 </tr>
 <tr>
 <td><code>planning-control</code></td>
@@ -2755,7 +2755,7 @@
 <tr>
 <td><code>visualizer</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit:visualizer</code></td>
-<td>Browser-accessible RViz</td>
+<td>Browser-accessible RViz2</td>
 </tr>
 <tr>
 <td><code>sensing-perception</code></td>
@@ -2819,7 +2819,7 @@
 <p class="admonition-title">Patterns to keep</p>
 <ul>
 <li>Components are launched with <code>ros2 launch autoware_launch tier4_&lt;component&gt;_component.launch.xml component_wise_launch:=true ...</code> — there are no per-component ROS packages named after the images.</li>
-<li>Do <strong>not</strong> override the visualizer's <code>command</code>: its entrypoint starts the VNC/noVNC stack and RViz.</li>
+<li>Do <strong>not</strong> override the visualizer's <code>command</code>: its entrypoint starts the VNC/noVNC stack and RViz2.</li>
 <li>All services need the same <code>RMW_IMPLEMENTATION</code> and <code>ROS_DOMAIN_ID</code> for DDS discovery; the samples use <code>network_mode: host</code> with CycloneDDS.</li>
 </ul>
 </div>
@@ -2972,8 +2972,6 @@ docker<span class="w"> </span>compose<span class="w"> </span>down
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

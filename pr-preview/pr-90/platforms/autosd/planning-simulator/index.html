@@ -274,7 +274,7 @@
   
     
   
-  Getting started
+  Getting Started
 
         </a>
       </li>
@@ -596,7 +596,7 @@
   <span class="md-ellipsis">
     
   
-    Getting started
+    Getting Started
   
 
     
@@ -618,7 +618,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Getting started
+    Getting Started
   
 
           </label>
@@ -1124,7 +1124,7 @@
   <span class="md-ellipsis">
     
   
-    Carla simulation
+    CARLA Simulation
   
 
     
@@ -1141,7 +1141,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Carla simulation
+    CARLA Simulation
   
 
           </label>
@@ -2541,7 +2541,11 @@
 </tr>
 </tbody>
 </table>
-<p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code>. The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario.</p>
+<div class="admonition note">
+<p class="admonition-title">Unit naming</p>
+<p>Quadlet <code>.container</code> files register with systemd as <code>.service</code> units. The table lists the source unit files (<code>awf-oak-planning.container</code>); when querying them with <code>systemctl</code>, use the generated service name (<code>awf-oak-planning.service</code>). Both names refer to the same unit.</p>
+</div>
+<p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code>, including the noVNC RViz2 visualizer. The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario.</p>
 <h2 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">#</a></h2>
 <ol>
 <li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code> (see <a href="../#building-an-autosd-image">AutoSD build instructions</a>)</li>
@@ -2563,11 +2567,11 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
     Systemd --&gt; Podman[Podman Pod]
     Podman --&gt; PC[awf-oak-planning]
     Podman --&gt; SIM[awf-oak-simulator]
-    Podman --&gt; VIZ[visualizer]</code></pre>
+    PC --&gt; VIZ[noVNC RViz2]</code></pre>
 <h2 id="expected-outcome">Expected Outcome<a class="headerlink" href="#expected-outcome" title="Permanent link">#</a></h2>
 <p>Once all services are running, you can:</p>
 <ul>
-<li>Set initial and goal poses in the noVNC RViz interface</li>
+<li>Set initial and goal poses in the noVNC RViz2 interface</li>
 <li>Observe the Autoware planning stack responding to the scenario simulator environment</li>
 <li>Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware</li>
 </ul>
@@ -2686,8 +2690,6 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
       <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-      
-        <script src="../../../assets/js/pipeline-diagram.js"></script>
       
     
   </body>

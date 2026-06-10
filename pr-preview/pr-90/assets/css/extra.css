@@ -105,6 +105,11 @@
   padding-left: 2.4rem;
 }
 
+.md-typeset .admonition.abstract {
+  background-color: rgba(0, 176, 255, 0.06);
+  border-left-color: #00b0ff;
+}
+
 .md-typeset .admonition .admonition-title::before,
 .md-typeset details summary::before {
   left: 0.6rem;
@@ -158,6 +163,7 @@
   padding: 1rem;
   font-size: 0.85em;
   line-height: 1.6;
+  overflow-x: auto;
 }
 
 .md-typeset code {
@@ -171,26 +177,28 @@
    -------------------------------------------------------------------------- */
 .md-typeset h1:has(+ .oak-hero-lead) {
   font-size: 2.6rem;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.15;
   margin-bottom: 0.6rem;
   border-bottom: none;
   padding-bottom: 0;
+  color: var(--md-default-fg-color);
 }
 
 .oak-hero-lead {
   font-size: 1.15rem;
   line-height: 1.65;
   color: #555;
-  max-width: 42rem;
+  max-width: 32rem;
   margin: 0 0 1.5rem;
 }
 
 .md-typeset h2#explore,
-.md-typeset h2#why-open-ad-kit {
+.md-typeset h2#why-open-ad-kit,
+.md-typeset h2.oak-eyebrow {
   margin-top: 2.5rem;
-  font-size: 1.15rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #888;
@@ -217,7 +225,8 @@
 }
 
 [data-md-color-scheme="slate"] .md-typeset h2#explore,
-[data-md-color-scheme="slate"] .md-typeset h2#why-open-ad-kit {
+[data-md-color-scheme="slate"] .md-typeset h2#why-open-ad-kit,
+[data-md-color-scheme="slate"] .md-typeset h2.oak-eyebrow {
   color: rgba(255, 255, 255, 0.45);
 }
 
@@ -281,6 +290,10 @@
   width: 1.6em;
   height: 1.6em;
   fill: var(--md-accent-fg-color);
+}
+
+.oak-card h3 .headerlink {
+  display: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -367,6 +380,12 @@
   border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
+.oak-badge--required {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
 /* --------------------------------------------------------------------------
    Step Flow
    -------------------------------------------------------------------------- */
@@ -374,6 +393,12 @@
   counter-reset: oak-step;
   list-style: none;
   padding-left: 0;
+}
+
+.oak-steps ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
 }
 
 .oak-steps li {
@@ -420,6 +445,10 @@
   padding: 1rem 1.2rem;
   border-radius: 0 6px 6px 0;
   margin: 1.5rem 0;
+}
+
+.oak-callout p {
+  margin-bottom: 0.6rem;
 }
 
 .oak-callout p:first-child {
@@ -474,6 +503,10 @@
   color: #c084fc;
 }
 
+[data-md-color-scheme="slate"] .oak-badge--required {
+  color: #f87171;
+}
+
 [data-md-color-scheme="slate"] .oak-card {
   background-color: #1e1e2e;
   border-color: rgba(255, 255, 255, 0.08);
@@ -494,31 +527,6 @@
 
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
   border-bottom-color: rgba(255, 255, 255, 0.06);
-}
-
-/* --------------------------------------------------------------------------
-   Dark Mermaid diagrams — white labels on dark nodes
-   Material Mermaid theme uses --md-mermaid-label-fg-color (dark by default).
-   -------------------------------------------------------------------------- */
-.md-typeset .oak-mermaid-dark,
-.md-typeset .oak-mermaid-dark .mermaid,
-.md-typeset .oak-mermaid-dark .mermaid svg {
-  --md-mermaid-label-fg-color: #ffffff;
-  --md-mermaid-label-bg-color: transparent;
-}
-
-.md-typeset .oak-mermaid-dark .mermaid .label,
-.md-typeset .oak-mermaid-dark .mermaid .label div,
-.md-typeset .oak-mermaid-dark .mermaid .nodeLabel,
-.md-typeset .oak-mermaid-dark .mermaid foreignObject,
-.md-typeset .oak-mermaid-dark .mermaid foreignObject * {
-  color: #ffffff !important;
-}
-
-.md-typeset .oak-mermaid-dark .mermaid .label,
-.md-typeset .oak-mermaid-dark .mermaid text,
-.md-typeset .oak-mermaid-dark .mermaid tspan {
-  fill: #ffffff !important;
 }
 
 /* --------------------------------------------------------------------------

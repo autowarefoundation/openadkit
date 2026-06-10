@@ -2544,7 +2544,7 @@
 
 - **Scan the images**
   Ensure `scan-images` completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise run `scan-images` manually.
-  Scans validate SBOMs and check for known CVEs.
+  Scans check images for known CVEs.
 
 - **Promote and tag**
   Run the `release` workflow with the Open AD Kit `version` and the validated `build_tag`. This promotes the scanned images to stable release tags and updates latest aliases.
@@ -2576,12 +2576,12 @@
 <tr>
 <td>Build tag</td>
 <td>Stable release</td>
-<td><code>planning-control-humble-123456789-1</code> → <code>planning-control-humble-v1.0.0</code></td>
+<td><code>planning-control-humble-123456789-1</code> → <code>planning-control-humble-v2.0.0</code></td>
 </tr>
 <tr>
 <td>Stable release</td>
 <td>Latest alias</td>
-<td><code>planning-control-humble-v1.0.0</code> → <code>planning-control-humble</code></td>
+<td><code>planning-control-humble-v2.0.0</code> → <code>planning-control-humble</code></td>
 </tr>
 <tr>
 <td>Latest alias</td>

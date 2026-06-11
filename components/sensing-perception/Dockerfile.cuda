@@ -66,6 +66,11 @@ FROM ${BASE_CUDA_RUNTIME_IMAGE} AS sensing-perception-cuda
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
+# base-cuda-runtime descends from base, which (unlike core) does not set
+# AUTOWARE_RUNTIME, so the upstream entrypoint would skip sourcing
+# /opt/autoware. Re-assert it here, as upstream universe-cuda.Dockerfile does.
+ENV AUTOWARE_RUNTIME=1
+
 USER root
 COPY --from=universe-common /opt/autoware /opt/autoware
 COPY --from=sensing-perception-cuda-devel /opt/autoware /opt/autoware

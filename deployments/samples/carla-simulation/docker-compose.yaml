@@ -5,7 +5,7 @@ services:
     network_mode: host
     init: true
     ipc: host
-    gpus: all
+    runtime: nvidia
     environment:
       - DISPLAY=${CARLA_DISPLAY}
       - SDL_VIDEODRIVER=x11
@@ -101,7 +101,7 @@ services:
     init: true
     ipc: host
     pid: service:map
-    gpus: all
+    runtime: nvidia
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
@@ -128,7 +128,7 @@ services:
     init: true
     ipc: host
     pid: service:map
-    gpus: all
+    runtime: nvidia
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}

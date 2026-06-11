@@ -270,6 +270,17 @@ start_autoware() {
     vehicle \
     control \
     api
+
+  # Fail fast if the pointcloud map is not visible inside the container. A
+  # wrong or empty bind mount (for example MAP_PATH expanded with the wrong
+  # HOME) otherwise surfaces much later as an NDT/localization timeout, which
+  # is hard to diagnose.
+  if [[ "$DRY_RUN" == false ]] \
+    && ! run_compose exec -T map test -s "/autoware_map/$POINTCLOUD_MAP_FILE"; then
+    printf 'Pointcloud map not visible in container at /autoware_map/%s; check MAP_PATH=%s\n' \
+      "$POINTCLOUD_MAP_FILE" "$MAP_PATH" >&2
+    return 1
+  fi
 }
 
 start_visualizer() {

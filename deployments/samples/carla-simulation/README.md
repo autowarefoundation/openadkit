@@ -15,7 +15,11 @@ The default runtime uses the official CARLA Ubuntu 22 container image. It does n
 
 ## Requirements
 
-- Docker with NVIDIA Container Toolkit
+- Docker with NVIDIA Container Toolkit, registered as the `nvidia` runtime
+  (`sudo nvidia-ctk runtime configure --runtime=docker`). Run the demo as a
+  user in the `docker` group, not via `sudo`: `sudo` resets `HOME` to `/root`,
+  so `${MAP_PATH}` (which uses `$HOME`) interpolates to an empty mount and
+  localization never initializes.
 - Access to `carlasim/carla:0.9.16`
 - A working host X display, usually `DISPLAY=:0`
 - Host X access for local Docker containers, for example `xhost +SI:localuser:root`

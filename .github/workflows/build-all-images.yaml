@@ -357,7 +357,11 @@ jobs:
           UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
         run: |
           set -euo pipefail
-          refs=$(docker buildx bake -f "${BAKE_FILE}" --print universe-common 2>/dev/null \
+          # universe-common surfaces core/core-devel; sensing-perception-cuda
+          # surfaces base-cuda-{devel,runtime}. Together they cover every
+          # upstream base this build depends on, so a missing CUDA base fails
+          # here instead of late in build-components.
+          refs=$(docker buildx bake -f "${BAKE_FILE}" --print universe-common sensing-perception-cuda 2>/dev/null \
             | jq -r '[.target[].contexts // {} | to_entries[].value]
                      | map(select(startswith("docker-image://ghcr.io/autowarefoundation/autoware:")))
                      | unique[]' | sed 's#^docker-image://##')

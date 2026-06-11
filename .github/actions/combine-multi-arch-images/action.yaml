@@ -42,9 +42,8 @@ runs:
         DISTRO="${{ inputs.ros-distro }}"
         BUILD_TAG="${{ inputs.build-tag }}"
 
-        # Known common image variants
-        MULTI_ARCH_VARIANTS="base devel"
-        CUDA_VARIANTS="base-cuda devel-cuda"
+        # Known common image variants (universe-common is multi-arch; no CUDA variant)
+        MULTI_ARCH_VARIANTS="universe-common-devel universe-common"
 
         # Create multi-arch manifests (amd64 + arm64)
         for variant in ${MULTI_ARCH_VARIANTS}; do
@@ -53,15 +52,6 @@ runs:
           docker buildx imagetools create -t "${IMAGE}:${base_tag}" \
             "${IMAGE}:${variant}-amd64-${DISTRO}-${BUILD_TAG}" \
             "${IMAGE}:${variant}-arm64-${DISTRO}-${BUILD_TAG}"
-          echo "Created ${IMAGE}:${base_tag}"
-        done
-
-        # Create single-arch aliases for CUDA (amd64-only)
-        for variant in ${CUDA_VARIANTS}; do
-          base_tag="${variant}-${DISTRO}-${BUILD_TAG}"
-          echo "Creating single-arch manifest for ${IMAGE}:${base_tag}"
-          docker buildx imagetools create -t "${IMAGE}:${base_tag}" \
-            "${IMAGE}:${variant}-amd64-${DISTRO}-${BUILD_TAG}"
           echo "Created ${IMAGE}:${base_tag}"
         done
       shell: bash

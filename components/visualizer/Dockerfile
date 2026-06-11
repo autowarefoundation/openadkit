@@ -1,83 +1,110 @@
-# Dockerfile - Builds visualizer image
-ARG COMMON_BASE_IMAGE=ghcr.io/autowarefoundation/openadkit-common:base
-ARG COMMON_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit-common:devel
-ARG ROS_DISTRO=humble
+# syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom,UndefinedVar
+ARG UNIVERSE_COMMON_DEVEL_IMAGE
+ARG UNIVERSE_COMMON_IMAGE
 
 # =============================================================================
 # Build stage: visualizer-devel
 # =============================================================================
-FROM $COMMON_DEVEL_IMAGE AS visualizer-devel
+FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS visualizer-devel
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
-# Install rosdep dependencies and build packages
-RUN --mount=type=cache,target="${CCACHE_DIR}" \
-  --mount=type=bind,source=autoware/src/universe/autoware_universe/visualization,target=/autoware/src/universe/autoware_universe/visualization \
-  apt-get update \
-  && source /opt/ros/"$ROS_DISTRO"/setup.bash \
-  && source /opt/autoware/setup.bash \
-  && rosdep update \
-  && /scripts/resolve_rosdep_keys.sh /autoware/src "${ROS_DISTRO}" --dependency-types=exec > /tmp/rosdep-visualizer-exec-pkgs.txt \
-  && /scripts/resolve_rosdep_keys.sh /autoware/src "${ROS_DISTRO}" > /tmp/rosdep-visualizer-pkgs.txt \
-  && cat /tmp/rosdep-visualizer-pkgs.txt | xargs apt-get install -y --no-install-recommends \
-  && /scripts/cleanup_apt.sh true \
-  && source /opt/ros/"$ROS_DISTRO"/setup.bash \
-  && source /opt/autoware/setup.bash \
-  && /scripts/build_and_clean.sh "${CCACHE_DIR}" /opt/autoware
+COPY --parents --chown=${USERNAME}:${USERNAME} \
+    autoware/src/**/package.xml \
+    /tmp/
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
+      --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --dependency-types=build --dependency-types=build_export \
+      --dependency-types=buildtool --dependency-types=buildtool_export \
+      --dependency-types=test
+
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths \
+        /tmp/autoware/src/universe/autoware_universe/visualization \
+      --install-base /opt/autoware \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf build log
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
+      --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --dependency-types=exec && \
+    rm -rf /tmp/autoware
 
 # =============================================================================
 # Runtime stage: visualizer
 # =============================================================================
-FROM $COMMON_BASE_IMAGE AS visualizer
+FROM ${UNIVERSE_COMMON_IMAGE} AS visualizer
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
-# Copy rosdep dependency lists and binaries from devel stage
-COPY --from=visualizer-devel /tmp/rosdep-universe-common-exec-pkgs.txt /tmp/rosdep-universe-common-exec-pkgs.txt
-COPY --from=visualizer-devel /tmp/rosdep-visualizer-exec-pkgs.txt /tmp/rosdep-visualizer-exec-pkgs.txt
-
-# Install rosdep dependencies and apt packages (openbox, VNC, and simulator dependencies)
-RUN --mount=type=ssh \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt-get update \
-  && cat /tmp/rosdep-universe-common-exec-pkgs.txt | xargs apt-get install -y --no-install-recommends \
-  && cat /tmp/rosdep-visualizer-exec-pkgs.txt | xargs apt-get install -y --no-install-recommends \
-  && apt-get install -y --no-install-recommends \
-  curl \
-  unzip \
-  openbox \
-  tigervnc-standalone-server \
-  tigervnc-common \
-  tigervnc-tools \
-  novnc \
-  websockify \
-  python3-numpy \
-  python3-xdg \
-  pipx \
-  && pipx install yamale \
-  && pipx install xmlschema \
-  && /scripts/cleanup_apt.sh true \
-  && /scripts/cleanup_system.sh $ROS_DISTRO
-
-# Copy binaries from devel stage
+USER root
 COPY --from=visualizer-devel /opt/autoware /opt/autoware
+RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
 
-# Create SSL certificate for NoVNC
+COPY --parents --chown=${USERNAME}:${USERNAME} \
+    autoware/src/**/package.xml \
+    /tmp/
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
+    rm -rf /tmp/*
+
+# Install VNC / NoVNC / Openbox stack and simulation tooling.
+USER root
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      curl \
+      unzip \
+      openbox \
+      tigervnc-standalone-server \
+      tigervnc-common \
+      tigervnc-tools \
+      novnc \
+      websockify \
+      python3-numpy \
+      python3-xdg \
+      pipx && \
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install yamale && \
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema
+
+# Create SSL certificate for NoVNC.
 RUN openssl req -x509 -nodes -newkey rsa:2048 \
-  -keyout /etc/ssl/private/novnc.key \
-  -out /etc/ssl/certs/novnc.crt \
-  -days 365 \
-  -subj "/O=Autoware-OpenADKit/CN=localhost"
+    -keyout /etc/ssl/private/novnc.key \
+    -out /etc/ssl/certs/novnc.crt \
+    -days 365 \
+    -subj "/O=Autoware-OpenADKit/CN=localhost"
 
-# Need to expose VNC and NoVNC ports when running the container
+# Need to expose VNC and NoVNC ports when running the container.
 EXPOSE 5900 6080
 
-# Add source commands to bash startup
-RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /root/.bashrc && \
-  echo "source /opt/autoware/setup.bash" >> /root/.bashrc
+# Add source commands to bash startup.
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
+    echo "source /opt/autoware/setup.bash" >> /root/.bashrc
 
-# Copy startup scripts
+# Copy startup scripts.
 COPY components/visualizer/etc/xstartup /root/.vnc/xstartup
-COPY components/visualizer/etc/visualizer_entrypoint.sh /scripts/visualizer_entrypoint.sh
-RUN chmod +x /scripts/visualizer_entrypoint.sh && chmod +x /root/.vnc/xstartup
-ENTRYPOINT ["/scripts/visualizer_entrypoint.sh"]
+COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
+RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /root/.vnc/xstartup
+
+ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]

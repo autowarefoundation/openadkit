@@ -36,7 +36,7 @@ sensor_mappings:
       topic_image: /sensing/camera/CAM_FRONT/image_raw
       topic_info: /sensing/camera/CAM_FRONT/camera_info
       frequency_hz: 11
-      qos_profile: reliable
+      qos_profile: best_effort
     parameters:
       image_size_x: 1600
       image_size_y: 900
@@ -50,7 +50,7 @@ sensor_mappings:
       topic_image: /sensing/camera/CAM_FRONT_LEFT/image_raw
       topic_info: /sensing/camera/CAM_FRONT_LEFT/camera_info
       frequency_hz: 11
-      qos_profile: reliable
+      qos_profile: best_effort
     parameters:
       image_size_x: 1600
       image_size_y: 900
@@ -64,7 +64,7 @@ sensor_mappings:
       topic_image: /sensing/camera/CAM_FRONT_RIGHT/image_raw
       topic_info: /sensing/camera/CAM_FRONT_RIGHT/camera_info
       frequency_hz: 11
-      qos_profile: reliable
+      qos_profile: best_effort
     parameters:
       image_size_x: 1600
       image_size_y: 900
@@ -78,7 +78,7 @@ sensor_mappings:
       topic_image: /sensing/camera/CAM_BACK/image_raw
       topic_info: /sensing/camera/CAM_BACK/camera_info
       frequency_hz: 11
-      qos_profile: reliable
+      qos_profile: best_effort
     parameters:
       image_size_x: 1600
       image_size_y: 900
@@ -92,7 +92,7 @@ sensor_mappings:
       topic_image: /sensing/camera/CAM_BACK_LEFT/image_raw
       topic_info: /sensing/camera/CAM_BACK_LEFT/camera_info
       frequency_hz: 11
-      qos_profile: reliable
+      qos_profile: best_effort
     parameters:
       image_size_x: 1600
       image_size_y: 900
@@ -106,7 +106,7 @@ sensor_mappings:
       topic_image: /sensing/camera/CAM_BACK_RIGHT/image_raw
       topic_info: /sensing/camera/CAM_BACK_RIGHT/camera_info
       frequency_hz: 11
-      qos_profile: reliable
+      qos_profile: best_effort
     parameters:
       image_size_x: 1600
       image_size_y: 900
@@ -165,11 +165,12 @@ enabled_sensors:
 
   # Cameras are intentionally not enabled in this sample. Perception runs in
   # lidar mode with traffic light recognition disabled, so no node consumes
-  # camera images, while each camera adds CARLA render work inside every
-  # synchronous tick and multi-megabyte reliable publishes inside the bridge
-  # loop. On hosts without high single-core clocks this slows the simulation
-  # below what Autoware's data-freshness gates tolerate.
-  # To experiment with cameras, uncomment entries below:
+  # camera images, while each camera still adds CARLA render work inside every
+  # synchronous tick plus image publishes inside the bridge loop, which slows
+  # the simulation on hosts without high single-core clocks. The cameras use
+  # best_effort QoS (above) so those publishes do not block the tick loop on
+  # reliable-QoS flow control, which keeps the simulation usable when cameras
+  # are enabled. To experiment with cameras, uncomment entries below:
   # - CAM_FRONT/camera_link
   # - CAM_FRONT_LEFT/camera_link
   # - CAM_FRONT_RIGHT/camera_link

@@ -83,6 +83,12 @@ In RViz:
 - Wait for routing and planning to become available.
 - Click `Auto` to engage autonomous driving.
 
+The visualizer renders RViz on the GPU via VirtualGL when one is available,
+which keeps RViz smooth with dense point clouds and camera images instead of
+falling back to slow software rendering. Detection is automatic; force it with
+`RVIZ_GPU=on` or disable it with `RVIZ_GPU=off` (the same image still runs on
+hosts without a GPU).
+
 ## Optional Drive Check
 
 To automatically set a short forward route, engage autonomous mode, and verify movement:

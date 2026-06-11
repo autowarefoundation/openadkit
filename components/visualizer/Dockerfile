@@ -56,6 +56,9 @@ RUN --mount=type=ssh \
   pipx \
   && pipx install yamale \
   && pipx install xmlschema \
+  && curl -fsSL -o /tmp/virtualgl.deb https://github.com/VirtualGL/virtualgl/releases/download/3.1.2/virtualgl_3.1.2_amd64.deb \
+  && apt-get install -y --no-install-recommends /tmp/virtualgl.deb \
+  && rm -f /tmp/virtualgl.deb \
   && /scripts/cleanup_apt.sh true \
   && /scripts/cleanup_system.sh $ROS_DISTRO
 

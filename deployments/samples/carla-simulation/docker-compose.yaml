@@ -279,11 +279,18 @@ services:
     init: true
     ipc: host
     pid: service:map
+    runtime: nvidia
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
+      # GPU-accelerate RViz via VirtualGL when a GPU is present; the
+      # visualizer entrypoint auto-detects and falls back to software
+      # rendering otherwise (override with RVIZ_GPU=on|off).
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
+      - RVIZ_GPU=auto
     depends_on:
       - map
       - api

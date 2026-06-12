@@ -401,31 +401,16 @@ jobs:
       - name: Inject BuildKit cache mounts
         uses: reproducible-containers/buildkit-cache-dance@v3
         with:
+          # Only ccache is persisted across runs: it is the entire ~4.5x
+          # recompile win and stays small (~0.14 GB/leg). apt/pip mounts were
+          # dropped to keep the repo-wide 10 GB cache budget clear of LRU
+          # eviction (their bandwidth-bound saving is largely covered by the
+          # registry layer cache anyway).
           cache-map: |
             {
-              "cache-mounts/apt-cache": {
-                "id": "apt-cache-${{ matrix.ros-distro }}",
-                "target": "/var/cache/apt"
-              },
-              "cache-mounts/apt-lists": {
-                "id": "apt-lists-${{ matrix.ros-distro }}",
-                "target": "/var/lib/apt/lists"
-              },
               "cache-mounts/ccache": {
                 "id": "ccache-${{ matrix.ros-distro }}",
                 "target": "/home/aw/.ccache",
-                "uid": "1000",
-                "gid": "1000"
-              },
-              "cache-mounts/pip": {
-                "id": "pip-cache",
-                "target": "/home/aw/.cache/pip",
-                "uid": "1000",
-                "gid": "1000"
-              },
-              "cache-mounts/pipx": {
-                "id": "pipx-cache",
-                "target": "/home/aw/.cache/pipx",
                 "uid": "1000",
                 "gid": "1000"
               }
@@ -574,28 +559,14 @@ jobs:
       - name: Inject BuildKit cache mounts
         uses: reproducible-containers/buildkit-cache-dance@v3
         with:
+          # Only ccache is persisted across runs (see build-common above for
+          # the rationale). A single uniform map also drops the previous CUDA
+          # apt special-case.
           cache-map: |
             {
-              ${{ matrix.target != 'sensing-perception-cuda' && format('"cache-mounts/apt-cache": {{ "id": "apt-cache-{0}", "target": "/var/cache/apt" }},', matrix.ros-distro) || '' }}
-              "cache-mounts/apt-lists": {
-                "id": "apt-lists-${{ matrix.ros-distro }}",
-                "target": "/var/lib/apt/lists"
-              },
               "cache-mounts/ccache": {
                 "id": "ccache-${{ matrix.ros-distro }}",
                 "target": "/home/aw/.ccache",
-                "uid": "1000",
-                "gid": "1000"
-              },
-              "cache-mounts/pip": {
-                "id": "pip-cache",
-                "target": "/home/aw/.cache/pip",
-                "uid": "1000",
-                "gid": "1000"
-              },
-              "cache-mounts/pipx": {
-                "id": "pipx-cache",
-                "target": "/home/aw/.cache/pipx",
                 "uid": "1000",
                 "gid": "1000"
               }

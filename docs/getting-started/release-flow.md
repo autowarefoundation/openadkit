@@ -36,7 +36,7 @@ flowchart LR
 The following artifacts are the canonical reference for release validation:
 
 - **Build metadata** — CI run logs and artifact manifests
-- **Scan metadata** — SBOM and CVE scan results
+- **Scan metadata** — CVE scan results
 - **`.github/image-inventory.json`** — Canonical inventory of all published images and their tags
 
 ## Tag Promotion

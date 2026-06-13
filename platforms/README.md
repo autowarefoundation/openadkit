@@ -2,5 +2,5 @@
 
 This directory contains platform specific deployment configurations for **Open AD Kit**. Each folder contains a README file with detailed instructions on how to deploy the deployment configuration for the specific platform.
 
-- [AutoSD](./autosd/README.md): How to build and deploy Open AD Kit components in AutoSD
-- EWAOL (planned): Target platform under discussion; runnable assets are not yet present in this repository
+- [AutoSD](./autosd/README.md): Build and deploy Open AD Kit components in AutoSD (runnable assets in repo)
+- EWAOL: Verified upstream; EWAOL-specific deployment assets are still being added to this repository (see [EWAOL docs](../docs/platforms/ewaol/index.md))

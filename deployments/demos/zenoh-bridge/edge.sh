@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Function to show help message
 show_help() {
@@ -20,6 +21,7 @@ show_help() {
 
 # Import common library
 source ./common.sh
+load_env
 
 # Define Edge services
 EDGE_SERVICES="autoware scenario_simulator edge_zenoh_bridge"
@@ -63,14 +65,21 @@ fi
 
 TARGET_SERVICES="$EDGE_SERVICES"
 
+# The map is mounted from the host (fetched beforehand), not extracted in-container.
+# .env is the single source for the path; compose interpolates the same variable.
+MAP_DIR="${MAP_PATH:?MAP_PATH not set — is .env present?}"
 if [ "$CMD" == "up" ]; then
-    echo -e "${YELLOW}[Info]${NC} Initializing map volume..."
-    if ! docker compose up --force-recreate --no-deps map-init; then
-        echo -e "${RED}[Error]${NC} Map initialization failed."
-        exit 1
-    fi
-elif [ "$CMD" == "down" ]; then
-    TARGET_SERVICES="map-init $EDGE_SERVICES"
+    for map_file in lanelet2_map.osm pointcloud_map.pcd; do
+        if [ ! -f "${MAP_DIR}/${map_file}" ]; then
+            echo -e "${RED}[Error]${NC} Map file ${map_file} not found in ${MAP_DIR}."
+            if [ -f ./fetch-sample-data.sh ]; then
+                echo -e "       Run ./fetch-sample-data.sh zenoh-bridge --force to (re-)fetch the map."
+            else
+                echo -e "       Run ../../scripts/fetch-sample-data.sh zenoh-bridge --force to (re-)fetch the map."
+            fi
+            exit 1
+        fi
+    done
 fi
 
 # Run Compose

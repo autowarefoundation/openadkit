@@ -23,8 +23,14 @@ log/
 # MkDocs
 /site/
 
+# Generated docs
+docs/releases/index.md
+
 # rviz Screen Capture
 capture/
 
 # CodeChecker
 .codechecker/
+
+# Playwright CLI artifacts
+.playwright-cli/

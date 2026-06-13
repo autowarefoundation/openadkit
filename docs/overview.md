@@ -1,0 +1,58 @@
+# Overview
+
+<p class="oak-hero-lead">
+  What Open AD Kit is, why it exists, and how it relates to Autoware — the autonomous driving stack it packages for cloud-native deployment.
+</p>
+
+## What is Open AD Kit
+
+Open AD Kit packages the [Autoware](https://github.com/autowarefoundation/autoware) autonomous driving stack as a set of focused, independently deployable container images. Rather than shipping one monolithic image, it splits the stack along the AD pipeline — sensing, perception, localization, mapping, planning, control, and supporting services — so you can run only what a given workload needs.
+
+Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packages upstream software into composable container images, defines deployment configurations, integrates with target platforms and vehicle systems, and maintains the build, test, and release tooling needed to run consistently from simulation through in-vehicle deployment.
+
+!!! abstract "SOAFEE Blueprint"
+    The first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle, co-developed with the [eSync Alliance](https://esyncalliance.org/). Learn more on the [Platforms](platforms/index.md) page.
+
+## Why Open AD Kit
+
+<div class="oak-card-grid" markdown="1">
+
+<div class="oak-card" markdown="1">
+
+:material-view-module-outline:{ .oak-card-icon }
+
+<h3>Modular Components</h3>
+<p>Independent images for each stage of the AD pipeline. Deploy only what you need.</p>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-shield-half-full:{ .oak-card-icon }
+
+<h3>Mixed Criticality</h3>
+<p>Separate safety-critical and non-critical workloads across certified and standard hardware.</p>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-cloud-sync-outline:{ .oak-card-icon }
+
+<h3>Cloud Native</h3>
+<p>Scale from simulation to the edge with Docker Compose, Docker Bake, and platform integrations.</p>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-infinity:{ .oak-card-icon }
+
+<h3>Connected and Continuous</h3>
+<p>CI/CD with GitHub Actions, optimized build caching, and containerized testing.</p>
+</div>
+
+</div>
+
+<h2 class="oak-eyebrow" id="related">Related</h2>
+
+- [Getting Started](getting-started/index.md) — Set up your environment
+- [Deployment](deployment/index.md) — Run your first sample
+- [Platforms](platforms/index.md) — Choose a deployment target

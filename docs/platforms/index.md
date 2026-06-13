@@ -1,19 +1,80 @@
 # Supported Platforms
 
-As the Autoware Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software defined vehicle ecosystem, it tracks multiple platform directions. The repository currently contains runnable assets for AutoSD; EWAOL remains a documented target rather than an implemented one.
+As the Autoware Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle ecosystem, it tracks multiple platform directions aligned with cloud-native, software-defined vehicle principles.
 
-Here is an explanatory blog post on the [benefits of open standards in automotive development](https://www.soafee.io/blog/2025/the-benefits-of-open-standards-in-automotive-development/).
+!!! abstract "SOAFEE and Open AD Kit"
+    The Autoware Foundation is a voting member of [SOAFEE](https://www.soafee.io/) (Scalable Open Architecture For the Embedded Edge). Open AD Kit was co-developed with SOAFEE and the [eSync Alliance](https://esyncalliance.org/) as the first blueprint, and has since seeded derived blueprints including DENSO's AVP blueprint and Red Hat's AutoSD blueprint.
+
+    Read more about the [benefits of open standards in automotive development](https://www.soafee.io/blog/2025/the-benefits-of-open-standards-in-automotive-development/).
+
+```mermaid
+graph LR
+    OAK[Open AD Kit<br/>First Blueprint] --> DENSO[DENSO AVP Blueprint]
+    OAK --> RH[Red Hat AutoSD Blueprint]
+```
+
+## Platform Overview
+
+<div class="oak-card-grid" markdown="1">
+
+<div class="oak-card" markdown="1">
+
+:material-server:{ .oak-card-icon }
+
+<h3>AutoSD</h3>
+<p>Automotive Stream Distribution — the upstream preview of Red Hat In-Vehicle OS. Mixed-criticality containers with Podman, Quadlet, and BlueChi orchestration.</p>
+<a href="autosd/" class="md-button md-button--primary">View AutoSD Docs</a>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-cloud-outline:{ .oak-card-icon }
+
+<h3>EWAOL</h3>
+<p>Edge Workload Abstraction and Orchestration Layer — Arm's container-centric Yocto framework. Verified on ADLINK AVA with K3s runtime.</p>
+<a href="ewaol/" class="md-button md-button--primary">View EWAOL Docs</a>
+</div>
+
+</div>
 
 ## SOAFEE Middleware Platforms
 
-### [AutoSD](https://docs.centos.org/automotive-sig-documentation/features-and-concepts/)
+### [AutoSD](autosd/index.md)
 
-AutoSD is the upstream binary distribution that serves as the public, in-development preview of Red Hat In-Vehicle Operating System (OS). AutoSD is downstream of CentOS Stream, so it retains most of the CentOS Stream code with a few divergences, such as an optimized automotive-specific kernel rather than CentOS Stream's kernel package. Red Hat In-Vehicle OS is based on both AutoSD and RHEL, both of which are downstreams of CentOS Stream. 
+<span class="oak-badge oak-badge--verified">Verified</span> <span class="oak-badge oak-badge--supported">Runnable assets in repo</span>
 
-Instructions on how to build and deploy Open AD Kit on AutoSD can be found in the [AutoSD folder](autosd/index.md).
+AutoSD is the upstream binary distribution that serves as the public, in-development preview of **Red Hat In-Vehicle Operating System (OS)**. It is built on CentOS Stream with an automotive-specific kernel (`kernel-automotive`) and provides mixed-criticality container orchestration via Podman, Quadlet, and BlueChi.
 
-### [EWAOL](https://ewaol.docs.arm.com/en/kirkstone-dev/)
+Key capabilities:
 
-The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying and orchestrating applications on edge platforms, delivered via the `meta-ewaol` Yocto layer to build distribution images. It organizes the stack into user-defined containerized application workloads (deployed by end users), an EWAOL Linux filesystem that provides core services such as Docker, K3s, and Xen along with validation and development tooling, and platform-specific system software (firmware, bootloader, OS, and optional Xen) integrated from `meta-arm`, `meta-arm-bsp`, and `meta-virtualization`. EWAOL is the reference implementation for SOAFEE, extending cloud-native methods to automotive with an emphasis on real-time and functional safety.
+- **Mixed criticality**: Root partition for safety-critical containers, QM partition for non-critical workloads
+- **Atomic updates**: OSTree and composefs for immutable, rollback-capable system images
+- **Real-time kernel**: RT-optimized scheduling for deterministic autonomous driving functions
+- **Container-native**: Podman and Quadlet for systemd-managed container services
 
-The [EWAOL page](ewaol/index.md) currently captures project intent and status only. Runnable deployment instructions are still planned.
+### [EWAOL](ewaol/index.md)
+
+<span class="oak-badge oak-badge--verified">Verified upstream</span> <span class="oak-badge oak-badge--planned">Assets in progress</span>
+
+The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying edge workloads, delivered via the `meta-ewaol` Yocto layer. It is the reference implementation for SOAFEE.
+
+Key capabilities:
+
+- **Container-native runtime**: Docker and K3s orchestration on the edge
+- **Real-time Linux**: Deterministic scheduling for safety-critical workloads
+- **Virtualization**: Xen support for mixed-criticality separation
+- **Cloud-to-edge parity**: Arm Neoverse N1 architecture on both AVA platform and AWS Graviton
+
+EWAOL is a verified platform with upstream build and runtime instructions for the ADLINK AADP-AVA platform. This repository is progressively adding EWAOL-specific deployment assets — see the [EWAOL platform page](ewaol/index.md) and [`platforms/README.md`](https://github.com/autowarefoundation/openadkit/blob/main/platforms/README.md) for current status.
+
+## Development Platforms
+
+For local development and simulation, Open AD Kit supports:
+
+- **Ubuntu 22.04 LTS** (primary)
+- **Ubuntu 24.04 LTS**
+
+## Related
+
+- [Hardware requirements and tested platforms](hardware/index.md)
+- [Getting started guide](../getting-started/index.md)

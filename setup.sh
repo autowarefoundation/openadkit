@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC1091
 
-set -e
+set -euo pipefail
 SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
 CLR_GREEN="\033[32m"
 CLR_RED="\033[31m"
 CLR_RESET="\033[0m"
 INSTALL_NVIDIA=true
 DOWNLOAD_ARTIFACTS=false
+# Resolve the real invoking user whether the script is run via sudo or directly as root.
+TARGET_USER="${SUDO_USER:-$(id -un)}"
 
 #### Functions ####
 print_help() {
@@ -61,7 +63,7 @@ install_nvidia_container_toolkit() {
         sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 
     # Add NVIDIA container toolkit repository using official repo list
-    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+    curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
         sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
         sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
 
@@ -107,7 +109,7 @@ install_docker() {
 
     # Add user to docker group
     sudo groupadd docker 2>/dev/null || true
-    sudo usermod -aG docker "$USER"
+    sudo usermod -aG docker "$TARGET_USER"
 
     echo -e "${CLR_GREEN}Docker installed successfully!${CLR_RESET}"
     echo -e "${CLR_GREEN}Please log out and log back in for Docker group changes to take effect.${CLR_RESET}"
@@ -117,7 +119,7 @@ download_autoware_artifacts() {
     echo "Downloading Autoware artifacts..."
 
     # Remove apt installed ansible (In Ubuntu 22.04, ansible the version is old)
-    sudo apt-get purge ansible
+    sudo apt-get purge -y ansible || true
 
     # Install pipx
     sudo apt-get -y update
@@ -132,14 +134,14 @@ download_autoware_artifacts() {
     # Clone Autoware
     git clone https://github.com/autowarefoundation/autoware.git ~/autoware
 
-    # Get the user home directory from the sudo user
-    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    # Get the user home directory from the resolved target user
+    USER_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 
     # Install Autoware artifacts
     cd ~/autoware # The root directory of the cloned repository
     ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml"
     ansible-playbook autoware.dev_env.download_artifacts -e "data_dir=$USER_HOME/autoware_data"
-    chown -R "$SUDO_USER:$SUDO_USER" "$USER_HOME/autoware_data"
+    sudo chown -R "$TARGET_USER:$TARGET_USER" "$USER_HOME/autoware_data"
 
     # Remove the cloned Autoware directory
     rm -rf ~/autoware

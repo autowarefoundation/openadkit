@@ -1,11 +1,39 @@
 # Open AD Kit Deployments
 
-This directory contains deployment configurations for **Open AD Kit**. Each folder contains a README file with detailed instructions on how to deploy the deployment configuration.
+This directory contains deployment configurations for Open AD Kit.
 
-- **Sample deployment** configurations for development and testing.
-  - [CARLA Simulation](./samples/carla-simulation): Simple Open AD Kit deployment that demonstrates the open-source planning stack with CARLA as an external simulator.
-  - [Planning Simulation](./samples/planning-simulation): Simple Open AD Kit deployment that demonstrates the autoware **planning features** with planning simulation.
-  - [Scenario Simulation](./samples/scenario-simulation): Simple Open AD Kit deployment that demonstrates **scenario-based validation** with the TIER IV Scenario Simulator.
-  - [Logging Simulation](./samples/logging-simulation): Simple Open AD Kit deployment that demonstrates the autoware **end-to-end functionality** with sensor simulation using rosbag.
-- **Demo deployment** configurations with specific use case scenarios.
-  - [Zenoh Bridge](./demos/zenoh-bridge): A demo of remote visualization with Zenoh bridge. See the [Zenoh Bridge documentation](../docs/deployments/demos/zenoh-bridge/index.md) for more details.
+## Quick Links
+
+For **complete documentation**, operational steps, and troubleshooting, see the [Open AD Kit Documentation Site](https://autowarefoundation.github.io/openadkit/deployment/).
+
+## Available Deployments
+
+### Samples
+
+Single-machine deployments for learning and development:
+
+- [Planning Simulation](./samples/planning-simulation) — Planning stack with a sample map
+- [Scenario Simulation](./samples/scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
+- [Logging Simulation](./samples/logging-simulation) — End-to-end stack with rosbag replay
+- [CARLA Simulation](./samples/carla-simulation) — Closed-loop planning with CARLA as an external simulator (experimental, amd64 + GPU)
+
+### Demos
+
+Distributed deployments for advanced use cases:
+
+- [Zenoh Bridge](./demos/zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
+
+## Directory Layout
+
+```text
+deployments/
+├── samples/
+│   ├── planning-simulation/
+│   ├── scenario-simulation/
+│   ├── logging-simulation/
+│   └── carla-simulation/       # downloads its own assets via start-carla-e2e-demo.sh
+├── demos/
+│   └── zenoh-bridge/
+└── scripts/
+    └── fetch-sample-data.sh   # downloads sample maps/rosbags into ~/autoware_map
+```

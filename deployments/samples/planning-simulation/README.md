@@ -1,57 +1,27 @@
 # Autoware Open AD Kit Planning Simulation
 
-This sample deployment shows how to run Autoware Open AD Kit **planning simulation**.
+This sample deployment demonstrates the Open AD Kit planning simulation workflow.
 
-## Requirements
+## Documentation
 
-In order to run the planning simulation, you need the planning simulation **sample map**.
+For **complete operational instructions** including map download, startup, visualizer access, and troubleshooting, see the canonical documentation:
 
-If `gdown` or `unzip` are not installed yet, install them first:
+**[Open AD Kit Docs — Planning Simulation](https://autowarefoundation.github.io/openadkit/deployment/samples/planning-simulation/)**
 
-```bash
-sudo apt-get install -y python3-pip unzip
-python3 -m pip install --user gdown
-```
-
-### Sample Planning Map
-
-Download and unpack a planning simulation sample map that is used in this sample.
-
-- You can also download [the map](https://drive.google.com/file/d/1499_nsbUbIeturZaDj7jhUownh5fvXHd/view?usp=sharing) manually.
+## Quick Start
 
 ```bash
-mkdir -p ~/autoware_map
-gdown -O ~/autoware_map/sample-map-planning.zip 'https://docs.google.com/uc?export=download&id=1499_nsbUbIeturZaDj7jhUownh5fvXHd'
-unzip -o -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
+# From this directory
+# 1. Download the sample map (from a cloned repo: ../../scripts/fetch-sample-data.sh)
+./fetch-sample-data.sh planning-simulation
+
+# 2. Start the deployment
+docker compose --env-file planning-simulation.env up -d
 ```
 
-> **Note**: This sample map(Copyright 2020 TIER IV, Inc.) is only for demonstration purposes. You can use your own map by following the [How-to Guide](https://autowarefoundation.github.io/autoware-documentation/main/how-to-guides/integrating-autoware/creating-maps/).
+Open the visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`).
 
-## Run the Deployment
-
-1. Start the deployment by running the following command:
-
-    ```bash
-    docker compose --env-file planning-simulation.env up -d
-    ```
-
-2. Wait for the deployment to start for about 10 seconds and then open a browser to visualize the simulation and navigate to:
-
-    ```bash
-    http://localhost:6080/vnc.html
-    ```
-
-    Use the default password `openadkit` to access the visualizer. **It can take a few seconds for the visualizer to start.**
-
-    > If your machine is on a remote server, you can access the visualizer by using its accessible IP address:
-    >
-    > ```bash
-    > http://<your-server-ip>:6080/vnc.html
-    > ```
-
-3. After you see the visualizer, you can start the autonomous driving simulation by following the [planning simulation instructions](https://autowarefoundation.github.io/autoware-documentation/main/demos/planning-sim/lane-driving/#2-set-an-initial-pose-for-the-ego-vehicle) in the Autoware documentation.
-
-## Stop the Deployment
+## Stop
 
 ```bash
 docker compose --env-file planning-simulation.env down

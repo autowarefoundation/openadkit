@@ -1,26 +1,14 @@
 x-scenario-simulator-image: &scenario-simulator-image ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
 
 services:
-  map-init:
-    image: *scenario-simulator-image
-    volumes:
-      - autoware_map:/autoware_map
-      - ../../common/scripts/map-init.sh:/map-init.sh:ro
-    command: /map-init.sh
-    environment:
-      - SCENARIO_SIMULATOR_IMAGE=ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
-      - MAP_VOLUME_PATH=/autoware_map
-      - REQUIRED_FILES=lanelet2_map.osm pointcloud_map.pcd
-    restart: "no"
-
   autoware:
     image: ghcr.io/autowarefoundation/autoware:universe
     volumes:
-      - autoware_map:/autoware_map:ro
+      - ${MAP_PATH}:/autoware_map:ro
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
-    command: > 
+    command: >
       bash -c "source /opt/ros/humble/setup.bash &&
       ros2 launch autoware_launch planning_simulator.launch.xml
       map_path:=/autoware_map
@@ -29,8 +17,6 @@ services:
       scenario_simulation:=${SCENARIO_SIMULATION:-true}
       rviz:=false"
     depends_on:
-      map-init:
-        condition: service_completed_successfully
       edge_zenoh_bridge:
         condition: service_started
 
@@ -60,15 +46,13 @@ services:
           use_sim_time:=false \
           vehicle_model:=sample_vehicle
     depends_on:
-      map-init:
-        condition: service_completed_successfully
       autoware:
         condition: service_started
       edge_zenoh_bridge:
         condition: service_started
 
   edge_zenoh_bridge:
-    image:  eclipse/zenoh-bridge-ros2dds:latest
+    image: eclipse/zenoh-bridge-ros2dds:latest
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=0
@@ -80,16 +64,21 @@ services:
       -c /config/zenoh-bridge-ros2dds.json5
 
   visualizer:
-    image: ghcr.io/autowarefoundation/autoware-tools:visualizer-20251009
+    image: ghcr.io/autowarefoundation/openadkit:visualizer
+    # Uses bridge networking (port-mapped) to allow access from the host machine
+    # during split-topology deployments where edge and cloud run on separate hosts.
+    # The visualizer runs in a separate Docker network rather than host networking
+    # to enable controlled access via the exposed port (6081:6080).
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
-      - REMOTE_PASSWORD=openadkit
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD:?Set REMOTE_PASSWORD in .env before starting the visualizer}
       - USE_SIM_TIME=true
     ports:
       - "0.0.0.0:6081:6080"
     depends_on:
-      - cloud_zenoh_bridge
+      cloud_zenoh_bridge:
+        condition: service_started
 
   cloud_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
@@ -114,6 +103,3 @@ services:
     command: sleep infinity
     depends_on:
       - cloud_zenoh_bridge
-
-volumes:
-  autoware_map:

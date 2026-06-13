@@ -2,135 +2,74 @@
 
 This project demonstrates how to bridge Autoware data from Edge to Cloud using Zenoh.
 
-## Demo
+## Documentation
+
+For **complete architecture documentation**, setup instructions, troubleshooting, and multi-machine deployment details, see the canonical documentation:
+
+**[Open AD Kit Docs — Zenoh Bridge Demo](https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/)**
+
+## Demo Video
 
 [![[openadkit x zenoh-bridge] remote control (cloud/edge) demo](https://img.youtube.com/vi/6yhhxlVQTKI/0.jpg)](https://www.youtube.com/watch?v=6yhhxlVQTKI)
 
-| Time  | Description                  |
-| :---- | :--------------------------- |
-| 00:00 | Start cloud services         |
-| 00:16 | Start edge services          |
-| 00:52 | Demo: Stop, planning, resume |
-| 01:53 | Stop edge and cloud services |
-
-## Project Structure
-
-The project provides different deployment strategies to suit various testing needs:
-
-### Monolithic Demo
-*   Single compose deployment without network separation.
-*   Usage: `docker compose up -d`
-
-### Split Topology Demo
-*   Simulates Edge/Cloud separation (Unified local environment).
-*   Usage: `./edge.sh up -d` + `./cloud.sh up -d`
-
 ## Quick Start
 
-We recommend using the Split Topology mode from this directory:
+First download the sample map (mounted by the Autoware service). From a cloned repo, use `../../scripts/fetch-sample-data.sh` instead:
+
+```bash
+./fetch-sample-data.sh zenoh-bridge
+```
+
+### Split Topology (Recommended)
+
+Before starting, set a password for the visualizer in `.env`:
+
+```bash
+# Edit .env and set REMOTE_PASSWORD to a secure value
+```
 
 ```bash
 ./edge.sh up -d
 ./cloud.sh up -d
 ```
 
-Then access the visualizer at `http://localhost:6081`.
+Access the visualizer at `http://localhost:6081` (use the `REMOTE_PASSWORD` set in `.env`).
 
-The edge stack runs `map-init` before Autoware. It extracts the Kashiwanoha map from the pinned TIER IV scenario simulator image and refreshes the `autoware_map` volume when the image tag changes or required map files are missing.
+### Monolithic
 
-
-
-## Distributed Deployment (Multi-Machine)
-
-To deploy on separate machines (e.g., one Cloud, one Edge):
-
-1.  **Cloud Machine**:
-    Run `cloud.sh` to start services. It will automatically detect and display available IP addresses:
-    ```bash
-    ./cloud.sh
-    # [Info] Cloud services started.
-    #        To connect from Edge, set CLOUD_IP to one of the following:
-    #        [Public/Routable IPs]
-    #        - 192.168.1.100
-    ```
-
-2.  **Edge Machine**:
-    Use the displayed IP to connect:
-    ```bash
-    export CLOUD_IP=192.168.1.100
-    ./edge.sh
-    ```
-
-## Teleoperation (Manual Control)
-
-We provide a containerized terminal-based teleoperation interface.
-
-### 1. Start Services
-
-**Step 1: Start Cloud with Teleop (Prerequisite)**
-This service hosts the teleoperation backend.
 ```bash
-./cloud.sh up --with-teleop -d
+# Make sure to set REMOTE_PASSWORD in .env first
+docker compose up -d
 ```
 
-**Step 2: Start Edge (Choose Mode)**
+## Teleoperation Controls
 
-*   **Mode A: Standard Simulation** (Default)
-    ```bash
-    ./edge.sh -d
-    ```
+The teleop backend only runs when the cloud side is started with `--with-teleop`:
 
-*   **Mode B: No Simulation** (Recommended for Teleop)
-    Ideal for pure control testing without scenario interference.
-    ```bash
-    ./edge.sh --no-sim -d
-    ```
-
-### 2. Launch Interface
-Run the helper script to connect to the teleop container:
 ```bash
+./cloud.sh up --with-teleop -d
 ./run_teleop.sh
 ```
 
-### 3. Controls
-The interface uses keyboard inputs to control the vehicle.
-
-| Key       | Function       | Description                                                  |
-| :-------- | :------------- | :----------------------------------------------------------- |
-| **W**     | Throttle       | Accelerate                                                   |
-| **S**     | Brake          | Decelerate                                                   |
-| **A**     | Turn Left      | Steer left                                                   |
-| **D**     | Turn Right     | Steer right                                                  |
-| **Z**     | Auto/Local     | **Toggle Control Mode** (Must be in Local/External to drive) |
-| **M**     | Switch Mode    | Cycle modes: `STOP` -> `PHYSICS` -> `CRUISE`                 |
-| **X**     | Gear: Drive    | Shift to Drive (D)                                           |
-| **C**     | Gear: Reverse  | Shift to Reverse (R)                                         |
-| **V**     | Gear: Park     | Shift to Park (P)                                            |
-| **Space** | Emergency Stop | Immediate max braking / Resume                               |
-| **R**     | Reset Pose     | Reset to initial position                                    |
-| **Q**     | Quit           | Exit the interface                                           |
+| Key | Function |
+|-----|----------|
+| **W/S** | Throttle / Brake |
+| **A/D** | Turn Left / Right |
+| **Z** | Toggle Auto/Local Control |
+| **Space** | Emergency Stop / Resume |
+| **Q** | Quit |
 
 ## CLI Reference
 
-Scripts (`cloud.sh`, `edge.sh`) support the following commands:
-
-*   `up [args]` (default): Start services (foreground). To run in background, add `-d` (e.g., `./cloud.sh up -d`).
-*   `down`: Stop and remove services.
-*   `dry-run`: Preview composition config and connection information without starting containers.
-    *   Useful for checking `CLOUD_IP` candidates on the Cloud machine without launching everything.
-*   `...`: Any other command (e.g., `logs`, `restart`, `ps`) is passed directly to `docker compose`.
+| Command | Description |
+|---------|-------------|
+| `up -d` | Start services in background |
+| `down` | Stop and remove services |
+| `dry-run` | Preview config without starting |
 
 ## Shutdown
 
-To stop the containers:
-
 ```bash
-# Stop Cloud
 ./cloud.sh down
-
-# Stop Edge
 ./edge.sh down
-
-# Stop All and remove volumes
-docker compose down -v
 ```

@@ -64,8 +64,8 @@ EOF
 
     # Configure VNC password
     if [ -z "$REMOTE_PASSWORD" ]; then
-        echo -e "\e[31mREMOTE_PASSWORD is not set, using *openadkit* as default\e[0m"
-        REMOTE_PASSWORD="openadkit"
+        echo -e "\e[31mREMOTE_PASSWORD is not set. Please set it before starting.\e[0m"
+        exit 1
     fi
     mkdir -p ~/.vnc
     echo "$REMOTE_PASSWORD" | vncpasswd -f >~/.vnc/passwd && chmod 600 ~/.vnc/passwd

@@ -1,0 +1,33 @@
+name: build-docs
+description: Build the MkDocs site (install deps, generate release notes, build)
+
+inputs:
+  github-token:
+    description: GitHub token used by the release-notes generator
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+        cache: pip
+        cache-dependency-path: docs/requirements.txt
+
+    - name: Install dependencies
+      run: pip install -r docs/requirements.txt
+      shell: bash
+
+    - name: Generate release notes
+      run: python docs/scripts/generate_release_notes.py
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+
+    - name: Build with MkDocs
+      run: mkdocs build --clean --verbose
+      shell: bash
+      env:
+        NO_MKDOCS_2_WARNING: 1

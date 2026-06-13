@@ -1,18 +1,4 @@
 services:
-  map-init:
-    image: ${SCENARIO_SIMULATOR_IMAGE}
-    volumes:
-      - ${MAP_PATH}:/autoware_map
-      - ../../common/scripts/map-init.sh:/map-init.sh:ro
-    command: /map-init.sh
-    environment:
-      - SCENARIO_SIMULATOR_IMAGE=${SCENARIO_SIMULATOR_IMAGE}
-      - MAP_VOLUME_PATH=/autoware_map
-      - REQUIRED_FILES=${LANELET2_MAP_FILE} ${POINTCLOUD_MAP_FILE}
-      - AUTO_EXTRACT_MAP=${AUTO_EXTRACT_MAP:-true}
-      - MAP_PATH=${MAP_PATH}
-    restart: "no"
-
   map:
     image: ghcr.io/autowarefoundation/openadkit:localization-mapping
     container_name: autoware-map
@@ -22,9 +8,6 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    depends_on:
-      map-init:
-        condition: service_completed_successfully
     volumes:
       - ${MAP_PATH}:/autoware_map:ro
     command: >
@@ -290,4 +273,6 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
     restart: on-failure

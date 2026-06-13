@@ -41,7 +41,7 @@ services:
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
     restart: on-failure
-  
+
   vehicle:
     image: ghcr.io/autowarefoundation/openadkit:vehicle-system
     container_name: autoware-vehicle
@@ -180,3 +180,5 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}

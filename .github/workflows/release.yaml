@@ -13,6 +13,10 @@ on:
       build_tag:
         description: 'Build tag to promote (e.g. 123456789-1)'
         required: true
+      default_ros_distro:
+        description: 'ROS distro to use for bare tag aliases (e.g. humble)'
+        required: false
+        default: humble
 
 concurrency:
   group: release
@@ -22,7 +26,6 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
   IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
-  DEFAULT_ROS_DISTRO: humble
 
 jobs:
   validate:
@@ -419,7 +422,7 @@ jobs:
       - name: Promote image digests
         env:
           VERSION: ${{ inputs.version }}
-          DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
+          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
         run: |
           set -euo pipefail
@@ -428,6 +431,16 @@ jobs:
           stable_release=false
           if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
             stable_release=true
+          fi
+
+          available_distros=$(jq -r '.images | unique_by(.ros_distro) | map(.ros_distro) | join(" ")' release-input/build/build-metadata.json)
+          echo "Available ROS distros in build: ${available_distros}"
+
+          if ! echo "${available_distros}" | grep -qw "${DEFAULT_ROS_DISTRO}"; then
+            echo "ERROR: default_ros_distro '${DEFAULT_ROS_DISTRO}' is not in the build metadata." >&2
+            echo "Available distros: ${available_distros}" >&2
+            echo "Update the 'default_ros_distro' input or trigger a new build for '${DEFAULT_ROS_DISTRO}'." >&2
+            exit 1
           fi
 
           promote_tag() {
@@ -477,6 +490,14 @@ jobs:
       actions: read
       contents: write
     steps:
+      - name: Check out repository at release SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.release_sha }}
+          path: src
+          # Bundle packaging only reads deployments/.
+          sparse-checkout: deployments
+
       - name: Download validated release metadata
         uses: actions/download-artifact@v4
         with:
@@ -487,7 +508,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-          DEFAULT_ROS_DISTRO: ${{ env.DEFAULT_ROS_DISTRO }}
+          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
         run: |
           set -euo pipefail
@@ -575,6 +596,31 @@ jobs:
           fi
         shell: bash
 
+      - name: Package deployment bundles
+        run: |
+          set -euo pipefail
+          fetch="src/deployments/scripts/fetch-sample-data.sh"
+          mkdir -p dist staging
+          for entry in \
+            "planning-simulation:src/deployments/samples/planning-simulation" \
+            "scenario-simulation:src/deployments/samples/scenario-simulation" \
+            "logging-simulation:src/deployments/samples/logging-simulation" \
+            "carla-simulation:src/deployments/samples/carla-simulation" \
+            "zenoh-bridge:src/deployments/demos/zenoh-bridge"; do
+            name="${entry%%:*}"
+            dir="${entry#*:}"
+            rm -rf "staging/${name}"
+            cp -a "${dir}" "staging/${name}"
+            # carla-simulation downloads its own assets via start-carla-e2e-demo.sh
+            if [ "${name}" != "carla-simulation" ]; then
+              cp "${fetch}" "staging/${name}/fetch-sample-data.sh"
+              chmod +x "staging/${name}/fetch-sample-data.sh"
+            fi
+            tar -C staging -czf "dist/${name}.tar.gz" "${name}"
+            echo "packaged dist/${name}.tar.gz"
+          done
+        shell: bash
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -608,5 +654,5 @@ jobs:
               --notes-file release-notes.md \
               "${release_flags[@]}"
           fi
-          gh release upload "${VERSION}" release-metadata.json release-input/build/autoware-lock.repos --clobber
+          gh release upload "${VERSION}" release-metadata.json release-input/build/autoware-lock.repos dist/*.tar.gz --clobber
         shell: bash

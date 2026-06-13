@@ -1,0 +1,10 @@
+# hadolint config, used by the hadolint job in .github/workflows/lint.yaml
+# and auto-discovered by local hadolint runs.
+ignored:
+  - DL3006 # untagged FROM — base image is parameterized via Docker Bake (hadolint cannot evaluate at lint time)
+  - DL3008 # pin apt package versions — upstream ROS/Autoware packages move too fast to pin
+  - DL3009 # delete apt-get lists — addressed in final layer or via multi-stage builds
+  - DL3013 # pin pip versions — addressed in final layer or via multi-stage builds
+  - DL3015 # --no-install-recommends — some base images rely on recommended packages
+  - SC1091 # sourced files not available in hadolint mock environment
+  - SC2002 # useless cat — stylistic, not a functional issue

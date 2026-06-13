@@ -1,0 +1,53 @@
+name: pr-preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+    paths:
+      - mkdocs.yaml
+      - docs/requirements.txt
+      - "docs/scripts/**"
+      - "**/*.md"
+      - "**/*.svg"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "docs/assets/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build docs
+        if: github.event.action != 'closed'
+        uses: ./.github/actions/build-docs
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy preview
+        # Forked PRs run with a read-only token: the build above still
+        # validates the docs, but deploying the preview to gh-pages and
+        # commenting on the PR only works for branches in this repository.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1
+        with:
+          source-dir: ./site
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          action: auto
+          comment: true
+          qr-code: false

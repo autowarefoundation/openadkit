@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Function to get IPs excluding docker/br/veth interfaces
 get_ips() {
@@ -52,6 +53,7 @@ show_help() {
 
 # Import common library
 source ./common.sh
+load_env
 
 # Define Cloud services
 BASE_SERVICES="visualizer cloud_zenoh_bridge"

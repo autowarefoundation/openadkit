@@ -41,7 +41,7 @@ services:
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
     restart: on-failure
-  
+
   vehicle:
     image: ghcr.io/autowarefoundation/openadkit:vehicle-system
     container_name: autoware-vehicle
@@ -110,7 +110,7 @@ services:
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
     restart: on-failure
-  
+
   perception:
     image: ${SENSING_PERCEPTION_IMAGE}
     container_name: autoware-perception
@@ -138,7 +138,7 @@ services:
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
     restart: on-failure
-    
+
   localization:
     image: ghcr.io/autowarefoundation/openadkit:localization-mapping
     container_name: autoware-localization
@@ -255,7 +255,9 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
-  
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
+
   rosbag:
     image: ghcr.io/autowarefoundation/autoware:universe
     container_name: autoware-rosbag

@@ -1,11 +1,10 @@
 # Open AD Kit Components
 
-[Open AD Kit](https://autoware.org/open-ad-kit/) offers containers for
-Autoware Components to simplify the deployment of Autoware and its
-dependencies. This directory holds the per-component Dockerfiles.
+This directory contains scripts and configurations to build Open AD Kit container images.
 
-Detailed instructions on how to deploy the components can be found in the
-[Open AD Kit Deployments](https://autowarefoundation.github.io/openadkit/deployments/).
+## Documentation
+
+For **complete component documentation**, architecture overview, and visualizer settings, see the [Open AD Kit Components Documentation](https://autowarefoundation.github.io/openadkit/components/).
 
 ## Build Pipeline
 
@@ -63,3 +62,8 @@ universe-common slice of Autoware on top of upstream `core-devel`/`core`.
 
 See the [components documentation](https://autowarefoundation.github.io/openadkit/components/)
 for build commands and the CI pipeline.
+
+## Related
+
+- [Open AD Kit Deployments](https://autowarefoundation.github.io/openadkit/deployment/)
+- [Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/)

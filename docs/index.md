@@ -1,62 +1,47 @@
-# Introduction
+# Open AD Kit
 
-Open AD Kit adopts a modular, component-based architecture designed for flexibility, scalability, and platform independence. It leverages cloud-native principles and containerization to decompose [Autoware](https://github.com/autowarefoundation/autoware) into a collection of interoperable components. This approach allows developers to create customized autonomous driving (AD) systems by combining components to meet their specific needs.
+<p class="oak-hero-lead">
+A modular, container-based distribution of <a href="https://github.com/autowarefoundation/autoware">Autoware</a> for building autonomous driving systems from simulation and development through to in-vehicle deployment.
+</p>
 
-## Architecture
+## Explore
 
-The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Architecture For the Embedded Edge)](https://soafee.io/) initiative, as the **Autoware Open AD Kit is the first SOAFEE blueprint for the software defined vehicle ecosystem**.
+<div class="oak-card-grid oak-nav-grid" markdown="1">
 
-![Soafee Architecture](assets/images/openadkit.drawio.png)
+<div class="oak-card oak-nav-card" markdown="1">
 
-## Deployments
+:material-book-open-outline:{ .oak-card-icon }
 
-A **deployment** is a running instance of Open AD Kit, a specific combination of **Autoware components** configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
+<h3>Overview</h3>
+<p>Learn what Open AD Kit is, why it exists, and how it relates to Autoware.</p>
+<a href="overview/" class="md-button">Read overview</a>
+</div>
 
-Deployments are defined using container orchestration files (e.g., `docker-compose.yaml`). This makes them portable and easy to reproduce across different environments, from a developer's laptop to edge devices in a vehicle. This container-based approach is a cornerstone of the Open AD Kit's cloud-native and platform-agnostic philosophy, aligning with standards like SOAFEE.
+<div class="oak-card oak-nav-card" markdown="1">
 
-This modular structure allows users to start with a minimal deployment and incrementally add components and tools as their system evolves.
+:material-rocket-launch-outline:{ .oak-card-icon }
 
-For more details, see the [Deployments](./deployments/index.md).
+<h3>Getting Started</h3>
+<p>Set up Docker, pull images, and run your first deployment in minutes.</p>
+<a href="getting-started/" class="md-button md-button--primary">Start here</a>
+</div>
 
-## Components
+<div class="oak-card oak-nav-card" markdown="1">
 
-The core functional components of the Open AD Kit are derived from the main **[Autoware](https://github.com/autowarefoundation/autoware)** project. Each image packages a focused part of the autonomous driving pipeline, which makes it possible to compose different AD systems from a common container set.
+:material-rocket-outline:{ .oak-card-icon }
 
-The primary images include:
+<h3>Deployment</h3>
+<p>Ready-to-run samples and multi-machine demos for simulation and AD stacks.</p>
+<a href="deployment/" class="md-button">View deployment</a>
+</div>
 
-- **Sensing and Perception**: Collects and processes sensor data.
-- **Localization and Mapping**: Manages maps and vehicle pose estimation.
-- **Planning and Control**: Produces and follows the driving trajectory.
-- **Vehicle and System**: Packages vehicle interfaces and system-level services in the `vehicle-system` image.
-- **API**: Offers an interface for external systems to interact with the vehicle.
-- **Simulator**: Allows testing the AD stack in a virtual environment.
-- **Visualizer**: Provides a browser-accessible RViz environment for remote inspection.
+<div class="oak-card oak-nav-card" markdown="1">
 
-These images communicate through ROS 2 middleware, and some deployments bridge isolated environments with Zenoh. For more details, see the [Autoware components](./components/index.md).
+:material-source-branch:{ .oak-card-icon }
 
-## Tools
+<h3>Development</h3>
+<p>Build from source, contribute code, and help shape the Open AD Kit roadmap.</p>
+<a href="development/" class="md-button">Contribute</a>
+</div>
 
-In addition to the **Autoware components**, Open AD Kit integrates essential containerized tools for development, simulation, and visualization.
-
-- **TIER IV Scenario Simulator**: Runs scenario-based simulations for validation, CI, and local development.
-
-For more details, see the [Tools](./tools/index.md).
-
-## Supported Platforms
-
-Open AD Kit currently documents Ubuntu as the primary development host and AutoSD as the platform-specific deployment path available in this repository. EWAOL is planned but does not yet ship runnable assets here.
-
-### Development platforms
-
-- Ubuntu 22.04, 24.04
-
-### Platform-specific deployment paths
-
-- [AutoSD](https://docs.centos.org/automotive-sig-documentation/features-and-concepts/)
-- [EWAOL](https://ewaol.docs.arm.com/en/kirkstone-dev/) (planned)
-
-For more details, see the [Supported SOAFEE Platforms](./platforms/index.md).
-
-## Supported Hardware
-
-For detailed information on system requirements, tested hardware, and cloud instances, please refer to the [Hardware](./hardware/index.md) section.
+</div>

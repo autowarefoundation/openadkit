@@ -1,19 +1,33 @@
-# Autoware Tools - Visualizer
+# Visualizer
 
-Opens a remote RViz display for Autoware.
+The visualizer component provides a browser-accessible RViz environment via noVNC, enabling remote inspection of Autoware topics and state without installing ROS 2 locally.
+
+## Documentation
+
+For full visualizer settings and deployment context, see the [Open AD Kit Docs — Visualizer](https://autowarefoundation.github.io/openadkit/components/visualizer/).
 
 ## Standalone Run
 
 ```bash
-docker run --rm --name visualizer -p 6080:6080 ghcr.io/autowarefoundation/autoware-tools:visualizer
+docker run --rm --name visualizer -p 6080:6080 \
+  -e REMOTE_PASSWORD=yourpassword \
+  ghcr.io/autowarefoundation/openadkit:visualizer
 ```
 
 ## Settings
 
-The following environment variables can be configured with `-e` while launching the visualizer container:
+| Variable | Default | Options | Description |
+|----------|---------|---------|-------------|
+| `RVIZ_CONFIG` | `/opt/autoware/share/autoware_launch/rviz/autoware.rviz` | Any valid path | RViz configuration file inside the container |
+| `REMOTE_DISPLAY` | `true` | `true`, `false` | Browser-based display (recommended). Set `false` for local RViz2 |
+| `REMOTE_PASSWORD` | — (required) | Any string | Password for the remote display; the container exits if unset |
 
-| Variable          | Default Value                  | Possible Values                       | Description                                                                                                                                    |
-| ----------------- | ------------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RVIZ_CONFIG`     | `/autoware/rviz/autoware.rviz` | Any valid path                        | The full path to the RViz configuration file inside the container                                                                              |
-| `REMOTE_DISPLAY`  | `true`                         | `true`, `false`                       | **(Recommended)** Lightweight and browser-based RViz display, accessible from any device. Set this to `false` to launch a local rviz2 display. |
-| `REMOTE_PASSWORD` | `openadkit`                    | Any string without special characters | Password for remote display (only used when `REMOTE_DISPLAY=true`)                                                                             |
+## Example with Custom Settings
+
+```bash
+docker run --rm --name visualizer \
+  -p 6080:6080 \
+  -e RVIZ_CONFIG=/opt/autoware/share/autoware_launch/rviz/custom.rviz \
+  -e REMOTE_PASSWORD=mysecurepass \
+  ghcr.io/autowarefoundation/openadkit:visualizer
+```

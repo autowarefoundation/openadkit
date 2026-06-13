@@ -8,67 +8,89 @@ This guide covers building Open AD Kit container images locally from the reposit
 ## Prerequisites
 
 - Docker Engine with [Buildx](https://docs.docker.com/build/architecture/#buildx) (bundled with current Docker Engine)
-- Git
+- Git (to clone this repository)
 - Sufficient disk space — the full build set is large (multiple multi-gigabyte images)
+
+You do **not** need a local Autoware source tree. Open AD Kit builds *from* the
+upstream Autoware base images published on GHCR, so the only source you need is
+this repository.
 
 ## Build System
 
 Images are built with [Docker Bake](https://docs.docker.com/build/bake/). All targets are defined in [`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl), which is also the file CI uses (`build-all-images.yaml`).
 
-The build is staged: base images build first, component images build *from* them.
+The build is staged: the `universe-common` intermediate builds on top of the upstream Autoware images, and the component images build *from* `universe-common`.
 
 ```mermaid
 flowchart TB
-    ROS["ros:humble-ros-base-jammy<br/>ros:jazzy-ros-base-noble"] --> CB["common-base"]
-    CB --> CD["common-devel"]
-    CD --> SP["sensing-perception"]
-    CD --> LM["localization-mapping"]
-    CD --> PC["planning-control"]
-    CD --> VS["vehicle-system"]
-    CD --> API["api"]
-    CD --> VIZ["visualizer"]
-    CD --> SIM["simulator"]
+    UP["autoware:core-devel / core<br/>autoware:base-cuda-{devel,runtime}"] --> UC["universe-common"]
+    UC --> SP["sensing-perception"]
+    UC --> LM["localization-mapping"]
+    UC --> PC["planning-control"]
+    UC --> VS["vehicle-system"]
+    UC --> API["api"]
+    UC --> VIZ["visualizer"]
+    UC --> SIM["simulator"]
+    UP --> SPC["sensing-perception-cuda"]
+    UC --> SPC
+    SIM --> CARLA["carla-interface"]
 ```
+
+`universe-common` is an Open AD Kit-owned thin intermediate that compiles only the
+universe-common slice of Autoware on top of the upstream `core-devel`/`core`
+images; everything below it (base OS, ROS, core) is owned and built by upstream.
+`sensing-perception-cuda` is a parallel CUDA branch that inherits from the
+upstream `base-cuda-{devel,runtime}` images and grafts in the `universe-common`
+install tree.
 
 ### Build Groups
 
 | Group | Targets | Published To |
 |-------|---------|--------------|
-| `common` | `common-base`, `common-devel` (+ `-cuda` variants) | `ghcr.io/autowarefoundation/openadkit-common` |
-| `component` | `sensing-perception`, `localization-mapping`, `planning-control`, `vehicle-system`, `api`, `visualizer`, `simulator` (+ `sensing-perception-cuda`) | `ghcr.io/autowarefoundation/openadkit` |
+| `universe-common` | `universe-common-devel`, `universe-common` | `ghcr.io/autowarefoundation/openadkit-common` |
+| `component` | `sensing-perception`, `localization-mapping`, `planning-control`, `vehicle-system`, `api`, `visualizer`, `simulator`, `sensing-perception-cuda`, `carla-interface` | `ghcr.io/autowarefoundation/openadkit` |
+| `default` | everything: `universe-common` + `component` | — |
 
-The `carla-interface` image is not part of the `component` group — it is built separately on top of the `simulator` image and published as `ghcr.io/autowarefoundation/openadkit:carla-interface`.
+`carla-interface` is an **amd64-only** member of the `component` group, built on top of the `simulator` image and published as `ghcr.io/autowarefoundation/openadkit:carla-interface`.
 
 ## Building
 
-Use the repository's [`build.sh`](https://github.com/autowarefoundation/openadkit/blob/main/build.sh) wrapper — it checks out the Autoware source tree (`git clone` + `vcs import` of `autoware.repos`) and then invokes Docker Bake with the right build context, base image, and tags. Building Bake directly will not work without that source tree (see the note below).
+Local builds resolve cross-stage references within a single Bake graph, so you can build any group or target directly — no source checkout or wrapper script is required:
 
 ```bash
 # Clone the repository
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
-# Build the component images (default target)
-./build.sh
+# Build everything (universe-common + all components)
+docker buildx bake -f components/docker-bake.hcl
 
-# Build only the common base/devel images
-./build.sh --target common
+# Build only the universe-common intermediate
+docker buildx bake -f components/docker-bake.hcl universe-common
+
+# Build a single component and load it into the local Docker image store
+docker buildx bake -f components/docker-bake.hcl \
+  --set sensing-perception.tags=openadkit:sensing-perception \
+  --load \
+  sensing-perception
 ```
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--target` | `common` or `components` | `components` |
-| `--ros-distro` | `humble` or `jazzy` | `humble` |
-| `--platform` | `linux/amd64` or `linux/arm64` | `linux/amd64` (or `linux/arm64` on aarch64) |
-| `--no-cuda` | Skip building the CUDA images | CUDA enabled |
+The Bake file exposes a few variables, overridable via environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ROS_DISTRO` | `humble` or `jazzy` | `jazzy` |
+| `UPSTREAM_TAG` | Pins the upstream Autoware release (e.g. `1.8.0`). Empty pulls the plain `<name>-<distro>` multi-arch tag — handy for local experiments, not for reproducible builds. | `""` |
+| `UPSTREAM_REPO` | Upstream Autoware image repository | `ghcr.io/autowarefoundation/autoware` |
 
 ```bash
-# Build for ROS 2 Jazzy, amd64, without CUDA
-./build.sh --ros-distro jazzy --platform linux/amd64 --no-cuda
+# Build the component group for ROS 2 Humble against a pinned upstream release
+ROS_DISTRO=humble UPSTREAM_TAG=1.8.0 \
+  docker buildx bake -f components/docker-bake.hcl component
 ```
 
-!!! note "Why a wrapper instead of raw `docker buildx bake`"
-    The component Dockerfiles bind-mount parts of the Autoware source tree (`autoware/src/...`), so the source must be present before building. `build.sh` handles the `git clone` + `vcs import`, sets the Bake `context`, `BASE_IMAGE`, and image tags, and builds the `common` images before the `component` images (which build `FROM` them). The `docker-bake.hcl` targets themselves carry no context/tags defaults — CI supplies those the same way `build.sh` does.
+!!! note "Tags and contexts"
+    The `docker-bake.hcl` targets carry no tag or context defaults — image tags are injected by `docker/metadata-action` in CI, and you supply them locally with `--set <target>.tags=...`. Cross-stage references (`universe-common` ← components) resolve via `target:` within one local build graph; CI instead overrides each context to an already-pushed GHCR tag so groups can build in separate jobs.
 
 ## Continuous Integration
 

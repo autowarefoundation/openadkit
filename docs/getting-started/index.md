@@ -10,7 +10,7 @@ flowchart LR
 
 ## Prerequisites
 
-Open AD Kit runs on **Ubuntu** with Docker. Install everything with the included [`setup.sh`](https://github.com/autowarefoundation/openadkit/blob/main/setup.sh) script instead of following separate install guides:
+Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on the committed host profile — **Ubuntu 22.04 (Jammy) with ROS 2 Humble**. Install everything with the included [`setup.sh`](https://github.com/autowarefoundation/openadkit/blob/main/setup.sh) script instead of following separate install guides:
 
 | Component | When you need it | How to install |
 |-----------|------------------|----------------|

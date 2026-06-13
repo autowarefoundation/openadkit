@@ -41,7 +41,7 @@ graph LR
 
 ### [AutoSD](autosd/index.md)
 
-<span class="oak-badge oak-badge--verified">Verified</span> <span class="oak-badge oak-badge--supported">Runnable assets in repo</span>
+<span class="oak-badge oak-badge--testing">Experimental</span> <span class="oak-badge oak-badge--supported">Runnable assets in repo</span>
 
 AutoSD is the upstream binary distribution that serves as the public, in-development preview of **Red Hat In-Vehicle Operating System (OS)**. It is built on CentOS Stream with an automotive-specific kernel (`kernel-automotive`) and provides mixed-criticality container orchestration via Podman, Quadlet, and BlueChi.
 

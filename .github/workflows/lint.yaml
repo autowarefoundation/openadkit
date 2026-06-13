@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@be0761e4c1bab7cfdfca56cd03d4bb6253e39a4a # v1.72.0
+        uses: reviewdog/action-actionlint@6fb7acc99f4a1008869fa8a0f09cfca740837d9d # v1.72.0
         with:
           # github-pr-check is fork-safe: on read-only tokens (PRs from forks)
           # reviewdog falls back to GitHub Actions annotations instead of the

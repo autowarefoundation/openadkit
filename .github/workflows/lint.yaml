@@ -96,3 +96,37 @@ jobs:
           # Review API, which github-pr-review cannot do.
           reporter: github-pr-check
           fail_on_error: true
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate documented Docker Compose files
+        # `docker compose config -q` parses, interpolates, and schema-validates
+        # each documented stack with its sample env file. It does not pull images.
+        run: |
+          set -euo pipefail
+          # zenoh-bridge requires a non-empty REMOTE_PASSWORD (its .env leaves it
+          # blank on purpose); a shell value overrides the blank for validation.
+          export REMOTE_PASSWORD="ci-validate"
+          fail=0
+          validate() {
+            local dir="$1"; shift
+            echo "::group::${dir} $*"
+            if ( cd "${dir}" && docker compose "$@" config -q ); then
+              echo "ok: ${dir} $*"
+            else
+              echo "::error file=${dir}/docker-compose.yaml::invalid docker compose config ($*)"
+              fail=1
+            fi
+            echo "::endgroup::"
+          }
+          validate deployments/samples/planning-simulation --env-file planning-simulation.env
+          validate deployments/samples/scenario-simulation --env-file scenario-simulation.env
+          validate deployments/samples/logging-simulation  --env-file logging-simulation.env
+          validate deployments/samples/logging-simulation  --env-file logging-simulation.env --env-file logging-simulation.gpu.env -f docker-compose.yaml -f docker-compose.gpu.yaml
+          validate deployments/samples/carla-simulation    --env-file carla-simulation.e2e.env
+          validate deployments/demos/zenoh-bridge          --env-file .env
+          exit "${fail}"

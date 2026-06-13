@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/components/perception/">
+        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/getting-started/versioning/">
       
       
-        <link rel="prev" href="../sensing/">
+        <link rel="prev" href="../image-tags/">
       
       
-        <link rel="next" href="../mapping/">
+        <link rel="next" href="../release-flow/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Perception - Autoware Open AD Kit</title>
+        <title>Versioning & Support Policy - Autoware Open AD Kit</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#perception" class="md-skip">
+        <a href="#versioning-support-policy" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
               </button>
             
             
-  <a href="../../getting-started/">
+  <a href="../">
     🚀 New here? Follow the <strong>Getting Started</strong> guide to run your first deployment
   </a>
 
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Perception
+              Versioning &amp; Support Policy
             
           </span>
         </div>
@@ -264,11 +264,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../getting-started/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -308,13 +310,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../components/" class="md-tabs__link">
           
   
   
@@ -555,6 +555,8 @@
       
   
   
+    
+  
   
   
     
@@ -576,22 +578,23 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../getting-started/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -609,13 +612,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -635,7 +638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../image-tags/" class="md-nav__link">
         
   
   
@@ -660,10 +663,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../getting-started/versioning/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Versioning &amp; Support Policy
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -679,6 +709,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#version-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version Scheme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-autoware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to Autoware
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ros-2-distro-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROS 2 Distro Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-supported-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "Supported" Means
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Help
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -691,7 +796,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/release-flow/" class="md-nav__link">
+      <a href="../release-flow/" class="md-nav__link">
         
   
   
@@ -719,7 +824,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../troubleshooting/" class="md-nav__link">
         
   
   
@@ -1459,8 +1564,6 @@
       
   
   
-    
-  
   
   
     
@@ -1496,23 +1599,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../components/" class="md-nav__link ">
               
   
   
@@ -1530,13 +1632,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1556,7 +1658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sensing/" class="md-nav__link">
+      <a href="../../components/sensing/" class="md-nav__link">
         
   
   
@@ -1581,37 +1683,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Perception
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../components/perception/" class="md-nav__link">
         
   
   
@@ -1627,81 +1702,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-this-image-contains" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What This Image Contains
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cuda-variant" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CUDA Variant
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#used-in" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Used In
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1714,7 +1714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mapping/" class="md-nav__link">
+      <a href="../../components/mapping/" class="md-nav__link">
         
   
   
@@ -1742,7 +1742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../localization/" class="md-nav__link">
+      <a href="../../components/localization/" class="md-nav__link">
         
   
   
@@ -1770,7 +1770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../planning/" class="md-nav__link">
+      <a href="../../components/planning/" class="md-nav__link">
         
   
   
@@ -1798,7 +1798,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../control/" class="md-nav__link">
+      <a href="../../components/control/" class="md-nav__link">
         
   
   
@@ -1826,7 +1826,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../vehicle-system/" class="md-nav__link">
+      <a href="../../components/vehicle-system/" class="md-nav__link">
         
   
   
@@ -1854,7 +1854,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api/" class="md-nav__link">
+      <a href="../../components/api/" class="md-nav__link">
         
   
   
@@ -1882,7 +1882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../simulator/" class="md-nav__link">
+      <a href="../../components/simulator/" class="md-nav__link">
         
   
   
@@ -1910,7 +1910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../visualizer/" class="md-nav__link">
+      <a href="../../components/visualizer/" class="md-nav__link">
         
   
   
@@ -1938,7 +1938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../carla-interface/" class="md-nav__link">
+      <a href="../../components/carla-interface/" class="md-nav__link">
         
   
   
@@ -2577,10 +2577,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#version-scheme" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Version Scheme
       
     </span>
   </a>
@@ -2588,10 +2588,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-this-image-contains" class="md-nav__link">
+  <a href="#relationship-to-autoware" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What This Image Contains
+        Relationship to Autoware
       
     </span>
   </a>
@@ -2599,10 +2599,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cuda-variant" class="md-nav__link">
+  <a href="#ros-2-distro-support" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CUDA Variant
+        ROS 2 Distro Support
       
     </span>
   </a>
@@ -2610,10 +2610,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#used-in" class="md-nav__link">
+  <a href="#what-supported-means" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Used In
+        What "Supported" Means
       
     </span>
   </a>
@@ -2621,10 +2621,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
+  <a href="#getting-help" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related
+        Getting Help
       
     </span>
   </a>
@@ -2648,7 +2648,7 @@
 
 
   
-    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/components/perception.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/getting-started/versioning.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2656,37 +2656,70 @@
   
 
 
-<h1 id="perception">Perception<a class="headerlink" href="#perception" title="Permanent link">#</a></h1>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">#</a></h2>
-<p>The perception component processes preprocessed sensor data to build an understanding of the driving environment. It detects, tracks, and classifies objects and produces occupancy maps. It runs inside the <code>sensing-perception</code> image, which is the same image that hosts sensing.</p>
-<h2 id="what-this-image-contains">What This Image Contains<a class="headerlink" href="#what-this-image-contains" title="Permanent link">#</a></h2>
+<h1 id="versioning-support-policy">Versioning &amp; Support Policy<a class="headerlink" href="#versioning-support-policy" title="Permanent link">#</a></h1>
+<p>This page defines how Open AD Kit is versioned, how releases map to Autoware, and what "supported" means. It is the canonical reference for the project's versioning and support commitments.</p>
+<h2 id="version-scheme">Version Scheme<a class="headerlink" href="#version-scheme" title="Permanent link">#</a></h2>
+<p>Open AD Kit releases use <a href="https://semver.org/">Semantic Versioning</a>: <code>vMAJOR.MINOR.PATCH</code> (for example, <code>v2.0.0</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Increments when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MAJOR</strong></td>
+<td>A backward-incompatible change to the public deployment surface — image taxonomy, documented compose/deployment layout, or removal of a supported platform/variant.</td>
+</tr>
+<tr>
+<td><strong>MINOR</strong></td>
+<td>New backward-compatible capability — additional components, platforms, deployment samples, or CI/release machinery.</td>
+</tr>
+<tr>
+<td><strong>PATCH</strong></td>
+<td>Backward-compatible fixes — bug fixes, security/CVE remediation, image refreshes, and documentation corrections within the same release surface.</td>
+</tr>
+</tbody>
+</table>
+<p>The Open AD Kit version is <strong>independent of the Autoware version</strong> it packages: a single Open AD Kit release pins a specific upstream Autoware release (see below), and a new Autoware release does not automatically change the Open AD Kit version.</p>
+<h2 id="relationship-to-autoware">Relationship to Autoware<a class="headerlink" href="#relationship-to-autoware" title="Permanent link">#</a></h2>
+<p>Each Open AD Kit release pins a specific upstream <strong>Autoware semver meta-release</strong> and records it in the release:</p>
 <ul>
-<li><strong>Multi-sensor object detection</strong> — Fusion of camera, LiDAR, and radar for multi-class object detection</li>
-<li><strong>Multi-object tracking (MOT v2)</strong> — Temporal consistency and trajectory prediction for detected objects</li>
-<li><strong>Priority object merger</strong> — Resolution of overlapping detections from multiple sensors</li>
-<li><strong>Camera-only 3D detection</strong> — Monocular depth estimation and 3D bounding box generation</li>
-<li><strong>Radar-only 3D detection</strong> — Radar-based object localization and velocity estimation</li>
-<li><strong>Cluster-based 3D detection</strong> — Unsupervised LiDAR clustering for object detection</li>
-<li><strong>Occupancy grid mapping</strong> — 2D grid-based environment representation for navigation</li>
-<li><strong>Traffic light recognition</strong> — Camera-based traffic signal state detection</li>
-<li><strong>Launch file:</strong> <code>tier4_perception_component.launch.xml</code></li>
+<li>Stable Open AD Kit releases pin an Autoware <code>X.Y.Z</code> meta-release tag.</li>
+<li><code>v2.0.0</code> pins Autoware <strong>1.8.0</strong>.</li>
 </ul>
-<p>Typical resource usage:</p>
+<p>A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. The full per-release detail lives in the <a href="../release-flow/">Release Flow</a> and the published image inventory; how to consume the tags is in <a href="../image-tags/">Container Image Tags</a>.</p>
+<h2 id="ros-2-distro-support">ROS 2 Distro Support<a class="headerlink" href="#ros-2-distro-support" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Distro</th>
+<th>Status at v2.0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Humble</strong></td>
+<td>Default, documented path. The default-distro image aliases (<code>&lt;target&gt;</code>) resolve to Humble.</td>
+</tr>
+<tr>
+<td><strong>Jazzy</strong></td>
+<td>Built and published <strong>in parallel</strong> (<code>&lt;target&gt;-jazzy</code>) wherever the <code>amd64</code>+<code>arm64</code> matrix is green.</td>
+</tr>
+</tbody>
+</table>
+<p>Each release pins its ROS distro(s), and Humble and Jazzy are built while both matrices are green. Jazzy is promoted to the primary documented path at the first release with a sustained green Jazzy <code>amd64</code>+<code>arm64</code> matrix. Distro support tracks the upstream ROS 2 lifecycle — a distro is supported by Open AD Kit only while it is supported upstream.</p>
+<h2 id="what-supported-means">What "Supported" Means<a class="headerlink" href="#what-supported-means" title="Permanent link">#</a></h2>
 <ul>
-<li><strong>CPU</strong>: Moderate — used as a fallback when no GPU is available, with significantly degraded performance</li>
-<li><strong>GPU</strong>: Heavy — neural network inference; 4 GB+ VRAM strongly recommended (use the <code>sensing-perception-cuda</code> variant)</li>
-<li><strong>Memory</strong>: Scales with active detection models</li>
+<li><strong>Releases</strong> — The latest stable release is supported. Fixes (including security/CVE remediation) land in a new patch or minor release rather than being backported to older tags. Stable release tags are immutable; pin to a fully qualified <code>&lt;target&gt;-&lt;ros_distro&gt;-vX.Y.Z</code> tag for reproducible deployments.</li>
+<li><strong>Platforms</strong> — Support is tiered (committed / experimental / best-effort / unsupported). A variant that does not pass its build/validation gate is dropped from the support matrix rather than shipped as if it worked. See <a href="../../platforms/">Platform Support</a> for the current, honest matrix.</li>
+<li><strong>No certification claims</strong> — "Supported" refers to build, deployment, and validation in a non-certified environment. Open AD Kit makes no safety-certification, functional-safety, or production-readiness claims.</li>
 </ul>
-<h2 id="cuda-variant">CUDA Variant<a class="headerlink" href="#cuda-variant" title="Permanent link">#</a></h2>
-<p>The <code>sensing-perception-cuda</code> image is an amd64-only, GPU-accelerated variant that enables CUDA-based neural network inference for object detection and traffic light recognition. It requires the NVIDIA Container Toolkit and is the default choice for <a href="../../deployment/samples/logging-simulation/">Logging Simulation</a> deployments.</p>
-<h2 id="used-in">Used In<a class="headerlink" href="#used-in" title="Permanent link">#</a></h2>
+<h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">#</a></h2>
 <ul>
-<li><a href="../../deployment/samples/logging-simulation/">Logging Simulation</a> — Processes real recorded sensor data</li>
-</ul>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
-<ul>
-<li><a href="../sensing/">Sensing</a> — Shares the same <code>sensing-perception</code> image</li>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/perception/">Autoware perception design document</a></li>
+<li>Questions and bug reports: <a href="https://github.com/autowarefoundation/openadkit/issues">GitHub Issues</a>.</li>
+<li>See also <a href="https://github.com/autowarefoundation/openadkit/blob/main/SUPPORT.md"><code>SUPPORT.md</code></a> and <a href="../troubleshooting/">Troubleshooting</a>.</li>
 </ul>
 
 
@@ -2725,7 +2758,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../sensing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Sensing">
+          <a href="../image-tags/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Container Image Tags">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2735,20 +2768,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Sensing
+                Container Image Tags
               </div>
             </div>
           </a>
         
         
           
-          <a href="../mapping/" class="md-footer__link md-footer__link--next" aria-label="Next: Mapping">
+          <a href="../release-flow/" class="md-footer__link md-footer__link--next" aria-label="Next: Release Flow">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Mapping
+                Release Flow
               </div>
             </div>
             <div class="md-footer__button md-icon">

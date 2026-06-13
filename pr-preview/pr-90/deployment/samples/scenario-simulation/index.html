@@ -2718,7 +2718,7 @@
 <p>Open your browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html
 </code></pre></div>
-<p>Use the default password <strong><code>openadkit</code></strong>. If running on a remote server, use the server's IP address and ensure port <code>6080</code> is reachable:</p>
+<p>Use the default password <strong><code>openadkit</code></strong>. The visualizer is bound to <code>localhost</code> only. To reach it from another machine, change the port binding to <code>0.0.0.0:6080:6080</code> in <code>docker-compose.yaml</code>, set a strong <code>REMOTE_PASSWORD</code>, and ensure port <code>6080</code> is reachable:</p>
 <div class="highlight"><pre><span></span><code>http://&lt;server-ip&gt;:6080/vnc.html
 </code></pre></div>
 <h2 id="stop-the-deployment">Stop the Deployment<a class="headerlink" href="#stop-the-deployment" title="Permanent link">#</a></h2>

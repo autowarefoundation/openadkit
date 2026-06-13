@@ -2656,7 +2656,7 @@
 <p>Open your browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html
 </code></pre></div>
-<p>Use the default password <strong><code>openadkit</code></strong>. If running on a remote server, use the server's IP address.</p>
+<p>Use the default password <strong><code>openadkit</code></strong>. The visualizer is bound to <code>localhost</code> only; to reach it from another machine, change the port binding to <code>0.0.0.0:6080:6080</code> in <code>docker-compose.yaml</code> and set a strong <code>REMOTE_PASSWORD</code>.</p>
 <h2 id="start-the-rosbag-playback">Start the Rosbag Playback<a class="headerlink" href="#start-the-rosbag-playback" title="Permanent link">#</a></h2>
 <p>To begin replaying the recorded sensor data, start the rosbag container:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>up<span class="w"> </span>rosbag<span class="w"> </span>-d

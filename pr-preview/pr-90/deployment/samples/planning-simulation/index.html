@@ -2633,7 +2633,7 @@
 <p>Use the default password <strong><code>openadkit</code></strong> to access the visualizer. The RViz2 interface may take a few additional seconds to fully load.</p>
 <div class="admonition tip">
 <p class="admonition-title">Remote Access</p>
-<p>If running on a remote server, replace <code>localhost</code> with the server's IP address:
+<p>The visualizer is bound to <code>localhost</code> only. To reach it from another machine, change the port binding to <code>0.0.0.0:6080:6080</code> in <code>docker-compose.yaml</code> and set a strong <code>REMOTE_PASSWORD</code>, then use the server's IP address:
 <div class="highlight"><pre><span></span><code>http://&lt;your-server-ip&gt;:6080/vnc.html
 </code></pre></div></p>
 </div>

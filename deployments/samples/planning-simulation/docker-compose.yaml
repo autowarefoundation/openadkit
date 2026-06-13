@@ -174,7 +174,10 @@ services:
     ipc: host
     pid: service:map
     ports:
-      - 6080:6080
+      # Bound to localhost: the noVNC visualizer ships a default REMOTE_PASSWORD,
+      # so it is not exposed beyond this host. To view it from another machine,
+      # set a strong REMOTE_PASSWORD and change this to 0.0.0.0:6080:6080.
+      - 127.0.0.1:6080:6080
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}

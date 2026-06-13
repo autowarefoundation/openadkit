@@ -843,8 +843,6 @@
       
         
       
-        
-      
     
     
     
@@ -933,14 +931,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/carla-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/planning-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    CARLA Simulation
+    Planning simulation
   
 
     
@@ -957,7 +955,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    CARLA Simulation
+    Planning simulation
   
 
           </label>
@@ -1005,14 +1003,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/planning-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/scenario-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Planning simulation
+    Scenario simulation
   
 
     
@@ -1029,7 +1027,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Planning simulation
+    Scenario simulation
   
 
           </label>
@@ -1077,14 +1075,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/scenario-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/logging-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Scenario simulation
+    Logging simulation
   
 
     
@@ -1101,7 +1099,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Scenario simulation
+    Logging simulation
   
 
           </label>
@@ -1149,14 +1147,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/logging-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/carla-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Logging simulation
+    Carla simulation
   
 
     
@@ -1173,79 +1171,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Logging simulation
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-          
-        
-      
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_6" >
-        
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/carla-simulation/" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CARLA Simulation
-  
-
-    
-  </span>
-  
-  
-
-            </a>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    CARLA Simulation
+    Carla simulation
   
 
           </label>
@@ -2539,10 +2465,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#tested-platform" class="md-nav__link">
+  <a href="#upstream-documented-platforms" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tested Platform
+        Upstream-Documented Platforms
       
     </span>
   </a>
@@ -2587,12 +2513,14 @@
 
 <h1 id="ewaol">EWAOL<a class="headerlink" href="#ewaol" title="Permanent link">#</a></h1>
 <div class="admonition abstract">
-<p>EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It is the reference implementation for SOAFEE and extends cloud-native methods to automotive with an emphasis on real-time execution and functional safety.</p>
+<p>EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It was the original SOAFEE reference implementation, extending cloud-native methods to automotive with an emphasis on real-time execution and deterministic behavior.</p>
 </div>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">#</a></h2>
-<p><span class="oak-badge oak-badge--verified">Verified upstream</span> <span class="oak-badge oak-badge--planned">Assets in progress</span></p>
-<p>EWAOL is a verified platform with upstream build and runtime instructions for the ADLINK AADP-AVA platform.</p>
-<p><strong>Platform status:</strong> Verified upstream (ADLINK AADP-AVA, K3s runtime).</p>
+<p><span class="oak-badge oak-badge--neutral">Upstream reference</span></p>
+<div class="admonition note">
+<p class="admonition-title">Not a committed Open AD Kit target</p>
+<p>EWAOL is retained as upstream SOAFEE background. Open AD Kit's committed SOAFEE-aligned target is the <strong>Arm Automotive Solutions reference stack / RD-1 AE FVP</strong>. This page documents EWAOL's upstream build/runtime instructions for the ADLINK AADP-AVA platform for reference only; it is not a validated Open AD Kit deployment path.</p>
+</div>
 <p><strong>This repository:</strong> EWAOL-specific deployment assets and container orchestration files are still being added. For current repo status, see <a href="https://github.com/autowarefoundation/openadkit/blob/main/platforms/README.md"><code>platforms/README.md</code></a>.</p>
 <h2 id="what-is-ewaol">What is EWAOL?<a class="headerlink" href="#what-is-ewaol" title="Permanent link">#</a></h2>
 <p>EWAOL is delivered via the <code>meta-ewaol</code> Yocto layer and organizes the stack into three layers:</p>
@@ -2605,7 +2533,7 @@
 <h2 id="key-capabilities">Key Capabilities<a class="headerlink" href="#key-capabilities" title="Permanent link">#</a></h2>
 <ul>
 <li><strong>Container-native runtime</strong> with Docker and K3s orchestration</li>
-<li><strong>Real-time Linux</strong> with deterministic scheduling for safety-critical workloads</li>
+<li><strong>Real-time Linux</strong> with deterministic scheduling for time-sensitive workloads</li>
 <li><strong>Virtualization support</strong> via Xen for mixed-criticality separation</li>
 <li><strong>Yocto-based build system</strong> using <code>kas</code> for reproducible image generation</li>
 <li><strong>Cloud-to-edge parity</strong> with Arm Neoverse N1 architecture on both AVA and AWS Graviton</li>
@@ -2626,25 +2554,26 @@
 <ul>
 <li><a href="https://ewaol.docs.arm.com/en/kirkstone-dev/user_guide/reproduce.html">EWAOL User Guide</a></li>
 </ul>
-<h2 id="tested-platform">Tested Platform<a class="headerlink" href="#tested-platform" title="Permanent link">#</a></h2>
+<h2 id="upstream-documented-platforms">Upstream-Documented Platforms<a class="headerlink" href="#upstream-documented-platforms" title="Permanent link">#</a></h2>
+<p>These platforms are documented by the upstream EWAOL project (not validated by Open AD Kit):</p>
 <table>
 <thead>
 <tr>
 <th>Platform</th>
 <th>Architecture</th>
-<th>Status</th>
+<th>Source</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>ADLINK AADP-AVA</td>
 <td>arm64 (Ampere Altra, Neoverse N1)</td>
-<td>Verified</td>
+<td>Upstream EWAOL</td>
 </tr>
 <tr>
 <td>AWS EC2 Graviton</td>
 <td>arm64 (Neoverse N1 equivalent)</td>
-<td>Runtime parity confirmed</td>
+<td>Upstream EWAOL</td>
 </tr>
 </tbody>
 </table>

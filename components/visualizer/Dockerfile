@@ -87,8 +87,9 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       pipx && \
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install yamale && \
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema && \
-    curl -fsSL -o /tmp/virtualgl.deb https://github.com/VirtualGL/virtualgl/releases/download/3.1.2/virtualgl_3.1.2_amd64.deb && \
+    curl -fsSL -o /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/3.1.2/virtualgl_3.1.2_$(dpkg --print-architecture).deb" && \
     apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
+    ln -sf /opt/VirtualGL/bin/vglrun /usr/local/bin/vglrun && \
     rm -f /tmp/virtualgl.deb
 
 # Create SSL certificate for NoVNC.
@@ -108,6 +109,7 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
 # Copy startup scripts.
 COPY components/visualizer/etc/xstartup /root/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
-RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /root/.vnc/xstartup
+COPY components/visualizer/etc/start-rviz2.sh /usr/local/bin/start-rviz2-gpu
+RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /root/.vnc/xstartup /usr/local/bin/start-rviz2-gpu
 
 ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]

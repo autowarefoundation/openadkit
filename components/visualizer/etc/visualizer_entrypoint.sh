@@ -35,32 +35,11 @@ configure_vnc() {
   </applications>
 </openbox_config>
 EOF
-    # Create rviz2 start script
-    cat >/usr/local/bin/start-rviz2.sh <<'EOF'
-#!/bin/bash
-source /opt/ros/"$ROS_DISTRO"/setup.bash
-source /opt/autoware/setup.bash
-
-# Optional GPU-accelerated rendering via VirtualGL (EGL). RViz renders in
-# software (llvmpipe) by default, which is slow for dense point clouds and
-# camera images. When an NVIDIA GPU is available in the container, render on
-# it instead. Detection is at runtime so the same image works with or without
-# a GPU. Override with RVIZ_GPU=on (force) or RVIZ_GPU=off (disable).
-RVIZ_GPU="${RVIZ_GPU:-auto}"
-rviz_launcher=""
-if [ "$RVIZ_GPU" != "off" ]; then
-    if [ "$RVIZ_GPU" = "on" ] || { [ -e /dev/nvidia0 ] && command -v vglrun >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q libEGL_nvidia; }; then
-        rviz_launcher="vglrun -d egl"
-        echo "RViz: GPU-accelerated rendering via VirtualGL (EGL)"
-    fi
-fi
-[ -z "$rviz_launcher" ] && echo "RViz: software rendering (no GPU detected; set RVIZ_GPU=on to force VirtualGL)"
-
-exec $rviz_launcher rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
-EOF
-    chmod +x /usr/local/bin/start-rviz2.sh
+    # Launch the pre-installed GPU-aware rviz2 script (installed by the Dockerfile).
+    # RVIZ_GPU=auto detects, RVIZ_GPU=on forces (errors if GPU/VirtualGL
+    # are missing), RVIZ_GPU=off skips VirtualGL.
     echo "echo 'Autostart executed at $(date)' >> /tmp/autostart.log" >>/etc/xdg/openbox/autostart
-    echo "/usr/local/bin/start-rviz2.sh" >>/etc/xdg/openbox/autostart
+    echo "/usr/local/bin/start-rviz2-gpu" >>/etc/xdg/openbox/autostart
 
     # Configure VNC password
     if [ -z "$REMOTE_PASSWORD" ]; then

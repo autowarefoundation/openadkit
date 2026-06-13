@@ -1,0 +1,23 @@
+{
+  "TimeScale": 1,
+  "TimeSourceType": 0,
+  "RandomTrafficSeed": 33,
+  "MaxVehicleCount": 10,
+  "EgoVehicleSettings": {
+    "_maxSteerTireAngleInput": 35,
+    "_maxAccelerationInput": 2,
+    "_maxDecelerationInput": 2
+  },
+  "EgoPose": {
+    "Position": {
+      "x": 81381.7265625,
+      "y": 49920.1890625,
+      "z": 41.57674865722656
+    },
+    "EulerAngles": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 35.0
+    }
+  }
+}

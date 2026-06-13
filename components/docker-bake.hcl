@@ -1,41 +1,62 @@
-// Docker Bake configuration for Open AD Kit images
-// This file defines build targets for all images
+// Docker Bake configuration for Open AD Kit images.
+//
+// Local builds: every target resolves cross-references via `target:` within one
+// build graph.
+//
+// CI: each bake-group builds in its own job; build-all-images.yaml overrides
+// cross-stage contexts via `set: *.contexts.<name>=docker-image://...` so that
+// cross-group references resolve to already-pushed GHCR tags. Tags themselves
+// are supplied by docker/metadata-action via the docker-metadata-action-*
+// targets, not by this file.
 
-group "default" {
-  targets = [
-    "common",
-    "component"
-  ]
+variable "ROS_DISTRO" {
+  default = "jazzy"
 }
 
-group "common" {
-  targets = [
-    "common-base",
-    "common-base-cuda",
-    "common-devel",
-    "common-devel-cuda"
-  ]
+// Pin for upstream Autoware images. A concrete release tag (e.g. "1.2.3") is
+// the production default, set via a repo Variable in CI. Empty string yields
+// the upstream "plain" <name>-<distro> multi-arch manifest — handy for local
+// experiments, but NOT what CI should run with.
+variable "UPSTREAM_TAG" {
+  default = ""
+}
+variable "UPSTREAM_REPO" {
+  default = "ghcr.io/autowarefoundation/autoware"
+}
+
+// Local builds resolve cross-stage refs within one graph. CI overrides each
+// context via `set: *.contexts.<name>=docker-image://...` in build-all-images.yaml.
+function "ctx" {
+  params = [name]
+  result = "target:${name}"
+}
+
+// Resolves an upstream Autoware image reference. UPSTREAM_TAG="" yields the
+// plain <name>-<distro> multi-arch tag; non-empty yields <name>-<distro>-<tag>.
+function "upstream" {
+  params = [name]
+  result = "docker-image://${UPSTREAM_REPO}:${name}-${ROS_DISTRO}${UPSTREAM_TAG == "" ? "" : "-${UPSTREAM_TAG}"}"
+}
+
+group "default" {
+  targets = ["universe-common", "component"]
+}
+
+group "universe-common" {
+  targets = ["universe-common-devel", "universe-common"]
 }
 
 group "component" {
   targets = [
-    "sensing-perception",
-    "sensing-perception-cuda",
-    "localization-mapping",
-    "planning-control",
-    "vehicle-system",
-    "api",
-    "visualizer",
-    "simulator",
+    "sensing-perception", "sensing-perception-cuda", "localization-mapping",
+    "planning-control", "vehicle-system", "api", "visualizer", "simulator",
     "carla-interface",
   ]
 }
 
-// For docker/metadata-action
-target "docker-metadata-action-common-base" {}
-target "docker-metadata-action-common-base-cuda" {}
-target "docker-metadata-action-common-devel" {}
-target "docker-metadata-action-common-devel-cuda" {}
+// For docker/metadata-action (tags injected by the workflow).
+target "docker-metadata-action-universe-common-devel" {}
+target "docker-metadata-action-universe-common" {}
 target "docker-metadata-action-sensing-perception" {}
 target "docker-metadata-action-sensing-perception-cuda" {}
 target "docker-metadata-action-localization-mapping" {}
@@ -46,76 +67,103 @@ target "docker-metadata-action-visualizer" {}
 target "docker-metadata-action-simulator" {}
 target "docker-metadata-action-carla-interface" {}
 
-target "common-base" {
-  inherits = ["docker-metadata-action-common-base"]
-  dockerfile = "components/common/Dockerfile"
-  target = "common-base"
+// Common base for both universe-common stages. The Dockerfile has FROM lines
+// for both ${CORE_DEVEL_IMAGE} (devel stage) and ${CORE_IMAGE} (runtime
+// stage), so BuildKit needs both ARGs and both contexts resolved at parse
+// time regardless of which target stage is being built — mirrors upstream's
+// `_universe-base` / `_universe-cuda-base` inheritable pattern.
+target "_universe-common-base" {
+  dockerfile = "components/universe-common/Dockerfile"
+  contexts = {
+    autoware-core-devel = upstream("core-devel")
+    autoware-core       = upstream("core")
+  }
+  args = {
+    CORE_DEVEL_IMAGE = "autoware-core-devel"
+    CORE_IMAGE       = "autoware-core"
+    ROS_DISTRO       = ROS_DISTRO
+  }
 }
 
-target "common-base-cuda" {
-  inherits = ["docker-metadata-action-common-base-cuda"]
-  dockerfile = "components/common/Dockerfile"
-  target = "common-base-cuda"
+target "universe-common-devel" {
+  inherits = ["_universe-common-base", "docker-metadata-action-universe-common-devel"]
+  target   = "universe-common-devel"
 }
 
-target "common-devel" {
-  inherits = ["docker-metadata-action-common-devel"]
-  dockerfile = "components/common/Dockerfile"
-  target = "common-devel"
+target "universe-common" {
+  inherits = ["_universe-common-base", "docker-metadata-action-universe-common"]
+  target   = "universe-common"
+  contexts = {
+    universe-common-devel = ctx("universe-common-devel")
+  }
 }
 
-target "common-devel-cuda" {
-  inherits = ["docker-metadata-action-common-devel-cuda"]
-  dockerfile = "components/common/Dockerfile"
-  target = "common-devel-cuda"
+target "_component-base" {
+  contexts = {
+    universe-common-devel = ctx("universe-common-devel")
+    universe-common       = ctx("universe-common")
+  }
+  args = {
+    UNIVERSE_COMMON_DEVEL_IMAGE = "universe-common-devel"
+    UNIVERSE_COMMON_IMAGE       = "universe-common"
+    ROS_DISTRO                  = ROS_DISTRO
+  }
 }
 
 target "sensing-perception" {
-  inherits = ["docker-metadata-action-sensing-perception"]
+  inherits   = ["_component-base", "docker-metadata-action-sensing-perception"]
   dockerfile = "components/sensing-perception/Dockerfile"
-  target = "sensing-perception"
-}
-
-target "sensing-perception-cuda" {
-  inherits = ["docker-metadata-action-sensing-perception-cuda"]
-  dockerfile = "components/sensing-perception/Dockerfile.cuda"
-  target = "sensing-perception-cuda"
+  target     = "sensing-perception"
 }
 
 target "localization-mapping" {
-  inherits = ["docker-metadata-action-localization-mapping"]
+  inherits   = ["_component-base", "docker-metadata-action-localization-mapping"]
   dockerfile = "components/localization-mapping/Dockerfile"
-  target = "localization-mapping"
+  target     = "localization-mapping"
 }
 
 target "planning-control" {
-  inherits = ["docker-metadata-action-planning-control"]
+  inherits   = ["_component-base", "docker-metadata-action-planning-control"]
   dockerfile = "components/planning-control/Dockerfile"
-  target = "planning-control"
-}
-
-target "api" {
-  inherits = ["docker-metadata-action-api"]
-  dockerfile = "components/api/Dockerfile"
-  target = "api"
+  target     = "planning-control"
 }
 
 target "vehicle-system" {
-  inherits = ["docker-metadata-action-vehicle-system"]
+  inherits   = ["_component-base", "docker-metadata-action-vehicle-system"]
   dockerfile = "components/vehicle-system/Dockerfile"
-  target = "vehicle-system"
+  target     = "vehicle-system"
+}
+
+target "api" {
+  inherits   = ["_component-base", "docker-metadata-action-api"]
+  dockerfile = "components/api/Dockerfile"
+  target     = "api"
 }
 
 target "visualizer" {
-  inherits = ["docker-metadata-action-visualizer"]
+  inherits   = ["_component-base", "docker-metadata-action-visualizer"]
   dockerfile = "components/visualizer/Dockerfile"
-  target = "visualizer"
+  target     = "visualizer"
 }
 
 target "simulator" {
-  inherits = ["docker-metadata-action-simulator"]
+  inherits   = ["_component-base", "docker-metadata-action-simulator"]
   dockerfile = "components/simulator/Dockerfile"
-  target = "simulator"
+  target     = "simulator"
+}
+
+target "sensing-perception-cuda" {
+  inherits   = ["_component-base", "docker-metadata-action-sensing-perception-cuda"]
+  dockerfile = "components/sensing-perception/Dockerfile.cuda"
+  target     = "sensing-perception-cuda"
+  contexts = {
+    autoware-base-cuda-runtime = upstream("base-cuda-runtime")
+    autoware-base-cuda-devel   = upstream("base-cuda-devel")
+  }
+  args = {
+    BASE_CUDA_RUNTIME_IMAGE = "autoware-base-cuda-runtime"
+    BASE_CUDA_DEVEL_IMAGE   = "autoware-base-cuda-devel"
+  }
 }
 
 target "carla-interface" {
@@ -123,4 +171,3 @@ target "carla-interface" {
   dockerfile = "components/carla-interface/Dockerfile"
   target = "carla-interface"
 }
-

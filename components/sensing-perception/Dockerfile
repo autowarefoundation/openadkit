@@ -1,62 +1,77 @@
-# Dockerfile - Builds sensing-perception runtime image
-ARG COMMON_BASE_IMAGE=ghcr.io/autowarefoundation/openadkit-common:base
-ARG COMMON_DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit-common:devel
-ARG ROS_DISTRO=humble
+# syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom,UndefinedVar
+ARG UNIVERSE_COMMON_DEVEL_IMAGE
+ARG UNIVERSE_COMMON_IMAGE
 
 # =============================================================================
 # Build stage: sensing-perception-devel
 # =============================================================================
-FROM $COMMON_DEVEL_IMAGE AS sensing-perception-devel
+FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS sensing-perception-devel
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
-# Install rosdep dependencies and build packages
-RUN --mount=type=cache,target="${CCACHE_DIR}" \
---mount=type=bind,source=autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch,target=/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
---mount=type=bind,source=autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch,target=/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch \
---mount=type=bind,source=autoware/src/universe/external/trt_batched_nms,target=/autoware/src/universe/external/trt_batched_nms \
---mount=type=bind,source=autoware/src/universe/external/bevdet_vendor,target=/autoware/src/universe/external/bevdet_vendor \
---mount=type=bind,source=autoware/src/universe/external/cuda_blackboard,target=/autoware/src/universe/external/cuda_blackboard \
---mount=type=bind,source=autoware/src/universe/external/negotiated,target=/autoware/src/universe/external/negotiated \
---mount=type=bind,source=autoware/src/universe/autoware_universe/perception,target=/autoware/src/universe/autoware_universe/perception \
---mount=type=bind,source=autoware/src/universe/autoware_universe/sensing,target=/autoware/src/universe/autoware_universe/sensing \
---mount=type=bind,source=autoware/src/sensor_component,target=/autoware/src/sensor_component \
-  apt-get update \
-  && source /opt/ros/"$ROS_DISTRO"/setup.bash \
-  && source /opt/autoware/setup.bash \
-  && rosdep update \
-  && /scripts/resolve_rosdep_keys.sh /autoware/src "${ROS_DISTRO}" --dependency-types=exec > /tmp/rosdep-sensing-perception-exec-pkgs.txt \
-  && /scripts/resolve_rosdep_keys.sh /autoware/src "${ROS_DISTRO}" > /tmp/rosdep-sensing-perception-pkgs.txt \
-  && cat /tmp/rosdep-sensing-perception-pkgs.txt | xargs apt-get install -y --no-install-recommends \
-  && /scripts/cleanup_apt.sh true \
-  && source /opt/ros/"$ROS_DISTRO"/setup.bash \
-  && source /opt/autoware/setup.bash \
-  && /scripts/build_and_clean.sh "${CCACHE_DIR}" /opt/autoware "--parallel-workers 1 --cmake-args -DBUILD_TESTING=OFF"
+COPY --parents --chown=${USERNAME}:${USERNAME} \
+    autoware/src/**/package.xml \
+    /tmp/
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
+      --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --dependency-types=build --dependency-types=build_export \
+      --dependency-types=buildtool --dependency-types=buildtool_export \
+      --dependency-types=test
+
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths \
+        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
+        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch \
+        /tmp/autoware/src/universe/external/trt_batched_nms \
+        /tmp/autoware/src/universe/external/bevdet_vendor \
+        /tmp/autoware/src/universe/external/cuda_blackboard \
+        /tmp/autoware/src/universe/external/negotiated \
+        /tmp/autoware/src/universe/autoware_universe/perception \
+        /tmp/autoware/src/universe/autoware_universe/sensing \
+        /tmp/autoware/src/sensor_component \
+      --install-base /opt/autoware \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf build log
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
+      --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --dependency-types=exec && \
+    rm -rf /tmp/autoware
 
 # =============================================================================
 # Runtime stage: sensing-perception
 # =============================================================================
-FROM $COMMON_BASE_IMAGE AS sensing-perception
+FROM ${UNIVERSE_COMMON_IMAGE} AS sensing-perception
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
-# Copy rosdep dependency lists
-COPY --from=sensing-perception-devel /tmp/rosdep-universe-common-exec-pkgs.txt /tmp/rosdep-universe-common-exec-pkgs.txt
-COPY --from=sensing-perception-devel /tmp/rosdep-sensing-perception-exec-pkgs.txt /tmp/rosdep-sensing-perception-exec-pkgs.txt
-
-# Set up runtime environment and install rosdep dependencies
-RUN --mount=type=ssh \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  ./setup-dev-env.sh -y --module all --no-nvidia --no-cuda-drivers --runtime openadkit --ros-distro $ROS_DISTRO \
-  && pipx uninstall ansible \
-  && apt-get update \
-  && cat /tmp/rosdep-universe-common-exec-pkgs.txt | xargs apt-get install -y --no-install-recommends \
-  && cat /tmp/rosdep-sensing-perception-exec-pkgs.txt | xargs apt-get install -y --no-install-recommends \
-  && /scripts/cleanup_apt.sh true \
-  && /scripts/cleanup_system.sh $ROS_DISTRO
-
-# Copy binaries from devel stage
+USER root
 COPY --from=sensing-perception-devel /opt/autoware /opt/autoware
+RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
 
-ENTRYPOINT ["/scripts/autoware_entrypoint.sh"]
-CMD ["/bin/bash"]
+COPY --parents --chown=${USERNAME}:${USERNAME} \
+    autoware/src/**/package.xml \
+    /tmp/
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
+    rm -rf /tmp/*

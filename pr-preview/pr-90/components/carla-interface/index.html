@@ -2607,6 +2607,10 @@
 <h1 id="carla-interface">CARLA Interface<a class="headerlink" href="#carla-interface" title="Permanent link">#</a></h1>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">#</a></h2>
 <p>The <code>carla-interface</code> image packages the <code>autoware_carla_interface</code> bridge, enabling <strong>closed-loop end-to-end simulation</strong> with the <a href="https://carla.org/">CARLA</a> simulator. It is built on top of the <code>simulator</code> image and published as <code>ghcr.io/autowarefoundation/openadkit:carla-interface</code>. It acts as a bidirectional gateway between Autoware and CARLA: translating Autoware control outputs into CARLA ego vehicle commands, and converting CARLA sensor data into Autoware-compatible ROS 2 messages. This allows the full Autoware stack to drive and perceive within a photorealistic CARLA world.</p>
+<div class="admonition note">
+<p class="admonition-title">Platform support</p>
+<p><code>carla-interface</code> is published for <strong>amd64 + Humble only</strong> and requires an <strong>NVIDIA GPU</strong> (the CARLA server renders the world). There is no arm64 image.</p>
+</div>
 <h2 id="what-this-image-contains">What This Image Contains<a class="headerlink" href="#what-this-image-contains" title="Permanent link">#</a></h2>
 <p>The <code>carla-interface</code> image bundles the following capabilities:</p>
 <ul>

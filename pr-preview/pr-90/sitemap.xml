@@ -2,146 +2,146 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/overview/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/api/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/carla-interface/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/control/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/localization/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/mapping/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/perception/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/planning/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/sensing/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/simulator/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/vehicle-system/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/visualizer/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/custom-deployment/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/demos/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/carla-simulation/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/logging-simulation/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/planning-simulation/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/scenario-simulation/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/development/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/development/build-from-source/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/development/contributing/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/getting-started/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/getting-started/image-tags/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/getting-started/release-flow/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/getting-started/troubleshooting/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/platforms/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/platforms/autosd/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/platforms/autosd/planning-simulator/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/platforms/ewaol/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/platforms/hardware/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/releases/</loc>
-         <lastmod>2026-06-10</lastmod>
+         <lastmod>2026-06-13</lastmod>
     </url>
 </urlset>

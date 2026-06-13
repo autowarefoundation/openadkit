@@ -813,6 +813,8 @@
       
         
       
+        
+      
     
     
     
@@ -901,14 +903,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployment/samples/planning-simulation/" class="md-nav__link ">
+            <a href="../deployment/samples/carla-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Planning simulation
+    CARLA Simulation
   
 
     
@@ -925,7 +927,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Planning simulation
+    CARLA Simulation
   
 
           </label>
@@ -973,14 +975,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployment/samples/scenario-simulation/" class="md-nav__link ">
+            <a href="../deployment/samples/planning-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Scenario simulation
+    Planning simulation
   
 
     
@@ -997,7 +999,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Scenario simulation
+    Planning simulation
   
 
           </label>
@@ -1045,14 +1047,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../deployment/samples/logging-simulation/" class="md-nav__link ">
+            <a href="../deployment/samples/scenario-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Logging simulation
+    Scenario simulation
   
 
     
@@ -1069,7 +1071,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Logging simulation
+    Scenario simulation
   
 
           </label>
@@ -1117,6 +1119,78 @@
         
           
           <div class="md-nav__link md-nav__container">
+            <a href="../deployment/samples/logging-simulation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging simulation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Logging simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
             <a href="../deployment/samples/carla-simulation/" class="md-nav__link ">
               
   
@@ -1136,8 +1210,8 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2_5">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2390,23 +2464,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Build Pipeline">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Groups
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -2425,6 +2482,56 @@
     <span class="md-ellipsis">
       
         Autoware Components
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-from-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from source
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Building from source">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bake-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bake groups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upstream-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upstream pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI pipeline
       
     </span>
   </a>
@@ -2484,39 +2591,20 @@
 <p>Autoware uses a <strong>Core / Universe</strong> architecture. <strong>Core</strong> contains rigorously reviewed base functionality required for safe autonomous driving. <strong>Universe</strong> contains community extensions and research features that build on the Core foundation. Open AD Kit packages Universe components into focused container images that can be composed into complete AD systems.</p>
 <h2 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart TB
-    ROS["ros:humble-ros-base-jammy&lt;br/&gt;ros:jazzy-ros-base-noble"] --&gt; CB["common-base"]
-    CB --&gt; CD["common-devel"]
-    CD --&gt; SP["sensing-perception"]
-    CD --&gt; LM["localization-mapping"]
-    CD --&gt; PC["planning-control"]
-    CD --&gt; VS["vehicle-system"]
-    CD --&gt; API["api"]
-    CD --&gt; VIZ["visualizer"]
-    CD --&gt; SIM["simulator"]
+    UP["autoware:core-devel / core&lt;br/&gt;autoware:base-cuda-{devel,runtime}"] --&gt; UC["universe-common"]
+    UC --&gt; SP["sensing-perception"]
+    UC --&gt; LM["localization-mapping"]
+    UC --&gt; PC["planning-control"]
+    UC --&gt; VS["vehicle-system"]
+    UC --&gt; API["api"]
+    UC --&gt; VIZ["visualizer"]
+    UC --&gt; SIM["simulator"]
+    UP --&gt; SPC["sensing-perception-cuda"]
+    UC --&gt; SPC
     SIM --&gt; CARLA["carla-interface"]</code></pre>
-<h3 id="build-groups">Build Groups<a class="headerlink" href="#build-groups" title="Permanent link">#</a></h3>
-<table>
-<thead>
-<tr>
-<th>Group</th>
-<th>Description</th>
-<th>Targets</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>common</code></td>
-<td>Common base and development images</td>
-<td>base, devel, base-cuda, devel-cuda</td>
-</tr>
-<tr>
-<td><code>component</code></td>
-<td>Component images</td>
-<td>sensing-perception, sensing-perception-cuda, localization-mapping, planning-control, vehicle-system, api, visualizer, simulator</td>
-</tr>
-</tbody>
-</table>
-<p>The <code>carla-interface</code> image is built separately, on top of the <code>simulator</code> image, and is not part of the <code>component</code> bake group.</p>
+<p><code>universe-common</code> is an Open AD Kit-owned thin intermediate built on top of the
+upstream <code>autoware:core-devel</code>/<code>core</code> images. The bake groups and build commands
+are documented under <a href="#building-from-source">Building from source</a> below.</p>
 <h2 id="interface-layers">Interface Layers<a class="headerlink" href="#interface-layers" title="Permanent link">#</a></h2>
 <p>Autoware defines three formal interface categories that govern how components communicate:</p>
 <div class="oak-component-grid">
@@ -2615,6 +2703,66 @@
 
 </div>
 
+<h2 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">#</a></h2>
+<p>Open AD Kit images are built with <code>docker buildx bake</code> using
+<a href="https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl"><code>components/docker-bake.hcl</code></a>.
+The build graph is:</p>
+<div class="highlight"><pre><span></span><code>upstream autoware:core-devel / core / base-cuda-{devel,runtime}
+        │
+        ▼
+universe-common  (openadkit-owned thin intermediate)
+        │
+        ▼
+seven non-CUDA component images (sensing-perception,
+localization-mapping, planning-control, vehicle-system,
+api, visualizer, simulator)
+</code></pre></div>
+<p><code>sensing-perception-cuda</code> is a parallel CUDA branch: it inherits from
+upstream <code>base-cuda-{devel,runtime}</code> and additionally grafts in the
+<code>universe-common</code> install tree (so it has both CUDA toolkit access and the
+universe-common compiled packages).</p>
+<p><code>carla-interface</code> is an amd64-only component image built on top of
+<code>simulator</code>; it is part of the <code>component</code> bake group but is published for
+amd64 only.</p>
+<p>The <code>universe-common</code> layer compiles only the universe-common slice of
+Autoware on top of upstream <code>core-devel</code>/<code>core</code>; everything below
+<code>universe-common</code> (base OS, ROS, core) is owned and built by upstream.</p>
+<h3 id="bake-groups">Bake groups<a class="headerlink" href="#bake-groups" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Targets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td>everything: <code>universe-common</code> + <code>component</code></td>
+</tr>
+<tr>
+<td><code>universe-common</code></td>
+<td><code>universe-common-devel</code>, <code>universe-common</code></td>
+</tr>
+<tr>
+<td><code>component</code></td>
+<td>the seven non-CUDA component images plus <code>sensing-perception-cuda</code> and <code>carla-interface</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="upstream-pin">Upstream pin<a class="headerlink" href="#upstream-pin" title="Permanent link">#</a></h3>
+<p>The <code>UPSTREAM_TAG</code> bake variable pins the upstream Autoware release the
+images are built against. CI sets it from a repository Variable; leaving it
+empty uses upstream's plain <code>&lt;name&gt;-&lt;distro&gt;</code> multi-arch tag.</p>
+<h2 id="ci-pipeline">CI pipeline<a class="headerlink" href="#ci-pipeline" title="Permanent link">#</a></h2>
+<p><code>build-all-images.yaml</code> builds the universe-common graph on pushes,
+schedules, and manual dispatch. It walks the <code>{humble, jazzy} × {amd64,
+arm64}</code> matrix through staged jobs — <code>prepare</code>, then <code>build-common</code> and
+<code>build-components</code> — so each layer is pushed before the
+layer that depends on it. A final <code>create-manifests</code> job stitches the
+per-arch tags into multi-arch manifests via the <code>combine-multi-arch-images</code>
+composite action. <code>release-all-images.yaml</code> runs on a schedule to track
+Autoware release tags and build the matching single-arch release images.</p>
 <h2 id="open-ad-kit-roadmap">Open AD Kit Roadmap<a class="headerlink" href="#open-ad-kit-roadmap" title="Permanent link">#</a></h2>
 <p>Open AD Kit tracks Autoware's architecture evolution upstream, but its own roadmap is focused on <strong>deployment</strong> — containerization, platform support, release trust, and CI/CD — rather than on the autonomy algorithms themselves. The goal is to package whatever Autoware ships into clean, composable, deployment-ready images.</p>
 <div class="admonition note">

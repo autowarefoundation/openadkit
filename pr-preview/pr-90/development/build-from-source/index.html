@@ -813,6 +813,8 @@
       
         
       
+        
+      
     
     
     
@@ -901,14 +903,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/planning-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/carla-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Planning simulation
+    CARLA Simulation
   
 
     
@@ -925,7 +927,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Planning simulation
+    CARLA Simulation
   
 
           </label>
@@ -973,14 +975,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/scenario-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/planning-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Scenario simulation
+    Planning simulation
   
 
     
@@ -997,7 +999,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Scenario simulation
+    Planning simulation
   
 
           </label>
@@ -1045,14 +1047,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../deployment/samples/logging-simulation/" class="md-nav__link ">
+            <a href="../../deployment/samples/scenario-simulation/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-    Logging simulation
+    Scenario simulation
   
 
     
@@ -1069,7 +1071,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Logging simulation
+    Scenario simulation
   
 
           </label>
@@ -1117,6 +1119,78 @@
         
           
           <div class="md-nav__link md-nav__container">
+            <a href="../../deployment/samples/logging-simulation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging simulation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Logging simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
             <a href="../../deployment/samples/carla-simulation/" class="md-nav__link ">
               
   
@@ -1136,8 +1210,8 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2_5">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2595,22 +2669,33 @@
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
 <li>Docker Engine with <a href="https://docs.docker.com/build/architecture/#buildx">Buildx</a> (bundled with current Docker Engine)</li>
-<li>Git</li>
+<li>Git (to clone this repository)</li>
 <li>Sufficient disk space — the full build set is large (multiple multi-gigabyte images)</li>
 </ul>
+<p>You do <strong>not</strong> need a local Autoware source tree. Open AD Kit builds <em>from</em> the
+upstream Autoware base images published on GHCR, so the only source you need is
+this repository.</p>
 <h2 id="build-system">Build System<a class="headerlink" href="#build-system" title="Permanent link">#</a></h2>
 <p>Images are built with <a href="https://docs.docker.com/build/bake/">Docker Bake</a>. All targets are defined in <a href="https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl"><code>components/docker-bake.hcl</code></a>, which is also the file CI uses (<code>build-all-images.yaml</code>).</p>
-<p>The build is staged: base images build first, component images build <em>from</em> them.</p>
+<p>The build is staged: the <code>universe-common</code> intermediate builds on top of the upstream Autoware images, and the component images build <em>from</em> <code>universe-common</code>.</p>
 <pre class="mermaid"><code>flowchart TB
-    ROS["ros:humble-ros-base-jammy&lt;br/&gt;ros:jazzy-ros-base-noble"] --&gt; CB["common-base"]
-    CB --&gt; CD["common-devel"]
-    CD --&gt; SP["sensing-perception"]
-    CD --&gt; LM["localization-mapping"]
-    CD --&gt; PC["planning-control"]
-    CD --&gt; VS["vehicle-system"]
-    CD --&gt; API["api"]
-    CD --&gt; VIZ["visualizer"]
-    CD --&gt; SIM["simulator"]</code></pre>
+    UP["autoware:core-devel / core&lt;br/&gt;autoware:base-cuda-{devel,runtime}"] --&gt; UC["universe-common"]
+    UC --&gt; SP["sensing-perception"]
+    UC --&gt; LM["localization-mapping"]
+    UC --&gt; PC["planning-control"]
+    UC --&gt; VS["vehicle-system"]
+    UC --&gt; API["api"]
+    UC --&gt; VIZ["visualizer"]
+    UC --&gt; SIM["simulator"]
+    UP --&gt; SPC["sensing-perception-cuda"]
+    UC --&gt; SPC
+    SIM --&gt; CARLA["carla-interface"]</code></pre>
+<p><code>universe-common</code> is an Open AD Kit-owned thin intermediate that compiles only the
+universe-common slice of Autoware on top of the upstream <code>core-devel</code>/<code>core</code>
+images; everything below it (base OS, ROS, core) is owned and built by upstream.
+<code>sensing-perception-cuda</code> is a parallel CUDA branch that inherits from the
+upstream <code>base-cuda-{devel,runtime}</code> images and grafts in the <code>universe-common</code>
+install tree.</p>
 <h3 id="build-groups">Build Groups<a class="headerlink" href="#build-groups" title="Permanent link">#</a></h3>
 <table>
 <thead>
@@ -2622,67 +2707,75 @@
 </thead>
 <tbody>
 <tr>
-<td><code>common</code></td>
-<td><code>common-base</code>, <code>common-devel</code> (+ <code>-cuda</code> variants)</td>
+<td><code>universe-common</code></td>
+<td><code>universe-common-devel</code>, <code>universe-common</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit-common</code></td>
 </tr>
 <tr>
 <td><code>component</code></td>
-<td><code>sensing-perception</code>, <code>localization-mapping</code>, <code>planning-control</code>, <code>vehicle-system</code>, <code>api</code>, <code>visualizer</code>, <code>simulator</code> (+ <code>sensing-perception-cuda</code>)</td>
+<td><code>sensing-perception</code>, <code>localization-mapping</code>, <code>planning-control</code>, <code>vehicle-system</code>, <code>api</code>, <code>visualizer</code>, <code>simulator</code>, <code>sensing-perception-cuda</code>, <code>carla-interface</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit</code></td>
+</tr>
+<tr>
+<td><code>default</code></td>
+<td>everything: <code>universe-common</code> + <code>component</code></td>
+<td>—</td>
 </tr>
 </tbody>
 </table>
-<p>The <code>carla-interface</code> image is not part of the <code>component</code> group — it is built separately on top of the <code>simulator</code> image and published as <code>ghcr.io/autowarefoundation/openadkit:carla-interface</code>.</p>
+<p><code>carla-interface</code> is an <strong>amd64-only</strong> member of the <code>component</code> group, built on top of the <code>simulator</code> image and published as <code>ghcr.io/autowarefoundation/openadkit:carla-interface</code>.</p>
 <h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">#</a></h2>
-<p>Use the repository's <a href="https://github.com/autowarefoundation/openadkit/blob/main/build.sh"><code>build.sh</code></a> wrapper — it checks out the Autoware source tree (<code>git clone</code> + <code>vcs import</code> of <code>autoware.repos</code>) and then invokes Docker Bake with the right build context, base image, and tags. Building Bake directly will not work without that source tree (see the note below).</p>
+<p>Local builds resolve cross-stage references within a single Bake graph, so you can build any group or target directly — no source checkout or wrapper script is required:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Clone the repository</span>
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
 <span class="nb">cd</span><span class="w"> </span>openadkit
 
-<span class="c1"># Build the component images (default target)</span>
-./build.sh
+<span class="c1"># Build everything (universe-common + all components)</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl
 
-<span class="c1"># Build only the common base/devel images</span>
-./build.sh<span class="w"> </span>--target<span class="w"> </span>common
+<span class="c1"># Build only the universe-common intermediate</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>universe-common
+
+<span class="c1"># Build a single component and load it into the local Docker image store</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>sensing-perception.tags<span class="o">=</span>openadkit:sensing-perception<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--load<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>sensing-perception
 </code></pre></div>
+<p>The Bake file exposes a few variables, overridable via environment variables:</p>
 <table>
 <thead>
 <tr>
-<th>Flag</th>
+<th>Variable</th>
 <th>Description</th>
 <th>Default</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>--target</code></td>
-<td><code>common</code> or <code>components</code></td>
-<td><code>components</code></td>
-</tr>
-<tr>
-<td><code>--ros-distro</code></td>
+<td><code>ROS_DISTRO</code></td>
 <td><code>humble</code> or <code>jazzy</code></td>
-<td><code>humble</code></td>
+<td><code>jazzy</code></td>
 </tr>
 <tr>
-<td><code>--platform</code></td>
-<td><code>linux/amd64</code> or <code>linux/arm64</code></td>
-<td><code>linux/amd64</code> (or <code>linux/arm64</code> on aarch64)</td>
+<td><code>UPSTREAM_TAG</code></td>
+<td>Pins the upstream Autoware release (e.g. <code>1.8.0</code>). Empty pulls the plain <code>&lt;name&gt;-&lt;distro&gt;</code> multi-arch tag — handy for local experiments, not for reproducible builds.</td>
+<td><code>""</code></td>
 </tr>
 <tr>
-<td><code>--no-cuda</code></td>
-<td>Skip building the CUDA images</td>
-<td>CUDA enabled</td>
+<td><code>UPSTREAM_REPO</code></td>
+<td>Upstream Autoware image repository</td>
+<td><code>ghcr.io/autowarefoundation/autoware</code></td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><span class="c1"># Build for ROS 2 Jazzy, amd64, without CUDA</span>
-./build.sh<span class="w"> </span>--ros-distro<span class="w"> </span>jazzy<span class="w"> </span>--platform<span class="w"> </span>linux/amd64<span class="w"> </span>--no-cuda
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the component group for ROS 2 Humble against a pinned upstream release</span>
+<span class="nv">ROS_DISTRO</span><span class="o">=</span>humble<span class="w"> </span><span class="nv">UPSTREAM_TAG</span><span class="o">=</span><span class="m">1</span>.8.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component
 </code></pre></div>
 <div class="admonition note">
-<p class="admonition-title">Why a wrapper instead of raw <code>docker buildx bake</code></p>
-<p>The component Dockerfiles bind-mount parts of the Autoware source tree (<code>autoware/src/...</code>), so the source must be present before building. <code>build.sh</code> handles the <code>git clone</code> + <code>vcs import</code>, sets the Bake <code>context</code>, <code>BASE_IMAGE</code>, and image tags, and builds the <code>common</code> images before the <code>component</code> images (which build <code>FROM</code> them). The <code>docker-bake.hcl</code> targets themselves carry no context/tags defaults — CI supplies those the same way <code>build.sh</code> does.</p>
+<p class="admonition-title">Tags and contexts</p>
+<p>The <code>docker-bake.hcl</code> targets carry no tag or context defaults — image tags are injected by <code>docker/metadata-action</code> in CI, and you supply them locally with <code>--set &lt;target&gt;.tags=...</code>. Cross-stage references (<code>universe-common</code> ← components) resolve via <code>target:</code> within one local build graph; CI instead overrides each context to an already-pushed GHCR tag so groups can build in separate jobs.</p>
 </div>
 <h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">#</a></h2>
 <p>CI builds every target automatically via <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml"><code>.github/workflows/build-all-images.yaml</code></a>, which invokes the same Bake file across a build matrix. The matrix (targets, platforms, ROS distros) is driven by <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json"><code>.github/image-inventory.json</code></a> — the source of truth for what gets built and on which architectures.</p>

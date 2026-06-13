@@ -30,7 +30,7 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 :material-shield-half-full:{ .oak-card-icon }
 
 <h3>Mixed Criticality</h3>
-<p>Separate safety-critical and non-critical workloads across certified and standard hardware.</p>
+<p>Separate workloads by criticality assumption across safety-qualified and standard hardware.</p>
 </div>
 
 <div class="oak-card" markdown="1">

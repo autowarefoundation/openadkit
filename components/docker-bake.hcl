@@ -50,6 +50,7 @@ group "component" {
   targets = [
     "sensing-perception", "sensing-perception-cuda", "localization-mapping",
     "planning-control", "vehicle-system", "api", "visualizer", "simulator",
+    "carla-interface",
   ]
 }
 
@@ -64,6 +65,7 @@ target "docker-metadata-action-vehicle-system" {}
 target "docker-metadata-action-api" {}
 target "docker-metadata-action-visualizer" {}
 target "docker-metadata-action-simulator" {}
+target "docker-metadata-action-carla-interface" {}
 
 // Common base for both universe-common stages. The Dockerfile has FROM lines
 // for both ${CORE_DEVEL_IMAGE} (devel stage) and ${CORE_IMAGE} (runtime
@@ -162,4 +164,10 @@ target "sensing-perception-cuda" {
     BASE_CUDA_RUNTIME_IMAGE = "autoware-base-cuda-runtime"
     BASE_CUDA_DEVEL_IMAGE   = "autoware-base-cuda-devel"
   }
+}
+
+target "carla-interface" {
+  inherits = ["docker-metadata-action-carla-interface"]
+  dockerfile = "components/carla-interface/Dockerfile"
+  target = "carla-interface"
 }

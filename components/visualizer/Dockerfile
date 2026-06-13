@@ -86,7 +86,10 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       python3-xdg \
       pipx && \
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install yamale && \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema && \
+    curl -fsSL -o /tmp/virtualgl.deb https://github.com/VirtualGL/virtualgl/releases/download/3.1.2/virtualgl_3.1.2_amd64.deb && \
+    apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
+    rm -f /tmp/virtualgl.deb
 
 # Create SSL certificate for NoVNC.
 RUN openssl req -x509 -nodes -newkey rsa:2048 \

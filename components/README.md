@@ -22,6 +22,7 @@ block-beta
     space:8
 
     SP["sensing-perception"] SPC["sensing-perception-cuda"] LM["localization-mapping"] PC["planning-control"] VS["vehicle-system"] API["api"] VIZ["visualizer"] SIM["simulator"]
+    space:7 CARLA["carla-interface"]
 
     UP --> UC
     UC --> SP
@@ -31,6 +32,7 @@ block-beta
     UC --> API
     UC --> VIZ
     UC --> SIM
+    UC --> CARLA
     UP --> SPC
     UC --> SPC
 
@@ -44,6 +46,7 @@ block-beta
     style API fill:#14532d,stroke:#22c55e,color:#bbf7d0
     style VIZ fill:#14532d,stroke:#22c55e,color:#bbf7d0
     style SIM fill:#14532d,stroke:#22c55e,color:#bbf7d0
+    style CARLA fill:#14532d,stroke:#22c55e,color:#bbf7d0
 ```
 
 Images are built with `docker buildx bake` from
@@ -56,7 +59,7 @@ universe-common slice of Autoware on top of upstream `core-devel`/`core`.
 | Group | Description | Targets |
 |-------|-------------|---------|
 | `universe-common` | Thin intermediate layer | `universe-common-devel`, `universe-common` |
-| `component` | Component images (incl. CUDA) | `sensing-perception`, `sensing-perception-cuda`, `localization-mapping`, `planning-control`, `vehicle-system`, `api`, `visualizer`, `simulator` |
+| `component` | Component images (incl. CUDA) | `sensing-perception`, `sensing-perception-cuda`, `localization-mapping`, `planning-control`, `vehicle-system`, `api`, `visualizer`, `simulator`, `carla-interface` |
 
 See the [components documentation](https://autowarefoundation.github.io/openadkit/components/)
 for build commands and the CI pipeline.

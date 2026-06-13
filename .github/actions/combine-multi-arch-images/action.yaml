@@ -20,6 +20,10 @@ inputs:
   component-targets:
     description: 'Space-separated list of component image targets (e.g., "sensing-perception localization-mapping")'
     required: true
+  single-arch-component-targets:
+    description: 'Space-separated amd64-only component targets from image inventory'
+    required: false
+    default: ''
   token:
     description: GitHub token for registry access
     required: true
@@ -64,12 +68,13 @@ runs:
         DISTRO="${{ inputs.ros-distro }}"
         BUILD_TAG="${{ inputs.build-tag }}"
         TARGETS="${{ inputs.component-targets }}"
+        SINGLE_ARCH_TARGETS="${{ inputs.single-arch-component-targets }}"
 
         for target in ${TARGETS}; do
           base_tag="${target}-${DISTRO}-${BUILD_TAG}"
 
-          if [[ "${target}" == *cuda* ]]; then
-            # CUDA: single-arch alias (amd64-only)
+          if [[ " ${SINGLE_ARCH_TARGETS} " == *" ${target} "* ]]; then
+            # amd64-only component targets from image inventory
             echo "Creating single-arch manifest for ${IMAGE}:${base_tag}"
             docker buildx imagetools create -t "${IMAGE}:${base_tag}" \
               "${IMAGE}:${target}-amd64-${DISTRO}-${BUILD_TAG}"

@@ -294,9 +294,12 @@ jobs:
     needs: prepare
     runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
     permissions:
-      actions: read
+      actions: write
       contents: read
       packages: write
+    env:
+      CACHE_KEY_PREFIX: buildkit-mounts-universe-common-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
+      IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -400,6 +403,42 @@ jobs:
           [ "${fail}" -eq 0 ]
         shell: bash
 
+      - name: Restore BuildKit cache mounts
+        id: cache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: cache-mounts
+          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
+          restore-keys: |
+            ${{ env.CACHE_KEY_PREFIX }}
+
+      - name: Arm post-step save of BuildKit cache mounts (main only)
+        if: env.IS_MAIN_PUSH == 'true'
+        uses: actions/cache@v5
+        with:
+          path: cache-mounts
+          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
+          lookup-only: true
+
+      - name: Inject BuildKit cache mounts
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          # Only ccache is persisted across runs: it is the entire ~4.5x
+          # recompile win and stays small (~0.14 GB/leg). apt/pip mounts were
+          # dropped to keep the repo-wide 10 GB cache budget clear of LRU
+          # eviction (their bandwidth-bound saving is largely covered by the
+          # registry layer cache anyway).
+          cache-map: |
+            {
+              "cache-mounts/ccache": {
+                "id": "ccache-${{ matrix.ros-distro }}",
+                "target": "/home/aw/.ccache",
+                "uid": "1000",
+                "gid": "1000"
+              }
+            }
+          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
+
       - name: Build and push universe-common images
         uses: docker/bake-action@v5
         env:
@@ -426,6 +465,29 @@ jobs:
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
 
+      - name: Prune BuildKit cache mount lineage (main only)
+        if: env.IS_MAIN_PUSH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_KEY: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
+          MAX_GB: 6
+        run: |
+          set -euo pipefail
+          # KEEP_KEY is written by the actions/cache POST step, which runs after
+          # this step, so it is never present here: this prune only removes
+          # prior-lineage caches. The size check refreshes an oversized cache on
+          # a same-SHA rerun (when KEEP_KEY already exists). --limit caps recovery
+          # if a lineage ever exceeds it; steady state keeps a single entry.
+          max_bytes=$((MAX_GB * 1000 * 1000 * 1000))
+          gh cache list --repo "$GITHUB_REPOSITORY" --key "$CACHE_KEY_PREFIX" --limit 100 --json key,sizeInBytes \
+            | jq -r --arg keep "$KEEP_KEY" --argjson max "$max_bytes" \
+                '.[] | select(.key != $keep or .sizeInBytes > $max) | .key' \
+            | while read -r key; do
+                echo "delete: $key"
+                gh cache delete "$key" --repo "$GITHUB_REPOSITORY" || true
+              done
+        shell: bash
+
   # =============================================================================
   # Stage 2: Build component images (parallel)
   # =============================================================================
@@ -433,9 +495,12 @@ jobs:
     runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
     needs: [prepare, build-common]
     permissions:
-      actions: read
+      actions: write
       contents: read
       packages: write
+    env:
+      CACHE_KEY_PREFIX: buildkit-mounts-${{ matrix.target }}-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
+      IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -496,6 +561,40 @@ jobs:
           flavor: |
             latest=false
 
+      - name: Restore BuildKit cache mounts
+        id: cache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: cache-mounts
+          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
+          restore-keys: |
+            ${{ env.CACHE_KEY_PREFIX }}
+
+      - name: Arm post-step save of BuildKit cache mounts (main only)
+        if: env.IS_MAIN_PUSH == 'true'
+        uses: actions/cache@v5
+        with:
+          path: cache-mounts
+          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
+          lookup-only: true
+
+      - name: Inject BuildKit cache mounts
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          # Only ccache is persisted across runs (see build-common above for
+          # the rationale). A single uniform map also drops the previous CUDA
+          # apt special-case.
+          cache-map: |
+            {
+              "cache-mounts/ccache": {
+                "id": "ccache-${{ matrix.ros-distro }}",
+                "target": "/home/aw/.ccache",
+                "uid": "1000",
+                "gid": "1000"
+              }
+            }
+          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
+
       - name: Build and push ${{ matrix.target }}
         uses: docker/bake-action@v5
         env:
@@ -522,6 +621,29 @@ jobs:
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
+
+      - name: Prune BuildKit cache mount lineage (main only)
+        if: env.IS_MAIN_PUSH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_KEY: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
+          MAX_GB: 6
+        run: |
+          set -euo pipefail
+          # KEEP_KEY is written by the actions/cache POST step, which runs after
+          # this step, so it is never present here: this prune only removes
+          # prior-lineage caches. The size check refreshes an oversized cache on
+          # a same-SHA rerun (when KEEP_KEY already exists). --limit caps recovery
+          # if a lineage ever exceeds it; steady state keeps a single entry.
+          max_bytes=$((MAX_GB * 1000 * 1000 * 1000))
+          gh cache list --repo "$GITHUB_REPOSITORY" --key "$CACHE_KEY_PREFIX" --limit 100 --json key,sizeInBytes \
+            | jq -r --arg keep "$KEEP_KEY" --argjson max "$max_bytes" \
+                '.[] | select(.key != $keep or .sizeInBytes > $max) | .key' \
+            | while read -r key; do
+                echo "delete: $key"
+                gh cache delete "$key" --repo "$GITHUB_REPOSITORY" || true
+              done
+        shell: bash
 
   # =============================================================================
   # Stage 3: Create multi-arch manifests

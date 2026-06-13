@@ -29,9 +29,9 @@ The system container provides health monitoring, diagnostics, and orchestration:
 
 | | Vehicle | System |
 |---|---|---|
-| **Purpose** | Talks to the real or simulated vehicle hardware | Monitors and safeguards the overall Autoware stack |
-| **Outputs** | Actuation commands (steering, throttle, brake) | Diagnostic status, health reports, emergency decisions |
-| **When it runs** | Required whenever the vehicle moves or reports state | Required in all deployments for safety monitoring |
+| **Purpose** | Talks to the real or simulated vehicle hardware | Monitors the overall Autoware stack and reports system health |
+| **Outputs** | Actuation commands (steering, throttle, brake) | Diagnostic status, health reports, emergency state signals |
+| **When it runs** | Required whenever the vehicle moves or reports state | Required in all deployments for system health and diagnostic monitoring |
 | **Typical customization** | Vehicle model, sensor model, interface type | System monitor enablement, dummy diag publisher, run mode |
 
 Typical resource usage for both services combined:

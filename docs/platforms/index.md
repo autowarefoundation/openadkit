@@ -31,8 +31,8 @@ graph LR
 :material-cloud-outline:{ .oak-card-icon }
 
 <h3>EWAOL</h3>
-<p>Edge Workload Abstraction and Orchestration Layer — Arm's container-centric Yocto framework. Verified on ADLINK AVA with K3s runtime.</p>
-<a href="ewaol/" class="md-button md-button--primary">View EWAOL Docs</a>
+<p>Edge Workload Abstraction and Orchestration Layer — Arm's container-centric Yocto framework. Upstream SOAFEE reference, retained as background; not a committed Open AD Kit target.</p>
+<a href="ewaol/" class="md-button">View EWAOL Docs</a>
 </div>
 
 </div>
@@ -54,18 +54,19 @@ Key capabilities:
 
 ### [EWAOL](ewaol/index.md)
 
-<span class="oak-badge oak-badge--verified">Verified upstream</span> <span class="oak-badge oak-badge--planned">Assets in progress</span>
+<span class="oak-badge oak-badge--neutral">Upstream reference</span>
 
-The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying edge workloads, delivered via the `meta-ewaol` Yocto layer. It is the reference implementation for SOAFEE.
+The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying edge workloads, delivered via the `meta-ewaol` Yocto layer. It was the original SOAFEE reference implementation.
 
 Key capabilities:
 
 - **Container-native runtime**: Docker and K3s orchestration on the edge
-- **Real-time Linux**: Deterministic scheduling for safety-critical workloads
+- **Real-time Linux**: Deterministic scheduling
 - **Virtualization**: Xen support for mixed-criticality separation
 - **Cloud-to-edge parity**: Arm Neoverse N1 architecture on both AVA platform and AWS Graviton
 
-EWAOL is a verified platform with upstream build and runtime instructions for the ADLINK AADP-AVA platform. This repository is progressively adding EWAOL-specific deployment assets — see the [EWAOL platform page](ewaol/index.md) and [`platforms/README.md`](https://github.com/autowarefoundation/openadkit/blob/main/platforms/README.md) for current status.
+!!! note "Not a committed Open AD Kit target"
+    EWAOL is retained here as upstream SOAFEE background only. Open AD Kit's committed SOAFEE-aligned target is the **Arm Automotive Solutions reference stack / RD-1 AE FVP** (experimental; SOAFEE Integration Lab validation planned). This page documents EWAOL's upstream build/runtime instructions for reference; it is not a validated Open AD Kit deployment path.
 
 ## Development Platforms
 

@@ -33,7 +33,7 @@ Demos illustrate real-world deployment patterns:
 
 - **Cloud-Edge Separation** — Compute-intensive perception and planning run on vehicle or edge hardware; lightweight visualization and control run remotely
 - **Network Bridging** — Zenoh bridges isolated ROS 2 domains over TCP, enabling secure cross-network communication
-- **Mixed Criticality** — Safety-critical components on certified hardware, monitoring on standard platforms
+- **Mixed Criticality** — Higher-criticality components on safety-qualified hardware, monitoring on standard platforms
 
 ## Next Steps
 

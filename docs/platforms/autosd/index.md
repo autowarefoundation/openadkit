@@ -5,7 +5,7 @@
 
 ## What is AutoSD?
 
-AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel-automotive`) and is the functional precursor to the commercial safety-certified **Red Hat In-Vehicle OS**. It is the platform-specific deployment path for Open AD Kit in this repository.
+AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel-automotive`) and is the upstream, in-development preview of Red Hat's commercial **In-Vehicle OS (RHIVOS)**, which Red Hat positions for functional-safety use. It is the platform-specific deployment path for Open AD Kit in this repository.
 
 ## Key Features for Autonomous Driving
 

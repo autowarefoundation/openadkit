@@ -1,15 +1,14 @@
 # EWAOL
 
 !!! abstract ""
-    EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It is the reference implementation for SOAFEE and extends cloud-native methods to automotive with an emphasis on real-time execution and functional safety.
+    EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It was the original SOAFEE reference implementation, extending cloud-native methods to automotive with an emphasis on real-time execution and deterministic behavior.
 
 ## Status
 
-<span class="oak-badge oak-badge--verified">Verified upstream</span> <span class="oak-badge oak-badge--planned">Assets in progress</span>
+<span class="oak-badge oak-badge--neutral">Upstream reference</span>
 
-EWAOL is a verified platform with upstream build and runtime instructions for the ADLINK AADP-AVA platform.
-
-**Platform status:** Verified upstream (ADLINK AADP-AVA, K3s runtime).
+!!! note "Not a committed Open AD Kit target"
+    EWAOL is retained as upstream SOAFEE background. Open AD Kit's committed SOAFEE-aligned target is the **Arm Automotive Solutions reference stack / RD-1 AE FVP**. This page documents EWAOL's upstream build/runtime instructions for the ADLINK AADP-AVA platform for reference only; it is not a validated Open AD Kit deployment path.
 
 **This repository:** EWAOL-specific deployment assets and container orchestration files are still being added. For current repo status, see [`platforms/README.md`](https://github.com/autowarefoundation/openadkit/blob/main/platforms/README.md).
 
@@ -26,7 +25,7 @@ It provides runtime parity between edge hardware (ADLINK AVA with Ampere Altra /
 ## Key Capabilities
 
 - **Container-native runtime** with Docker and K3s orchestration
-- **Real-time Linux** with deterministic scheduling for safety-critical workloads
+- **Real-time Linux** with deterministic scheduling for time-sensitive workloads
 - **Virtualization support** via Xen for mixed-criticality separation
 - **Yocto-based build system** using `kas` for reproducible image generation
 - **Cloud-to-edge parity** with Arm Neoverse N1 architecture on both AVA and AWS Graviton
@@ -56,12 +55,14 @@ For the EWAOL installation and runtime guide, see the upstream documentation:
 
 - [EWAOL User Guide](https://ewaol.docs.arm.com/en/kirkstone-dev/user_guide/reproduce.html)
 
-## Tested Platform
+## Upstream-Documented Platforms
 
-| Platform | Architecture | Status |
+These platforms are documented by the upstream EWAOL project (not validated by Open AD Kit):
+
+| Platform | Architecture | Source |
 |----------|--------------|--------|
-| ADLINK AADP-AVA | arm64 (Ampere Altra, Neoverse N1) | Verified |
-| AWS EC2 Graviton | arm64 (Neoverse N1 equivalent) | Runtime parity confirmed |
+| ADLINK AADP-AVA | arm64 (Ampere Altra, Neoverse N1) | Upstream EWAOL |
+| AWS EC2 Graviton | arm64 (Neoverse N1 equivalent) | Upstream EWAOL |
 
 ## Related
 

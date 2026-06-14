@@ -1,8 +1,24 @@
 x-scenario-simulator-image: &scenario-simulator-image ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
 
+# Three named networks match the architecture described in
+# docs/deployment/demos/zenoh-bridge/index.md:
+#   - edge_net: edge-side (autoware, scenario_simulator, edge_zenoh_bridge)
+#   - cloud_net: cloud-side (visualizer, cloud_zenoh_bridge, teleop)
+#   - zenoh_net: dedicated bridge between the two zenoh routers, so DDS
+#     multicast on edge_net cannot leak into cloud_net and vice versa.
+networks:
+  edge_net:
+    driver: bridge
+  cloud_net:
+    driver: bridge
+  zenoh_net:
+    driver: bridge
+
 services:
   autoware:
     image: ghcr.io/autowarefoundation/autoware:universe
+    networks:
+      - edge_net
     volumes:
       - ${MAP_PATH}:/autoware_map:ro
     environment:
@@ -22,6 +38,8 @@ services:
 
   scenario_simulator:
     image: *scenario-simulator-image
+    networks:
+      - edge_net
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
@@ -53,6 +71,15 @@ services:
 
   edge_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
+    # Bridges edge_net (ROS 2 DDS) and zenoh_net (tunneled TCP). DNS alias
+    # `cloud_zenoh_bridge` resolves via zenoh_net regardless of CLOUD_IP.
+    networks:
+      edge_net:
+        aliases:
+          - edge_zenoh_bridge
+      zenoh_net:
+        aliases:
+          - edge_zenoh_bridge
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=0
@@ -65,23 +92,35 @@ services:
 
   visualizer:
     image: ghcr.io/autowarefoundation/openadkit:visualizer
-    # Uses bridge networking (port-mapped) to allow access from the host machine
-    # during split-topology deployments where edge and cloud run on separate hosts.
-    # The visualizer runs in a separate Docker network rather than host networking
-    # to enable controlled access via the exposed port (6081:6080).
+    networks:
+      - cloud_net
+    # Port-mapped so the host browser can reach noVNC. The visualizer's
+    # websockify is bound to loopback inside the container, so cloud_net
+    # traffic that reaches port 6080 inside the container is served locally
+    # and only the host's 6081 port is exposed externally.
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
       - REMOTE_PASSWORD=${REMOTE_PASSWORD:?Set REMOTE_PASSWORD in .env before starting the visualizer}
       - USE_SIM_TIME=true
     ports:
-      - "0.0.0.0:6081:6080"
+      - "127.0.0.1:6081:6080"
     depends_on:
       cloud_zenoh_bridge:
         condition: service_started
 
   cloud_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
+    # Bridges cloud_net and zenoh_net. The 7448 listener is exposed to the
+    # host (and through CLOUD_IP to remote edge machines) via the bridge
+    # port mapping.
+    networks:
+      cloud_net:
+        aliases:
+          - cloud_zenoh_bridge
+      zenoh_net:
+        aliases:
+          - cloud_zenoh_bridge
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=1
@@ -95,6 +134,8 @@ services:
 
   teleop:
     image: ghcr.io/evshary/autoware_manual_control:feat-ci-image-release
+    networks:
+      - cloud_net
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1

@@ -125,8 +125,18 @@ download_autoware_artifacts() {
     sudo apt-get -y update
     sudo apt-get -y install pipx
 
-    # Add pipx to the system PATH
+    # Register pipx's bin dir with the current shell. `pipx ensurepath` only
+    # appends to ~/.bashrc and similar rc files, which a non-interactive
+    # `set -euo pipefail` script does not re-read; prepending directly to
+    # PATH makes `ansible-galaxy`/`ansible-playbook` available in the same
+    # shell invocation that ran the script.
+    PIPX_BIN_DIR="$HOME/.local/bin"
     python3 -m pipx ensurepath
+    case ":$PATH:" in
+        *":${PIPX_BIN_DIR}:"*) ;;
+        *) PATH="${PIPX_BIN_DIR}:${PATH}" ;;
+    esac
+    export PATH
 
     # Install ansible
     pipx install --include-deps --force "ansible==6.*"

@@ -1,5 +1,5 @@
 [Unit]
-Description=Open Autoware AD Kit Panning
+Description=Open Autoware AD Kit Planning
 Wants=network-online.target
 Requires=awf-oak-map.service
 After=network-online.target

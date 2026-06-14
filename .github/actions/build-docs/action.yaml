@@ -21,7 +21,12 @@ runs:
       shell: bash
 
     - name: Generate release notes
-      run: python docs/scripts/generate_release_notes.py
+      # Tolerate failure here (offline or GitHub rate-limit); the doc page
+      # falls back to a placeholder section and the rest of the build still
+      # ships. Mirrors the `|| echo "WARNING..."` tolerance in the Makefile.
+      # The run value is quoted because `||` at the start of a YAML scalar
+      # would otherwise be parsed as a block-scalar indicator.
+      run: "python docs/scripts/generate_release_notes.py || echo \"WARNING: could not refresh release notes (offline or rate-limited); continuing without them\""
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}

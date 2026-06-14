@@ -37,6 +37,7 @@ env:
 jobs:
   prepare:
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
@@ -206,6 +207,7 @@ jobs:
   build-common:
     needs: prepare
     runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    timeout-minutes: 120
     permissions:
       actions: write
       contents: read
@@ -406,6 +408,7 @@ jobs:
   # =============================================================================
   build-components:
     runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    timeout-minutes: 120
     needs: [prepare, build-common]
     permissions:
       actions: write
@@ -563,6 +566,7 @@ jobs:
   # =============================================================================
   create-manifests:
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     needs: [prepare, build-common, build-components]
     if: ${{ !cancelled() }}
     permissions:
@@ -621,6 +625,7 @@ jobs:
 
   capture-metadata:
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     needs: [prepare, create-manifests]
     permissions:
       actions: read
@@ -758,6 +763,7 @@ jobs:
 
   summarize:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [prepare, capture-metadata]
     if: success()
     steps:
@@ -806,6 +812,7 @@ jobs:
 
   notify-failure:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [prepare, build-common, build-components, create-manifests, capture-metadata]
     if: failure() && github.event_name == 'schedule'
     permissions:

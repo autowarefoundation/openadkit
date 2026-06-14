@@ -44,13 +44,22 @@ def define_env(env):
 
     @env.macro
     def component_table():
-        """Markdown table of component images, generated from the catalog."""
+        """Markdown table of component images, generated from the catalog.
+
+        The ROS Distros column reflects the per-image `ros_distros` override in
+        the catalog when present, otherwise the catalog-wide `ros_distros` list.
+        """
+        data = json.loads(INVENTORY.read_text())
+        global_distros = data["ros_distros"]
         rows = [
-            "| Component | Image | Platforms |",
-            "|-----------|-------|-----------|",
+            "| Component | Image | ROS Distros | Platforms |",
+            "|-----------|-------|-------------|-----------|",
         ]
         for img in _components():
             target = img["target"]
+            distros = ", ".join(img.get("ros_distros", global_distros))
             arches = ", ".join(p.rsplit("/", 1)[-1] for p in img["platforms"])
-            rows.append(f"| `{target}` | `{REGISTRY}:{target}` | {arches} |")
+            rows.append(
+                f"| `{target}` | `{REGISTRY}:{target}` | {distros} | {arches} |"
+            )
         return "\n".join(rows)

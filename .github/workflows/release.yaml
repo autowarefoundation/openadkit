@@ -30,6 +30,7 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     permissions:
       actions: read
       contents: read
@@ -396,6 +397,7 @@ jobs:
 
   release-images:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     needs: validate
     environment: release
     permissions:
@@ -485,6 +487,7 @@ jobs:
 
   release-github:
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     needs: [validate, release-images]
     permissions:
       actions: read
@@ -629,7 +632,22 @@ jobs:
               env_file="staging/${name}/${name}.env"
               if [ -f "${env_file}" ]; then
                 tmp="$(mktemp)"
+                # Ensure base.env ends with a newline so its last value is not
+                # concatenated onto the first line of the sample env.
+                if [ -s "${base_dir}/base.env" ] && [ "$(tail -c 1 "${base_dir}/base.env" | wc -l)" -eq 0 ]; then
+                  printf '\n' >> "${base_dir}/base.env"
+                fi
                 cat "${base_dir}/base.env" "${env_file}" > "${tmp}"
+                # Fold in any optional <name>.<variant>.env (e.g. logging-simulation.gpu.env)
+                # so the shipped bundle runs with one --env-file regardless of variant.
+                for variant_env in "staging/${name}/${name}."*.env; do
+                  [ -f "${variant_env}" ] || continue
+                  case "${variant_env}" in
+                    *".env.example") continue ;;
+                  esac
+                  printf '\n# --- %s ---\n' "$(basename "${variant_env}")" >> "${tmp}"
+                  cat "${variant_env}" >> "${tmp}"
+                done
                 mv "${tmp}" "${env_file}"
               fi
             fi

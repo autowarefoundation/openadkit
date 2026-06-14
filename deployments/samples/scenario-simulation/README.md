@@ -8,21 +8,11 @@ For **complete operational instructions** including configuration, custom scenar
 
 **[Open AD Kit Docs — Scenario Simulation](https://autowarefoundation.github.io/openadkit/deployment/samples/scenario-simulation/)**
 
-## Quick Start
+## Run It
+
+Use the canonical documentation above for the supported bundle workflow. From a
+cloned repository, this sample also needs the shared deployment base env first:
 
 ```bash
-# From this directory
-# 1. Download the Kashiwanoha map (from a cloned repo: ../../scripts/fetch-sample-data.sh)
-./fetch-sample-data.sh scenario-simulation
-
-# 2. Start the deployment
-docker compose --env-file scenario-simulation.env up -d
-```
-
-Open the visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`).
-
-## Stop
-
-```bash
-docker compose --env-file scenario-simulation.env down
+docker compose --env-file ../_base/base.env --env-file scenario-simulation.env up -d
 ```

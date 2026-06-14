@@ -37,7 +37,7 @@ Run the full lint suite before pushing:
 
 ```bash
 # Shell scripts
-shellcheck **/*.sh
+git ls-files '*.sh' | xargs shellcheck --severity=error
 
 # GitHub Actions workflows
 actionlint .github/workflows/*.yaml

@@ -8,16 +8,7 @@ on:
       - '.github/image-inventory.json'
       - '.github/scripts/**'
       - '.github/workflows/build-all-images.yaml'
-      - 'components/docker-bake.hcl'
-      - 'components/universe-common/**'
-      - 'components/sensing-perception/**'
-      - 'components/localization-mapping/**'
-      - 'components/planning-control/**'
-      - 'components/vehicle-system/**'
-      - 'components/api/**'
-      - 'components/visualizer/**'
-      - 'components/simulator/**'
-      - 'components/carla-interface/**'
+      - 'components/**'
 
   schedule:
     - cron: '0 0 * * 0'

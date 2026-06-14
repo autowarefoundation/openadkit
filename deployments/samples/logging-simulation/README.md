@@ -8,24 +8,11 @@ For **complete operational instructions** including map/rosbag download, artifac
 
 **[Open AD Kit Docs — Logging Simulation](https://autowarefoundation.github.io/openadkit/deployment/samples/logging-simulation/)**
 
-## Quick Start
+## Run It
+
+Use the canonical documentation above for the supported bundle workflow. From a
+cloned repository, this sample also needs the shared deployment base env first:
 
 ```bash
-# From this directory
-# 1. Download the sample map and rosbag (from a cloned repo: ../../scripts/fetch-sample-data.sh)
-./fetch-sample-data.sh logging-simulation
-
-# 2. Start the base deployment
-docker compose --env-file logging-simulation.env up -d
-
-# 3. Start the rosbag playback
-docker compose --env-file logging-simulation.env up rosbag -d
-```
-
-Open the visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`).
-
-## Stop
-
-```bash
-docker compose --env-file logging-simulation.env --profile rosbag down
+docker compose --env-file ../_base/base.env --env-file logging-simulation.env up -d
 ```

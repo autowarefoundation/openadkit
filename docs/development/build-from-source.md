@@ -9,11 +9,12 @@ This guide covers building Open AD Kit container images locally from the reposit
 
 - Docker Engine with [Buildx](https://docs.docker.com/build/architecture/#buildx) (bundled with current Docker Engine)
 - Git (to clone this repository)
+- `pipx` and `vcs2l` (to import the Autoware source tree used by component Dockerfiles)
 - Sufficient disk space — the full build set is large (multiple multi-gigabyte images)
 
-You do **not** need a local Autoware source tree. Open AD Kit builds *from* the
-upstream Autoware base images published on GHCR, so the only source you need is
-this repository.
+Open AD Kit builds on top of upstream Autoware base images published on GHCR, but
+the component Dockerfiles still bind-mount a local `autoware/src` tree to compile
+their scoped package sets. Prepare that tree before running Bake.
 
 ## Build System
 
@@ -55,18 +56,35 @@ install tree.
 
 ## Building
 
-Local builds resolve cross-stage references within a single Bake graph, so you can build any group or target directly — no source checkout or wrapper script is required:
+Local builds resolve cross-stage references within a single Bake graph. First
+prepare the Autoware source tree in the repository root, matching the shape CI
+uses:
 
 ```bash
 # Clone the repository
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
+# Import the upstream Autoware sources used by component Dockerfiles
+pipx install vcs2l
+git clone --depth 1 https://github.com/autowarefoundation/autoware.git
+mkdir -p autoware/src
+vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+mkdir -p autoware/src/middleware/external
+touch autoware/src/middleware/external/.keep
+```
+
+Then build any group or target directly:
+
+```bash
 # Build everything (universe-common + all components)
 docker buildx bake -f components/docker-bake.hcl
 
 # Build only the universe-common intermediate
 docker buildx bake -f components/docker-bake.hcl universe-common
+
+# Build the component group
+docker buildx bake -f components/docker-bake.hcl component
 
 # Build a single component and load it into the local Docker image store
 docker buildx bake -f components/docker-bake.hcl \

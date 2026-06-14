@@ -23,7 +23,7 @@ Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on 
 `setup.sh` is self-contained — no `git clone` required. Run it directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh | sudo bash
+{{ setup_command }}
 ```
 
 This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requires sudo).

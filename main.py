@@ -1,0 +1,56 @@
+"""mkdocs-macros module — single-source repeated reference facts.
+
+Facts that were retyped across many pages (the setup command, the registry path,
+the default ROS distro) live here as variables, and the component image table is
+generated from the catalog (.github/image-inventory.json) so the docs cannot
+drift from what CI actually builds.
+
+Used by the `macros` plugin configured in mkdocs.yaml. Reference in any page
+under docs/ as `{{ setup_command }}`, `{{ registry }}`, `{{ default_distro }}`,
+`{{ default_distro_title }}`, or `{{ component_table() }}`.
+"""
+
+import json
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).parent
+INVENTORY = REPO_ROOT / ".github" / "image-inventory.json"
+
+# The container registry + repository that all Open AD Kit component images share.
+REGISTRY = "ghcr.io/autowarefoundation/openadkit"
+
+# The ROS distro the default `<target>` image aliases resolve to. When the
+# published default changes, change it here only.
+DEFAULT_DISTRO = "humble"
+
+SETUP_COMMAND = (
+    "curl -fsSL "
+    "https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh "
+    "| sudo bash"
+)
+
+
+def _components():
+    """Component images from the catalog, in catalog order."""
+    data = json.loads(INVENTORY.read_text())
+    return [img for img in data["images"] if img.get("stage") == "component"]
+
+
+def define_env(env):
+    env.variables["registry"] = REGISTRY
+    env.variables["default_distro"] = DEFAULT_DISTRO
+    env.variables["default_distro_title"] = DEFAULT_DISTRO.capitalize()
+    env.variables["setup_command"] = SETUP_COMMAND
+
+    @env.macro
+    def component_table():
+        """Markdown table of component images, generated from the catalog."""
+        rows = [
+            "| Component | Image | Platforms |",
+            "|-----------|-------|-----------|",
+        ]
+        for img in _components():
+            target = img["target"]
+            arches = ", ".join(p.rsplit("/", 1)[-1] for p in img["platforms"])
+            rows.append(f"| `{target}` | `{REGISTRY}:{target}` | {arches} |")
+        return "\n".join(rows)

@@ -27,7 +27,7 @@ A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, 
 
 | Distro | Status at v2.0 |
 |--------|----------------|
-| **Humble** | Default, documented path. The default-distro image aliases (`<target>`) resolve to Humble. |
+| **Humble** | Default, documented path. The default-distro image aliases (`<target>`) resolve to {{ default_distro_title }}. |
 | **Jazzy** | Built and published **in parallel** (`<target>-jazzy`) wherever the `amd64`+`arm64` matrix is green. |
 
 Each release pins its ROS distro(s), and Humble and Jazzy are built while both matrices are green. Jazzy is promoted to the primary documented path at the first release with a sustained green Jazzy `amd64`+`arm64` matrix. Distro support tracks the upstream ROS 2 lifecycle — a distro is supported by Open AD Kit only while it is supported upstream.

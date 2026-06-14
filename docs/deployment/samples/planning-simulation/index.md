@@ -27,7 +27,7 @@ No `git clone` required — set up Docker, then download the self-contained depl
 ### 1. Set up the environment (one-time)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh | sudo bash
+{{ setup_command }}
 ```
 
 ### 2. Download the deployment bundle

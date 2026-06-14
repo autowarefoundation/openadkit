@@ -29,7 +29,7 @@ No `git clone` required.
 ### 1. Set up the environment + download Autoware artifacts (one-time)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh | sudo bash -s -- --download-artifacts
+{{ setup_command }} -s -- --download-artifacts
 ```
 
 This installs Docker / the NVIDIA Container Toolkit and downloads the perception artifacts into `${HOME}/autoware_data` (mounted into the sensing and perception containers).

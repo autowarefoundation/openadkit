@@ -65,7 +65,7 @@ No `git clone` is needed — each sample is downloaded as a self-contained bundl
 
 <div class="oak-steps" markdown="1">
 
-- **Set up the environment** — `curl -fsSL https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh | sudo bash` (one-time)
+- **Set up the environment** — `{{ setup_command }}` (one-time)
 - **Get the deployment** — Download and extract the sample's `<sample>.tar.gz` bundle, then `cd <sample>`
 - **Download assets** — `./fetch-sample-data.sh <sample>` (maps/rosbags as required)
 - **Configure environment** — Edit the `.env` file for your setup (optional)

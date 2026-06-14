@@ -9,6 +9,8 @@ on:
       - closed
     paths:
       - mkdocs.yaml
+      - main.py
+      - .github/image-inventory.json
       - docs/requirements.txt
       - "docs/scripts/**"
       - "**/*.md"

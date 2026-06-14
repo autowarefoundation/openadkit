@@ -600,6 +600,7 @@ jobs:
         run: |
           set -euo pipefail
           fetch="src/deployments/scripts/fetch-sample-data.sh"
+          base_dir="src/deployments/samples/_base"
           mkdir -p dist staging
           for entry in \
             "planning-simulation:src/deployments/samples/planning-simulation" \
@@ -615,6 +616,22 @@ jobs:
             if [ "${name}" != "carla-simulation" ]; then
               cp "${fetch}" "staging/${name}/fetch-sample-data.sh"
               chmod +x "staging/${name}/fetch-sample-data.sh"
+            fi
+            # Samples that share the deployment base ship a self-contained copy of
+            # it: vendor _base/ into the bundle, repoint the include at the local
+            # copy, and fold base.env into the sample env so the bundle still runs
+            # with a single `--env-file <name>.env`, exactly as documented.
+            compose="staging/${name}/docker-compose.yaml"
+            if [ -f "${compose}" ] && grep -q '\.\./_base/docker-compose\.yaml' "${compose}"; then
+              mkdir -p "staging/${name}/_base"
+              cp "${base_dir}/docker-compose.yaml" "staging/${name}/_base/docker-compose.yaml"
+              sed -i 's#\.\./_base/docker-compose\.yaml#_base/docker-compose.yaml#' "${compose}"
+              env_file="staging/${name}/${name}.env"
+              if [ -f "${env_file}" ]; then
+                tmp="$(mktemp)"
+                cat "${base_dir}/base.env" "${env_file}" > "${tmp}"
+                mv "${tmp}" "${env_file}"
+              fi
             fi
             tar -C staging -czf "dist/${name}.tar.gz" "${name}"
             echo "packaged dist/${name}.tar.gz"

@@ -123,10 +123,13 @@ jobs:
             fi
             echo "::endgroup::"
           }
-          validate deployments/samples/planning-simulation --env-file planning-simulation.env
-          validate deployments/samples/scenario-simulation --env-file scenario-simulation.env
-          validate deployments/samples/logging-simulation  --env-file logging-simulation.env
-          validate deployments/samples/logging-simulation  --env-file logging-simulation.env --env-file logging-simulation.gpu.env -f docker-compose.yaml -f docker-compose.gpu.yaml
+          # Samples sharing the deployment base load ../_base/base.env first, then
+          # their delta env (last wins). Release packaging concatenates the two so
+          # shipped bundles run with a single --env-file.
+          validate deployments/samples/planning-simulation --env-file ../_base/base.env --env-file planning-simulation.env
+          validate deployments/samples/scenario-simulation --env-file ../_base/base.env --env-file scenario-simulation.env
+          validate deployments/samples/logging-simulation  --env-file ../_base/base.env --env-file logging-simulation.env
+          validate deployments/samples/logging-simulation  --env-file ../_base/base.env --env-file logging-simulation.env --env-file logging-simulation.gpu.env -f docker-compose.yaml -f docker-compose.gpu.yaml
           validate deployments/samples/carla-simulation    --env-file carla-simulation.e2e.env
           validate deployments/demos/zenoh-bridge          --env-file .env
           exit "${fail}"

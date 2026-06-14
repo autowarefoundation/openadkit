@@ -62,7 +62,10 @@ plugins:
       regex:
         - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?jpg|(.*\.)?pages).*$
         - ^(.*/)?[^.]*$
-  - macros
+  - macros:
+      # main.py at the repo root: variables + catalog-generated tables.
+      module_name: main
+      on_error_fail: true
   - search
 
 markdown_extensions:

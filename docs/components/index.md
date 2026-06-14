@@ -132,6 +132,15 @@ Each Autoware function is packaged into a focused container image. Select a comp
 
 </div>
 
+## Image Reference
+
+The published component images and their platforms. This table is generated from
+the image catalog (`.github/image-inventory.json`), so it always matches what CI
+builds. See [Container Image Tags](../getting-started/image-tags.md) for the tag
+naming scheme.
+
+{{ component_table() }}
+
 ## Building from source
 
 Open AD Kit images are built with `docker buildx bake` using

@@ -122,7 +122,7 @@ graph TD
 ### 1. Set up the environment (one-time)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh | sudo bash
+{{ setup_command }}
 ```
 
 ### 2. Download the deployment bundle and sample map

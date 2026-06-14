@@ -85,9 +85,16 @@ EOF
     echo "export DISPLAY=:99" >>~/.bashrc
     sleep 2
 
-    # Start NoVNC
+    # Start NoVNC, bound to loopback only. The compose uses `network_mode: host`
+    # so the `ports:` mapping is ignored; websockify's default source_addr is
+    # `0.0.0.0` which would expose noVNC on every interface. Pass an explicit
+    # source_addr of 127.0.0.1 to bind to the loopback interface. To expose
+    # externally, change it to 0.0.0.0 and front the port with an authenticated
+    # reverse proxy.
     echo "Starting NoVNC..."
-    websockify --daemon --web=/usr/share/novnc/ --cert=/etc/ssl/certs/novnc.crt --key=/etc/ssl/private/novnc.key 6080 localhost:5999
+    websockify --daemon --web=/usr/share/novnc/ \
+      --cert=/etc/ssl/certs/novnc.crt --key=/etc/ssl/private/novnc.key \
+      127.0.0.1:6080 localhost:5999
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"

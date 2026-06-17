@@ -6,6 +6,7 @@ on:
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
       - '.github/image-inventory.json'
+      - '.github/scripts/**'
       - '.github/workflows/build-all-images.yaml'
       - 'components/docker-bake.hcl'
       - 'components/universe-common/**'
@@ -58,9 +59,7 @@ jobs:
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
       ros_distro_matrix: ${{ steps.inventory.outputs.ros_distro_matrix }}
-      manifest_targets: ${{ steps.inventory.outputs.manifest_targets }}
-      component_manifest_targets: ${{ steps.inventory.outputs.component_manifest_targets }}
-      single_arch_component_targets: ${{ steps.inventory.outputs.single_arch_component_targets }}
+      manifest_matrix: ${{ steps.inventory.outputs.manifest_matrix }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
@@ -123,83 +122,7 @@ jobs:
           set -euo pipefail
           mkdir -p image-inventory
           cp .github/image-inventory.json image-inventory/image-inventory.json
-          python3 <<'PY'
-          import json
-          import os
-          import pathlib
-
-          inventory = json.loads(pathlib.Path(".github/image-inventory.json").read_text())
-          distros = inventory["ros_distros"]
-          images = inventory["images"]
-
-          def image_distros(image):
-              return image.get("ros_distros", distros)
-
-          def platform_label(platform):
-              if platform == "linux/amd64":
-                  return "amd64"
-              if platform == "linux/arm64":
-                  return "arm64"
-              raise ValueError(f"unsupported platform: {platform}")
-
-          def matrix_for(stage):
-              include = []
-              for image in images:
-                  if image["stage"] != stage:
-                      continue
-                  for distro in image_distros(image):
-                      for platform in image["platforms"]:
-                          include.append({
-                              "platform": platform,
-                              "platform-label": platform_label(platform),
-                              "ros-distro": distro,
-                              "target": image["target"],
-                          })
-              return {"include": include}
-
-          common_pairs = sorted({
-              (platform, distro)
-              for image in images if image["stage"] == "common"
-              for distro in image_distros(image)
-              for platform in image["platforms"]
-          })
-          common_matrix = {
-              "include": [
-                  {"platform": platform, "platform-label": platform_label(platform), "ros-distro": distro}
-                  for platform, distro in common_pairs
-              ]
-          }
-          ros_distro_matrix = {"include": [{"ros-distro": distro} for distro in distros]}
-          component_images = [image for image in images if image["repo"] == "component"]
-          manifest_targets = " ".join(image["target"] for image in component_images)
-          component_manifest_targets = {
-              distro: " ".join(
-                  sorted(image["target"] for image in component_images if distro in image_distros(image))
-              )
-              for distro in distros
-          }
-          single_arch_component_targets = " ".join(
-              sorted(
-                  image["target"] for image in component_images
-                  if "linux/arm64" not in image["platforms"]
-              )
-          )
-
-          outputs = {
-              "common_matrix": common_matrix,
-              "component_matrix": matrix_for("component"),
-              "ros_distro_matrix": ros_distro_matrix,
-              "manifest_targets": manifest_targets,
-              "component_manifest_targets": component_manifest_targets,
-              "single_arch_component_targets": single_arch_component_targets,
-          }
-          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              for key, value in outputs.items():
-                  if isinstance(value, str):
-                      output.write(f"{key}={value}\n")
-                  else:
-                      output.write(f"{key}={json.dumps(value, separators=(',', ':'))}\n")
-          PY
+          python3 .github/scripts/resolve_image_matrices.py >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Upload image inventory

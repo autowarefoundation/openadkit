@@ -53,7 +53,6 @@ def build_matrices(inventory):
         {"platform": p, "platform-label": platform_label(p), "ros-distro": d}
         for p, d in common_pairs
     ]}
-    ros_distro_matrix = {"include": [{"ros-distro": d} for d in distros]}
 
     manifest_include = []
     for image in images:
@@ -70,7 +69,6 @@ def build_matrices(inventory):
     return {
         "common_matrix": common_matrix,
         "component_matrix": matrix_for("component"),
-        "ros_distro_matrix": ros_distro_matrix,
         "manifest_matrix": manifest_matrix,
     }
 

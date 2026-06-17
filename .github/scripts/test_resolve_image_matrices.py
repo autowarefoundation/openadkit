@@ -43,9 +43,8 @@ def test_existing_matrices_unchanged_shape():
     m = r.build_matrices(INVENTORY)
     entry = m["component_matrix"]["include"][0]
     assert set(entry) == {"platform", "platform-label", "ros-distro", "target"}
-    assert m["ros_distro_matrix"] == {
-        "include": [{"ros-distro": "humble"}, {"ros-distro": "jazzy"}]
-    }
+    common_entry = m["common_matrix"]["include"][0]
+    assert set(common_entry) == {"platform", "platform-label", "ros-distro"}
 
 
 def test_old_outputs_removed():
@@ -55,10 +54,10 @@ def test_old_outputs_removed():
     assert "single_arch_component_targets" not in m
 
 
-def test_cli_emits_exactly_four_keys():
+def test_cli_emits_exactly_three_keys():
     out = subprocess.run(
         [sys.executable, ".github/scripts/resolve_image_matrices.py"],
         capture_output=True, text=True, check=True,
     ).stdout
     keys = {line.split("=", 1)[0] for line in out.splitlines() if line}
-    assert keys == {"common_matrix", "component_matrix", "ros_distro_matrix", "manifest_matrix"}
+    assert keys == {"common_matrix", "component_matrix", "manifest_matrix"}

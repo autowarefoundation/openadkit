@@ -58,7 +58,6 @@ jobs:
       scan_requested: ${{ steps.prepare.outputs.scan_requested }}
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
-      ros_distro_matrix: ${{ steps.inventory.outputs.ros_distro_matrix }}
       manifest_matrix: ${{ steps.inventory.outputs.manifest_matrix }}
     steps:
       - name: Checkout OpenADKit repository
@@ -574,12 +573,13 @@ jobs:
   create-manifests:
     runs-on: ubuntu-22.04
     needs: [prepare, build-common, build-components]
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare.outputs.ros_distro_matrix) }}
+      matrix: ${{ fromJson(needs.prepare.outputs.manifest_matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -587,16 +587,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Combine multi-arch images
+      - name: Create multi-arch manifest for ${{ matrix.target }} (${{ matrix.ros-distro }})
         uses: ./.github/actions/combine-multi-arch-images
         with:
+          image: ${{ matrix.repo == 'common' && env.IMAGE_PREFIX_COMMON || env.IMAGE_PREFIX_COMPONENT }}
+          target: ${{ matrix.target }}
           ros-distro: ${{ matrix.ros-distro }}
+          arches: ${{ matrix.arches }}
           build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
-          image-prefix-common: ${{ env.IMAGE_PREFIX_COMMON }}
-          image-prefix-component: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          component-targets: ${{ fromJson(needs.prepare.outputs.component_manifest_targets)[matrix.ros-distro] }}
-          single-arch-component-targets: ${{ needs.prepare.outputs.single_arch_component_targets }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   capture-metadata:

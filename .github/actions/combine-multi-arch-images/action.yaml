@@ -1,9 +1,18 @@
 name: combine-multi-arch-images
-description: Combine platform-specific Docker images into multi-arch manifests
+description: Create one image's multi-arch (or single-arch) manifest from per-arch tags
 
 inputs:
+  image:
+    description: Full image prefix, e.g. ghcr.io/<owner>/openadkit
+    required: true
+  target:
+    description: Image target name, e.g. planning-control
+    required: true
   ros-distro:
     description: ROS distribution name
+    required: true
+  arches:
+    description: 'Space-separated required architecture labels, e.g. "amd64 arm64"'
     required: true
   build-tag:
     description: Immutable build tag for this workflow run
@@ -11,19 +20,6 @@ inputs:
   registry:
     description: Container registry
     required: true
-  image-prefix-common:
-    description: Image prefix for common images
-    required: true
-  image-prefix-component:
-    description: Image prefix for component images
-    required: true
-  component-targets:
-    description: 'Space-separated list of component image targets (e.g., "sensing-perception localization-mapping")'
-    required: true
-  single-arch-component-targets:
-    description: 'Space-separated amd64-only component targets from image inventory'
-    required: false
-    default: ''
   token:
     description: GitHub token for registry access
     required: true
@@ -31,61 +27,19 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Login to GitHub Container Registry
+    - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ inputs.registry }}
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
 
-    - name: Combine multi-arch images for common packages
-      run: |
-        set -e
-
-        IMAGE="${{ inputs.image-prefix-common }}"
-        DISTRO="${{ inputs.ros-distro }}"
-        BUILD_TAG="${{ inputs.build-tag }}"
-
-        # Known common image variants (universe-common is multi-arch; no CUDA variant)
-        MULTI_ARCH_VARIANTS="universe-common-devel universe-common"
-
-        # Create multi-arch manifests (amd64 + arm64)
-        for variant in ${MULTI_ARCH_VARIANTS}; do
-          base_tag="${variant}-${DISTRO}-${BUILD_TAG}"
-          echo "Creating multi-arch manifest for ${IMAGE}:${base_tag}"
-          docker buildx imagetools create -t "${IMAGE}:${base_tag}" \
-            "${IMAGE}:${variant}-amd64-${DISTRO}-${BUILD_TAG}" \
-            "${IMAGE}:${variant}-arm64-${DISTRO}-${BUILD_TAG}"
-          echo "Created ${IMAGE}:${base_tag}"
-        done
+    - name: Create multi-arch manifest
       shell: bash
-
-    - name: Combine multi-arch images for component packages
-      run: |
-        set -e
-
-        IMAGE="${{ inputs.image-prefix-component }}"
-        DISTRO="${{ inputs.ros-distro }}"
-        BUILD_TAG="${{ inputs.build-tag }}"
-        TARGETS="${{ inputs.component-targets }}"
-        SINGLE_ARCH_TARGETS="${{ inputs.single-arch-component-targets }}"
-
-        for target in ${TARGETS}; do
-          base_tag="${target}-${DISTRO}-${BUILD_TAG}"
-
-          if [[ " ${SINGLE_ARCH_TARGETS} " == *" ${target} "* ]]; then
-            # amd64-only component targets from image inventory
-            echo "Creating single-arch manifest for ${IMAGE}:${base_tag}"
-            docker buildx imagetools create -t "${IMAGE}:${base_tag}" \
-              "${IMAGE}:${target}-amd64-${DISTRO}-${BUILD_TAG}"
-            echo "Created ${IMAGE}:${base_tag}"
-          else
-            # Multi-arch manifest (amd64 + arm64)
-            echo "Creating multi-arch manifest for ${IMAGE}:${base_tag}"
-            docker buildx imagetools create -t "${IMAGE}:${base_tag}" \
-              "${IMAGE}:${target}-amd64-${DISTRO}-${BUILD_TAG}" \
-              "${IMAGE}:${target}-arm64-${DISTRO}-${BUILD_TAG}"
-            echo "Created ${IMAGE}:${base_tag}"
-          fi
-        done
-      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        TARGET: ${{ inputs.target }}
+        ROS_DISTRO: ${{ inputs.ros-distro }}
+        ARCHES: ${{ inputs.arches }}
+        BUILD_TAG: ${{ inputs.build-tag }}
+      run: bash "${GITHUB_ACTION_PATH}/create-manifest.sh"

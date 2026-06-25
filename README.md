@@ -38,14 +38,13 @@ For complete documentation, operational steps, and troubleshooting:
 
 - **[Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/)**
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
+- **[Release Flow](https://autowarefoundation.github.io/openadkit/getting-started/release-flow/)** — Promote existing builds instead of rebuilding at release time
 - **[Supported Platforms](https://autowarefoundation.github.io/openadkit/platforms/)** — Hardware and platform support status
-- **[Development](https://autowarefoundation.github.io/openadkit/development/)** — Build from source and contribute
+- **[Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)** — Build component images locally with `docker buildx bake`
 
-## Release & Development
+## Container Image Tags
 
-- **[Release Flow](https://autowarefoundation.github.io/openadkit/getting-started/release-flow/)** — Maintainers promote an existing build instead of rebuilding during release. The build metadata, scan metadata, and `.github/image-inventory.json` are the source of truth for release validation.
-- **[Container Image Tags](https://autowarefoundation.github.io/openadkit/getting-started/image-tags/)** — Build-specific, release, latest-stable, and CI development tags are published to GitHub Container Registry. Use stable release tags for fully pinned deployments; compose files use default ROS distro aliases for convenience. CUDA image aliases are amd64-only.
-- **[Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)** — Component images are built with `docker buildx bake`, driven by [`components/docker-bake.hcl`](components/docker-bake.hcl), on top of upstream Autoware base images published to `ghcr.io/autowarefoundation/autoware`.
+Open AD Kit publishes build-specific, release, latest-stable, and CI development image tags to GitHub Container Registry. See the canonical **[Container Image Tags](https://autowarefoundation.github.io/openadkit/getting-started/image-tags/)** page for the full tag taxonomy, examples, and pinning guidance. Use stable release tags for fully pinned deployments; compose files use default ROS distro aliases for convenience. CUDA image aliases are amd64-only.
 
 ## Contributing
 

@@ -55,7 +55,11 @@ def fetch_releases(repo: str, token: Optional[str]) -> list[dict]:
         request = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
-                batch = json.load(response)
+                try:
+                    batch = json.load(response)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    print(f"GitHub API returned invalid JSON: {exc}", file=sys.stderr)
+                    raise SystemExit(1) from exc
         except urllib.error.HTTPError as exc:
             print(f"GitHub API request failed: {exc.code} {exc.reason}", file=sys.stderr)
             raise SystemExit(1) from exc

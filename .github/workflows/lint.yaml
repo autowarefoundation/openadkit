@@ -83,7 +83,13 @@ jobs:
           yamllint_flags: >-
             .github/workflows/
             .github/actions/
+            .github/ISSUE_TEMPLATE/
+            .github/DISCUSSION_TEMPLATE/
+            .github/dependabot.yaml
+            .github/stale.yml
+            .github/sync-files.yaml
             deployments/
+            platforms/
             mkdocs.yaml
             docs/
 
@@ -154,3 +160,21 @@ jobs:
           validate deployments/samples/carla-simulation    --env-file carla-simulation.e2e.env
           validate deployments/demos/zenoh-bridge          --env-file .env
           exit "${fail}"
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run Python tests
+        run: pytest .github/scripts/test_resolve_image_matrices.py
+
+      - name: Run shell tests
+        run: |
+          bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
+          bash .github/scripts/test_report_manifests.sh

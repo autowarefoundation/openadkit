@@ -69,11 +69,11 @@ Once all services are running, you can:
 - Observe the Autoware planning stack responding to the scenario simulator environment
 - Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware
 
-For a Docker Compose equivalent on a development laptop, see the [Planning Simulation sample deployment](../../../deployment/planning-simulation/index.md).
+For a Docker Compose equivalent on a development laptop, see the [Planning Simulation deployment](../../../deployment/planning-simulation/index.md).
 
 ## Related
 
 - [AutoSD Platform Overview](../index.md)
-- [Planning Simulation sample deployment](../../../deployment/planning-simulation/index.md)
+- [Planning Simulation deployment](../../../deployment/planning-simulation/index.md)
 - [Open AD Kit Deployments](../../../deployment/index.md)
 - [Components Overview](../../../components/index.md)

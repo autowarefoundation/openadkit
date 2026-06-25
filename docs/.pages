@@ -4,8 +4,8 @@ nav:
     - Overview: overview.md
   - Getting Started: getting-started
   - Deployment: deployment
-  - components
-  - platforms
+  - Components: components
+  - Platforms: platforms
   - Development: development
   - Releases: releases
   - Roadmap: roadmap.md

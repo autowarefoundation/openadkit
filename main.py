@@ -11,6 +11,7 @@ under docs/ as `{{ setup_command }}`, `{{ registry }}`, `{{ default_distro }}`,
 """
 
 import json
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent
@@ -23,16 +24,30 @@ REGISTRY = "ghcr.io/autowarefoundation/openadkit"
 # published default changes, change it here only.
 DEFAULT_DISTRO = "humble"
 
+# Derive the branch/tag from the build environment so release docs point to
+# the matching script. Falls back to "main" for local builds.
+SETUP_BRANCH = os.environ.get("GITHUB_REF_NAME", "main")
+
 SETUP_COMMAND = (
     "curl -fsSL "
-    "https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh "
+    f"https://raw.githubusercontent.com/autowarefoundation/openadkit/{SETUP_BRANCH}/setup.sh "
     "| sudo bash"
 )
 
 
+def _load_inventory():
+    """Load and return the image inventory, with a clear error on failure."""
+    try:
+        return json.loads(INVENTORY.read_text())
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Failed to read image catalog at {INVENTORY}: {exc}"
+        ) from exc
+
+
 def _components():
     """Component images from the catalog, in catalog order."""
-    data = json.loads(INVENTORY.read_text())
+    data = _load_inventory()
     return [img for img in data["images"] if img.get("stage") == "component"]
 
 
@@ -49,7 +64,7 @@ def define_env(env):
         The ROS Distros column reflects the per-image `ros_distros` override in
         the catalog when present, otherwise the catalog-wide `ros_distros` list.
         """
-        data = json.loads(INVENTORY.read_text())
+        data = _load_inventory()
         global_distros = data["ros_distros"]
         rows = [
             "| Component | Image | ROS Distros | Platforms |",

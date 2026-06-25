@@ -202,7 +202,7 @@ Autoware release tags and build the matching single-arch release images.
 Open AD Kit tracks Autoware's architecture evolution upstream, but its own roadmap is focused on **deployment** — containerization, platform support, release trust, and CI/CD — rather than on the autonomy algorithms themselves. The goal is to package whatever Autoware ships into clean, composable, deployment-ready images.
 
 !!! note "Roadmap"
-    The 2026–2027 Open AD Kit roadmap is being ratified through the Open AD Kit working group (June 2026) and will be published in this repository. Current focus areas include:
+    The 2026–2027 Open AD Kit roadmap has been ratified and is published in the repository. See the [Roadmap](../roadmap.md) for the full release ladder. Current focus areas include:
 
     - **Containerization** — Splitting the monolithic stack into focused component images and retiring `autoware:universe` fallbacks (see deployment *Known Limitations*).
     - **Platform support** — Expanding verified coverage across edge and cloud targets (see [Platforms](../platforms/index.md)).

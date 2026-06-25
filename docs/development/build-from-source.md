@@ -97,7 +97,7 @@ The Bake file exposes a few variables, overridable via environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ROS_DISTRO` | `humble` or `jazzy` | `jazzy` |
+| `ROS_DISTRO` | `humble` or `jazzy` | `humble` |
 | `UPSTREAM_TAG` | Pins the upstream Autoware release (e.g. `1.8.0`). Empty pulls the plain `<name>-<distro>` multi-arch tag — handy for local experiments, not for reproducible builds. | `""` |
 | `UPSTREAM_REPO` | Upstream Autoware image repository | `ghcr.io/autowarefoundation/autoware` |
 

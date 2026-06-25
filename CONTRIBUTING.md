@@ -23,7 +23,7 @@ See the [full guide](https://autowarefoundation.github.io/openadkit/development/
 
 ## For Internal (Foundation) Contributors
 
-If you are a member of the Autoware Foundation contributing to the `docs-consistency` branch or other internal work:
+If you are a member of the Autoware Foundation contributing to active development branches or other internal work:
 
 ### Branch Strategy
 

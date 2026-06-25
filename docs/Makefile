@@ -18,7 +18,7 @@ help:
 
 # Serve documentation locally
 serve: prepare-if-missing generate-release-notes
-	docker run --rm -p 8000:8000 -v $(REPO_ROOT):/app -e NO_MKDOCS_2_WARNING=1 mkdocs-dev
+	docker run --rm -p 8000:8000 -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev
 
 # Refresh release notes from GitHub Releases (runs inside the docs container).
 # Non-fatal: when offline or rate-limited, the site still builds — the

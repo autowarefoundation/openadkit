@@ -336,7 +336,7 @@ jobs:
           lookup-only: true
 
       - name: Inject BuildKit cache mounts
-        uses: reproducible-containers/buildkit-cache-dance@v3
+        uses: reproducible-containers/buildkit-cache-dance@7a38cfab60c63ee1022b7c1a14a031c82f4114c7 # v3
         with:
           # Only ccache is persisted across runs: it is the entire ~4.5x
           # recompile win and stays small (~0.14 GB/leg). apt/pip mounts were

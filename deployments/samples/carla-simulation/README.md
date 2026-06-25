@@ -4,6 +4,14 @@ This sample runs closed-loop CARLA 0.9.16 end-to-end simulation with modular Ope
 
 The default runtime uses the official CARLA Ubuntu 22 container image. It does not use the CARLA ROS bridge, dummy vehicle, dummy perception, a monolithic Autoware container, or a host-installed CARLA runtime.
 
+## Documentation
+
+Canonical bundle-framed instructions live on the docs site:
+
+**https://autowarefoundation.github.io/openadkit/deployment/samples/carla-simulation/**
+
+The bundle ships a single env file (`carla-simulation.env`) and one `docker-compose.yaml`. This README is for developers running from the source tree, where the bundle layout does not apply.
+
 ## Runtime
 
 - CARLA: `carlasim/carla:0.9.16`

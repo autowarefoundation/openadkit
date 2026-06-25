@@ -14,6 +14,7 @@ on:
       - '**/docker-compose*.yaml'
       - '**/docker-compose*.yml'
       - '**/*.env'
+      - 'components/**/*.hcl'
       - 'mkdocs.yaml'
       - 'docs/**/*.yaml'
       - 'docs/**/*.yml'
@@ -155,6 +156,48 @@ jobs:
           validate deployments/demos/zenoh-bridge          --env-file .env
           exit "${fail}"
 
+  bake-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate bake.hcl parses and COLCON_BASE_PATHS is single-source
+        # `docker buildx bake --print` parses the HCL and resolves every target
+        # without pulling images. The CPU and CUDA sensing targets must produce
+        # the same COLCON_BASE_PATHS value (R4's invariant: a single source of
+        # truth for the sensing `--base-paths` list).
+        run: |
+          set -euo pipefail
+          fail=0
+          cpu=$(docker buildx bake -f components/docker-bake.hcl --print sensing-perception \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["target"]["sensing-perception"]["args"]["COLCON_BASE_PATHS"])')
+          cuda=$(docker buildx bake -f components/docker-bake.hcl --print sensing-perception-cuda \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["target"]["sensing-perception-cuda"]["args"]["COLCON_BASE_PATHS"])')
+          if [ -z "${cpu}" ]; then
+            echo "::error::sensing-perception has no COLCON_BASE_PATHS"
+            fail=1
+          fi
+          if [ -z "${cuda}" ]; then
+            echo "::error::sensing-perception-cuda has no COLCON_BASE_PATHS"
+            fail=1
+          fi
+          if [ "${cpu}" != "${cuda}" ]; then
+            echo "::error::COLCON_BASE_PATHS diverges between CPU and CUDA sensing targets"
+            echo "  cpu:  ${cpu}"
+            echo "  cuda: ${cuda}"
+            fail=1
+          fi
+          # Validate that the universe-common-devel target parses cleanly (catches
+          # locals-blocks, typo'd function names, missing ARGs, etc.).
+          docker buildx bake -f components/docker-bake.hcl --print universe-common-devel \
+            > /dev/null
+          exit "${fail}"
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -166,7 +209,7 @@ jobs:
         run: pip install pytest
 
       - name: Run Python tests
-        run: pytest .github/scripts/test_resolve_image_matrices.py
+        run: pytest .github/scripts/
 
       - name: Run shell tests
         run: |

@@ -34,7 +34,10 @@ This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requ
 !!! info "Autoware artifacts"
     For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `setup.sh --download-artifacts` directly (no `-s` needed).
 
-Each deployment is then downloaded as a self-contained bundle — see [Deployments](../deployment/index.md). You do **not** clone the repository to run deployments.
+Each deployment is downloaded as a self-contained bundle — see [Deployments](../deployment/index.md).
+
+!!! warning "First release pending"
+    Open AD Kit has not published its first stable release yet. Until release bundles are available, clone this repository and run from the `deployments/<sample>/` folders.
 
 ## Verify Your Installation
 

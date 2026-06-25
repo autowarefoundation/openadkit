@@ -2580,7 +2580,7 @@
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Memory sizing</p>
-<p>The <code>-m 2G</code> value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the <a href="../hardware/">hardware requirements</a> (16 GB minimum, 32 GB recommended) and raise <code>-m</code> accordingly.</p>
+<p>The <code>-m 2G</code> value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the <a href="../hardware/">hardware requirements</a> (16 GB minimum, 32 GB recommended) and raise <code>-m</code> accordingly. A concrete starting point is <code>-m 16384</code> (16 GB); for heavier workloads use <code>-m 32768</code> (32 GB).</p>
 </div>
 <h2 id="architecture-on-autosd">Architecture on AutoSD<a class="headerlink" href="#architecture-on-autosd" title="Permanent link">#</a></h2>
 <p>AutoSD's mixed-criticality architecture maps naturally to Open AD Kit's component model:</p>

@@ -9,7 +9,7 @@ Open AD Kit releases use [Semantic Versioning](https://semver.org/): `vMAJOR.MIN
 | Component | Increments when |
 |-----------|-----------------|
 | **MAJOR** | A backward-incompatible change to the public deployment surface — image taxonomy, documented compose/deployment layout, or removal of a supported platform/variant. |
-| **MINOR** | New backward-compatible capability — additional components, platforms, deployment samples, or CI/release machinery. |
+| **MINOR** | New backward-compatible capability — additional components, platforms, deployments, or CI/release machinery. |
 | **PATCH** | Backward-compatible fixes — bug fixes, security/CVE remediation, image refreshes, and documentation corrections within the same release surface. |
 
 The Open AD Kit version is **independent of the Autoware version** it packages: a single Open AD Kit release pins a specific upstream Autoware release (see below), and a new Autoware release does not automatically change the Open AD Kit version.

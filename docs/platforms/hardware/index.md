@@ -8,7 +8,7 @@ Open AD Kit supports both **amd64** and **arm64** architectures. Requirements va
 
 ### Local Development & Simulation
 
-For running sample deployments, simulations, and development workloads on a workstation or cloud instance:
+For running deployments, simulations, and development workloads on a workstation or cloud instance:
 
 | Resource | Minimum | Recommended |
 |----------|---------|-------------|

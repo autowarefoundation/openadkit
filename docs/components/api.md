@@ -34,7 +34,7 @@ Typical resource usage:
 - [Scenario Simulation](../deployment/scenario-simulation/index.md) — Used by the scenario runner to engage, set routes, and monitor state
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Provides API access during rosbag replay
 
-All sample deployments include the `api` container because it is the standard entry point for external interaction with the Autoware stack.
+All deployments include the `api` container because it is the standard entry point for external interaction with the Autoware stack.
 
 ## Related
 

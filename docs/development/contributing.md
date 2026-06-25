@@ -15,7 +15,7 @@ All commits must include a **Signed-off-by** line to certify that you have the r
 
 ```bash
 # Sign off automatically when committing
-git commit -s -m "feat: add new deployment sample"
+git commit -s -m "feat: add new deployment"
 ```
 
 The sign-off is a simple line at the end of the commit message:
@@ -84,7 +84,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit 
 | `chore` | Maintenance tasks | `chore: update CI workflow` |
 
 ```bash
-git commit -s -m "feat: add new deployment sample for logging simulation"
+git commit -s -m "feat: add new deployment for logging simulation"
 ```
 
 ### 6. Push and Open a Pull Request

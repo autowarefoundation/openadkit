@@ -1,7 +1,7 @@
 x-scenario-simulator-image: &scenario-simulator-image ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime
 
 # Three named networks match the architecture described in
-# docs/deployment/demos/zenoh-bridge/index.md:
+# docs/deployment/zenoh-bridge/index.md:
 #   - edge_net: edge-side (autoware, scenario_simulator, edge_zenoh_bridge)
 #   - cloud_net: cloud-side (visualizer, cloud_zenoh_bridge, teleop)
 #   - zenoh_net: dedicated bridge between the two zenoh routers, so DDS

@@ -2564,7 +2564,7 @@
 <p>If you have <code>automotive-image-runner</code> available:</p>
 <div class="highlight"><pre><span></span><code>automotive-image-runner<span class="w"> </span>--nographic<span class="w"> </span>disk.qcow2
 </code></pre></div>
-<p>Otherwise, use the following sample QEMU command:</p>
+<p>Otherwise, use the following example QEMU command:</p>
 <div class="highlight"><pre><span></span><code>/usr/bin/qemu-system-x86_64<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span>/usr/share/OVMF/OVMF_CODE.fd,if<span class="o">=</span>pflash,format<span class="o">=</span>raw,unit<span class="o">=</span><span class="m">0</span>,readonly<span class="o">=</span>on<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span>/usr/share/OVMF/OVMF_VARS.fd,if<span class="o">=</span>pflash,format<span class="o">=</span>raw,unit<span class="o">=</span><span class="m">1</span>,snapshot<span class="o">=</span>on,readonly<span class="o">=</span>off<span class="w"> </span><span class="se">\</span>

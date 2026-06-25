@@ -2360,10 +2360,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-download-the-sample-map-and-rosbag" class="md-nav__link">
+  <a href="#3-download-the-demo-map-and-rosbag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Download the sample map and rosbag
+        3. Download the demo map and rosbag
       
     </span>
   </a>
@@ -2490,7 +2490,7 @@
 
 <h1 id="logging-simulation">Logging Simulation<a class="headerlink" href="#logging-simulation" title="Permanent link">#</a></h1>
 <div class="admonition abstract">
-<p>The Logging Simulation sample replays recorded sensor data (a rosbag) through the full Autoware stack. It is the most realistic single-machine simulation, testing perception, localization, and planning against actual real-world logged data.</p>
+<p>The Logging Simulation deployment replays recorded sensor data (a rosbag) through the full Autoware stack. It is the most realistic single-machine simulation, testing perception, localization, and planning against actual real-world logged data.</p>
 </div>
 <h2 id="what-you-will-see">What You Will See<a class="headerlink" href="#what-you-will-see" title="Permanent link">#</a></h2>
 <p>After starting the deployment and playing the rosbag, you will observe the Autoware stack processing real recorded sensor data:</p>
@@ -2504,12 +2504,12 @@
 <ul>
 <li>Docker Engine (set up via <code>setup.sh</code>, below)</li>
 <li>NVIDIA Container Toolkit <strong>highly recommended</strong> (for GPU-accelerated sensing and perception)</li>
-<li>Logging simulation sample map and rosbag (downloaded below)</li>
+<li>Logging simulation map and rosbag (downloaded below)</li>
 <li>Autoware artifacts (downloaded via <code>setup.sh</code>)</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">GPU Strongly Recommended</p>
-<p>This sample runs the full sensing and perception pipeline. Without a GPU, performance will be significantly degraded. An NVIDIA GPU with 4 GB+ VRAM is strongly recommended.</p>
+<p>This deployment runs the full sensing and perception pipeline. Without a GPU, performance will be significantly degraded. An NVIDIA GPU with 4 GB+ VRAM is strongly recommended.</p>
 </div>
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
 <p>No <code>git clone</code> required.</p>
@@ -2525,14 +2525,14 @@
 <p class="admonition-title">Releases</p>
 <p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/logging-simulation/</code> folder from a cloned repository instead.</p>
 </div>
-<h3 id="3-download-the-sample-map-and-rosbag">3. Download the sample map and rosbag<a class="headerlink" href="#3-download-the-sample-map-and-rosbag" title="Permanent link">#</a></h3>
+<h3 id="3-download-the-demo-map-and-rosbag">3. Download the demo map and rosbag<a class="headerlink" href="#3-download-the-demo-map-and-rosbag" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>./fetch-sample-data.sh<span class="w"> </span>logging-simulation
 </code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">About the rosbag</p>
-<p>This sample rosbag (Copyright 2020 TIER IV, Inc.) is provided for demonstration. Due to privacy concerns, it does <strong>not</strong> contain image data. This means:</p>
+<p>This demo rosbag (Copyright 2020 TIER IV, Inc.) is provided for demonstration. Due to privacy concerns, it does <strong>not</strong> contain image data. This means:</p>
 <ul>
-<li><strong>Traffic light recognition</strong> cannot be tested with this sample</li>
+<li><strong>Traffic light recognition</strong> cannot be tested with this demo</li>
 <li><strong>Object detection accuracy</strong> is decreased compared to full camera data</li>
 </ul>
 </div>
@@ -2598,7 +2598,7 @@
 </tr>
 <tr>
 <td>No objects detected</td>
-<td>The rosbag lacks image data. This is expected for the sample rosbag.</td>
+<td>The rosbag lacks image data. This is expected for the demo rosbag.</td>
 </tr>
 </tbody>
 </table>

@@ -30,7 +30,7 @@ Typical resource usage:
 
 ## Used In
 
-- [Planning Simulation](../deployment/planning-simulation/index.md) — Core planning stack with a sample map
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Core planning stack with a demo map
 - [Scenario Simulation](../deployment/scenario-simulation/index.md) — Planning in predefined traffic scenarios
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Planning against real-world replayed data
 

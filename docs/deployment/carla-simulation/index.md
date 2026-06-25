@@ -1,7 +1,7 @@
 # CARLA Simulation
 
 !!! abstract ""
-    The CARLA Simulation sample runs a **closed-loop CARLA 0.9.16 end-to-end simulation** with the modular Open AD Kit containers and Autoware's `autoware_carla_interface`. The full Autoware stack — sensing, perception, localization, planning, control — drives a CARLA ego vehicle inside a photorealistic virtual world.
+    The CARLA Simulation deployment runs a **closed-loop CARLA 0.9.16 end-to-end simulation** with the modular Open AD Kit containers and Autoware's `autoware_carla_interface`. The full Autoware stack — sensing, perception, localization, planning, control — drives a CARLA ego vehicle inside a photorealistic virtual world.
 
 ## What You Will See
 
@@ -21,7 +21,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
 
 !!! warning "GPU Required"
-    Unlike the other samples, CARLA itself is GPU-rendered. This sample does not run on CPU-only machines.
+    Unlike the other deployments, CARLA itself is GPU-rendered. This deployment does not run on CPU-only machines.
 
 ## Before You Start
 

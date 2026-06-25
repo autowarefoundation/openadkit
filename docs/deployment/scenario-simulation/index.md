@@ -1,7 +1,7 @@
 # Scenario Simulation
 
 !!! abstract ""
-    The Scenario Simulation sample runs the Autoware stack alongside the official [TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2) container. It enables you to execute predefined traffic scenarios to validate planning and behavior under specific conditions — ideal for CI pipelines and regression testing.
+    The Scenario Simulation deployment runs the Autoware stack alongside the official [TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2) container. It enables you to execute predefined traffic scenarios to validate planning and behavior under specific conditions — ideal for CI pipelines and regression testing.
 
 ## What You Will See
 
@@ -51,7 +51,7 @@ Edit `scenario-simulation.env` to customize the deployment:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SCENARIO` | Scenario file path inside the container | (bundled sample) |
+| `SCENARIO` | Scenario file path inside the container | (bundled example) |
 | `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` | `./scenarios/` |
 | `OUTPUT_HOST_PATH` | Host directory for simulation results | `./output/` |
 | `OUTPUT_DIRECTORY` | Container path for simulation results | — |

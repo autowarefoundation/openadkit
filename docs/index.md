@@ -31,7 +31,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 :material-rocket-outline:{ .oak-card-icon }
 
 <h3>Deployment</h3>
-<p>Ready-to-run samples and multi-machine demos for simulation and AD stacks.</p>
+<p>Ready-to-run deployments for simulation and AD stacks.</p>
 <a href="deployment/" class="md-button">View deployment</a>
 </div>
 

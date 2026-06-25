@@ -125,7 +125,7 @@ graph TD
 {{ setup_command }}
 ```
 
-### 2. Download the deployment bundle and sample map
+### 2. Download the deployment bundle and demo map
 
 ```bash
 curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz | tar xz

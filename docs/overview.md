@@ -54,5 +54,5 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 <h2 class="oak-eyebrow" id="related">Related</h2>
 
 - [Getting Started](getting-started/index.md) — Set up your environment
-- [Deployment](deployment/index.md) — Run your first sample
+- [Deployment](deployment/index.md) — Run your first deployment
 - [Platforms](platforms/index.md) — Choose a deployment target

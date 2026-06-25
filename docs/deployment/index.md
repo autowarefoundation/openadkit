@@ -64,7 +64,7 @@ Deployments are defined using container orchestration files (typically `docker-c
 
 | Deployment | Purpose | Scope |
 |-----------|---------|-------|
-| [Planning Simulation](planning-simulation/index.md) | Run Autoware planning stack with a sample map | Single machine |
+| [Planning Simulation](planning-simulation/index.md) | Run Autoware planning stack with a pre-recorded map | Single machine |
 | [Scenario Simulation](scenario-simulation/index.md) | Execute predefined scenarios with TIER IV Scenario Simulator | Single machine |
 | [Logging Simulation](logging-simulation/index.md) | Replay recorded sensor data (rosbag) through the AD stack | Single machine |
 | [CARLA Simulation](carla-simulation/index.md) | Closed-loop end-to-end simulation with the CARLA simulator | Single machine |

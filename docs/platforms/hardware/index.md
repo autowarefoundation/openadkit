@@ -32,7 +32,7 @@ For running a full Autoware stack on a verified edge platform, the requirements 
 | Architecture | arm64 |
 
 !!! info "Why the difference?"
-    The 40-core Neoverse N1 requirement reflects the verified ADLINK AADP-AVA platform, which runs the full Autoware stack with real-time constraints. Local development with sample simulations has lower requirements.
+    The 40-core Neoverse N1 requirement reflects the verified ADLINK AADP-AVA platform, which runs the full Autoware stack with real-time constraints. Local development with demo simulations has lower requirements.
 
 ## Tested Hardware
 

@@ -43,7 +43,7 @@ ghcr.io/autowarefoundation/openadkit
 
 **Development / latest features** — Use a latest stable alias (`<target>-<ros_distro>`).
 
-**Quick start / samples** — Use a default ROS distro alias (`<target>`).
+**Quick start / deployments** — Use a default ROS distro alias (`<target>`).
 
 **Never pin to CI development aliases** (`*-amd64-*`) — Do not use mutable per-platform tags in committed deployment files.
 

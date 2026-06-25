@@ -1,7 +1,7 @@
 # Logging Simulation
 
 !!! abstract ""
-    The Logging Simulation sample replays recorded sensor data (a rosbag) through the full Autoware stack. It is the most realistic single-machine simulation, testing perception, localization, and planning against actual real-world logged data.
+    The Logging Simulation deployment replays recorded sensor data (a rosbag) through the full Autoware stack. It is the most realistic single-machine simulation, testing perception, localization, and planning against actual real-world logged data.
 
 ## What You Will See
 
@@ -16,11 +16,11 @@ After starting the deployment and playing the rosbag, you will observe the Autow
 
 - Docker Engine (set up via `setup.sh`, below)
 - NVIDIA Container Toolkit **highly recommended** (for GPU-accelerated sensing and perception)
-- Logging simulation sample map and rosbag (downloaded below)
+- Logging simulation map and rosbag (downloaded below)
 - Autoware artifacts (downloaded via `setup.sh`)
 
 !!! warning "GPU Strongly Recommended"
-    This sample runs the full sensing and perception pipeline. Without a GPU, performance will be significantly degraded. An NVIDIA GPU with 4 GB+ VRAM is strongly recommended.
+    This deployment runs the full sensing and perception pipeline. Without a GPU, performance will be significantly degraded. An NVIDIA GPU with 4 GB+ VRAM is strongly recommended.
 
 ## Before You Start
 
@@ -44,16 +44,16 @@ cd logging-simulation
 !!! note "Releases"
     Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/logging-simulation/` folder from a cloned repository instead.
 
-### 3. Download the sample map and rosbag
+### 3. Download the demo map and rosbag
 
 ```bash
 ./fetch-sample-data.sh logging-simulation
 ```
 
 !!! info "About the rosbag"
-    This sample rosbag (Copyright 2020 TIER IV, Inc.) is provided for demonstration. Due to privacy concerns, it does **not** contain image data. This means:
+    This demo rosbag (Copyright 2020 TIER IV, Inc.) is provided for demonstration. Due to privacy concerns, it does **not** contain image data. This means:
 
-    - **Traffic light recognition** cannot be tested with this sample
+    - **Traffic light recognition** cannot be tested with this demo
     - **Object detection accuracy** is decreased compared to full camera data
 
 ## Start the Deployment
@@ -114,7 +114,7 @@ docker compose --env-file logging-simulation.env --profile rosbag down
 | `file not found` for map/rosbag | Re-run `./fetch-sample-data.sh logging-simulation` to (re)download into `~/autoware_map` |
 | Very slow perception | GPU not available. Install NVIDIA Container Toolkit or reduce workload |
 | Visualizer blank | Wait 10-30 seconds for containers to initialize, then refresh |
-| No objects detected | The rosbag lacks image data. This is expected for the sample rosbag. |
+| No objects detected | The rosbag lacks image data. This is expected for the demo rosbag. |
 
 ## Architecture
 

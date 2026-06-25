@@ -110,7 +110,7 @@ If you have `automotive-image-runner` available:
 automotive-image-runner --nographic disk.qcow2
 ```
 
-Otherwise, use the following sample QEMU command:
+Otherwise, use the following example QEMU command:
 
 ```bash
 /usr/bin/qemu-system-x86_64 \

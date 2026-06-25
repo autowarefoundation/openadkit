@@ -29,7 +29,7 @@ After boot, systemd starts the following services defined under `components/`:
 |---------|------|-------------|
 | `awf-oak-map.service` | Oneshot | Extracts the bundled Kashiwanoha map to `/opt/tier4/kashiwanoha_map` |
 | `awf-oak-planning.container` | Container | Runs the Autoware planning stack with scenario simulation enabled |
-| `awf-oak-simulator.container` | Container | Runs the TIER IV Scenario Simulator with the bundled sample scenario |
+| `awf-oak-simulator.container` | Container | Runs the TIER IV Scenario Simulator with the bundled example scenario |
 | `awf-oak.pod` | Pod | Shared Podman pod for co-located planning and simulator containers |
 
 !!! note "Unit naming"

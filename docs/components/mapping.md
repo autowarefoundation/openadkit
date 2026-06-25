@@ -17,7 +17,7 @@ Typical resource usage:
 
 - **CPU**: Low — serves map data with minimal processing
 - **GPU**: Not required
-- **Memory**: Scales with map size (typically ~2–4 GB for sample maps)
+- **Memory**: Scales with map size (typically ~2–4 GB for demo maps)
 
 ## Used In
 

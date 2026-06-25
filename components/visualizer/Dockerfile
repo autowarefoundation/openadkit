@@ -91,13 +91,6 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
     rm -f /tmp/virtualgl.deb
 
-# Create SSL certificate for NoVNC.
-RUN openssl req -x509 -nodes -newkey rsa:2048 \
-    -keyout /etc/ssl/private/novnc.key \
-    -out /etc/ssl/certs/novnc.crt \
-    -days 365 \
-    -subj "/O=Autoware-OpenADKit/CN=localhost"
-
 # Need to expose VNC and NoVNC ports when running the container.
 EXPOSE 5900 6080
 

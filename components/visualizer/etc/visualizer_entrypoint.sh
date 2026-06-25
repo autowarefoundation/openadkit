@@ -85,6 +85,17 @@ EOF
     echo "export DISPLAY=:99" >>~/.bashrc
     sleep 2
 
+    # Generate a unique self-signed TLS certificate at runtime so each
+    # container instance has its own key pair (instead of a shared build-time
+    # certificate baked into the image).
+    echo "Generating TLS certificate for NoVNC..."
+    mkdir -p /etc/ssl/private /etc/ssl/certs
+    openssl req -x509 -nodes -newkey rsa:2048 \
+      -keyout /etc/ssl/private/novnc.key \
+      -out /etc/ssl/certs/novnc.crt \
+      -days 365 \
+      -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1
+
     # Start NoVNC, bound to loopback only. The compose uses `network_mode: host`
     # so the `ports:` mapping is ignored; websockify's default source_addr is
     # `0.0.0.0` which would expose noVNC on every interface. Pass an explicit

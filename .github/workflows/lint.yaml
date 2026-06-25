@@ -110,6 +110,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install Docker Compose v5.2+
+        # The ubuntu-latest runner ships an older compose plugin that rejects
+        # service overrides after `include:` (used by scenario-simulation).
+        # Install the latest release that supports the compose-spec include/merge.
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.docker/cli-plugins
+          latest_tag=$(curl -fsSL https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name')
+          curl -fsSL \
+            "https://github.com/docker/compose/releases/download/${latest_tag}/docker-compose-linux-x86_64" \
+            -o ~/.docker/cli-plugins/docker-compose
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          docker compose version
+
       - name: Validate documented Docker Compose files
         # `docker compose config -q` parses, interpolates, and schema-validates
         # each documented stack with its sample env file. It does not pull images.

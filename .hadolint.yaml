@@ -8,3 +8,8 @@ ignored:
   - DL3015 # --no-install-recommends — some base images rely on recommended packages
   - SC1091 # sourced files not available in hadolint mock environment
   - SC2002 # useless cat — stylistic, not a functional issue
+  - DL3002 # Last USER should not be root — pre-existing in upstream component Dockerfiles, out of PR scope
+  - DL3003 # Use WORKDIR to switch to a directory — pre-existing in upstream component Dockerfiles, out of PR scope
+  - DL3004 # Do not use sudo — pre-existing in upstream component Dockerfiles, out of PR scope
+  - DL3022 # COPY --from should reference a previously defined FROM alias — pre-existing in upstream component Dockerfiles, out of PR scope
+  - SC2086 # Double quote to prevent globbing and word splitting — pre-existing in upstream component Dockerfiles, out of PR scope

@@ -647,17 +647,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#status-labels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status labels
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2365,17 +2354,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#status-labels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status labels
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2402,8 +2380,7 @@
 
 
 <h1 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">#</a></h1>
-<p>Open AD Kit releases follow a staged ladder from a <strong>trustworthy release surface</strong>
-to an <strong>evidence-backed closed loop</strong>.</p>
+<p>Open AD Kit matures in stages. We start with a trustworthy foundation and layer on validation, security, and automation until the full pipeline is proven end to end.</p>
 <pre class="mermaid"><code>flowchart LR
     subgraph "2026"
         v20["v2.0.0&lt;br/&gt;Jul 2026"]
@@ -2424,58 +2401,52 @@ to an <strong>evidence-backed closed loop</strong>.</p>
 <tr>
 <th style="text-align: left;">Release</th>
 <th style="text-align: left;">Target</th>
-<th style="text-align: left;">What it means</th>
+<th style="text-align: left;">Scope</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>v2.0.0</strong></td>
 <td style="text-align: left;">Jul 2026</td>
-<td style="text-align: left;">First trustworthy release — pinned images, metadata, scans, bundles, docs, compose validation, CARLA 0.9.16.</td>
+<td style="text-align: left;"><strong>Trustworthy release</strong><br>Pinned images, scans, bundles, compose validation, CARLA 0.9.16</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>v2.1.0</strong></td>
 <td style="text-align: left;">Sep 2026</td>
-<td style="text-align: left;">Compatibility-set MVP — lockfile, manifests, validation commands, evidence, supported-platform matrix.</td>
+<td style="text-align: left;"><strong>Compatibility MVP</strong><br>Lockfiles, manifests, validation, platform matrix</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>v2.2.0</strong></td>
 <td style="text-align: left;">Oct 2026</td>
-<td style="text-align: left;">Readiness + test gating — Scenario Simulator V2 CI gate, health-based readiness, one validated restart path.</td>
+<td style="text-align: left;"><strong>Readiness + gating</strong><br>Scenario V2 CI gate, health readiness, restart path</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>v2.3.0</strong></td>
 <td style="text-align: left;">Nov 2026</td>
-<td style="text-align: left;">Release trust — SBOM, provenance, cosign signing, vulnerability policy, static evidence dashboard.</td>
+<td style="text-align: left;"><strong>Trust signals</strong><br>SBOM, provenance, cosign signing, vulnerability policy</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>CES 2027</strong></td>
 <td style="text-align: left;">Jan 6–9</td>
-<td style="text-align: left;">Flagship event demo — VisionPilot + Safety Island + CARLA from v2.3 artifacts. Not a release gate.</td>
+<td style="text-align: left;"><strong>Flagship demo</strong><br>VisionPilot + Safety Island + CARLA (event, not a release gate)</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>v2.4.0</strong></td>
 <td style="text-align: left;">Late Jan–Feb</td>
-<td style="text-align: left;">Platform profiles + ecosystem — AutoSD/Podman, BlueChi first profile, Zenoh split-ready deployment, S-Core gap analysis.</td>
+<td style="text-align: left;"><strong>Platform profiles</strong><br>AutoSD/Podman, BlueChi, Zenoh split, S-Core analysis</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>v2.5.0</strong></td>
 <td style="text-align: left;">Mar 2027</td>
-<td style="text-align: left;">Update/rollback beta — staged apply, health-gated promotion, verified rollback, failure injection.</td>
+<td style="text-align: left;"><strong>Update/rollback beta</strong><br>Staged apply, health promotion, verified rollback</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>v3.0.0</strong></td>
 <td style="text-align: left;">May 2027</td>
-<td style="text-align: left;">Closed-loop release — build → deploy → test → observe → update → rollback, end-to-end in CI and on a clean host.</td>
+<td style="text-align: left;"><strong>Closed loop</strong><br>Build → deploy → test → observe → update → rollback</td>
 </tr>
 </tbody>
 </table>
-<h2 id="status-labels">Status labels<a class="headerlink" href="#status-labels" title="Permanent link">#</a></h2>
-<ul>
-<li><strong><code>COMMITTED</code></strong> — owned and scheduled. Ships executable evidence, or a dated blocker list when blocked by external lab/partner/upstream/hardware access.</li>
-<li><strong><code>CONDITIONAL</code></strong> — intended but dependent on validation/access/upstream/hardware/proof. Droppable without blocking core releases.</li>
-<li><strong><code>FUTURE</code></strong> — named direction, not scheduled this window.</li>
-</ul>
 
 
 

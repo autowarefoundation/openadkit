@@ -16,7 +16,7 @@ Open AD Kit is licensed under **Apache License 2.0**. All contributions are acce
 
 1. **Fork** the repository and create a feature branch (`feat/`, `fix/`, `docs/`, etc.)
 2. **Sign off** your commits (`git commit -s`) to certify DCO compliance
-3. **Preview docs** locally with `make serve` (from the repository root)
+3. **Preview docs** locally with `make -C docs serve`
 4. **Open a PR** against `main` with a clear description
 
 See the [full guide](https://autowarefoundation.github.io/openadkit/development/contributing/) for detailed instructions.

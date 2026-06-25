@@ -63,10 +63,10 @@ Follow the existing code style and documentation conventions. For documentation 
 
 ```bash
 # Build the MkDocs container image (run once)
-make prepare
+make -C docs prepare
 
 # Serve the docs site
-make serve
+make -C docs serve
 ```
 
 ### 5. Commit with Conventional Commits

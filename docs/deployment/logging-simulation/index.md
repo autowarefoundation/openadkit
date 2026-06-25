@@ -64,6 +64,10 @@ From the `logging-simulation` directory, start the base containers:
 docker compose --env-file logging-simulation.env up -d
 ```
 
+!!! warning "Cloned repository"
+    If running from a cloned repository rather than a release bundle, pass both env files:
+    `docker compose --env-file ../base/base.env --env-file logging-simulation.env up -d`
+
 Wait approximately 10 seconds for the containers to initialize.
 
 !!! tip "GPU acceleration (recommended)"

@@ -29,6 +29,7 @@ The `sensing-perception-cuda` image is an amd64-only, GPU-accelerated variant th
 ## Used In
 
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Processes real recorded sensor data
+- [CARLA Simulation](../deployment/carla-simulation/index.md) — Perception of simulated traffic and obstacles
 
 ## Related
 

@@ -14,7 +14,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 
 ## Requirements
 
-- An **amd64 (x86_64)** host running **ROS 2 Humble** — the `carla-interface` image is published for amd64 + Humble only (no arm64 image)
+- An **amd64 (x86_64)** host with Docker — the `carla-interface` image is published for **amd64 and ROS 2 Humble only**; there is no arm64 image
 - Docker Engine with the NVIDIA Container Toolkit (set up via `setup.sh`)
 - An NVIDIA GPU — the CARLA server requires GPU rendering
 - A working host X display (usually `DISPLAY=:0`) with X access for local containers (e.g. `xhost +SI:localuser:root`)
@@ -48,6 +48,9 @@ cd carla-simulation
 ```bash
 ./start-carla-e2e-demo.sh
 ```
+
+!!! note "Cloned repository"
+    If running from a cloned repository, ensure you have also sourced `../base/base.env` so that shared variables such as `ROS_DOMAIN_ID` and `REMOTE_PASSWORD` are set.
 
 The helper script:
 

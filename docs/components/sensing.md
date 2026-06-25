@@ -27,6 +27,7 @@ The `sensing-perception-cuda` image is an amd64-only, GPU-accelerated variant th
 ## Used In
 
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Replays recorded sensor data through the full stack
+- [CARLA Simulation](../deployment/carla-simulation/index.md) — Live sensor feed from the CARLA simulator
 
 ## Related
 

@@ -59,7 +59,7 @@ services:
     ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=0
+      - ROS_DOMAIN_ID=1
     command: >
       ros2 launch autoware_launch tier4_planning_component.launch.xml
       component_wise_launch:=true
@@ -72,7 +72,7 @@ services:
     ipc: host
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=0
+      - ROS_DOMAIN_ID=1
       - REMOTE_PASSWORD=openadkit # required — the container exits if unset
       - USE_SIM_TIME=true
 ```

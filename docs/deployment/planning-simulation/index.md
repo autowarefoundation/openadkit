@@ -57,6 +57,10 @@ From the `planning-simulation` directory, start the containers:
 docker compose --env-file planning-simulation.env up -d
 ```
 
+!!! warning "Cloned repository"
+    If running from a cloned repository rather than a release bundle, pass both env files:
+    `docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d`
+
 Wait approximately 10 seconds for the containers to initialize.
 
 ## Access the Visualizer

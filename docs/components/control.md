@@ -32,6 +32,7 @@ Typical resource usage:
 - [Planning Simulation](../deployment/planning-simulation/index.md) — Executes planned trajectories in a virtual environment
 - [Scenario Simulation](../deployment/scenario-simulation/index.md) — Control in predefined traffic scenarios
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Control against real-world replayed data
+- [CARLA Simulation](../deployment/carla-simulation/index.md) — Control of the CARLA ego vehicle
 
 ## Related
 

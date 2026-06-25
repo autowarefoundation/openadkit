@@ -33,6 +33,7 @@ Typical resource usage:
 - [Planning Simulation](../deployment/planning-simulation/index.md) — Core planning stack with a demo map
 - [Scenario Simulation](../deployment/scenario-simulation/index.md) — Planning in predefined traffic scenarios
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Planning against real-world replayed data
+- [CARLA Simulation](../deployment/carla-simulation/index.md) — Planning in a simulated urban environment
 
 ## Related
 

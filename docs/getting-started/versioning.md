@@ -41,4 +41,4 @@ Each release pins its ROS distro(s), and Humble and Jazzy are built while both m
 ## Getting Help
 
 - Questions and bug reports: [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues).
-- See also [`SUPPORT.md`](https://github.com/autowarefoundation/openadkit/blob/main/SUPPORT.md) and [Troubleshooting](troubleshooting.md).
+- See also [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues) for questions and bug reports, and [Troubleshooting](troubleshooting.md).

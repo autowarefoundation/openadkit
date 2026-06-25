@@ -25,6 +25,7 @@ Typical resource usage:
 - [Logging Simulation](../deployment/logging-simulation/index.md)
 - [Planning Simulation](../deployment/planning-simulation/index.md)
 - [Scenario Simulation](../deployment/scenario-simulation/index.md)
+- [CARLA Simulation](../deployment/carla-simulation/index.md)
 
 ## Related
 

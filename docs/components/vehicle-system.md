@@ -45,6 +45,7 @@ Typical resource usage for both services combined:
 - [Planning Simulation](../deployment/planning-simulation/index.md)
 - [Scenario Simulation](../deployment/scenario-simulation/index.md)
 - [Logging Simulation](../deployment/logging-simulation/index.md)
+- [CARLA Simulation](../deployment/carla-simulation/index.md)
 
 All deployments use the `vehicle-system` image because every running stack requires both vehicle actuation and system-level health monitoring.
 

@@ -9,17 +9,17 @@ Published release details are listed on the [Releases](../releases/index.md) pag
 <div class="oak-steps" markdown="1">
 
 - **Build all images**
-  Run `build-all-images` from `main`. Stable releases must use an Autoware `X.Y.Z` tag; pre-releases may use an Autoware tag or full 40-character SHA.
+  Run the **`build-all-images`** GitHub Actions workflow from `main`. Stable releases must use an Autoware `X.Y.Z` tag; pre-releases may use an Autoware tag or full 40-character SHA.
 
 - **Record the build tag**
   Keep the build summary's `build_tag`, formatted as `RUN_ID-RUN_ATTEMPT`.
 
 - **Scan the images**
-  Ensure `scan-images` completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise run `scan-images` manually.
+  Ensure the **`scan-images`** GitHub Actions workflow completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise trigger `scan-images` manually.
   Scans check images for known CVEs.
 
 - **Promote and tag**
-  Run the `release` workflow with the Open AD Kit `version` and the validated `build_tag`. This promotes the scanned images to stable release tags and updates latest aliases.
+  Run the **`release`** GitHub Actions workflow with the Open AD Kit `version` and the validated `build_tag`. This promotes the scanned images to stable release tags and updates latest aliases.
 
 </div>
 

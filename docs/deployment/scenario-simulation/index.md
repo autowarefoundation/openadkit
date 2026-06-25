@@ -51,6 +51,7 @@ Edit `scenario-simulation.env` to customize the deployment:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `SCENARIO_SIMULATION` | Enable scenario simulator mode | `true` |
 | `SCENARIO` | Scenario file path inside the container | (bundled example) |
 | `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` | `./scenarios/` |
 | `OUTPUT_HOST_PATH` | Host directory for simulation results | `./output/` |
@@ -82,6 +83,10 @@ From the `scenario-simulation` directory, start the containers:
 ```bash
 docker compose --env-file scenario-simulation.env up -d
 ```
+
+!!! warning "Cloned repository"
+    If running from a cloned repository rather than a release bundle, pass both env files:
+    `docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d`
 
 Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds for required Autoware map and API endpoints before launching.
 

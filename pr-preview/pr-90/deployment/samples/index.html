@@ -2658,7 +2658,7 @@
 <tr>
 <td>Port already in use</td>
 <td>Another service on 6080</td>
-<td>Change the port mapping in <code>docker-compose.yaml</code></td>
+<td>Stop the conflicting service (host networking binds <code>:6080</code> directly; <code>ports:</code> mappings are ignored)</td>
 </tr>
 <tr>
 <td>Poor performance</td>

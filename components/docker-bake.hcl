@@ -43,6 +43,24 @@ function "upstream" {
   result = "docker-image://${UPSTREAM_REPO}:${name}-${ROS_DISTRO}${UPSTREAM_TAG == "" ? "" : "-${UPSTREAM_TAG}"}"
 }
 
+// Single source of truth for the sensing-perception `--base-paths` package
+// list. Both the CPU and CUDA sensing Dockerfiles consume this via the
+// COLCON_BASE_PATHS arg so a drift cannot silently diverge the two images.
+function "sensing_base_paths" {
+  params = []
+  result = join(" ", [
+    "/tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch",
+    "/tmp/autoware/src/universe/external/trt_batched_nms",
+    "/tmp/autoware/src/universe/external/bevdet_vendor",
+    "/tmp/autoware/src/universe/external/cuda_blackboard",
+    "/tmp/autoware/src/universe/external/negotiated",
+    "/tmp/autoware/src/universe/autoware_universe/perception",
+    "/tmp/autoware/src/universe/autoware_universe/sensing",
+    "/tmp/autoware/src/sensor_component",
+  ])
+}
+
 group "default" {
   targets = ["universe-common", "component"]
 }
@@ -119,6 +137,9 @@ target "sensing-perception" {
   inherits   = ["_component-base", "docker-metadata-action-sensing-perception"]
   dockerfile = "components/sensing-perception/Dockerfile"
   target     = "sensing-perception"
+  args = {
+    COLCON_BASE_PATHS = sensing_base_paths()
+  }
 }
 
 target "localization-mapping" {
@@ -168,6 +189,7 @@ target "sensing-perception-cuda" {
   args = {
     BASE_CUDA_RUNTIME_IMAGE = "autoware-base-cuda-runtime"
     BASE_CUDA_DEVEL_IMAGE   = "autoware-base-cuda-devel"
+    COLCON_BASE_PATHS       = sensing_base_paths()
   }
 }
 

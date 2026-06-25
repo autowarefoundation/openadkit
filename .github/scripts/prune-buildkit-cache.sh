@@ -7,10 +7,11 @@
 # KEEP_KEY already exists). --limit caps recovery if a lineage ever exceeds it;
 # steady state keeps a single entry.
 #
-# Required env: GH_TOKEN, CACHE_KEY_PREFIX, KEEP_KEY, MAX_GB
+# Required env: GH_TOKEN, GITHUB_REPOSITORY, CACHE_KEY_PREFIX, KEEP_KEY, MAX_GB
 set -euo pipefail
 
 : "${GH_TOKEN:?GH_TOKEN is required}"
+: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 : "${CACHE_KEY_PREFIX:?CACHE_KEY_PREFIX is required}"
 : "${KEEP_KEY:?KEEP_KEY is required}"
 : "${MAX_GB:?MAX_GB is required}"

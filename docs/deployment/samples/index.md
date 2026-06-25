@@ -91,5 +91,5 @@ flowchart LR
 |-------|--------------|----------|
 | Visualizer shows blank screen | Containers still initializing | Wait 10-30 seconds and refresh |
 | `file not found` on startup | Map or rosbag not downloaded | Run `./fetch-sample-data.sh <sample>` |
-| Port already in use | Another service on 6080 | Change the port mapping in `docker-compose.yaml` |
+| Port already in use | Another service on 6080 | Stop the conflicting service (host networking binds `:6080` directly; `ports:` mappings are ignored) |
 | Poor performance | No GPU acceleration | Install NVIDIA Container Toolkit or reduce workload |

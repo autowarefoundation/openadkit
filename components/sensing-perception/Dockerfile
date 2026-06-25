@@ -9,6 +9,7 @@ ARG UNIVERSE_COMMON_IMAGE
 FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS sensing-perception-devel
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
+ARG COLCON_BASE_PATHS
 
 COPY --parents --chown=${USERNAME}:${USERNAME} \
     autoware/src/**/package.xml \
@@ -30,16 +31,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     . /opt/autoware/setup.sh && \
     colcon build \
-      --base-paths \
-        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
-        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch \
-        /tmp/autoware/src/universe/external/trt_batched_nms \
-        /tmp/autoware/src/universe/external/bevdet_vendor \
-        /tmp/autoware/src/universe/external/cuda_blackboard \
-        /tmp/autoware/src/universe/external/negotiated \
-        /tmp/autoware/src/universe/autoware_universe/perception \
-        /tmp/autoware/src/universe/autoware_universe/sensing \
-        /tmp/autoware/src/sensor_component \
+      --base-paths ${COLCON_BASE_PATHS} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log

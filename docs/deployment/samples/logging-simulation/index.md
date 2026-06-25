@@ -84,7 +84,9 @@ Open your browser and navigate to:
 http://localhost:6080/vnc.html
 ```
 
-Use the default password **`openadkit`**. The visualizer is bound to `localhost` only; to reach it from another machine, change the port binding to `0.0.0.0:6080:6080` in `docker-compose.yaml` and set a strong `REMOTE_PASSWORD`.
+Use the default password **`openadkit`**.
+
+--8<-- "includes/visualizer-remote-access.md"
 
 ## Start the Rosbag Playback
 

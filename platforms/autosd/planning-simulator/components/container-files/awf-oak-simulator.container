@@ -16,8 +16,6 @@ ContainerName=awf-oak-simulator
 Image=localhost/scenario_simulator_v2:runtime
 Network=bridge
 EnvironmentFile=/etc/containers/systemd/awf-oak.env
-Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-Environment=ROSBAG2_STORAGE_DEFAULT_URI=/var/log/awf
 Volume=/var/log/awf:/var/log/awf:Z
 # Resolve the bundled sample scenario via ros2 pkg prefix at runtime.
 Exec=bash -lc 'set -e; exec ros2 launch scenario_test_runner scenario_test_runner.launch.py architecture_type:=awf/universe/20250130 global_frame_rate:=30 global_timeout:=180 initialize_duration:=90 launch_autoware:=false launch_rviz:=false launch_visualization:=false output_directory:=/var/log/awf record:=false scenario:="$(ros2 pkg prefix --share scenario_test_runner)/scenario/sample.yaml" sensor_model:=sample_sensor_kit use_custom_centerline:=true use_sim_time:=false vehicle_model:=sample_vehicle'

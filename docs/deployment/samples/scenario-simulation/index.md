@@ -93,11 +93,9 @@ Open your browser and navigate to:
 http://localhost:6080/vnc.html
 ```
 
-Use the default password **`openadkit`**. The visualizer is bound to `localhost` only. To reach it from another machine, change the port binding to `0.0.0.0:6080:6080` in `docker-compose.yaml`, set a strong `REMOTE_PASSWORD`, and ensure port `6080` is reachable:
+Use the default password **`openadkit`**.
 
-```text
-http://<server-ip>:6080/vnc.html
-```
+--8<-- "includes/visualizer-remote-access.md"
 
 ## Stop the Deployment
 

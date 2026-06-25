@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Docker Compose v5.2+ from the official GitHub release.
+# Install the latest Docker Compose from the official GitHub release.
 #
 # The ubuntu-latest / ubuntu-22.04 runners ship an older compose plugin that
 # rejects service overrides after `include:`. This script downloads the latest

@@ -2,7 +2,6 @@
 # shellcheck disable=SC1091
 
 set -euo pipefail
-SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
 CLR_GREEN="\033[32m"
 CLR_RED="\033[31m"
 CLR_RESET="\033[0m"

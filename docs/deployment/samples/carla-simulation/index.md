@@ -67,12 +67,9 @@ Open your browser and navigate to:
 http://localhost:6080/vnc.html
 ```
 
-Use the default password **`openadkit`**. If running on a remote machine, forward the port first:
+Use the default password **`openadkit`**.
 
-```bash
-ssh -L 8080:localhost:6080 <user>@<host>
-# then open http://localhost:8080/vnc.html
-```
+--8<-- "includes/visualizer-remote-access.md"
 
 In RViz2:
 
@@ -91,7 +88,7 @@ To automatically set a short forward route, engage autonomous mode, and verify m
 ## Stop the Deployment
 
 ```bash
-docker compose --env-file ../_base/base.env --env-file carla-simulation.env -f docker-compose.yaml down
+docker compose --env-file carla-simulation.env down
 ```
 
 ## Troubleshooting

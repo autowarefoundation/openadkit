@@ -38,6 +38,7 @@ jobs:
     outputs:
       release_sha: ${{ steps.validate.outputs.release_sha }}
       publish_latest_aliases: ${{ steps.validate.outputs.publish_latest_aliases }}
+      is_stable_release: ${{ steps.validate.outputs.is_stable_release }}
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -74,7 +75,9 @@ jobs:
             || (echo "Release must be triggered from main branch (got ${GITHUB_REF})" >&2 && exit 1)
 
           publish_latest_aliases=false
+          is_stable_release=false
           if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+            is_stable_release=true
             existing_tag_refs=$(
               gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
                 --jq '.[].ref | sub("^refs/tags/"; "")'
@@ -385,6 +388,7 @@ jobs:
           [ "${conflicts}" -eq 0 ] || exit 1
           echo "release_sha=${release_sha}" >> "$GITHUB_OUTPUT"
           echo "publish_latest_aliases=${publish_latest_aliases}" >> "$GITHUB_OUTPUT"
+          echo "is_stable_release=${is_stable_release}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Upload validated release metadata
@@ -426,14 +430,11 @@ jobs:
           VERSION: ${{ inputs.version }}
           DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
         run: |
           set -euo pipefail
 
-          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-          stable_release=false
-          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
-            stable_release=true
-          fi
+          stable_release="${STABLE_RELEASE}"
 
           available_distros=$(jq -r '.images | unique_by(.ros_distro) | map(.ros_distro) | join(" ")' release-input/build/build-metadata.json)
           echo "Available ROS distros in build: ${available_distros}"
@@ -513,14 +514,11 @@ jobs:
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
         run: |
           set -euo pipefail
 
-          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-          stable_release=false
-          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
-            stable_release=true
-          fi
+          stable_release="${STABLE_RELEASE}"
           tab=$(printf "\t")
 
           jq \
@@ -684,12 +682,12 @@ jobs:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
         run: |
           set -euo pipefail
 
-          openadkit_stable_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
           release_flags=()
-          if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+          if [ "${STABLE_RELEASE}" = "true" ]; then
             if [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
               release_flags+=(--latest)
             else

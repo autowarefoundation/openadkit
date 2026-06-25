@@ -77,7 +77,9 @@ markdown_extensions:
   - mdx_truly_sane_lists
   - pymdownx.details
   - pymdownx.highlight
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: [docs]
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid

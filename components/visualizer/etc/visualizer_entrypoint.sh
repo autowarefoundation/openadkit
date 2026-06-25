@@ -59,7 +59,6 @@ fi
 exec $rviz_launcher rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
 EOF
     chmod +x /usr/local/bin/start-rviz2.sh
-    echo "echo 'Autostart executed at $(date)' >> /tmp/autostart.log" >>/etc/xdg/openbox/autostart
     echo "/usr/local/bin/start-rviz2.sh" >>/etc/xdg/openbox/autostart
 
     # Configure VNC password

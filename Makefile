@@ -14,7 +14,7 @@ help:
 	@echo "  make clean        Clean build artifacts"
 
 # Serve documentation locally
-serve: generate-release-notes
+serve: prepare-if-missing generate-release-notes
 	docker run --rm -p 8000:8000 -v $$(pwd):/app -e NO_MKDOCS_2_WARNING=1 mkdocs-dev
 
 # Refresh release notes from GitHub Releases (runs inside the docs container).
@@ -26,7 +26,7 @@ generate-release-notes:
 		|| echo "WARNING: could not refresh release notes (offline or rate-limited); continuing without them"
 
 # Build static documentation
-build: generate-release-notes
+build: prepare-if-missing generate-release-notes
 	docker run --rm -v $$(pwd):/app --user $$(id -u):$$(id -g) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev mkdocs build
 
 # Clean build artifacts

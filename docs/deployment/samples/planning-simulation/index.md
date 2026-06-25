@@ -69,11 +69,7 @@ http://localhost:6080/vnc.html
 
 Use the default password **`openadkit`** to access the visualizer. The RViz2 interface may take a few additional seconds to fully load.
 
-!!! tip "Remote Access"
-    The visualizer is bound to `localhost` only. To reach it from another machine, change the port binding to `0.0.0.0:6080:6080` in `docker-compose.yaml` and set a strong `REMOTE_PASSWORD`, then use the server's IP address:
-    ```text
-    http://<your-server-ip>:6080/vnc.html
-    ```
+--8<-- "includes/visualizer-remote-access.md"
 
 ## Run the Simulation
 
@@ -95,7 +91,7 @@ docker compose --env-file planning-simulation.env down
 |-------|----------|
 | Blank visualizer screen | Wait 10-30 seconds for containers to fully initialize, then refresh the browser |
 | `file not found` error | Re-run `./fetch-sample-data.sh planning-simulation` to (re)download the map into `~/autoware_map` |
-| Port 6080 in use | Modify the port mapping in `docker-compose.yaml` (e.g., `8080:6080`) |
+| Port 6080 in use | Stop the conflicting service (host networking binds `:6080` directly; `ports:` mappings are ignored) |
 | Vehicle does not move after setting goal | Check that the initial pose is set correctly and the map is loaded in RViz2 |
 
 ## Architecture

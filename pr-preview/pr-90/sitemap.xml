@@ -69,31 +69,23 @@
          <lastmod>2026-06-25</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/demos/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/</loc>
          <lastmod>2026-06-25</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/logging-simulation/</loc>
          <lastmod>2026-06-25</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/planning-simulation/</loc>
          <lastmod>2026-06-25</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/carla-simulation/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/scenario-simulation/</loc>
          <lastmod>2026-06-25</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/logging-simulation/</loc>
-         <lastmod>2026-06-25</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/planning-simulation/</loc>
-         <lastmod>2026-06-25</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/deployment/samples/scenario-simulation/</loc>
+         <loc>https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/</loc>
          <lastmod>2026-06-25</lastmod>
     </url>
     <url>

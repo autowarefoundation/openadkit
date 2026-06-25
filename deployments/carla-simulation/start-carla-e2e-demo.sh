@@ -74,16 +74,16 @@ run() {
 }
 
 run_compose() {
-  printf '+ docker compose --env-file ../_base/base.env --env-file %s -f docker-compose.yaml %s\n' "$ENV_FILE" "$*"
+  printf '+ docker compose --env-file ../base/base.env --env-file %s -f docker-compose.yaml %s\n' "$ENV_FILE" "$*"
   if [[ "$DRY_RUN" == false ]]; then
-    docker compose --env-file ../_base/base.env --env-file "$ENV_FILE" -f docker-compose.yaml "$@"
+    docker compose --env-file ../base/base.env --env-file "$ENV_FILE" -f docker-compose.yaml "$@"
   fi
 }
 
 load_env() {
   set -a
   # shellcheck source=/dev/null
-  source ../_base/base.env
+  source ../base/base.env
   # shellcheck source=/dev/null
   source "$ENV_FILE"
   set +a
@@ -319,7 +319,7 @@ verify_runtime() {
     sleep "$AUTOWARE_E2E_VERIFY_INTERVAL"
   done
 
-  docker compose --env-file ../_base/base.env --env-file "$ENV_FILE" -f docker-compose.yaml logs --tail 160 >&2 || true
+  docker compose --env-file ../base/base.env --env-file "$ENV_FILE" -f docker-compose.yaml logs --tail 160 >&2 || true
   printf 'Timed out waiting for CARLA e2e verification\n' >&2
   return 1
 }

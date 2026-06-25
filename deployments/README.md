@@ -18,7 +18,7 @@ For **complete documentation**, operational steps, and troubleshooting, see the 
 
 ```text
 deployments/
-├── _base/                    # shared services pulled in by other deployments
+├── base/                     # shared services pulled in by other deployments
 ├── planning-simulation/
 ├── scenario-simulation/
 ├── logging-simulation/

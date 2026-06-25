@@ -607,7 +607,7 @@ jobs:
         run: |
           set -euo pipefail
           fetch="src/deployments/scripts/fetch-sample-data.sh"
-          base_dir="src/deployments/_base"
+          base_dir="src/deployments/base"
           mkdir -p dist staging
           for entry in \
             "planning-simulation:src/deployments/planning-simulation" \
@@ -624,15 +624,15 @@ jobs:
               cp "${fetch}" "staging/${name}/fetch-sample-data.sh"
               chmod +x "staging/${name}/fetch-sample-data.sh"
             fi
-            # Samples that share the deployment base ship a self-contained copy of
-            # it: vendor _base/ into the bundle, repoint the include at the local
-            # copy, and fold base.env into the sample env so the bundle still runs
+            # Deployments that share the base ship a self-contained copy of
+            # it: vendor base/ into the bundle, repoint the include at the local
+            # copy, and fold base.env into the deployment env so the bundle still runs
             # with a single `--env-file <name>.env`, exactly as documented.
             compose="staging/${name}/docker-compose.yaml"
-            if [ -f "${compose}" ] && grep -q '\.\./_base/docker-compose\.yaml' "${compose}"; then
-              mkdir -p "staging/${name}/_base"
-              cp "${base_dir}/docker-compose.yaml" "staging/${name}/_base/docker-compose.yaml"
-              sed -i 's#\.\./_base/docker-compose\.yaml#_base/docker-compose.yaml#' "${compose}"
+            if [ -f "${compose}" ] && grep -q '\.\./base/docker-compose\.yaml' "${compose}"; then
+              mkdir -p "staging/${name}/base"
+              cp "${base_dir}/docker-compose.yaml" "staging/${name}/base/docker-compose.yaml"
+              sed -i 's#\.\./base/docker-compose\.yaml#base/docker-compose.yaml#' "${compose}"
               env_file="staging/${name}/${name}.env"
               if [ -f "${env_file}" ]; then
                 tmp="$(mktemp)"

@@ -58,13 +58,13 @@ mkdocs build
 
 Before merging deployment-related changes, verify the compose files. Base-backed
 deployments (`planning-simulation`, `scenario-simulation`, `logging-simulation`)
-declare defaults in `../_base/base.env` (relative to the deployment directory) and per-deployment deltas in their own
+declare defaults in `../base/base.env` (relative to the deployment directory) and per-deployment deltas in their own
 `<name>.env`. From a cloned repo, pass both, base first, last-wins:
 
 ```bash
 # Validate compose configuration
 docker compose -f deployments/planning-simulation/docker-compose.yaml \
-  --env-file deployments/_base/base.env \
+  --env-file deployments/base/base.env \
   --env-file deployments/planning-simulation/planning-simulation.env \
   config
 
@@ -78,7 +78,7 @@ docker compose --env-file planning-simulation.env up -d
 **Note:** Until the first official release is published, use your local
 `deployments/planning-simulation/` folder (with
 `deployments/scripts/fetch-sample-data.sh`) instead of downloading the bundle.
-`carla-simulation` runs with both `../_base/base.env` and `carla-simulation.env`, the same as the other deployments.
+`carla-simulation` runs with both `../base/base.env` and `carla-simulation.env`, the same as the other deployments.
 
 For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/).
 

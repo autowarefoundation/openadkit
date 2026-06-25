@@ -1,7 +1,7 @@
 # Scenario simulation — extends the deployment base with the scenario_simulator
 # runner and the param-file mounts the scenario stack needs.
 include:
-  - ../_base/docker-compose.yaml
+  - ../base/docker-compose.yaml
 
 services:
   # Overrides on base services (merged onto the base definitions).

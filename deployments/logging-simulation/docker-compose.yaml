@@ -2,7 +2,7 @@
 # perception, and localization stack plus a rosbag player. Pair with
 # docker-compose.gpu.yaml to GPU-accelerate sensing/perception.
 include:
-  - ../_base/docker-compose.yaml
+  - ../base/docker-compose.yaml
 
 services:
   sensing:

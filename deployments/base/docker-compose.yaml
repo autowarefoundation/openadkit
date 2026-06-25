@@ -4,7 +4,7 @@
 # Deployments pull this in with `include:` and add only their delta. Image refs use
 # `${COMPONENT_IMAGE:-<default>}` so the registry+tag lives here once; override a
 # COMPONENT_IMAGE var (e.g. for CUDA images) to swap an image without editing this
-# file. Do not run this file directly — run a sample, which includes it.
+# file. Do not run this file directly — run a deployment, which includes it.
 services:
   map:
     image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}

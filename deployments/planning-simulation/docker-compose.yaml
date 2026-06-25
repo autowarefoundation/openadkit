@@ -2,4 +2,4 @@
 # pre-recorded map in the built-in simulator. This sample is exactly the
 # deployment base, so it adds no services of its own.
 include:
-  - ../_base/docker-compose.yaml
+  - ../base/docker-compose.yaml

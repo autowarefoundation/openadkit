@@ -20,5 +20,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run setup script
+        # Validate the non-NVIDIA path, which covers the majority of samples
+        # (planning, scenario, logging). NVIDIA installs add ~30-60s of apt
+        # traffic and can flake on network; the GPU path is exercised by the
+        # build-all-images and compose-config jobs downstream.
         run: |
-          ./setup.sh
+          ./setup.sh --no-nvidia

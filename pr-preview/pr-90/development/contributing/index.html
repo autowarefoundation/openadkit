@@ -2838,10 +2838,10 @@ git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </s
 <h3 id="4-make-your-changes">4. Make Your Changes<a class="headerlink" href="#4-make-your-changes" title="Permanent link">#</a></h3>
 <p>Follow the existing code style and documentation conventions. For documentation changes, preview them locally:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Build the MkDocs container image (run once)</span>
-make<span class="w"> </span>prepare
+make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </span>prepare
 
 <span class="c1"># Serve the docs site</span>
-make<span class="w"> </span>serve
+make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </span>serve
 </code></pre></div>
 <h3 id="5-commit-with-conventional-commits">5. Commit with Conventional Commits<a class="headerlink" href="#5-commit-with-conventional-commits" title="Permanent link">#</a></h3>
 <p>Use <a href="https://www.conventionalcommits.org/">Conventional Commits</a> for all commit messages and PR titles:</p>

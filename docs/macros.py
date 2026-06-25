@@ -26,7 +26,10 @@ DEFAULT_DISTRO = "humble"
 
 # Derive the branch/tag from the build environment so release docs point to
 # the matching script. Falls back to "main" for local builds.
-SETUP_BRANCH = os.environ.get("GITHUB_REF_NAME", "main")
+# PR merge refs (e.g. "42/merge") are not valid for raw.githubusercontent.com,
+# so we fall back to "main" when the ref contains a slash.
+_raw_ref = os.environ.get("GITHUB_REF_NAME", "main")
+SETUP_BRANCH = "main" if "/" in _raw_ref else _raw_ref
 
 SETUP_COMMAND = (
     "curl -fsSL "

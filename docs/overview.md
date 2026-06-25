@@ -55,13 +55,13 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 
 Open AD Kit runs Autoware as a pipeline of containerized components. Each container handles one stage of autonomous driving, and the stages communicate over ROS 2 DDS on the host network:
 
-1. **Sensing** captures and preprocesses raw sensor data (LiDAR, camera, IMU).
-2. **Perception** detects and tracks objects, traffic lights, and drivable space.
-3. **Mapping** serves high-definition map data that the rest of the stack consumes.
-4. **Localization** determines the vehicle's exact position on the map.
-5. **Planning** computes a safe, feasible trajectory to the goal.
-6. **Control** converts that trajectory into throttle, brake, and steering commands.
-7. **Vehicle System** bridges those commands to the actual vehicle or simulator.
+1. [**Sensing**](components/sensing.md) captures and preprocesses raw sensor data (LiDAR, camera, IMU).
+2. [**Perception**](components/perception.md) detects and tracks objects, traffic lights, and drivable space.
+3. [**Mapping**](components/mapping.md) serves high-definition map data that the rest of the stack consumes.
+4. [**Localization**](components/localization.md) determines the vehicle's exact position on the map.
+5. [**Planning**](components/planning.md) computes a safe, feasible trajectory to the goal.
+6. [**Control**](components/control.md) converts that trajectory into throttle, brake, and steering commands.
+7. [**Vehicle System**](components/vehicle-system.md) bridges those commands to the actual vehicle or simulator.
 
 A **deployment** is a Docker Compose file that starts the subset of these containers needed for a specific task — for example, planning simulation starts only planning, control, and visualization, while logging simulation adds sensing and perception to replay real sensor data. For the full picture, see [Components](components/index.md) and [Deployment](deployment/index.md).
 

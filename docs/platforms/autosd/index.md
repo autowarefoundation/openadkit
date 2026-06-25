@@ -128,7 +128,7 @@ Otherwise, use the following example QEMU command:
 ```
 
 !!! note "Memory sizing"
-    The `-m 2G` value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the [hardware requirements](../hardware/index.md) (16 GB minimum, 32 GB recommended) and raise `-m` accordingly.
+    The `-m 2G` value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the [hardware requirements](../hardware/index.md) (16 GB minimum, 32 GB recommended) and raise `-m` accordingly. A concrete starting point is `-m 16384` (16 GB); for heavier workloads use `-m 32768` (32 GB).
 
 ## Architecture on AutoSD
 

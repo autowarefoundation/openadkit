@@ -1,3 +1,11 @@
+# CARLA simulation — self-contained sample (not on the deployment base).
+#
+# ⚠️  MAINTENANCE WARNING: the services `map`, `system`, `planning`, `vehicle`,
+# `control`, `api`, and `visualizer` below are intentionally duplicated from
+# `deployments/samples/_base/docker-compose.yaml`. Any change to the base
+# definition of those services (image vars, env, volumes, restart policy, etc.)
+# must be manually mirrored here. Keep this file in sync with `_base`.
+
 services:
   carla:
     image: ${CARLA_CONTAINER_IMAGE:-carlasim/carla:0.9.16}

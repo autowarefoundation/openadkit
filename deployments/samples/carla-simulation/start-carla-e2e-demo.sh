@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd)
-ENV_FILE=carla-simulation.e2e.env
+ENV_FILE=carla-simulation.env
 PYTHON_HELPER=$SCRIPT_DIR/carla_e2e_helper.py
 DRY_RUN=false
 BUILD_IMAGE=false

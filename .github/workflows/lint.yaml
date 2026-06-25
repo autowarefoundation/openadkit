@@ -183,7 +183,7 @@ jobs:
           validate deployments/samples/scenario-simulation --env-file ../_base/base.env --env-file scenario-simulation.env
           validate deployments/samples/logging-simulation  --env-file ../_base/base.env --env-file logging-simulation.env
           validate deployments/samples/logging-simulation  --env-file ../_base/base.env --env-file logging-simulation.env --env-file logging-simulation.gpu.env -f docker-compose.yaml -f docker-compose.gpu.yaml
-          validate deployments/samples/carla-simulation    --env-file carla-simulation.e2e.env
+          validate deployments/samples/carla-simulation    --env-file carla-simulation.env
           validate deployments/demos/zenoh-bridge          --env-file .env
           exit "${fail}"
 

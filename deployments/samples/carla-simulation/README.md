@@ -149,5 +149,5 @@ Closed-loop control uses this path:
 ## Stop
 
 ```bash
-docker compose --env-file carla-simulation.e2e.env -f docker-compose.yaml down
+docker compose --env-file carla-simulation.env -f docker-compose.yaml down
 ```

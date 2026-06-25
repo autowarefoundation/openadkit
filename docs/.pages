@@ -2,10 +2,10 @@ nav:
   - Introduction:
     - index.md
     - Overview: overview.md
-  - Roadmap: roadmap.md
   - Getting Started: getting-started
   - Deployment: deployment
   - components
   - platforms
   - Development: development
   - Releases: releases
+  - Roadmap: roadmap.md

@@ -13,9 +13,6 @@ services:
     volumes:
       - ./config/default_adapi.param.yaml:/opt/autoware/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro
 
-  visualizer:
-    restart: on-failure
-
   # Scenario-only service.
   scenario_simulator:
     image: ${SCENARIO_SIMULATOR_IMAGE}

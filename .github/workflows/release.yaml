@@ -632,12 +632,16 @@ jobs:
               env_file="staging/${name}/${name}.env"
               if [ -f "${env_file}" ]; then
                 tmp="$(mktemp)"
+                tmp_base="$(mktemp)"
                 # Ensure base.env ends with a newline so its last value is not
                 # concatenated onto the first line of the sample env.
-                if [ -s "${base_dir}/base.env" ] && [ "$(tail -c 1 "${base_dir}/base.env" | wc -l)" -eq 0 ]; then
-                  printf '\n' >> "${base_dir}/base.env"
+                # Copy to a temp file first so the checked-out source is not mutated.
+                cp "${base_dir}/base.env" "${tmp_base}"
+                if [ -s "${tmp_base}" ] && [ "$(tail -c 1 "${tmp_base}" | wc -l)" -eq 0 ]; then
+                  printf '\n' >> "${tmp_base}"
                 fi
-                cat "${base_dir}/base.env" "${env_file}" > "${tmp}"
+                cat "${tmp_base}" "${env_file}" > "${tmp}"
+                rm -f "${tmp_base}"
                 # Fold in any optional <name>.<variant>.env (e.g. logging-simulation.gpu.env)
                 # so the shipped bundle runs with one --env-file regardless of variant.
                 for variant_env in "staging/${name}/${name}."*.env; do

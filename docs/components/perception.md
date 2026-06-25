@@ -24,11 +24,11 @@ Typical resource usage:
 
 ## CUDA Variant
 
-The `sensing-perception-cuda` image is an amd64-only, GPU-accelerated variant that enables CUDA-based neural network inference for object detection and traffic light recognition. It requires the NVIDIA Container Toolkit and is the default choice for [Logging Simulation](../deployment/samples/logging-simulation/index.md) deployments.
+The `sensing-perception-cuda` image is an amd64-only, GPU-accelerated variant that enables CUDA-based neural network inference for object detection and traffic light recognition. It requires the NVIDIA Container Toolkit and is the default choice for [Logging Simulation](../deployment/logging-simulation/index.md) deployments.
 
 ## Used In
 
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md) — Processes real recorded sensor data
+- [Logging Simulation](../deployment/logging-simulation/index.md) — Processes real recorded sensor data
 
 ## Related
 

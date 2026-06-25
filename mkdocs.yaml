@@ -63,6 +63,15 @@ plugins:
       # docs/macros.py: variables + catalog-generated tables.
       module_name: docs/macros
       on_error_fail: true
+  - redirects:
+      redirect_maps:
+        deployment/samples/planning-simulation/index.md: deployment/planning-simulation/index.md
+        deployment/samples/scenario-simulation/index.md: deployment/scenario-simulation/index.md
+        deployment/samples/logging-simulation/index.md: deployment/logging-simulation/index.md
+        deployment/samples/carla-simulation/index.md: deployment/carla-simulation/index.md
+        deployment/demos/zenoh-bridge/index.md: deployment/zenoh-bridge/index.md
+        deployment/samples/index.md: deployment/index.md
+        deployment/demos/index.md: deployment/index.md
   - search
 
 markdown_extensions:

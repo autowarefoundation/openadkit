@@ -607,14 +607,14 @@ jobs:
         run: |
           set -euo pipefail
           fetch="src/deployments/scripts/fetch-sample-data.sh"
-          base_dir="src/deployments/samples/_base"
+          base_dir="src/deployments/_base"
           mkdir -p dist staging
           for entry in \
-            "planning-simulation:src/deployments/samples/planning-simulation" \
-            "scenario-simulation:src/deployments/samples/scenario-simulation" \
-            "logging-simulation:src/deployments/samples/logging-simulation" \
-            "carla-simulation:src/deployments/samples/carla-simulation" \
-            "zenoh-bridge:src/deployments/demos/zenoh-bridge"; do
+            "planning-simulation:src/deployments/planning-simulation" \
+            "scenario-simulation:src/deployments/scenario-simulation" \
+            "logging-simulation:src/deployments/logging-simulation" \
+            "carla-simulation:src/deployments/carla-simulation" \
+            "zenoh-bridge:src/deployments/zenoh-bridge"; do
             name="${entry%%:*}"
             dir="${entry#*:}"
             rm -rf "staging/${name}"

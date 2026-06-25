@@ -16,7 +16,7 @@ Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on 
 |-----------|------------------|----------------|
 | **Docker Engine** | All deployments | `setup.sh` (below) |
 | **NVIDIA Container Toolkit** | GPU-accelerated sensing and perception | Included by default; add `--no-nvidia` to skip |
-| **Autoware artifacts** | Sensing and perception samples (for example, [Logging Simulation](../deployment/samples/logging-simulation/index.md)) | `setup.sh --download-artifacts` |
+| **Autoware artifacts** | Sensing and perception samples (for example, [Logging Simulation](../deployment/logging-simulation/index.md)) | `setup.sh --download-artifacts` |
 
 ## Set Up Your Environment
 
@@ -32,9 +32,9 @@ This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requ
     Append `-s -- --no-nvidia` (i.e. `… | sudo bash -s -- --no-nvidia`) if you do not have an NVIDIA GPU. Otherwise the toolkit is **highly recommended** for sensing and perception performance.
 
 !!! info "Autoware artifacts"
-    For sensing/perception samples (e.g. [Logging Simulation](../deployment/samples/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `setup.sh --download-artifacts` directly (no `-s` needed).
+    For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `setup.sh --download-artifacts` directly (no `-s` needed).
 
-Each sample/demo is then downloaded as a self-contained bundle — see [Sample Deployments](../deployment/samples/index.md). You do **not** clone the repository to run deployments.
+Each deployment is then downloaded as a self-contained bundle — see [Deployments](../deployment/index.md). You do **not** clone the repository to run deployments.
 
 ## Verify Your Installation
 
@@ -53,7 +53,7 @@ ls -la ~/autoware_data
 ```
 
 !!! success "Ready to Deploy"
-    If all checks pass, you are ready to run a sample deployment. See [Sample Deployments](../deployment/samples/index.md).
+    If all checks pass, you are ready to run a deployment. See [Deployments](../deployment/index.md).
 
 <h2 class="oak-eyebrow" id="reference">Reference</h2>
 
@@ -62,6 +62,6 @@ ls -la ~/autoware_data
 
 <h2 class="oak-eyebrow" id="next-steps">Next Steps</h2>
 
-- [Run your first deployment](../deployment/samples/planning-simulation/index.md) — Start with the Planning Simulation sample
+- [Run your first deployment](../deployment/planning-simulation/index.md) — Start with the Planning Simulation
 - [Learn about components](../components/index.md) — Understand the Open AD Kit architecture
 - [Choose a platform](../platforms/index.md) — Deploy to AutoSD, EWAOL, or your local machine

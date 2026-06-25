@@ -134,7 +134,7 @@ cd zenoh-bridge
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/demos/zenoh-bridge/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/zenoh-bridge/` folder from a cloned repository instead.
 
 ### 3. Verify Directory Structure
 
@@ -349,4 +349,4 @@ This demo also depends on third-party images that are **not** pinned to immutabl
 - [Zenoh Plugin ROS2 DDS](https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds)
 - [Managing Multiple Autoware Vehicles with Zenoh](https://autoware.org/managing-multiple-autoware-vehicles-with-zenoh/)
 - [Driving Autoware with Zenoh](https://autoware.org/driving-autoware-with-zenoh/)
-- [Sample Deployments](../../samples/index.md) — Single-machine simulations
+- [Deployments](../index.md) — Single-machine simulations

@@ -41,7 +41,7 @@ cd carla-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/samples/carla-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/carla-simulation/` folder from a cloned repository instead.
 
 ## Start the Deployment
 
@@ -102,6 +102,6 @@ docker compose --env-file carla-simulation.env down
 
 ## Related
 
-- [CARLA Interface component](../../../components/carla-interface.md) — What the bridge image contains
+- [CARLA Interface component](../../components/carla-interface.md) — What the bridge image contains
 - [Planning Simulation](../planning-simulation/index.md) — Simpler planning-focused simulation
 - [Logging Simulation](../logging-simulation/index.md) — Replay recorded sensor data

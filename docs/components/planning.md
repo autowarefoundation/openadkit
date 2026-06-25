@@ -30,12 +30,12 @@ Typical resource usage:
 
 ## Used In
 
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md) — Core planning stack with a sample map
-- [Scenario Simulation](../deployment/samples/scenario-simulation/index.md) — Planning in predefined traffic scenarios
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md) — Planning against real-world replayed data
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Core planning stack with a sample map
+- [Scenario Simulation](../deployment/scenario-simulation/index.md) — Planning in predefined traffic scenarios
+- [Logging Simulation](../deployment/logging-simulation/index.md) — Planning against real-world replayed data
 
 ## Related
 
 - [Autoware planning design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/planning/)
 - [Control](control.md) — The companion component in the same image that executes the planned trajectory
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md) — Run the planning stack in a virtual environment
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Run the planning stack in a virtual environment

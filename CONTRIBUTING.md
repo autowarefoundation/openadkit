@@ -57,15 +57,15 @@ mkdocs build
 ### Testing Deployments
 
 Before merging deployment-related changes, verify the compose files. Base-backed
-samples (`planning-simulation`, `scenario-simulation`, `logging-simulation`)
-declare defaults in `../_base/base.env` and per-sample deltas in their own
-`<sample>.env`. From a cloned repo, pass both, base first, sample last (last-wins):
+deployments (`planning-simulation`, `scenario-simulation`, `logging-simulation`)
+declare defaults in `../_base/base.env` (relative to the deployment directory) and per-deployment deltas in their own
+`<name>.env`. From a cloned repo, pass both, base first, last-wins:
 
 ```bash
 # Validate compose configuration
-docker compose -f deployments/samples/planning-simulation/docker-compose.yaml \
-  --env-file deployments/samples/_base/base.env \
-  --env-file deployments/samples/planning-simulation/planning-simulation.env \
+docker compose -f deployments/planning-simulation/docker-compose.yaml \
+  --env-file deployments/_base/base.env \
+  --env-file deployments/planning-simulation/planning-simulation.env \
   config
 
 # Test the full deployment flow
@@ -76,11 +76,11 @@ docker compose --env-file planning-simulation.env up -d
 ```
 
 **Note:** Until the first official release is published, use your local
-`deployments/samples/planning-simulation/` folder (with
+`deployments/planning-simulation/` folder (with
 `deployments/scripts/fetch-sample-data.sh`) instead of downloading the bundle.
-`carla-simulation` runs with both `../_base/base.env` and `carla-simulation.env`, the same as the other samples.
+`carla-simulation` runs with both `../_base/base.env` and `carla-simulation.env`, the same as the other deployments.
 
-For zenoh-bridge split topology testing, follow the [demo documentation](https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/).
+For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/).
 
 ### Releasing
 

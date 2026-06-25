@@ -4,39 +4,71 @@ A **deployment** is a running instance of Open AD Kit — a specific combination
 
 Deployments are defined using container orchestration files (typically `docker-compose.yaml`), making them portable and reproducible across environments from a developer's laptop to production edge devices.
 
-## Deployment Types
+## Available Deployments
 
 <div class="oak-card-grid" markdown="1">
 
 <div class="oak-card" markdown="1">
 
-:material-test-tube:{ .oak-card-icon }
+:material-map-marker-path:{ .oak-card-icon }
 
-<h3>Samples</h3>
-<p>Self-contained, single-machine deployments for learning and development. Each sample demonstrates a specific Autoware workflow with minimal setup.</p>
-<a href="samples/" class="md-button">Explore Samples</a>
+<h3>Planning Simulation</h3>
+<p>Run the Autoware planning stack against a pre-recorded point cloud map. Set a goal pose and watch the vehicle plan and follow a trajectory in a virtual environment.</p>
+<p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--supported">GPU Optional</span></p>
+<a href="planning-simulation/" class="md-button">Run Planning Simulation</a>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-file-document-outline:{ .oak-card-icon }
+
+<h3>Scenario Simulation</h3>
+<p>Execute predefined traffic scenarios using the official TIER IV Scenario Simulator container. Validate planning and behavior under specific conditions.</p>
+<p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--supported">GPU Optional</span></p>
+<a href="scenario-simulation/" class="md-button">Run Scenario Simulation</a>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-play-circle-outline:{ .oak-card-icon }
+
+<h3>Logging Simulation</h3>
+<p>Replay recorded sensor data (rosbag) through the full Autoware stack. Test perception, localization, and planning against real-world logged data.</p>
+<p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--recommended">GPU Recommended</span></p>
+<a href="logging-simulation/" class="md-button">Run Logging Simulation</a>
+</div>
+
+<div class="oak-card" markdown="1">
+
+:material-car-sports:{ .oak-card-icon }
+
+<h3>CARLA Simulation</h3>
+<p>Closed-loop end-to-end simulation with the CARLA 0.9.16 simulator. The full Autoware stack perceives and drives a CARLA ego vehicle in a photorealistic world.</p>
+<p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--required">GPU Required</span></p>
+<a href="carla-simulation/" class="md-button">Run CARLA Simulation</a>
 </div>
 
 <div class="oak-card" markdown="1">
 
 :material-lan-connect:{ .oak-card-icon }
 
-<h3>Demos</h3>
-<p>Multi-machine and distributed deployments that demonstrate advanced use cases such as cloud-edge bridging and remote visualization.</p>
-<a href="demos/" class="md-button">Explore Demos</a>
+<h3>Zenoh Bridge</h3>
+<p>Distributed cloud-edge visualization. Run compute-intensive Autoware components on an edge server while remotely visualizing and controlling the stack from a lightweight cloud machine using Zenoh protocol bridging.</p>
+<p><span class="oak-badge oak-badge--neutral">Multi-Machine</span> <span class="oak-badge oak-badge--neutral">Advanced</span></p>
+<a href="zenoh-bridge/" class="md-button">Explore Zenoh Bridge</a>
 </div>
 
 </div>
 
 ## Choosing a Deployment
 
-| Deployment | Type | Purpose | Scope |
-|-----------|------|---------|-------|
-| [Planning Simulation](samples/planning-simulation/index.md) | Sample | Run Autoware planning stack with a sample map | Single machine |
-| [Scenario Simulation](samples/scenario-simulation/index.md) | Sample | Execute predefined scenarios with TIER IV Scenario Simulator | Single machine |
-| [Logging Simulation](samples/logging-simulation/index.md) | Sample | Replay recorded sensor data (rosbag) through the AD stack | Single machine |
-| [CARLA Simulation](samples/carla-simulation/index.md) | Sample | Closed-loop end-to-end simulation with the CARLA simulator | Single machine |
-| [Zenoh Bridge](demos/zenoh-bridge/index.md) | Demo | Distributed cloud-edge visualization with ROS 2 bridging | Multi-machine |
+| Deployment | Purpose | Scope |
+|-----------|---------|-------|
+| [Planning Simulation](planning-simulation/index.md) | Run Autoware planning stack with a sample map | Single machine |
+| [Scenario Simulation](scenario-simulation/index.md) | Execute predefined scenarios with TIER IV Scenario Simulator | Single machine |
+| [Logging Simulation](logging-simulation/index.md) | Replay recorded sensor data (rosbag) through the AD stack | Single machine |
+| [CARLA Simulation](carla-simulation/index.md) | Closed-loop end-to-end simulation with the CARLA simulator | Single machine |
+| [Zenoh Bridge](zenoh-bridge/index.md) | Distributed cloud-edge visualization with ROS 2 bridging | Multi-machine |
 
 ## Architecture
 
@@ -49,14 +81,14 @@ All deployments share a common pattern:
 
 ```mermaid
 graph LR
-    subgraph Samples["Samples (Single Machine)"]
+    subgraph Single["Single Machine"]
         S1[Planning Simulation]
         S2[Scenario Simulation]
         S3[Logging Simulation]
         S4[CARLA Simulation]
     end
 
-    subgraph Demos["Demos (Distributed)"]
+    subgraph Distributed["Distributed"]
         D1[Edge: Autoware + Simulator]
         D2[Cloud: Visualizer + Bridge]
     end
@@ -64,8 +96,8 @@ graph LR
 
 ## Next Steps
 
-- [Run your first sample deployment](samples/planning-simulation/index.md)
-- [Explore distributed demos](demos/index.md)
+- [Run your first deployment](planning-simulation/index.md)
+- [Zenoh Bridge](zenoh-bridge/index.md) — Learn distributed deployment with ROS 2 bridging
 - [Build a custom deployment](custom-deployment.md)
 - [Learn about Open AD Kit components](../components/index.md)
 - [Understand container image tags](../getting-started/image-tags.md)

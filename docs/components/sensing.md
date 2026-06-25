@@ -22,11 +22,11 @@ Typical resource usage:
 
 ## CUDA Variant
 
-The `sensing-perception-cuda` image is an amd64-only, GPU-accelerated variant that offloads point cloud preprocessing and sensor data operations to NVIDIA GPUs. It requires the NVIDIA Container Toolkit and is strongly recommended for [Logging Simulation](../deployment/samples/logging-simulation/index.md) deployments.
+The `sensing-perception-cuda` image is an amd64-only, GPU-accelerated variant that offloads point cloud preprocessing and sensor data operations to NVIDIA GPUs. It requires the NVIDIA Container Toolkit and is strongly recommended for [Logging Simulation](../deployment/logging-simulation/index.md) deployments.
 
 ## Used In
 
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md) — Replays recorded sensor data through the full stack
+- [Logging Simulation](../deployment/logging-simulation/index.md) — Replays recorded sensor data through the full stack
 
 ## Related
 

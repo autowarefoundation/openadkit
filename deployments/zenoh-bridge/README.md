@@ -1,12 +1,12 @@
-# Zenoh Bridge Demo
+# Zenoh Bridge
 
-This project demonstrates how to bridge Autoware data from Edge to Cloud using Zenoh.
+This deployment demonstrates how to bridge Autoware data from Edge to Cloud using Zenoh.
 
 ## Documentation
 
 For **complete architecture documentation**, setup instructions, troubleshooting, and multi-machine deployment details, see the canonical documentation:
 
-**[Open AD Kit Docs — Zenoh Bridge Demo](https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/)**
+**[Open AD Kit Docs — Zenoh Bridge](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)**
 
 ## Demo Video
 
@@ -14,7 +14,7 @@ For **complete architecture documentation**, setup instructions, troubleshooting
 
 ## Quick Start
 
-First download the sample map (mounted by the Autoware service). From a cloned repo, use `../../scripts/fetch-sample-data.sh` instead:
+First download the sample map (mounted by the Autoware service). From a cloned repo, use `../scripts/fetch-sample-data.sh` instead:
 
 ```bash
 ./fetch-sample-data.sh zenoh-bridge

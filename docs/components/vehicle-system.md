@@ -42,9 +42,9 @@ Typical resource usage for both services combined:
 
 ## Used In
 
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md)
-- [Scenario Simulation](../deployment/samples/scenario-simulation/index.md)
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md)
+- [Planning Simulation](../deployment/planning-simulation/index.md)
+- [Scenario Simulation](../deployment/scenario-simulation/index.md)
+- [Logging Simulation](../deployment/logging-simulation/index.md)
 
 All sample deployments use the `vehicle-system` image because every running stack requires both vehicle actuation and system-level health monitoring.
 

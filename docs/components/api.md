@@ -30,9 +30,9 @@ Typical resource usage:
 
 ## Used In
 
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md) — Provides the API for setting initial pose and goal
-- [Scenario Simulation](../deployment/samples/scenario-simulation/index.md) — Used by the scenario runner to engage, set routes, and monitor state
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md) — Provides API access during rosbag replay
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Provides the API for setting initial pose and goal
+- [Scenario Simulation](../deployment/scenario-simulation/index.md) — Used by the scenario runner to engage, set routes, and monitor state
+- [Logging Simulation](../deployment/logging-simulation/index.md) — Provides API access during rosbag replay
 
 All sample deployments include the `api` container because it is the standard entry point for external interaction with the Autoware stack.
 

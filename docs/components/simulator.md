@@ -30,9 +30,9 @@ Typical resource usage:
 
 ## Used In
 
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md) — Provides the simulated vehicle and environment for planning and control testing
-- [Scenario Simulation](../deployment/samples/scenario-simulation/index.md) — Feeds the stack with scenario-driven simulated data and acts as the ego vehicle interface
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md) — Supports simulated localization and vehicle states during rosbag replay
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Provides the simulated vehicle and environment for planning and control testing
+- [Scenario Simulation](../deployment/scenario-simulation/index.md) — Feeds the stack with scenario-driven simulated data and acts as the ego vehicle interface
+- [Logging Simulation](../deployment/logging-simulation/index.md) — Supports simulated localization and vehicle states during rosbag replay
 
 ## Related
 

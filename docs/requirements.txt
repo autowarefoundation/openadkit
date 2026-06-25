@@ -2,5 +2,6 @@ mkdocs-material==9.7.6
 mkdocs-awesome-pages-plugin==2.10.1
 mkdocs-exclude==1.0.2
 mkdocs-macros-plugin==1.5.0
+mkdocs-redirects==1.2.2
 pymdown-extensions==10.21.2
 mdx-truly-sane-lists==1.3

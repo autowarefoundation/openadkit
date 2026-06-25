@@ -32,7 +32,7 @@ Typical resource usage:
 
 ## Used In
 
-- [CARLA Simulation](../deployment/samples/carla-simulation/index.md) — Connects the full Autoware stack to the CARLA simulator for end-to-end autonomous driving simulation
+- [CARLA Simulation](../deployment/carla-simulation/index.md) — Connects the full Autoware stack to the CARLA simulator for end-to-end autonomous driving simulation
 
 ## Related
 

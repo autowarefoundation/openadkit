@@ -21,9 +21,9 @@ Typical resource usage:
 
 ## Used In
 
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md)
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md)
-- [Scenario Simulation](../deployment/samples/scenario-simulation/index.md)
+- [Logging Simulation](../deployment/logging-simulation/index.md)
+- [Planning Simulation](../deployment/planning-simulation/index.md)
+- [Scenario Simulation](../deployment/scenario-simulation/index.md)
 
 ## Related
 

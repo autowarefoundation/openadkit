@@ -1,6 +1,6 @@
 # CARLA simulation — extends the deployment base with CARLA-specific services
 # and overrides. Run with both env files:
-#   docker compose --env-file ../_base/base.env --env-file carla-simulation.env up -d
+#   docker compose --env-file ./_base/base.env --env-file carla-simulation.env up -d
 include:
   - ../_base/docker-compose.yaml
 

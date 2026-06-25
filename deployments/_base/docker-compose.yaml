@@ -1,7 +1,7 @@
 # Open AD Kit deployment base.
 #
-# The services shared by every sample deployment (planning/scenario/logging).
-# Samples pull this in with `include:` and add only their delta. Image refs use
+# The services shared by every deployment (planning/scenario/logging).
+# Deployments pull this in with `include:` and add only their delta. Image refs use
 # `${COMPONENT_IMAGE:-<default>}` so the registry+tag lives here once; override a
 # COMPONENT_IMAGE var (e.g. for CUDA images) to swap an image without editing this
 # file. Do not run this file directly — run a sample, which includes it.

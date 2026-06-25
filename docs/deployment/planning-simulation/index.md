@@ -18,7 +18,7 @@ After starting the deployment, you will access a noVNC-based RViz2 visualizer in
 - Planning simulation sample map (downloaded below)
 
 !!! tip "GPU"
-    A GPU is optional for this sample. The planning and control components run efficiently on CPU.
+    A GPU is optional for this deployment. The planning and control components run efficiently on CPU.
 
 ## Before You Start
 
@@ -38,7 +38,7 @@ cd planning-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/samples/planning-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/planning-simulation/` folder from a cloned repository instead.
 
 ### 3. Download the sample map
 
@@ -111,4 +111,4 @@ graph LR
 
 - [Scenario Simulation](../scenario-simulation/index.md) — Test with predefined traffic scenarios
 - [Logging Simulation](../logging-simulation/index.md) — Replay recorded sensor data
-- [Components Overview](../../../components/index.md) — Learn about the planning and control stack
+- [Components Overview](../../components/index.md) — Learn about the planning and control stack

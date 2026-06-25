@@ -6,7 +6,7 @@ This guide shows how to compose your own Open AD Kit deployment from OAK compone
 
 - Docker Engine (set up via `setup.sh`)
 - Optional: NVIDIA Container Toolkit (for GPU-accelerated components)
-- Optional: a sample deployment bundle as a starting reference — download from the [latest release](https://github.com/autowarefoundation/openadkit/releases/latest)
+- Optional: a deployment bundle as a starting reference — download from the [latest release](https://github.com/autowarefoundation/openadkit/releases/latest)
 
 ## Component Selection
 
@@ -82,10 +82,10 @@ With host networking, the visualizer is reachable directly at `http://localhost:
 !!! warning "Patterns to keep"
     - Components are launched with `ros2 launch autoware_launch tier4_<component>_component.launch.xml component_wise_launch:=true ...` — there are no per-component ROS packages named after the images.
     - Do **not** override the visualizer's `command`: its entrypoint starts the VNC/noVNC stack and RViz2.
-    - All services need the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID` for DDS discovery; the samples use `network_mode: host` with CycloneDDS.
+    - All services need the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID` for DDS discovery; deployments use `network_mode: host` with CycloneDDS.
 
 !!! note "A runnable stack needs more services"
-    A planning stack that actually does something also needs map serving, a simulator or vehicle interface, system services, and the API container. Use the [planning-simulation `docker-compose.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/deployments/samples/planning-simulation/docker-compose.yaml) as the reference and prune from there.
+    A planning stack that actually does something also needs map serving, a simulator or vehicle interface, system services, and the API container. Use the [planning-simulation `docker-compose.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/deployments/planning-simulation/docker-compose.yaml) as the reference and prune from there.
 
 ## Environment Configuration
 
@@ -118,9 +118,9 @@ docker compose down
 
 ## Next Steps
 
-- For a complete, ready-to-run example, see the [Planning Simulation](samples/planning-simulation/index.md)
-- For GPU-accelerated deployments, see the [Logging Simulation](samples/logging-simulation/index.md)
-- For distributed deployments, see the [Zenoh Bridge Demo](demos/zenoh-bridge/index.md)
+- For a complete, ready-to-run example, see the [Planning Simulation](planning-simulation/index.md)
+- For GPU-accelerated deployments, see the [Logging Simulation](logging-simulation/index.md)
+- For distributed deployments, see the [Zenoh Bridge](zenoh-bridge/index.md)
 
 !!! note "Future Work"
     A unified master deployment configuration is planned to serve as both documentation and a golden-path setup for all OAK components.

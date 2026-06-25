@@ -42,7 +42,7 @@ cd logging-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/samples/logging-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/logging-simulation/` folder from a cloned repository instead.
 
 ### 3. Download the sample map and rosbag
 
@@ -134,5 +134,5 @@ The `rosbag` service in this deployment uses the upstream `ghcr.io/autowarefound
 
 - [Planning Simulation](../planning-simulation/index.md) — Simpler planning-focused simulation
 - [Scenario Simulation](../scenario-simulation/index.md) — Predefined scenario testing
-- [Components Overview](../../../components/index.md) — Learn about the sensing and perception stack
-- [Getting Started](../../../getting-started/index.md) — Environment setup and artifact download
+- [Components Overview](../../components/index.md) — Learn about the sensing and perception stack
+- [Getting Started](../../getting-started/index.md) — Environment setup and artifact download

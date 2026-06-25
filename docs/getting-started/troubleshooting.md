@@ -8,7 +8,7 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 - Verify Docker Engine is running: `docker info`
 - Check that required ports are not already in use
-- Ensure the `.env` file exists and is correctly configured. Each [deployment sample](../deployment/samples/index.md) ships with its own `.env` (copied or generated during setup); confirm you are running `docker compose` from the sample directory that contains it
+- Ensure the `.env` file exists and is correctly configured. Each [deployment](../deployment/index.md) ships with its own `.env` (copied or generated during setup); confirm you are running `docker compose` from the deployment directory that contains it
 
 ### Permission denied
 
@@ -40,4 +40,4 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 - [Getting Started](index.md) — Quick start guide
 - [Container Image Tags](image-tags.md) — Understanding the tag schema
-- [Deployment Samples](../deployment/samples/index.md) — Self-contained sample deployments
+- [Deployments](../deployment/index.md) — Self-contained deployments

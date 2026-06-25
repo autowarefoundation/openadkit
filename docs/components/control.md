@@ -29,12 +29,12 @@ Typical resource usage:
 
 ## Used In
 
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md) — Executes planned trajectories in a virtual environment
-- [Scenario Simulation](../deployment/samples/scenario-simulation/index.md) — Control in predefined traffic scenarios
-- [Logging Simulation](../deployment/samples/logging-simulation/index.md) — Control against real-world replayed data
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Executes planned trajectories in a virtual environment
+- [Scenario Simulation](../deployment/scenario-simulation/index.md) — Control in predefined traffic scenarios
+- [Logging Simulation](../deployment/logging-simulation/index.md) — Control against real-world replayed data
 
 ## Related
 
 - [Autoware control design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/control/)
 - [Planning](planning.md) — The companion component in the same image that generates the trajectory
-- [Planning Simulation](../deployment/samples/planning-simulation/index.md) — Run the full planning and control stack
+- [Planning Simulation](../deployment/planning-simulation/index.md) — Run the full planning and control stack

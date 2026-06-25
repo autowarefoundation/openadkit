@@ -37,7 +37,7 @@ cd scenario-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/samples/scenario-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/scenario-simulation/` folder from a cloned repository instead.
 
 ### 3. Download the Kashiwanoha map
 

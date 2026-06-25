@@ -10,7 +10,7 @@
 // targets, not by this file.
 
 // Default ROS distro for local builds. Tracks the documented default distro
-// (main.py DEFAULT_DISTRO / the published `<target>` alias), which is Humble for
+// (docs/macros.py DEFAULT_DISTRO / the published `<target>` alias), which is Humble for
 // v2.0. CI never relies on this default — build-all-images.yaml sets ROS_DISTRO
 // explicitly per matrix entry. Flip to "jazzy" together with the docs default
 // when Jazzy-primary lands (v2.1).

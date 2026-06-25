@@ -14,7 +14,7 @@ import json
 import os
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).parent
+REPO_ROOT = Path(__file__).parent.parent
 INVENTORY = REPO_ROOT / ".github" / "image-inventory.json"
 
 # The container registry + repository that all Open AD Kit component images share.

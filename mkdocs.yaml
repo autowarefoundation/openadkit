@@ -60,8 +60,8 @@ plugins:
         - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?jpg|(.*\.)?pages).*$
         - ^(.*/)?[^.]*$
   - macros:
-      # main.py at the repo root: variables + catalog-generated tables.
-      module_name: main
+      # docs/macros.py: variables + catalog-generated tables.
+      module_name: docs/macros
       on_error_fail: true
   - search
 

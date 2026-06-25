@@ -9,7 +9,7 @@ on:
       - closed
     paths:
       - mkdocs.yaml
-      - main.py
+      - docs/macros.py
       - .github/image-inventory.json
       - docs/requirements.txt
       - "docs/scripts/**"

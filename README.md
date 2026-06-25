@@ -11,7 +11,7 @@
 
 Open AD Kit is the first [SOAFEE](https://soafee.io/) blueprint for deploying [Autoware](https://github.com/autowarefoundation/autoware) as containerized, cloud/edge-ready software-defined vehicle components.
 
-It packages Autoware into composable container images, deployment configurations, release bundles, and CI metadata so teams can run and ship Autoware-based stacks more predictably.
+This repository provides the component images, deployment configurations, release bundles, and CI metadata needed to run and ship Autoware-based stacks more predictably.
 
 ## Quickstart
 
@@ -31,15 +31,6 @@ Open the noVNC visualizer at `http://localhost:6080/vnc.html` (password: `openad
 
 For artifact downloads (logging-simulation's perception models), run `./setup.sh --download-artifacts`. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
 
-## Repository Scope
-
-This repository is the packaging and deployment layer around Autoware. It contains:
-
-- Component image definitions and image inventory metadata
-- Docker Compose deployments for simulation, logging, and edge/cloud bridging workflows
-- Release bundle packaging for pinned, reproducible deployments
-- Documentation for deploying, building, and releasing Open AD Kit
-
 ## Deployments
 
 Open AD Kit includes several user-facing deployment configurations, each with its own compose file and environment defaults:
@@ -50,24 +41,22 @@ Open AD Kit includes several user-facing deployment configurations, each with it
 - **[carla-simulation](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/)** - Connect Autoware to CARLA simulation
 - **[zenoh-bridge](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)** - Bridge Autoware traffic across edge and cloud hosts
 
-See the full [deployment documentation](https://autowarefoundation.github.io/openadkit/deployment/) for setup steps, bundle usage, and troubleshooting.
-
 ## Images and Releases
 
 Open AD Kit publishes build-specific, release, latest-stable, and CI development image tags to GitHub Container Registry. Use stable release tags for fully pinned deployments; compose files use default ROS distro aliases for convenience. CUDA image aliases are amd64-only.
 
-- **[Container Image Tags](https://autowarefoundation.github.io/openadkit/getting-started/image-tags/)** - Full tag taxonomy, examples, and pinning guidance
-- **[Release Flow](https://autowarefoundation.github.io/openadkit/getting-started/release-flow/)** - How maintainers promote existing builds instead of rebuilding at release time
-- **[Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)** - Build component images locally with `docker buildx bake`
+- **[Container Image Tags](https://autowarefoundation.github.io/openadkit/getting-started/image-tags/)** - Tag taxonomy, examples, and pinning guidance
+- **[Release Flow](https://autowarefoundation.github.io/openadkit/getting-started/release-flow/)** - How maintainers promote existing builds at release time
 
 ## Documentation
 
-For complete documentation, operational steps, and troubleshooting:
+For the full docs, platform support, and development guides:
 
 - **[Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/)**
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
 - **[Supported Platforms](https://autowarefoundation.github.io/openadkit/platforms/)** - Hardware and platform support status
-- **[Development](https://autowarefoundation.github.io/openadkit/development/)** - Source builds, validation, and contribution workflow
+- **[Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)** - Build component images locally with `docker buildx bake`
+- **[Contributing](https://autowarefoundation.github.io/openadkit/development/contributing/)** - Development workflow, DCO sign-off, and validation steps
 
 ## Contributing
 

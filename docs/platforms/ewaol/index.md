@@ -10,7 +10,7 @@
 !!! note "Not a committed Open AD Kit target"
     EWAOL is retained as upstream SOAFEE background. Open AD Kit's committed SOAFEE-aligned target is the **Arm Automotive Solutions reference stack / RD-1 AE FVP**. This page documents EWAOL's upstream build/runtime instructions for the ADLINK AADP-AVA platform for reference only; it is not a validated Open AD Kit deployment path.
 
-**This repository:** EWAOL-specific deployment assets and container orchestration files are still being added. For current repo status, see [`platforms/README.md`](https://github.com/autowarefoundation/openadkit/blob/main/platforms/README.md).
+**This repository:** EWAOL-specific deployment assets and container orchestration files are **not yet present** in this repository.
 
 ## What is EWAOL?
 

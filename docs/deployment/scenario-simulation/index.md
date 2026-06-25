@@ -12,7 +12,7 @@ After starting the deployment, the scenario simulator generates a virtual traffi
 - Review simulation results and metrics after scenario completion
 - Define and run your own custom scenarios
 
-## Requirements
+## Prerequisites
 
 - Docker Engine (set up via `setup.sh`, below)
 

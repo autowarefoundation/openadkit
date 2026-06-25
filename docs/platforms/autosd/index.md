@@ -1,4 +1,4 @@
-# AutoSD + Autoware Open AD Kit
+# AutoSD + Open AD Kit
 
 !!! abstract ""
     AutoSD is the upstream binary distribution serving as the public, in-development preview of the **Red Hat In-Vehicle Operating System (RHIVOS)**. It brings cloud-native, container-first principles to automotive edge computing with an emphasis on safety, security, and deterministic behavior.

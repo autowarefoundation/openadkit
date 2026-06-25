@@ -12,7 +12,7 @@ After starting the deployment, you will access a noVNC-based RViz2 visualizer in
 - Observe the planned trajectory, behavior planning, and control outputs in real time
 - Monitor the vehicle as it follows the planned path
 
-## Requirements
+## Prerequisites
 
 - Docker Engine (set up via `setup.sh`, below)
 - Planning simulation map (downloaded below)

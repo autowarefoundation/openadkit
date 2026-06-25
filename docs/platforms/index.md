@@ -1,6 +1,9 @@
 # Supported Platforms
 
-As the Autoware Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle ecosystem, it tracks multiple platform directions aligned with cloud-native, software-defined vehicle principles.
+**Deployments** ([../deployment/index.md](../deployment/index.md)) provide local development and simulation on Ubuntu using Docker Compose.
+**Platforms** provide edge-deployment targets for production automotive operating systems such as AutoSD.
+
+As Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle ecosystem, it tracks multiple platform directions aligned with cloud-native, software-defined vehicle principles.
 
 !!! abstract "SOAFEE and Open AD Kit"
     The Autoware Foundation is a voting member of [SOAFEE](https://www.soafee.io/) (Scalable Open Architecture For the Embedded Edge). Open AD Kit was co-developed with SOAFEE and the [eSync Alliance](https://esyncalliance.org/) as the first blueprint, and has since seeded derived blueprints including DENSO's AVP blueprint and Red Hat's AutoSD blueprint.

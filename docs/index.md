@@ -40,7 +40,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 :material-source-branch:{ .oak-card-icon }
 
 <h3>Development</h3>
-<p>Build from source, contribute code, and help shape the Open AD Kit roadmap.</p>
+<p>Build from source, contribute code, and help shape the future of Open AD Kit.</p>
 <a href="development/" class="md-button">Contribute</a>
 </div>
 

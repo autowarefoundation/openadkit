@@ -47,6 +47,11 @@ git remote add upstream https://github.com/autowarefoundation/openadkit.git
 ### 3. Create a Branch
 
 ```bash
+# Make sure you are on the latest main branch first
+git checkout main
+git pull upstream main
+
+# Create your feature branch
 git checkout -b feat/your-feature-name
 ```
 
@@ -112,9 +117,27 @@ Open a pull request against the `main` branch of the upstream repository. The PR
 - **Develop** your changes following project conventions
 - **Commit** with DCO sign-off and Conventional Commit format
 - **Push** your branch to your fork
+- **Validate** before opening a PR (see below)
 - **Open a Pull Request** against `main` with a clear description
 
 </div>
+
+## Validate Before Pushing
+
+Run the same checks CI runs to catch issues early:
+
+```bash
+# Documentation build
+make -C docs build
+
+# Docker Compose validation
+docker compose -f deployments/base/docker-compose.yaml config -q
+
+# Python tests
+pytest .github/scripts/
+```
+
+Fix any failures before pushing. This saves reviewer time and CI minutes.
 
 ```mermaid
 flowchart LR

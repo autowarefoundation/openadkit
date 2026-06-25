@@ -12,7 +12,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 - Autoware control commands actuating the CARLA ego vehicle in closed loop
 - Full RViz2 visualization via the noVNC browser interface
 
-## Requirements
+## Prerequisites
 
 - An **amd64 (x86_64)** host with Docker — the `carla-interface` image is published for **amd64 and ROS 2 Humble only**; there is no arm64 image
 - Docker Engine with the NVIDIA Container Toolkit (set up via `setup.sh`)
@@ -102,6 +102,42 @@ docker compose --env-file carla-simulation.env down
 | Black or frozen CARLA window | Check host X access (`xhost +SI:localuser:root`) and the Vulkan ICD path |
 | Visualizer blank | Wait for all containers to initialize, then refresh the browser |
 | Ego vehicle does not move | Set a route with **2D Goal Pose** and click **Auto**, or use `--drive` |
+
+## Architecture
+
+The CARLA simulation connects the Unreal Engine simulator to the full Autoware stack through a dedicated bridge:
+
+```mermaid
+flowchart LR
+    subgraph Host["Host (x86_64 + NVIDIA GPU)"]
+        C[carla-server]
+        CI[carla-interface]
+        S[sensing]
+        P[perception]
+        L[localization]
+        M[map]
+        PL[planning]
+        CO[control]
+        V[vehicle-system]
+        A[api]
+        VIZ[visualizer]
+    end
+
+    C -->|LiDAR, camera, GNSS| CI
+    CI --> S
+    S --> P
+    M --> L
+    M --> PL
+    L --> PL
+    P --> PL
+    PL --> CO
+    CO --> V
+    V --> A
+    PL --> VIZ
+    V --> VIZ
+```
+
+CARLA server generates synthetic sensor data. The `carla-interface` container translates CARLA formats to ROS 2 messages that the standard Open AD Kit sensing, perception, and localization containers consume. From there the pipeline follows the same planning → control → vehicle flow as the other simulations.
 
 ## Related
 

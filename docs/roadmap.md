@@ -32,3 +32,9 @@ flowchart LR
 | **v2.5.0** | Mar 2027 | **Update/rollback beta**<br>Staged apply, health promotion, verified rollback |
 | **v3.0.0** | May 2027 | **Closed loop**<br>Build → deploy → test → observe → update → rollback |
 
+## See also
+
+- [Getting Started](getting-started/index.md) — Set up your environment
+- [Development](development/index.md) — Build from source and contribute
+- [Releases](releases/index.md) — Current release status
+

@@ -65,7 +65,7 @@ Open AD Kit runs Autoware as a pipeline of containerized components. Each contai
 
 A **deployment** is a Docker Compose file that starts the subset of these containers needed for a specific task — for example, planning simulation starts only planning, control, and visualization, while logging simulation adds sensing and perception to replay real sensor data. For the full picture, see [Components](components/index.md) and [Deployment](deployment/index.md).
 
-<h2 class="oak-eyebrow" id="related">Related</h2>
+## Related
 
 - [Getting Started](getting-started/index.md) — Set up your environment
 - [Deployment](deployment/index.md) — Run your first deployment

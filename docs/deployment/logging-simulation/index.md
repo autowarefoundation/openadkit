@@ -12,7 +12,7 @@ After starting the deployment and playing the rosbag, you will observe the Autow
 - Planning and control outputs responding to the replayed environment
 - Full RViz2 visualization via the noVNC browser interface
 
-## Requirements
+## Prerequisites
 
 - Docker Engine (set up via `setup.sh`, below)
 - NVIDIA Container Toolkit **highly recommended** (for GPU-accelerated sensing and perception)

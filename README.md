@@ -63,7 +63,7 @@ that component Dockerfiles bind-mount during `docker buildx bake`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, DCO sign-off requirement, and deployment validation steps.
 
-## Community
+Join the community:
 
 - Autoware Discord: [discord.gg/Q94UsPvReQ](https://discord.gg/Q94UsPvReQ)
 - Autoware Foundation LinkedIn: [linkedin.com/company/the-autoware-foundation](https://www.linkedin.com/company/the-autoware-foundation/)

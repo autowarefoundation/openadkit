@@ -336,22 +336,9 @@ jobs:
           lookup-only: true
 
       - name: Inject BuildKit cache mounts
-        uses: reproducible-containers/buildkit-cache-dance@7a38cfab60c63ee1022b7c1a14a031c82f4114c7 # v3
+        uses: ./.github/actions/inject-ccache
         with:
-          # Only ccache is persisted across runs: it is the entire ~4.5x
-          # recompile win and stays small (~0.14 GB/leg). apt/pip mounts were
-          # dropped to keep the repo-wide 10 GB cache budget clear of LRU
-          # eviction (their bandwidth-bound saving is largely covered by the
-          # registry layer cache anyway).
-          cache-map: |
-            {
-              "cache-mounts/ccache": {
-                "id": "ccache-${{ matrix.ros-distro }}",
-                "target": "/home/aw/.ccache",
-                "uid": "1000",
-                "gid": "1000"
-              }
-            }
+          ros-distro: ${{ matrix.ros-distro }}
           skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
 
       - name: Build and push universe-common images
@@ -384,24 +371,10 @@ jobs:
         if: env.IS_MAIN_PUSH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          CACHE_KEY_PREFIX: ${{ env.CACHE_KEY_PREFIX }}
           KEEP_KEY: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
           MAX_GB: 6
-        run: |
-          set -euo pipefail
-          # KEEP_KEY is written by the actions/cache POST step, which runs after
-          # this step, so it is never present here: this prune only removes
-          # prior-lineage caches. The size check refreshes an oversized cache on
-          # a same-SHA rerun (when KEEP_KEY already exists). --limit caps recovery
-          # if a lineage ever exceeds it; steady state keeps a single entry.
-          max_bytes=$((MAX_GB * 1000 * 1000 * 1000))
-          gh cache list --repo "$GITHUB_REPOSITORY" --key "$CACHE_KEY_PREFIX" --limit 100 --json key,sizeInBytes \
-            | jq -r --arg keep "$KEEP_KEY" --argjson max "$max_bytes" \
-                '.[] | select(.key != $keep or .sizeInBytes > $max) | .key' \
-            | while read -r key; do
-                echo "delete: $key"
-                gh cache delete "$key" --repo "$GITHUB_REPOSITORY" || true
-              done
-        shell: bash
+        run: bash .github/scripts/prune-buildkit-cache.sh
 
   # =============================================================================
   # Stage 2: Build component images (parallel)
@@ -495,20 +468,9 @@ jobs:
           lookup-only: true
 
       - name: Inject BuildKit cache mounts
-        uses: reproducible-containers/buildkit-cache-dance@v3
+        uses: ./.github/actions/inject-ccache
         with:
-          # Only ccache is persisted across runs (see build-common above for
-          # the rationale). A single uniform map also drops the previous CUDA
-          # apt special-case.
-          cache-map: |
-            {
-              "cache-mounts/ccache": {
-                "id": "ccache-${{ matrix.ros-distro }}",
-                "target": "/home/aw/.ccache",
-                "uid": "1000",
-                "gid": "1000"
-              }
-            }
+          ros-distro: ${{ matrix.ros-distro }}
           skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
 
       - name: Build and push ${{ matrix.target }}
@@ -542,24 +504,10 @@ jobs:
         if: env.IS_MAIN_PUSH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          CACHE_KEY_PREFIX: ${{ env.CACHE_KEY_PREFIX }}
           KEEP_KEY: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
           MAX_GB: 6
-        run: |
-          set -euo pipefail
-          # KEEP_KEY is written by the actions/cache POST step, which runs after
-          # this step, so it is never present here: this prune only removes
-          # prior-lineage caches. The size check refreshes an oversized cache on
-          # a same-SHA rerun (when KEEP_KEY already exists). --limit caps recovery
-          # if a lineage ever exceeds it; steady state keeps a single entry.
-          max_bytes=$((MAX_GB * 1000 * 1000 * 1000))
-          gh cache list --repo "$GITHUB_REPOSITORY" --key "$CACHE_KEY_PREFIX" --limit 100 --json key,sizeInBytes \
-            | jq -r --arg keep "$KEEP_KEY" --argjson max "$max_bytes" \
-                '.[] | select(.key != $keep or .sizeInBytes > $max) | .key' \
-            | while read -r key; do
-                echo "delete: $key"
-                gh cache delete "$key" --repo "$GITHUB_REPOSITORY" || true
-              done
-        shell: bash
+        run: bash .github/scripts/prune-buildkit-cache.sh
 
   # =============================================================================
   # Stage 3: Create multi-arch manifests

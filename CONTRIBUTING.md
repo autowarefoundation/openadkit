@@ -78,7 +78,7 @@ docker compose --env-file planning-simulation.env up -d
 **Note:** Until the first official release is published, use your local
 `deployments/samples/planning-simulation/` folder (with
 `deployments/scripts/fetch-sample-data.sh`) instead of downloading the bundle.
-`carla-simulation` is self-contained — its env file is `carla-simulation.env`.
+`carla-simulation` runs with both `../_base/base.env` and `carla-simulation.env`, the same as the other samples.
 
 For zenoh-bridge split topology testing, follow the [demo documentation](https://autowarefoundation.github.io/openadkit/deployment/demos/zenoh-bridge/).
 

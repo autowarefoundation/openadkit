@@ -1,12 +1,64 @@
-# CARLA simulation — self-contained sample (not on the deployment base).
-#
-# ⚠️  MAINTENANCE WARNING: the services `map`, `system`, `planning`, `vehicle`,
-# `control`, `api`, and `visualizer` below are intentionally duplicated from
-# `deployments/samples/_base/docker-compose.yaml`. Any change to the base
-# definition of those services (image vars, env, volumes, restart policy, etc.)
-# must be manually mirrored here. Keep this file in sync with `_base`.
+# CARLA simulation — extends the deployment base with CARLA-specific services
+# and overrides. Run with both env files:
+#   docker compose --env-file ../_base/base.env --env-file carla-simulation.env up -d
+include:
+  - ../_base/docker-compose.yaml
 
 services:
+  # Disable the base simulator — CARLA provides its own simulation runtime.
+  simulator:
+    profiles:
+      - disabled
+
+  # Override base services with CARLA-specific changes.
+  system:
+    command: >
+      ros2 launch autoware_launch tier4_system_component.launch.xml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
+      launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
+      launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
+      sensor_model:=${SENSOR_MODEL}
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+
+  planning:
+    depends_on:
+      - map
+      - localization
+      - perception
+      - system
+
+  vehicle:
+    depends_on:
+      - map
+      - carla-interface
+
+  api:
+    depends_on:
+      - map
+      - system
+
+  visualizer:
+    container_name: autoware-e2e-visualizer
+    runtime: nvidia
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - RVIZ_CONFIG=${RVIZ_CONFIG}
+      - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=true
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
+      - RVIZ_GPU=auto
+    depends_on:
+      - map
+      - api
+      - planning
+      - control
+      - carla-interface
+
+  # CARLA-specific services.
   carla:
     image: ${CARLA_CONTAINER_IMAGE:-carlasim/carla:0.9.16}
     container_name: ${CARLA_CONTAINER_NAME}
@@ -58,48 +110,6 @@ services:
       carla_map:=${CARLA_WORLD}
       sensor_kit_name:=carla_sensor_kit_description
       sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
-    restart: on-failure
-
-  map:
-    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
-    container_name: autoware-map
-    network_mode: host
-    init: true
-    ipc: host
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    volumes:
-      - ${MAP_PATH}:/autoware_map:ro
-    command: >
-      ros2 launch autoware_launch tier4_map_component.launch.xml
-      lanelet2_map_file:=${LANELET2_MAP_FILE}
-      map_path:=/autoware_map
-      pointcloud_map_file:=${POINTCLOUD_MAP_FILE}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  system:
-    image: ${VEHICLE_SYSTEM_IMAGE:-ghcr.io/autowarefoundation/openadkit:vehicle-system}
-    container_name: autoware-system
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    depends_on:
-      - map
-    command: >
-      ros2 launch autoware_launch tier4_system_component.launch.xml
-      diagnostic_graph_aggregator_graph_path:=/opt/autoware/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
-      launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
-      launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
-      sensor_model:=${SENSOR_MODEL}
-      system_run_mode:=${SYSTEM_RUN_MODE}
-      use_sim_time:=${USE_SIM_TIME}
     restart: on-failure
 
   sensing:
@@ -182,129 +192,4 @@ services:
       system_run_mode:=${SYSTEM_RUN_MODE}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  planning:
-    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
-    container_name: autoware-planning
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    depends_on:
-      - map
-      - localization
-      - perception
-      - system
-    command: >
-      ros2 launch autoware_launch tier4_planning_component.launch.xml
-      component_wise_launch:=true
-      enable_all_modules_auto_mode:=${ENABLE_ALL_MODULES_AUTO_MODE}
-      is_simulation:=${IS_SIMULATION_MODE}
-      module_preset:=${PLANNING_MODULE_PRESET}
-      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  vehicle:
-    image: ${VEHICLE_SYSTEM_IMAGE:-ghcr.io/autowarefoundation/openadkit:vehicle-system}
-    container_name: autoware-vehicle
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    depends_on:
-      - map
-      - carla-interface
-    command: >
-      ros2 launch tier4_vehicle_launch vehicle.launch.xml
-      launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE}
-      raw_vehicle_cmd_converter_param_path:=/opt/autoware/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
-      sensor_model:=${SENSOR_MODEL}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_id:=${VEHICLE_ID}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  control:
-    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
-    container_name: autoware-control
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    depends_on:
-      - map
-      - planning
-      - system
-    command: >
-      ros2 launch autoware_launch tier4_control_component.launch.xml
-      check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT}
-      component_wise_launch:=true
-      lateral_controller_mode:=${LATERAL_CONTROLLER_MODE}
-      longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE}
-      module_preset:=${CONTROL_MODULE_PRESET}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_id:=${VEHICLE_ID}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  api:
-    image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
-    container_name: autoware-api
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-    depends_on:
-      - map
-      - system
-    command: >
-      ros2 launch autoware_launch tier4_autoware_api_component.launch.xml
-      component_wise_launch:=true
-      scenario_simulation:=${SCENARIO_SIMULATION}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  visualizer:
-    image: ${VISUALIZER_IMAGE:-ghcr.io/autowarefoundation/openadkit:visualizer}
-    container_name: autoware-e2e-visualizer
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    runtime: nvidia
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
-      - RVIZ_CONFIG=${RVIZ_CONFIG}
-      - USE_SIM_TIME=${USE_SIM_TIME}
-      - REMOTE_DISPLAY=true
-      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
-      # GPU-accelerate RViz via VirtualGL when a GPU is present; the
-      # visualizer entrypoint auto-detects and falls back to software
-      # rendering otherwise (override with RVIZ_GPU=on|off).
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
-      - RVIZ_GPU=auto
-    depends_on:
-      - map
-      - api
-      - planning
-      - control
-      - carla-interface
     restart: on-failure

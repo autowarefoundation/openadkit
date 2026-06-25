@@ -91,7 +91,7 @@ To automatically set a short forward route, engage autonomous mode, and verify m
 ## Stop the Deployment
 
 ```bash
-docker compose --env-file carla-simulation.env -f docker-compose.yaml down
+docker compose --env-file ../_base/base.env --env-file carla-simulation.env -f docker-compose.yaml down
 ```
 
 ## Troubleshooting

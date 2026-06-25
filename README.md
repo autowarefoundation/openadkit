@@ -43,7 +43,7 @@ Open AD Kit includes several user-facing deployment configurations, each with it
 
 ## Images and Releases
 
-Open AD Kit publishes build-specific, release, latest-stable, and CI development image tags to GitHub Container Registry. Use stable release tags for fully pinned deployments; compose files use default ROS distro aliases for convenience. CUDA image aliases are amd64-only.
+Images are published to GitHub Container Registry.
 
 - **[Container Image Tags](https://autowarefoundation.github.io/openadkit/getting-started/image-tags/)** - Tag taxonomy, examples, and pinning guidance
 - **[Release Flow](https://autowarefoundation.github.io/openadkit/getting-started/release-flow/)** - How maintainers promote existing builds at release time
@@ -56,7 +56,6 @@ For the full docs, platform support, and development guides:
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
 - **[Supported Platforms](https://autowarefoundation.github.io/openadkit/platforms/)** - Hardware and platform support status
 - **[Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)** - Build component images locally with `docker buildx bake`
-- **[Contributing](https://autowarefoundation.github.io/openadkit/development/contributing/)** - Development workflow, DCO sign-off, and validation steps
 
 ## Contributing
 

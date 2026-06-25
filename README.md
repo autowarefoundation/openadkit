@@ -31,10 +31,6 @@ Open the noVNC visualizer at `http://localhost:6080/vnc.html` (password: `openad
 
 For artifact downloads (logging-simulation's perception models), run `./setup.sh --download-artifacts`. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
 
-## Repository Layout
-
-See [deployments/README.md](deployments/README.md) for the current deployment directory structure and [`.github/image-inventory.json`](.github/image-inventory.json) for the source-of-truth list of container images.
-
 ## Documentation
 
 For complete documentation, operational steps, and troubleshooting:
@@ -75,7 +71,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, DCO sign-of
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
-
-## Security
-
-To report a security vulnerability, please use [GitHub's private security advisory reporting](https://github.com/autowarefoundation/openadkit/security/advisories/new) rather than a public issue.

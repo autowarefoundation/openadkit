@@ -2522,6 +2522,11 @@
 <p>From the <code>planning-simulation</code> directory, start the containers:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Cloned repository</p>
+<p>If running from a cloned repository rather than a release bundle, pass both env files:
+<code>docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d</code></p>
+</div>
 <p>Wait approximately 10 seconds for the containers to initialize.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>

@@ -2579,7 +2579,7 @@
 <ul>
 <li>Verify Docker Engine is running: <code>docker info</code></li>
 <li>Check that required ports are not already in use</li>
-<li>Ensure the <code>.env</code> file exists and is correctly configured. Each <a href="../../deployment/">deployment</a> ships with its own <code>.env</code> (copied or generated during setup); confirm you are running <code>docker compose</code> from the deployment directory that contains it</li>
+<li>Ensure the correct environment file exists and is correctly configured. Each <a href="../../deployment/">deployment</a> ships with its own <code>.env</code> file (e.g. <code>planning-simulation.env</code>, <code>logging-simulation.env</code>) — confirm you are running <code>docker compose</code> from the deployment directory that contains it. If running from a cloned repository, also pass <code>--env-file ../base/base.env</code>.</li>
 </ul>
 <h3 id="permission-denied">Permission denied<a class="headerlink" href="#permission-denied" title="Permanent link">#</a></h3>
 <ul>
@@ -2597,7 +2597,7 @@
 <h3 id="visualizer-shows-blank-screen">Visualizer shows blank screen<a class="headerlink" href="#visualizer-shows-blank-screen" title="Permanent link">#</a></h3>
 <ul>
 <li>Wait 10–30 seconds for containers to fully initialize</li>
-<li>Check container logs: <code>docker compose logs -f</code></li>
+<li>Check container logs: <code>docker compose --env-file &lt;deployment&gt;.env logs -f</code> (replace <code>&lt;deployment&gt;</code> with the actual env file name, e.g. <code>planning-simulation.env</code>)</li>
 <li>Verify all required map files are present</li>
 </ul>
 <h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">#</a></h2>

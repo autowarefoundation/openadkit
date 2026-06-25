@@ -2469,7 +2469,7 @@
 </ul>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
 <ul>
-<li>An <strong>amd64 (x86_64)</strong> host running <strong>ROS 2 Humble</strong> — the <code>carla-interface</code> image is published for amd64 + Humble only (no arm64 image)</li>
+<li>An <strong>amd64 (x86_64)</strong> host with Docker — the <code>carla-interface</code> image is published for <strong>amd64 and ROS 2 Humble only</strong>; there is no arm64 image</li>
 <li>Docker Engine with the NVIDIA Container Toolkit (set up via <code>setup.sh</code>)</li>
 <li>An NVIDIA GPU — the CARLA server requires GPU rendering</li>
 <li>A working host X display (usually <code>DISPLAY=:0</code>) with X access for local containers (e.g. <code>xhost +SI:localuser:root</code>)</li>
@@ -2495,6 +2495,10 @@
 <h2 id="start-the-deployment">Start the Deployment<a class="headerlink" href="#start-the-deployment" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>./start-carla-e2e-demo.sh
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Cloned repository</p>
+<p>If running from a cloned repository, ensure you have also sourced <code>../base/base.env</code> so that shared variables such as <code>ROS_DOMAIN_ID</code> and <code>REMOTE_PASSWORD</code> are set.</p>
+</div>
 <p>The helper script:</p>
 <ul>
 <li>Downloads the official CARLA Autoware <code>Town01</code> map assets if missing</li>

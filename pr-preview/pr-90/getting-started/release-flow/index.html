@@ -2433,7 +2433,7 @@
 <div class="oak-steps">
 <ul>
 <li><strong>Build all images</strong>
-  Run <code>build-all-images</code> from <code>main</code>. Stable releases must use an Autoware <code>X.Y.Z</code> tag; pre-releases may use an Autoware tag or full 40-character SHA.</li>
+  Run the <strong><code>build-all-images</code></strong> GitHub Actions workflow from <code>main</code>. Stable releases must use an Autoware <code>X.Y.Z</code> tag; pre-releases may use an Autoware tag or full 40-character SHA.</li>
 </ul>
 <ul>
 <li><strong>Record the build tag</strong>
@@ -2441,12 +2441,12 @@
 </ul>
 <ul>
 <li><strong>Scan the images</strong>
-  Ensure <code>scan-images</code> completes successfully for that <code>build_tag</code>. Scheduled builds request scans automatically; otherwise run <code>scan-images</code> manually.
+  Ensure the <strong><code>scan-images</code></strong> GitHub Actions workflow completes successfully for that <code>build_tag</code>. Scheduled builds request scans automatically; otherwise trigger <code>scan-images</code> manually.
   Scans check images for known CVEs.</li>
 </ul>
 <ul>
 <li><strong>Promote and tag</strong>
-  Run the <code>release</code> workflow with the Open AD Kit <code>version</code> and the validated <code>build_tag</code>. This promotes the scanned images to stable release tags and updates latest aliases.</li>
+  Run the <strong><code>release</code></strong> GitHub Actions workflow with the Open AD Kit <code>version</code> and the validated <code>build_tag</code>. This promotes the scanned images to stable release tags and updates latest aliases.</li>
 </ul>
 </div>
 <pre class="mermaid"><code>flowchart LR

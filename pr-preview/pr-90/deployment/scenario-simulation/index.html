@@ -2553,6 +2553,11 @@
 </thead>
 <tbody>
 <tr>
+<td><code>SCENARIO_SIMULATION</code></td>
+<td>Enable scenario simulator mode</td>
+<td><code>true</code></td>
+</tr>
+<tr>
 <td><code>SCENARIO</code></td>
 <td>Scenario file path inside the container</td>
 <td>(bundled example)</td>
@@ -2610,6 +2615,11 @@
 <p>From the <code>scenario-simulation</code> directory, start the containers:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>scenario-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Cloned repository</p>
+<p>If running from a cloned repository rather than a release bundle, pass both env files:
+<code>docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d</code></p>
+</div>
 <p>Wait approximately <strong>90 seconds</strong> for Autoware and the scenario simulator to initialize. The scenario runner waits up to <code>SCENARIO_READY_TIMEOUT</code> seconds for required Autoware map and API endpoints before launching.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>

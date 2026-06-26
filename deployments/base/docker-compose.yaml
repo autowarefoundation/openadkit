@@ -5,6 +5,12 @@
 # `${COMPONENT_IMAGE:-<default>}` so the registry+tag lives here once; override a
 # COMPONENT_IMAGE var (e.g. for CUDA images) to swap an image without editing this
 # file. Do not run this file directly — run a deployment, which includes it.
+x-cyclonedds: &cyclonedds
+  environment:
+    - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+  volumes:
+    - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+
 services:
   map:
     image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
@@ -15,8 +21,10 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
     volumes:
       - ${MAP_PATH}:/autoware_map:ro
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     command: >
       ros2 launch autoware_launch tier4_map_component.launch.xml
       lanelet2_map_file:=${LANELET2_MAP_FILE}
@@ -36,6 +44,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
     command: >
@@ -59,6 +70,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
     command: >
@@ -81,6 +95,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
     command: >
@@ -103,6 +120,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - planning
@@ -129,10 +149,16 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
-      - map
-      - system
-      - vehicle
+      map:
+        condition: service_started
+      system:
+        condition: service_started
+      vehicle:
+        condition: service_started
     command: >
       ros2 launch autoware_launch tier4_simulator_component.launch.xml
       initial_engage_state:=${INITIAL_ENGAGE_STATE}
@@ -152,7 +178,7 @@ services:
       use_pointcloud_container:=${USE_POINTCLOUD_CONTAINER}
       vehicle_info_param_file:=/opt/autoware/share/${VEHICLE_MODEL}_description/config/vehicle_info.param.yaml
       vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
+    restart: unless-stopped
 
   api:
     image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
@@ -164,6 +190,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
     command: >
@@ -191,8 +220,11 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
       - REMOTE_DISPLAY=${REMOTE_DISPLAY}
       - REMOTE_PASSWORD=${REMOTE_PASSWORD}
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     restart: on-failure

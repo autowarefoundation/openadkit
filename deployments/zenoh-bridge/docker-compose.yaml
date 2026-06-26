@@ -23,9 +23,10 @@ services:
       - ${MAP_PATH}:/autoware_map:ro
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DISTRO=${ROS_DISTRO:-humble}
       - ROS_DOMAIN_ID=0
     command: >
-      bash -c "source /opt/ros/humble/setup.bash &&
+      bash -c "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash &&
       ros2 launch autoware_launch planning_simulator.launch.xml
       map_path:=/autoware_map
       vehicle_model:=sample_vehicle
@@ -125,7 +126,7 @@ services:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=1
     ports:
-      - "7448:7448"
+      - "${ZENOH_ROUTER_BIND_IP:-127.0.0.1}:7448:7448"
     volumes:
       - ./config:/config
     command: >

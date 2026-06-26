@@ -24,6 +24,7 @@ cd openadkit
 
 # Start the planning-simulation deployment from the source tree
 cd deployments/planning-simulation
+../scripts/fetch-sample-data.sh planning-simulation
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 

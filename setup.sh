@@ -43,7 +43,13 @@ log_warn()  { echo -e "${CLR_YELLOW}[WARN]${CLR_RESET} $*"; }
 log_error() { echo -e "${CLR_RED}[ERROR]${CLR_RESET} $*"; }
 
 require_sudo() {
-    if ! sudo -n true 2>/dev/null; then
+    if [[ $EUID -eq 0 ]]; then
+        return 0
+    fi
+
+    if [[ -t 0 ]]; then
+        sudo -v
+    elif ! sudo -n true 2>/dev/null; then
         log_error "This script requires sudo privileges."
         echo "Please run with a user that has sudo access, e.g.:"
         echo "  curl -fsSL .../setup.sh | sudo bash"

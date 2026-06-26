@@ -28,10 +28,15 @@ def build_matrices(inventory):
     distros = inventory["ros_distros"]
     images = inventory["images"]
 
-    def matrix_for(stage):
+    def matrix_for(stage, include_target=None, exclude_targets=None):
+        exclude_targets = set(exclude_targets or [])
         include = []
         for image in images:
             if image["stage"] != stage:
+                continue
+            if include_target is not None and image["target"] != include_target:
+                continue
+            if image["target"] in exclude_targets:
                 continue
             for distro in image_distros(image, distros):
                 for platform in image["platforms"]:
@@ -68,7 +73,8 @@ def build_matrices(inventory):
 
     return {
         "common_matrix": common_matrix,
-        "component_matrix": matrix_for("component"),
+        "component_matrix": matrix_for("component", exclude_targets={"carla-interface"}),
+        "carla_matrix": matrix_for("component", include_target="carla-interface"),
         "manifest_matrix": manifest_matrix,
     }
 

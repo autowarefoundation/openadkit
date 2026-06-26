@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd)
 ENV_FILE=carla-simulation.env
+BASE_ENV_FILE=../base/base.env
 PYTHON_HELPER=$SCRIPT_DIR/carla_e2e_helper.py
 DRY_RUN=false
 BUILD_IMAGE=false
@@ -74,16 +75,22 @@ run() {
 }
 
 run_compose() {
-  printf '+ docker compose --env-file ../base/base.env --env-file %s -f docker-compose.yaml %s\n' "$ENV_FILE" "$*"
+  local env_args=(--env-file "$ENV_FILE")
+  if [[ -f "$BASE_ENV_FILE" ]]; then
+    env_args=(--env-file "$BASE_ENV_FILE" "${env_args[@]}")
+  fi
+  printf '+ docker compose %s -f docker-compose.yaml %s\n' "${env_args[*]}" "$*"
   if [[ "$DRY_RUN" == false ]]; then
-    docker compose --env-file ../base/base.env --env-file "$ENV_FILE" -f docker-compose.yaml "$@"
+    docker compose "${env_args[@]}" -f docker-compose.yaml "$@"
   fi
 }
 
 load_env() {
   set -a
-  # shellcheck source=/dev/null
-  source ../base/base.env
+  if [[ -f "$BASE_ENV_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$BASE_ENV_FILE"
+  fi
   # shellcheck source=/dev/null
   source "$ENV_FILE"
   set +a

@@ -108,9 +108,10 @@ EOF
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
-    echo -e "\033[32mBrowser interface available at local address http://$(hostname -I | cut -d' ' -f1):6080/vnc.html?resize=scale&password=${REMOTE_PASSWORD}&autoconnect=true\033[0m"
+    echo -e "\033[32mBrowser interface available at local address http://$(hostname -I | cut -d' ' -f1):6080/vnc.html?resize=scale&autoconnect=true\033[0m"
+    echo -e "\033[32mUse the REMOTE_PASSWORD configured in your env file.\033[0m"
     if curl -s --head 1.1.1.1 >/dev/null 2>&1; then
-        echo -e "\033[32mIf you have a static public ip you can access it on WEB at http://$(curl -s ifconfig.me):6080/vnc.html?resize=scale&password=${REMOTE_PASSWORD}&autoconnect=true\033[0m"
+        echo -e "\033[32mIf you have a static public ip you can access it on WEB at http://$(curl -s ifconfig.me):6080/vnc.html?resize=scale&autoconnect=true\033[0m"
     else
         echo -e "\033[31mNo internet connection available\033[0m"
     fi

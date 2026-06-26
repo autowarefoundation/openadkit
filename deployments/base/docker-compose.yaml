@@ -181,6 +181,8 @@ services:
     init: true
     ipc: host
     pid: service:map
+    depends_on:
+      - map
     # Note: `ports:` is ignored under `network_mode: host`. The visualizer's
     # websockify is pinned to loopback inside its entrypoint (see
     # components/visualizer/etc/visualizer_entrypoint.sh). To expose noVNC

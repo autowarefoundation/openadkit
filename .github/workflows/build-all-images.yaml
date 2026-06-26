@@ -50,6 +50,7 @@ jobs:
       scan_requested: ${{ steps.prepare.outputs.scan_requested }}
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
+      carla_matrix: ${{ steps.inventory.outputs.carla_matrix }}
       manifest_matrix: ${{ steps.inventory.outputs.manifest_matrix }}
     steps:
       - name: Checkout OpenADKit repository
@@ -489,7 +490,6 @@ jobs:
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
             *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
@@ -509,13 +509,71 @@ jobs:
           MAX_GB: 6
         run: bash .github/scripts/prune-buildkit-cache.sh
 
+  build-carla-interface:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    needs: [prepare, build-common, build-components]
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.carla_matrix) }}
+    steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for ${{ matrix.target }}
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
+          bake-target: docker-metadata-action-${{ matrix.target }}
+          tags: |
+            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+          flavor: |
+            latest=false
+
+      - name: Build and push ${{ matrix.target }}
+        uses: docker/bake-action@v5
+        env:
+          ROS_DISTRO: ${{ matrix.ros-distro }}
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta.outputs.bake-file }}
+          targets: ${{ matrix.target }}
+          push: true
+          set: |
+            *.platform=${{ matrix.platform }}
+            *.args.ROS_DISTRO=${{ matrix.ros-distro }}
+            carla-interface.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
+            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
+            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
+            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
+            *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
+            *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
+            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
+
   # =============================================================================
   # Stage 3: Create multi-arch manifests
   # =============================================================================
   create-manifests:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    needs: [prepare, build-common, build-components]
+    needs: [prepare, build-common, build-components, build-carla-interface]
     if: ${{ !cancelled() }}
     permissions:
       contents: read

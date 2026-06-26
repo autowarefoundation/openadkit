@@ -20,6 +20,7 @@ services:
       sensor_model:=${SENSOR_MODEL}
       system_run_mode:=${SYSTEM_RUN_MODE}
       use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
 
   planning:
     depends_on:

@@ -386,9 +386,11 @@ jobs:
           done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .ref, .digest] | @tsv' release-input/build/build-metadata.json)
 
           [ "${conflicts}" -eq 0 ] || exit 1
-          echo "release_sha=${release_sha}" >> "$GITHUB_OUTPUT"
-          echo "publish_latest_aliases=${publish_latest_aliases}" >> "$GITHUB_OUTPUT"
-          echo "is_stable_release=${is_stable_release}" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_sha=${release_sha}"
+            echo "publish_latest_aliases=${publish_latest_aliases}"
+            echo "is_stable_release=${is_stable_release}"
+          } >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Upload validated release metadata
@@ -434,7 +436,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          stable_release="${STABLE_RELEASE}"
+          stable_release="${STABLE_RELEASE:-false}"
 
           available_distros=$(jq -r '.images | unique_by(.ros_distro) | map(.ros_distro) | join(" ")' release-input/build/build-metadata.json)
           echo "Available ROS distros in build: ${available_distros}"
@@ -499,8 +501,9 @@ jobs:
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
           path: src
-          # Bundle packaging only reads deployments/.
-          sparse-checkout: deployments
+          sparse-checkout: |
+            .github/scripts/install-compose.sh
+            deployments
 
       - name: Download validated release metadata
         uses: actions/download-artifact@v4
@@ -518,7 +521,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          stable_release="${STABLE_RELEASE}"
+          stable_release="${STABLE_RELEASE:-false}"
           tab=$(printf "\t")
 
           jq \
@@ -601,7 +604,7 @@ jobs:
         # The ubuntu-22.04 runner ships an older compose plugin that rejects
         # service overrides after `include:`. Install a recent release for
         # bundle validation.
-        run: bash .github/scripts/install-compose.sh
+        run: bash src/.github/scripts/install-compose.sh
 
       - name: Package deployment bundles
         run: |
@@ -646,16 +649,6 @@ jobs:
                 fi
                 cat "${tmp_base}" "${env_file}" > "${tmp}"
                 rm -f "${tmp_base}"
-                # Fold in any optional <name>.<variant>.env (e.g. logging-simulation.gpu.env)
-                # so the shipped bundle runs with one --env-file regardless of variant.
-                for variant_env in "staging/${name}/${name}."*.env; do
-                  [ -f "${variant_env}" ] || continue
-                  case "${variant_env}" in
-                    *".env.example") continue ;;
-                  esac
-                  printf '\n# --- %s ---\n' "$(basename "${variant_env}")" >> "${tmp}"
-                  cat "${variant_env}" >> "${tmp}"
-                done
                 mv "${tmp}" "${env_file}"
               fi
             fi
@@ -664,6 +657,29 @@ jobs:
             if [ -f "${env_file}" ]; then
               echo "::group::validate ${name}"
               if ( cd "staging/${name}" && docker compose --env-file "${name}.env" config -q ); then
+                echo "ok: ${name}"
+              else
+                echo "::error::invalid docker compose config in staging/${name}"
+                exit 1
+              fi
+              for variant_path in "staging/${name}/${name}."*.env; do
+                [ -f "${variant_path}" ] || continue
+                variant_env="$(basename "${variant_path}")"
+                variant="${variant_env#"${name}".}"
+                variant="${variant%.env}"
+                variant_compose="docker-compose.${variant}.yaml"
+                [ -f "staging/${name}/${variant_compose}" ] || continue
+                if ( cd "staging/${name}" && docker compose --env-file "${name}.env" --env-file "${variant_env}" -f docker-compose.yaml -f "${variant_compose}" config -q ); then
+                  echo "ok: ${name} ${variant}"
+                else
+                  echo "::error::invalid docker compose config for ${variant} variant in staging/${name}"
+                  exit 1
+                fi
+              done
+              echo "::endgroup::"
+            elif [ "${name}" = "zenoh-bridge" ] && [ -f "staging/${name}/.env" ]; then
+              echo "::group::validate ${name}"
+              if ( cd "staging/${name}" && REMOTE_PASSWORD=ci-validate docker compose --env-file .env config -q ); then
                 echo "ok: ${name}"
               else
                 echo "::error::invalid docker compose config in staging/${name}"

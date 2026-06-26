@@ -32,7 +32,7 @@ This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requ
     Append `-s -- --no-nvidia` (i.e. `… | sudo bash -s -- --no-nvidia`) if you do not have an NVIDIA GPU. Otherwise the toolkit is **highly recommended** for sensing and perception performance.
 
 !!! info "Autoware artifacts"
-    For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `setup.sh --download-artifacts` directly (no `-s` needed).
+    For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `./setup.sh --download-artifacts` from a terminal; it will prompt for sudo if needed.
 
 Each deployment is downloaded as a self-contained bundle — see [Deployments](../deployment/index.md).
 

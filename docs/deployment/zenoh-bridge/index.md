@@ -165,9 +165,10 @@ Edit the `.env` file to customize your deployment. Key variables:
 | `CLOUD_IP` | IP address or hostname of the cloud machine (used by edge bridge to connect) | `cloud_zenoh_bridge` (Docker DNS, single-host only) |
 | `MAP_PATH` | Host path to the map directory | `$HOME/autoware_map/kashiwanoha_map` |
 | `REMOTE_PASSWORD` | Password for noVNC visualizer (port 6080/6081). **Required — must be set before starting.** | (none) |
+| `ZENOH_ROUTER_BIND_IP` | Host interface for the cloud Zenoh router. Use `0.0.0.0` only when remote edge hosts must connect. | `127.0.0.1` |
 | `SCENARIO_SIMULATION` | Enable scenario simulator (`true`/`false`) | `true` |
 
-For **split topology** (multi-machine), you must set `CLOUD_IP` to the actual IP of the cloud machine. See [Option A: Split Topology](#option-a-split-topology-recommended) below.
+For **split topology** (multi-machine), set `ZENOH_ROUTER_BIND_IP=0.0.0.0` on the cloud machine and set `CLOUD_IP` on the edge machine to the actual IP of the cloud machine. Restrict TCP 7448 with a firewall, VPN, or trusted network. See [Option A: Split Topology](#option-a-split-topology-recommended) below.
 
 ## Starting the System
 
@@ -213,6 +214,8 @@ Deploy on separate machines (e.g., one Cloud, one Edge):
 export CLOUD_IP=192.168.1.100
 ./edge.sh
 ```
+
+Before starting the cloud side for a multi-machine deployment, set `ZENOH_ROUTER_BIND_IP=0.0.0.0` in `.env` or export it in the shell. This exposes TCP 7448 on the cloud host; keep it limited to trusted networks.
 
 ### Monitor Startup Logs
 

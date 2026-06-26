@@ -33,6 +33,15 @@ def test_carla_is_humble_only():
     assert ("component", "carla-interface", "jazzy") not in idx
 
 
+def test_carla_builds_after_regular_components():
+    m = r.build_matrices(INVENTORY)
+    component_targets = {entry["target"] for entry in m["component_matrix"]["include"]}
+    carla_targets = {entry["target"] for entry in m["carla_matrix"]["include"]}
+    assert "simulator" in component_targets
+    assert "carla-interface" not in component_targets
+    assert carla_targets == {"carla-interface"}
+
+
 def test_common_images_included_multiarch():
     idx = manifest_index(r.build_matrices(INVENTORY))
     assert idx[("common", "universe-common", "humble")] == "amd64 arm64"
@@ -60,4 +69,4 @@ def test_cli_emits_exactly_three_keys():
         capture_output=True, text=True, check=True,
     ).stdout
     keys = {line.split("=", 1)[0] for line in out.splitlines() if line}
-    assert keys == {"common_matrix", "component_matrix", "manifest_matrix"}
+    assert keys == {"common_matrix", "component_matrix", "carla_matrix", "manifest_matrix"}

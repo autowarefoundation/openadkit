@@ -214,4 +214,4 @@ jobs:
       - name: Run shell tests
         run: |
           bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
-          bash .github/scripts/test_report_manifests.sh
+          bash .github/scripts/tests/test_report_manifests.sh

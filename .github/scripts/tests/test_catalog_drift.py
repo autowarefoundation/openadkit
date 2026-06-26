@@ -9,6 +9,9 @@ fast instead of producing a wrong-shape artifact.
 import json
 import pathlib
 import re
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import resolve_image_matrices as r
 

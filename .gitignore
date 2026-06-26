@@ -19,6 +19,7 @@ log/
 
 # Python
 *.pyc
+__pycache__/
 
 # MkDocs
 /site/

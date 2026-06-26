@@ -3,6 +3,8 @@ import pathlib
 import subprocess
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
 import resolve_image_matrices as r
 
 INVENTORY = json.loads(pathlib.Path(".github/image-inventory.json").read_text())

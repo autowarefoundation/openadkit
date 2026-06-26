@@ -33,6 +33,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --base-paths \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_control_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch \
+        /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/universe/autoware_universe/control \
         /tmp/autoware/src/universe/autoware_universe/planning \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \

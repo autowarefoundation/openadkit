@@ -68,6 +68,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/external/pointcloud_to_laserscan \
         /tmp/autoware/src/universe/external/rtklib_ros_bridge \
         /tmp/autoware/src/universe/external/tier4_autoware_msgs \
+        /tmp/autoware/src/launcher/autoware_launch/autoware_launch \
         /tmp/autoware/src/middleware/external \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \

@@ -103,12 +103,14 @@ docker compose --env-file planning-simulation.env down
 ```mermaid
 graph LR
     subgraph Host["Single Host"]
-        PC[planning-control]
+        P[planning]
+        C[control]
         VIZ[visualizer]
     end
 
-    Map[~/autoware_map] --> PC
-    PC <-->|ROS 2 DDS| VIZ
+    Map[~/autoware_map] --> P
+    P --> C
+    P <-->|ROS 2 DDS| VIZ
 ```
 
 ## Related

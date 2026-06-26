@@ -35,10 +35,10 @@ Each release pins its ROS distro(s), and Humble and Jazzy are built while both m
 ## What "Supported" Means
 
 - **Releases** — The latest stable release is supported. Fixes (including security/CVE remediation) land in a new patch or minor release rather than being backported to older tags. Stable release tags are immutable; pin to a fully qualified `<target>-<ros_distro>-vX.Y.Z` tag for reproducible deployments.
-- **Platforms** — Support is tiered (committed / experimental / best-effort / unsupported). A variant that does not pass its build/validation gate is dropped from the support matrix rather than shipped as if it worked. See [Platform Support](../platforms/index.md) for the current, honest matrix.
+- **Platforms** — Support is tiered (committed / experimental / best-effort / unsupported). A variant that does not pass its build/validation gate is dropped from the support matrix rather than shipped as if it worked. See [Supported Platforms](../platforms/index.md) for the current, honest matrix.
 - **No certification claims** — "Supported" refers to build, deployment, and validation in a non-certified environment. Open AD Kit makes no safety-certification, functional-safety, or production-readiness claims.
 
 ## Getting Help
 
 - Questions and bug reports: [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues).
-- See also [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues) for questions and bug reports, and [Troubleshooting](troubleshooting.md).
+- See also [Troubleshooting](troubleshooting.md).

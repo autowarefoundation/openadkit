@@ -204,7 +204,7 @@ Open AD Kit tracks Autoware's architecture evolution upstream, but its own roadm
 !!! note "Roadmap"
     The 2026–2027 Open AD Kit roadmap has been ratified and is published in the repository. See the [Roadmap](../roadmap.md) for the full release ladder. Current focus areas include:
 
-    - **Containerization** — Splitting the monolithic stack into focused component images and retiring `autoware:universe` fallbacks (see deployment *Known Limitations*).
+    - **Containerization** — Splitting the monolithic stack into focused component images and retiring `autoware:universe` fallbacks (see [Logging Simulation Known Limitations](../deployment/logging-simulation/index.md#known-limitations) and [Zenoh Bridge Known Limitations](../deployment/zenoh-bridge/index.md#known-limitations)).
     - **Platform support** — Expanding verified coverage across edge and cloud targets (see [Platforms](../platforms/index.md)).
     - **Release trust and CI/CD** — Multi-architecture builds, image scanning, and a reproducible release flow (see [Release Flow](../getting-started/release-flow.md)).
 

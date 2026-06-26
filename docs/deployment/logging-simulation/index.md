@@ -126,8 +126,9 @@ docker compose --env-file logging-simulation.env --profile rosbag down
 flowchart LR
     Rosbag[Rosbag File] --> SP[sensing-perception]
     SP --> LM[localization-mapping]
-    LM --> PC[planning-control]
-    PC --> Viz[visualizer]
+    LM --> P[planning]
+    P --> C[control]
+    C --> Viz[visualizer]
 ```
 
 ## Known Limitations

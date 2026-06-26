@@ -36,11 +36,13 @@ The helper downloads map assets, starts CARLA, Autoware modules, and the RViz vi
 | `--drive` | Start + auto-engage + verify movement |
 | `--build` | Rebuild CARLA interface image before starting |
 | `--no-drive` | Explicit no-drive (default) |
+| `--skip-build` | Skip CARLA interface image rebuild (default on subsequent runs) |
+| `--skip-verify` | Skip the post-start verification checks |
+| `--no-visualizer` | Start without the noVNC visualizer |
+| `--dry-run` | Print what would happen without executing |
 
 ## Stop
 
 ```bash
 docker compose --env-file carla-simulation.env down
 ```
-
-*Cloned repo: pass `--env-file ../base/base.env` before the deployment env file.*

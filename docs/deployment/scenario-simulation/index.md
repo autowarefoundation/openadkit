@@ -129,14 +129,20 @@ docker compose --env-file scenario-simulation.env down
 ```mermaid
 graph LR
     subgraph Host["Single Host"]
-        A[autoware]
-        S[scenario_simulator]
-        V[visualizer]
+        M[localization-mapping]
+        PC[planning-control]
+        VS[vehicle-system]
+        SIM[simulator]
+        API[api]
+        VIZ[visualizer]
+        SS[scenario_simulator]
     end
 
-    Map[~/autoware_map] --> A
-    S <-->|ROS 2 DDS| A
-    A <-->|ROS 2 DDS| V
+    Map[~/autoware_map] --> M
+    M --> PC
+    SS <-->|ROS 2 DDS| SIM
+    SIM --> PC
+    PC --> VIZ
 ```
 
 ## Related

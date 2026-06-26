@@ -263,7 +263,8 @@ download_sample_data() {
     local MAP_ROOT="${AUTOWARE_MAP_DIR:-${USER_HOME}/autoware_map}"
     local TMP
     TMP="$(mktemp -d)"
-    trap 'rm -rf "$TMP"' EXIT
+    # shellcheck disable=SC2064
+    trap "rm -rf '${TMP}'" EXIT
 
     if ! command -v curl >/dev/null 2>&1; then
         log_error "'curl' is required"
@@ -480,7 +481,9 @@ run_sample_data_command() {
         esac
     done
 
-    download_sample_data "$deployment" "$force"
+    if ! download_sample_data "$deployment" "$force"; then
+        exit 1
+    fi
     log_info "Sample data installation completed."
 }
 
@@ -509,7 +512,9 @@ if [ "$DOWNLOAD_ARTIFACTS" = true ]; then
 fi
 
 if [ "$DOWNLOAD_SAMPLES" = true ]; then
-    download_sample_data all false
+    if ! download_sample_data all false; then
+        exit 1
+    fi
 fi
 
 if [ "$RUN_VERIFY" = true ]; then

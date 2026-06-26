@@ -4,7 +4,7 @@ This guide shows how to compose your own Open AD Kit deployment from OAK compone
 
 ## Prerequisites
 
-- Docker Engine (set up via `setup.sh`)
+- Docker Engine (set up via `install.sh`)
 - Optional: NVIDIA Container Toolkit (for GPU-accelerated components)
 - Optional: a deployment bundle as a starting reference — download from the [latest release](https://github.com/autowarefoundation/openadkit/releases/latest)
 

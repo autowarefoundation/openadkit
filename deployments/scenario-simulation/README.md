@@ -1,18 +1,18 @@
-# Autoware Open AD Kit Scenario Simulation
+# Open AD Kit Scenario Simulation
 
-This deployment demonstrates the Open AD Kit scenario simulation workflow with the official TIER IV Scenario Simulator container.
+This deployment runs scenario-based simulation workflows with the TIER IV Scenario Simulator.
 
 ## Documentation
 
-For **complete operational instructions** including configuration, custom scenarios, and troubleshooting, see the canonical documentation:
+For complete operational instructions, see the canonical documentation:
 
 **[Open AD Kit Docs — Scenario Simulation](https://autowarefoundation.github.io/openadkit/deployment/scenario-simulation/)**
 
-## Run It
-
-Use the canonical documentation above for the supported bundle workflow. From a
-cloned repository, this deployment also needs the shared base env first:
+## Quick Start
 
 ```bash
-docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d
+./install.sh sample-data scenario-simulation
+docker compose --env-file scenario-simulation.env up -d
 ```
+
+*Cloned repo: run `../../install.sh` instead; pass `--env-file ../base/base.env` before the deployment env file.*

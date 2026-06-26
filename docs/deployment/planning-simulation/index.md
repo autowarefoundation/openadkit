@@ -14,7 +14,7 @@ After starting the deployment, you will access a noVNC-based RViz2 visualizer in
 
 ## Prerequisites
 
-- Docker Engine (set up via `setup.sh`, below)
+- Docker Engine (set up via `install.sh`, below)
 - Planning simulation map (downloaded below)
 
 !!! tip "GPU"
@@ -27,7 +27,7 @@ No `git clone` required — set up Docker, then download the self-contained depl
 ### 1. Set up the environment (one-time)
 
 ```bash
-{{ setup_command }}
+{{ install_command }}
 ```
 
 ### 2. Download the deployment bundle
@@ -38,12 +38,12 @@ cd planning-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/planning-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/planning-simulation/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data planning-simulation` to fetch the map.
 
 ### 3. Download the demo map
 
 ```bash
-./fetch-sample-data.sh planning-simulation
+./install.sh sample-data planning-simulation
 ```
 
 !!! info "About this map"
@@ -94,7 +94,7 @@ docker compose --env-file planning-simulation.env down
 | Issue | Solution |
 |-------|----------|
 | Blank visualizer screen | Wait 10-30 seconds for containers to fully initialize, then refresh the browser |
-| `file not found` error | Re-run `./fetch-sample-data.sh planning-simulation` to (re)download the map into `~/autoware_map` |
+| `file not found` error | Re-run `./install.sh sample-data planning-simulation --force` to re-download the map into `~/autoware_map` |
 | Port 6080 in use | Stop the conflicting service (host networking binds `:6080` directly; `ports:` mappings are ignored) |
 | Vehicle does not move after setting goal | Check that the initial pose is set correctly and the map is loaded in RViz2 |
 

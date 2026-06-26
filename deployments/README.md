@@ -23,7 +23,5 @@ deployments/
 ├── scenario-simulation/
 ├── logging-simulation/
 ├── carla-simulation/         # downloads its own assets via start-carla-e2e-demo.sh
-├── zenoh-bridge/
-└── scripts/
-    └── fetch-sample-data.sh  # downloads sample maps/rosbags into ~/autoware_map
+└── zenoh-bridge/
 ```

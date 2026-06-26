@@ -1,18 +1,18 @@
-# Autoware Open AD Kit Planning Simulation
+# Open AD Kit Planning Simulation
 
-This deployment demonstrates the Open AD Kit planning simulation workflow.
+This deployment runs the Autoware planning and control stack with a pre-recorded point cloud map.
 
 ## Documentation
 
-For **complete operational instructions** including map download, startup, visualizer access, and troubleshooting, see the canonical documentation:
+For complete operational instructions, see the canonical documentation:
 
 **[Open AD Kit Docs — Planning Simulation](https://autowarefoundation.github.io/openadkit/deployment/planning-simulation/)**
 
-## Run It
-
-Use the canonical documentation above for the supported bundle workflow. From a
-cloned repository, this deployment also needs the shared base env first:
+## Quick Start
 
 ```bash
-docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
+./install.sh sample-data planning-simulation
+docker compose --env-file planning-simulation.env up -d
 ```
+
+*Cloned repo: run `../../install.sh` instead; pass `--env-file ../base/base.env` before the deployment env file.*

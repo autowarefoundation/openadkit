@@ -1,12 +1,12 @@
 """mkdocs-macros module — single-source repeated reference facts.
 
-Facts that were retyped across many pages (the setup command, the registry path,
+Facts that were retyped across many pages (the install command, the registry path,
 the default ROS distro) live here as variables, and the component image table is
 generated from the catalog (.github/image-inventory.json) so the docs cannot
 drift from what CI actually builds.
 
 Used by the `macros` plugin configured in mkdocs.yaml. Reference in any page
-under docs/ as `{{ setup_command }}`, `{{ registry }}`, `{{ default_distro }}`,
+under docs/ as `{{ install_command }}`, `{{ registry }}`, `{{ default_distro }}`,
 `{{ default_distro_title }}`, or `{{ component_table() }}`.
 """
 
@@ -29,11 +29,11 @@ DEFAULT_DISTRO = "humble"
 # PR merge refs (e.g. "42/merge") are not valid for raw.githubusercontent.com,
 # so we fall back to "main" when the ref contains a slash.
 _raw_ref = os.environ.get("GITHUB_REF_NAME", "main")
-SETUP_BRANCH = "main" if "/" in _raw_ref else _raw_ref
+INSTALL_BRANCH = "main" if "/" in _raw_ref else _raw_ref
 
-SETUP_COMMAND = (
+INSTALL_COMMAND = (
     "curl -fsSL "
-    f"https://raw.githubusercontent.com/autowarefoundation/openadkit/{SETUP_BRANCH}/setup.sh "
+    f"https://raw.githubusercontent.com/autowarefoundation/openadkit/{INSTALL_BRANCH}/install.sh "
     "| sudo bash"
 )
 
@@ -58,7 +58,7 @@ def define_env(env):
     env.variables["registry"] = REGISTRY
     env.variables["default_distro"] = DEFAULT_DISTRO
     env.variables["default_distro_title"] = DEFAULT_DISTRO.capitalize()
-    env.variables["setup_command"] = SETUP_COMMAND
+    env.variables["install_command"] = INSTALL_COMMAND
 
     @env.macro
     def component_table():

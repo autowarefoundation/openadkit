@@ -14,10 +14,10 @@ After starting the deployment and playing the rosbag, you will observe the Autow
 
 ## Prerequisites
 
-- Docker Engine (set up via `setup.sh`, below)
+- Docker Engine (set up via `install.sh`, below)
 - NVIDIA Container Toolkit **highly recommended** (for GPU-accelerated sensing and perception)
 - Logging simulation map and rosbag (downloaded below)
-- Autoware artifacts (downloaded via `setup.sh`)
+- Autoware artifacts (downloaded via `install.sh`)
 
 !!! warning "GPU Strongly Recommended"
     This deployment runs the full sensing and perception pipeline. Without a GPU, performance will be significantly degraded. An NVIDIA GPU with 4 GB+ VRAM is strongly recommended.
@@ -29,7 +29,7 @@ No `git clone` required.
 ### 1. Set up the environment + download Autoware artifacts (one-time)
 
 ```bash
-{{ setup_command }} -s -- --download-artifacts
+{{ install_command }} -s -- --download-artifacts
 ```
 
 This installs Docker / the NVIDIA Container Toolkit and downloads the perception artifacts into `${HOME}/autoware_data` (mounted into the sensing and perception containers).
@@ -42,12 +42,12 @@ cd logging-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/logging-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/logging-simulation/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data logging-simulation` to fetch the map and rosbag.
 
 ### 3. Download the demo map and rosbag
 
 ```bash
-./fetch-sample-data.sh logging-simulation
+./install.sh sample-data logging-simulation
 ```
 
 !!! info "About the rosbag"
@@ -78,7 +78,7 @@ Wait approximately 10 seconds for the containers to initialize.
       --env-file logging-simulation.env --env-file logging-simulation.gpu.env up -d
     ```
 
-    This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `setup.sh` by default).
+    This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `install.sh` by default).
 
 ## Access the Visualizer
 
@@ -115,7 +115,7 @@ docker compose --env-file logging-simulation.env --profile rosbag down
 | Issue | Solution |
 |-------|----------|
 | Containers fail to start | Verify `~/autoware_data` exists and contains the downloaded artifacts |
-| `file not found` for map/rosbag | Re-run `./fetch-sample-data.sh logging-simulation` to (re)download into `~/autoware_map` |
+| `file not found` for map/rosbag | Re-run `./install.sh sample-data logging-simulation --force` to re-download into `~/autoware_map` |
 | Very slow perception | GPU not available. Install NVIDIA Container Toolkit or reduce workload |
 | Visualizer blank | Wait 10-30 seconds for containers to initialize, then refresh |
 | No objects detected | The rosbag lacks image data. This is expected for the demo rosbag. |

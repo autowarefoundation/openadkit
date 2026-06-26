@@ -15,7 +15,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 ## Prerequisites
 
 - An **amd64 (x86_64)** host with Docker — the `carla-interface` image is published for **amd64 and ROS 2 Humble only**; there is no arm64 image
-- Docker Engine with the NVIDIA Container Toolkit (set up via `setup.sh`)
+- Docker Engine with the NVIDIA Container Toolkit (set up via `install.sh`)
 - An NVIDIA GPU — the CARLA server requires GPU rendering
 - A working host X display (usually `DISPLAY=:0`) with X access for local containers (e.g. `xhost +SI:localuser:root`)
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
@@ -30,7 +30,7 @@ No `git clone` required.
 ### 1. Set up the environment (one-time)
 
 ```bash
-{{ setup_command }}
+{{ install_command }}
 ```
 
 ### 2. Download the deployment bundle

@@ -114,7 +114,7 @@ graph TD
 
 ## Prerequisites
 
-- Docker Engine + Docker Compose (set up via `setup.sh`, below)
+- Docker Engine + Docker Compose (set up via `install.sh`, below)
 - Stable internet connection for pulling images
 
 ## Setup
@@ -122,7 +122,7 @@ graph TD
 ### 1. Set up the environment (one-time)
 
 ```bash
-{{ setup_command }}
+{{ install_command }}
 ```
 
 ### 2. Download the deployment bundle and demo map
@@ -130,11 +130,11 @@ graph TD
 ```bash
 curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz | tar xz
 cd zenoh-bridge
-./fetch-sample-data.sh zenoh-bridge
+./install.sh sample-data zenoh-bridge
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/zenoh-bridge/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/zenoh-bridge/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data zenoh-bridge` to fetch the map.
 
 ### 3. Verify Directory Structure
 
@@ -147,7 +147,7 @@ cd zenoh-bridge
 ├── edge.sh
 ├── common.sh
 ├── run_teleop.sh
-├── fetch-sample-data.sh      # included in the release bundle
+├── install.sh                # included in the release bundle
 ├── teleop/
 │   └── teleop_config.yaml
 └── config/
@@ -264,7 +264,7 @@ Log in with the password you set as `REMOTE_PASSWORD` in `.env`.
 docker compose down
 ```
 
-The map is mounted read-only from `~/autoware_map/kashiwanoha_map` on the host, so stopping the stack leaves it untouched. Re-fetch it any time with `./fetch-sample-data.sh zenoh-bridge`.
+The map is mounted read-only from `~/autoware_map/kashiwanoha_map` on the host, so stopping the stack leaves it untouched. Re-fetch it any time with `./install.sh sample-data zenoh-bridge --force`.
 
 ## Teleoperation (Optional)
 

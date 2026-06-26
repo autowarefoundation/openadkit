@@ -1,50 +1,39 @@
-# Zenoh Bridge
+# Open AD Kit Zenoh Bridge
 
-This deployment demonstrates how to bridge Autoware data from Edge to Cloud using Zenoh.
+This deployment bridges Autoware data from Edge to Cloud using Zenoh for remote visualization and control.
 
 ## Documentation
 
-For **complete architecture documentation**, setup instructions, troubleshooting, and multi-machine deployment details, see the canonical documentation:
+For complete operational instructions, see the canonical documentation:
 
 **[Open AD Kit Docs — Zenoh Bridge](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)**
 
-## Demo Video
-
-[![[openadkit x zenoh-bridge] remote control (cloud/edge) demo](https://img.youtube.com/vi/6yhhxlVQTKI/0.jpg)](https://www.youtube.com/watch?v=6yhhxlVQTKI)
-
 ## Quick Start
 
-First download the sample map (mounted by the Autoware service). From a cloned repo, use `../scripts/fetch-sample-data.sh` instead:
-
 ```bash
-./fetch-sample-data.sh zenoh-bridge
+./install.sh sample-data zenoh-bridge
 ```
 
 ### Split Topology (Recommended)
 
-Before starting, set a password for the visualizer in `.env`:
-
-```bash
-# Edit .env and set REMOTE_PASSWORD to a secure value
-```
+Set a password in `.env`, then start each side in its own terminal:
 
 ```bash
 ./edge.sh up -d
 ./cloud.sh up -d
 ```
 
-Access the visualizer at `http://localhost:6081` (use the `REMOTE_PASSWORD` set in `.env`).
+Access the visualizer at `http://localhost:6081`.
 
 ### Monolithic
 
 ```bash
-# Make sure to set REMOTE_PASSWORD in .env first
 docker compose up -d
 ```
 
-## Teleoperation Controls
+*Cloned repo: run `../../install.sh` instead; pass `--env-file ../base/base.env` before the deployment env file.*
 
-The teleop backend only runs when the cloud side is started with `--with-teleop`:
+## Teleoperation
 
 ```bash
 ./cloud.sh up --with-teleop -d
@@ -58,18 +47,3 @@ The teleop backend only runs when the cloud side is started with `--with-teleop`
 | **Z** | Toggle Auto/Local Control |
 | **Space** | Emergency Stop / Resume |
 | **Q** | Quit |
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `up -d` | Start services in background |
-| `down` | Stop and remove services |
-| `dry-run` | Preview config without starting |
-
-## Shutdown
-
-```bash
-./cloud.sh down
-./edge.sh down
-```

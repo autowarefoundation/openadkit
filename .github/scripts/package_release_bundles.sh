@@ -3,7 +3,7 @@
 set -euo pipefail
 
 source_dir="${SOURCE_DIR:-src}"
-fetch="${source_dir}/deployments/scripts/fetch-sample-data.sh"
+install="${source_dir}/install.sh"
 base_dir="${source_dir}/deployments/base"
 
 mkdir -p dist staging
@@ -20,8 +20,8 @@ for entry in \
 
   # carla-simulation downloads its own assets via start-carla-e2e-demo.sh.
   if [ "${name}" != "carla-simulation" ]; then
-    cp "${fetch}" "staging/${name}/fetch-sample-data.sh"
-    chmod +x "staging/${name}/fetch-sample-data.sh"
+    cp "${install}" "staging/${name}/install.sh"
+    chmod +x "staging/${name}/install.sh"
   fi
 
   # Base-backed deployments ship a vendored base and a single merged env file.

@@ -72,10 +72,10 @@ if [ "$CMD" == "up" ]; then
     for map_file in lanelet2_map.osm pointcloud_map.pcd; do
         if [ ! -f "${MAP_DIR}/${map_file}" ]; then
             echo -e "${RED}[Error]${NC} Map file ${map_file} not found in ${MAP_DIR}."
-            if [ -f ./fetch-sample-data.sh ]; then
-                echo -e "       Run ./fetch-sample-data.sh zenoh-bridge --force to (re-)fetch the map."
+            if [ -f ./install.sh ]; then
+                echo -e "       Run ./install.sh sample-data zenoh-bridge --force to (re-)fetch the map."
             else
-                echo -e "       Run ../../scripts/fetch-sample-data.sh zenoh-bridge --force to (re-)fetch the map."
+                echo -e "       Run ../../install.sh sample-data zenoh-bridge --force to (re-)fetch the map."
             fi
             exit 1
         fi

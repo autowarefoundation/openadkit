@@ -71,13 +71,13 @@ docker compose -f deployments/planning-simulation/docker-compose.yaml \
 # Test the full deployment flow
 curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
 cd planning-simulation
-./fetch-sample-data.sh planning-simulation
+./install.sh sample-data planning-simulation
 docker compose --env-file planning-simulation.env up -d
 ```
 
 **Note:** Until the first official release is published, use your local
 `deployments/planning-simulation/` folder (with
-`deployments/scripts/fetch-sample-data.sh`) instead of downloading the bundle.
+`../../install.sh sample-data planning-simulation`) instead of downloading the bundle.
 `carla-simulation` runs with both `../base/base.env` and `carla-simulation.env`, the same as the other deployments.
 
 For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/).

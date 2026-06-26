@@ -4,26 +4,26 @@ This guide walks you through setting up your environment and running your first 
 
 ```mermaid
 flowchart LR
-    A[Run setup.sh] --> B[Verify Installation] --> C[Download a deployment]
+    A[Run install.sh] --> B[Verify Installation] --> C[Download a deployment]
     A -.->|Optional| D["--no-nvidia"]
 ```
 
 ## Prerequisites
 
-Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on the committed host profile — **Ubuntu 22.04 (Jammy) with ROS 2 Humble**. Install everything with the included [`setup.sh`](https://github.com/autowarefoundation/openadkit/blob/main/setup.sh) script instead of following separate install guides:
+Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on the committed host profile — **Ubuntu 22.04 (Jammy) with ROS 2 Humble**. Install everything with the included [`install.sh`](https://github.com/autowarefoundation/openadkit/blob/main/install.sh) script instead of following separate install guides:
 
 | Component | When you need it | How to install |
 |-----------|------------------|----------------|
-| **Docker Engine** | All deployments | `setup.sh` (below) |
+| **Docker Engine** | All deployments | `install.sh` (below) |
 | **NVIDIA Container Toolkit** | GPU-accelerated sensing and perception | Included by default; add `--no-nvidia` to skip |
-| **Autoware artifacts** | Sensing and perception samples (for example, [Logging Simulation](../deployment/logging-simulation/index.md)) | `setup.sh --download-artifacts` |
+| **Autoware artifacts** | Sensing and perception samples (for example, [Logging Simulation](../deployment/logging-simulation/index.md)) | `install.sh --download-artifacts` |
 
 ## Set Up Your Environment
 
-`setup.sh` is self-contained — no `git clone` required. Run it directly:
+`install.sh` is self-contained — no `git clone` required. Run it directly:
 
 ```bash
-{{ setup_command }}
+{{ install_command }}
 ```
 
 This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requires sudo).
@@ -32,7 +32,7 @@ This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requ
     Append `-s -- --no-nvidia` (i.e. `… | sudo bash -s -- --no-nvidia`) if you do not have an NVIDIA GPU. Otherwise the toolkit is **highly recommended** for sensing and perception performance.
 
 !!! info "Autoware artifacts"
-    For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `./setup.sh --download-artifacts` from a terminal; it will prompt for sudo if needed.
+    For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `./install.sh --download-artifacts` from a terminal; it will prompt for sudo if needed.
 
 Each deployment is downloaded as a self-contained bundle — see [Deployments](../deployment/index.md).
 
@@ -41,7 +41,7 @@ Each deployment is downloaded as a self-contained bundle — see [Deployments](.
 
 ## Verify Your Installation
 
-After running `setup.sh`, confirm your environment is ready:
+After running `install.sh`, confirm your environment is ready:
 
 ```bash
 # Check Docker

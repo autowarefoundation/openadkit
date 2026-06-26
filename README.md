@@ -20,17 +20,17 @@ git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
 # Install Docker (and NVIDIA Container Toolkit on supported hosts)
-./setup.sh
+./install.sh
 
 # Start the planning-simulation deployment from the source tree
 cd deployments/planning-simulation
-../scripts/fetch-sample-data.sh planning-simulation
+../../install.sh sample-data planning-simulation
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
 Open the noVNC visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`).
 
-For artifact downloads (logging-simulation's perception models), run `./setup.sh --download-artifacts`. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
+For artifact downloads (logging-simulation's perception models), run `./install.sh --download-artifacts`. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
 
 ## Deployments
 

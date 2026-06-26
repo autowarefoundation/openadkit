@@ -19,9 +19,24 @@ USER_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 #### Functions ####
 print_help() {
     cat <<EOF
-Setup runtime environment for Autoware Open AD Kit
+Install Open AD Kit host dependencies and sample data.
 
-Usage: setup.sh [OPTIONS]
+Usage:
+  install.sh [OPTIONS]
+  install.sh sample-data [DEPLOYMENT] [OPTIONS]
+
+Default behavior installs host dependencies (Docker and NVIDIA Container Toolkit).
+
+Commands:
+  sample-data            Download sample maps/rosbags only; defaults to all sample data
+
+Deployments for sample-data:
+  planning-simulation    Download the planning simulation map
+  logging-simulation     Download the logging simulation map and rosbag
+  scenario-simulation    Download the Kashiwanoha scenario map
+  zenoh-bridge           Download the Kashiwanoha scenario map
+  carla-simulation       No-op; CARLA assets are handled by its launcher
+  all                    Download all non-CARLA sample data (default)
 
 Options:
   --help                  Display this help message
@@ -29,22 +44,29 @@ Options:
   --no-nvidia             Skip installation of NVIDIA container toolkit
   --download-artifacts    Download Autoware artifacts (does not skip Docker)
   --build-deps            Install tools needed to build images from source
-                          (jq, vcs2l, python3-yaml, unzip, pipx, git)
+                           (jq, vcs2l, python3-yaml, unzip, pipx, git)
   --download-samples      Download sample map/rosbag data for deployments
   --verify                Run post-install smoke tests (Docker + GPU if available)
+  --force                 Re-download sample data in sample-data mode
 
 Examples:
   # Install Docker + NVIDIA toolkit (default)
-  curl -fsSL .../setup.sh | sudo bash
+  curl -fsSL .../install.sh | sudo bash
 
   # Install Docker only (no NVIDIA)
-  curl -fsSL .../setup.sh | sudo bash -s -- --no-nvidia
+  curl -fsSL .../install.sh | sudo bash -s -- --no-nvidia
 
   # Download artifacts + install Docker
-  curl -fsSL .../setup.sh | sudo bash -s -- --download-artifacts
+  curl -fsSL .../install.sh | sudo bash -s -- --download-artifacts
 
   # Full developer environment: Docker + NVIDIA + build deps + samples + verify
-  curl -fsSL .../setup.sh | sudo bash -s -- --build-deps --download-samples --verify
+  curl -fsSL .../install.sh | sudo bash -s -- --build-deps --download-samples --verify
+
+  # Download all sample data without host setup
+  ./install.sh sample-data
+
+  # Re-download data for one deployment
+  ./install.sh sample-data planning-simulation --force
 EOF
 }
 
@@ -62,7 +84,7 @@ require_sudo() {
     elif ! sudo -n true 2>/dev/null; then
         log_error "This script requires sudo privileges."
         echo "Please run with a user that has sudo access, e.g.:"
-        echo "  curl -fsSL .../setup.sh | sudo bash"
+        echo "  curl -fsSL .../install.sh | sudo bash"
         exit 1
     fi
 }
@@ -220,7 +242,7 @@ download_autoware_artifacts() {
     ansible-playbook autoware.dev_env.download_artifacts \
         -e "data_dir=${data_dir}"
 
-    sudo chown -R "${TARGET_USER}:${TARGET_USER}" "$data_dir"
+    sudo chown -R "${TARGET_USER}:" "$data_dir"
 
     # Clean up clone
     rm -rf "$autoware_tmp"
@@ -229,17 +251,24 @@ download_autoware_artifacts() {
 }
 
 download_sample_data() {
+    local deployment="${1:-all}"
+    local force="${2:-false}"
+
     log_info "Downloading sample map/rosbag data for deployments..."
 
-    # Self-contained sample data fetcher.
-    # These URLs and checksums mirror deployments/scripts/fetch-sample-data.sh.
-    # When updating either file, keep them in sync.
+    # Self-contained sample data fetcher used by host setup and release bundles.
     local S3_BASE="https://autoware-files.s3.us-west-2.amazonaws.com"
     local TIER4_TAG="25.0.20"
     local TIER4_RAW="https://raw.githubusercontent.com/tier4/scenario_simulator_v2/${TIER4_TAG}/map/kashiwanoha_map/map"
     local MAP_ROOT="${AUTOWARE_MAP_DIR:-${USER_HOME}/autoware_map}"
     local TMP
     TMP="$(mktemp -d)"
+    trap 'rm -rf "$TMP"' EXIT
+
+    if ! command -v curl >/dev/null 2>&1; then
+        log_error "'curl' is required"
+        return 1
+    fi
 
     # ---- helpers ----
     sha256_verify() {
@@ -260,9 +289,13 @@ download_sample_data() {
 
     fetch_zip() {
         local url="$1" sum="$2" name="$3" target="${MAP_ROOT}/$3"
-        if [ -d "$target" ]; then
+        if [ "$force" != true ] && [ -d "$target" ]; then
             log_info "$name already present at $target (use --force to re-download)"
             return 0
+        fi
+        if ! command -v unzip >/dev/null 2>&1; then
+            log_error "'unzip' is required"
+            return 1
         fi
         log_info "Downloading $name ..."
         curl -fL --retry 3 -o "${TMP}/${name}.zip" "$url"
@@ -274,8 +307,8 @@ download_sample_data() {
 
     fetch_kashiwanoha() {
         local target="${MAP_ROOT}/kashiwanoha_map"
-        if [ -d "$target" ]; then
-            log_info "kashiwanoha_map already present at $target"
+        if [ "$force" != true ] && [ -d "$target" ]; then
+            log_info "kashiwanoha_map already present at $target (use --force to re-download)"
             return 0
         fi
         log_info "Downloading kashiwanoha_map (tier4 scenario_simulator_v2 @ ${TIER4_TAG}) ..."
@@ -293,30 +326,53 @@ download_sample_data() {
         log_info "kashiwanoha_map -> $target"
     }
 
-    # ---- planning-simulation ----
-    fetch_zip \
-        "${S3_BASE}/maps/demos/sample-map-planning.zip" \
-        "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9" \
-        "sample-map-planning"
+    fetch_planning_simulation() {
+        fetch_zip \
+            "${S3_BASE}/maps/demos/sample-map-planning.zip" \
+            "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9" \
+            "sample-map-planning"
+    }
 
-    # ---- logging-simulation ----
-    fetch_zip \
-        "${S3_BASE}/maps/demos/sample-map-rosbag.zip" \
-        "07e2da0b0bf12e2324f7083c2ce5556fb8044c50cef1da6428ab9084c3903bc8" \
-        "sample-map-rosbag"
-    fetch_zip \
-        "${S3_BASE}/recordings/bags/demos/sample-rosbag.zip" \
-        "5f9d36353393b3d249212153c19049822b1298db56512aa045b4f7f6fc37cf88" \
-        "sample-rosbag"
-    mkdir -p "${USER_HOME}/autoware_data"
-    chown "${TARGET_USER}:${TARGET_USER}" "${USER_HOME}/autoware_data" 2>/dev/null || true
-    log_info "NOTE: logging-simulation also needs Autoware perception artifacts in ~/autoware_data"
-    log_info "      (download them with: setup.sh --download-artifacts)."
+    fetch_logging_simulation() {
+        fetch_zip \
+            "${S3_BASE}/maps/demos/sample-map-rosbag.zip" \
+            "07e2da0b0bf12e2324f7083c2ce5556fb8044c50cef1da6428ab9084c3903bc8" \
+            "sample-map-rosbag"
+        fetch_zip \
+            "${S3_BASE}/recordings/bags/demos/sample-rosbag.zip" \
+            "5f9d36353393b3d249212153c19049822b1298db56512aa045b4f7f6fc37cf88" \
+            "sample-rosbag"
+        mkdir -p "${USER_HOME}/autoware_data"
+        chown "${TARGET_USER}:" "${USER_HOME}/autoware_data" 2>/dev/null || true
+        log_info "NOTE: logging-simulation also needs Autoware perception artifacts in ~/autoware_data"
+        log_info "      (download them with: install.sh --download-artifacts)."
+    }
 
-    # ---- scenario-simulation + zenoh-bridge ----
-    fetch_kashiwanoha
+    case "$deployment" in
+        all|"")
+            fetch_planning_simulation
+            fetch_logging_simulation
+            fetch_kashiwanoha
+            ;;
+        planning-simulation)
+            fetch_planning_simulation
+            ;;
+        logging-simulation)
+            fetch_logging_simulation
+            ;;
+        scenario-simulation|zenoh-bridge)
+            fetch_kashiwanoha
+            ;;
+        carla-simulation)
+            log_info "carla-simulation downloads its assets via deployments/carla-simulation/start-carla-e2e-demo.sh."
+            return 0
+            ;;
+        *)
+            log_error "Unknown deployment for sample-data: $deployment"
+            return 1
+            ;;
+    esac
 
-    rm -rf "$TMP"
     log_info "Sample data downloaded to ${MAP_ROOT}."
 }
 
@@ -376,6 +432,11 @@ parse_args() {
                 RUN_VERIFY=true
                 shift
                 ;;
+            --force)
+                log_error "--force is only valid with: install.sh sample-data [DEPLOYMENT] --force"
+                print_help
+                exit 1
+                ;;
             *)
                 log_error "Unknown option: $1"
                 print_help
@@ -385,7 +446,50 @@ parse_args() {
     done
 }
 
+run_sample_data_command() {
+    local deployment="all"
+    local deployment_set="false"
+    local force="false"
+
+    shift
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help|-h)
+                print_help
+                exit 0
+                ;;
+            --force)
+                force=true
+                shift
+                ;;
+            -*)
+                log_error "Unknown sample-data option: $1"
+                print_help
+                exit 1
+                ;;
+            *)
+                if [ "$deployment_set" = true ]; then
+                    log_error "Unexpected sample-data argument: $1"
+                    print_help
+                    exit 1
+                fi
+                deployment="$1"
+                deployment_set=true
+                shift
+                ;;
+        esac
+    done
+
+    download_sample_data "$deployment" "$force"
+    log_info "Sample data installation completed."
+}
+
 #### Main ####
+if [[ "${1:-}" == "sample-data" ]]; then
+    run_sample_data_command "$@"
+    exit 0
+fi
+
 parse_args "$@"
 require_sudo
 check_os
@@ -405,14 +509,14 @@ if [ "$DOWNLOAD_ARTIFACTS" = true ]; then
 fi
 
 if [ "$DOWNLOAD_SAMPLES" = true ]; then
-    download_sample_data
+    download_sample_data all false
 fi
 
 if [ "$RUN_VERIFY" = true ]; then
     verify_installation
 fi
 
-log_info "Setup completed."
+log_info "Installation completed."
 
 # If Docker was freshly installed, remind the user about group membership.
 # For non-interactive / pipe usage we can't newgrp, so print a clear note.

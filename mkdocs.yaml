@@ -73,7 +73,7 @@ plugins:
         deployments/samples/index.md: deployment/index.md
         deployments/demos/index.md: deployment/index.md
         deployments/index.md: deployment/index.md
-        contributing/index.md: development/contributing/index.md
+        contributing/index.md: development/contributing.md
         hardware/index.md: platforms/hardware/index.md
         tools/index.md: development/index.md
         deployment/samples/planning-simulation/index.md: deployment/planning-simulation/index.md

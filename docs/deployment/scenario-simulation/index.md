@@ -14,7 +14,7 @@ After starting the deployment, the scenario simulator generates a virtual traffi
 
 ## Prerequisites
 
-- Docker Engine (set up via `setup.sh`, below)
+- Docker Engine (set up via `install.sh`, below)
 
 !!! warning "Use the Correct Map"
     Do **not** use the `sample-map-planning` map with this deployment. The Kashiwanoha map is required. Using a different map will cause `setMap() for invalid version map`, missing route/localization, and repeated MRM transitions.
@@ -26,7 +26,7 @@ No `git clone` required.
 ### 1. Set up the environment (one-time)
 
 ```bash
-{{ setup_command }}
+{{ install_command }}
 ```
 
 ### 2. Download the deployment bundle
@@ -37,12 +37,12 @@ cd scenario-simulation
 ```
 
 !!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/scenario-simulation/` folder from a cloned repository instead.
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/scenario-simulation/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data scenario-simulation` to fetch the map.
 
 ### 3. Download the Kashiwanoha map
 
 ```bash
-./fetch-sample-data.sh scenario-simulation
+./install.sh sample-data scenario-simulation
 ```
 
 ## Configuration
@@ -119,7 +119,7 @@ docker compose --env-file scenario-simulation.env down
 
 | Issue | Solution |
 |-------|----------|
-| Scenario does not start | Ensure the map was fetched: re-run `./fetch-sample-data.sh scenario-simulation` |
+| Scenario does not start | Ensure the map was fetched: re-run `./install.sh sample-data scenario-simulation --force` |
 | `setMap() for invalid version map` | You are using the wrong map. Ensure Kashiwanoha is extracted, not `sample-map-planning` |
 | Visualizer blank | Wait up to 90 seconds for full initialization; containers depend on each other sequentially |
 | Missing results | Verify `OUTPUT_HOST_PATH` exists and is writable |

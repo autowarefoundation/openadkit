@@ -102,6 +102,7 @@ services:
       - map
     command: >
       ros2 launch autoware_launch tier4_system_component.launch.xml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/autoware-main.yaml
       launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
       launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
       sensor_model:=${SENSOR_MODEL}

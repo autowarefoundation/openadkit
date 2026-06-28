@@ -7,11 +7,11 @@ services:
   # Overrides on base services (merged onto the base definitions).
   system:
     volumes:
-      - ./config/mrm_handler.param.yaml:/opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro
+      - ./config/mrm_handler.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro
 
   api:
     volumes:
-      - ./config/default_adapi.param.yaml:/opt/autoware/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro
+      - ./config/default_adapi.param.yaml:/opt/autoware/autoware_default_adapi_universe/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro
 
   # Scenario-only service.
   scenario_simulator:
@@ -92,6 +92,7 @@ services:
           launch_rviz:=${LAUNCH_RVIZ} \
           launch_visualization:=${LAUNCH_VISUALIZATION} \
           output_directory:=${OUTPUT_DIRECTORY} \
+          port:=${SCENARIO_SIMULATOR_PORT} \
           record:=${RECORD} \
           scenario:="$1" \
           sensor_model:=${SENSOR_MODEL} \

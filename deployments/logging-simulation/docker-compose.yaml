@@ -15,8 +15,10 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - system
@@ -40,8 +42,10 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - system
@@ -54,6 +58,7 @@ services:
       occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
       perception_mode:=${PERCEPTION_MODE}
       pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_traffic_light_recognition:=${USE_TRAFFIC_LIGHT_RECOGNITION}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
     restart: on-failure
@@ -68,6 +73,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - system

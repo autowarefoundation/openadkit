@@ -33,12 +33,25 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --base-paths \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_simulator_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_launch \
         /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/universe/autoware_universe/simulator \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_shape_estimation \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_multi_object_tracker \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_crosswalk_traffic_light_estimator \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_elevation_map_loader \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_detected_object_feature_remover \
+        /tmp/autoware/src/universe/autoware_universe/perception/perception_utils \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_arbiter \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_category_merger \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_classifier \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_fine_detector \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_multi_camera_fusion \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_selector \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_visualization \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_common \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_probabilistic_occupancy_grid_map \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_map_based_prediction \

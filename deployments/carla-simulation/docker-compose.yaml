@@ -14,7 +14,7 @@ services:
   system:
     command: >
       ros2 launch autoware_launch tier4_system_component.launch.xml
-      diagnostic_graph_aggregator_graph_path:=/opt/autoware/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
       launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
       launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
       sensor_model:=${SENSOR_MODEL}
@@ -45,6 +45,7 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
       - REMOTE_DISPLAY=true
@@ -52,6 +53,8 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
       - RVIZ_GPU=auto
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - api
@@ -69,7 +72,6 @@ services:
     runtime: nvidia
     environment:
       - DISPLAY=${CARLA_DISPLAY}
-      - SDL_VIDEODRIVER=x11
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,display
       - VK_ICD_FILENAMES=${CARLA_VK_ICD_CONTAINER_PATH}
@@ -78,6 +80,7 @@ services:
       - ${CARLA_VK_ICD_HOST_PATH}:${CARLA_VK_ICD_CONTAINER_PATH}:ro
     command: >
       /bin/bash ./CarlaUE4.sh
+      ${CARLA_RENDER_ARGS}
       -windowed
       -vulkan
       -nosound
@@ -88,6 +91,12 @@ services:
       -world-port=${CARLA_WORLD_PORT}
       -stdout
       -FullStdOutLogOutput
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/127.0.0.1/${CARLA_RPC_PORT}'"]
+      interval: 5s
+      timeout: 2s
+      retries: 60
+      start_period: 30s
     restart: on-failure
 
   carla-interface:
@@ -99,10 +108,13 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
     volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ./sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
     depends_on:
-      - carla
+      carla-map-loader:
+        condition: service_completed_successfully
     command: >
       ros2 launch autoware_carla_interface autoware_carla_interface.launch.xml
       host:=${CARLA_RPC_HOST}
@@ -112,6 +124,25 @@ services:
       sensor_kit_name:=carla_sensor_kit_description
       sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
     restart: on-failure
+
+  carla-map-loader:
+    image: ${CARLA_INTERFACE_IMAGE:-ghcr.io/autowarefoundation/openadkit:carla-interface}
+    container_name: ${CARLA_MAP_LOADER_CONTAINER}
+    network_mode: host
+    init: true
+    ipc: host
+    environment:
+      - CARLA_RPC_HOST=${CARLA_RPC_HOST}
+      - CARLA_RPC_PORT=${CARLA_RPC_PORT}
+      - CARLA_WORLD=${CARLA_WORLD}
+      - CARLA_LOAD_TIMEOUT=${CARLA_LOAD_TIMEOUT}
+    volumes:
+      - ./load-carla-map.py:/autoware_config/load-carla-map.py:ro
+    depends_on:
+      carla:
+        condition: service_healthy
+    command: python3 /autoware_config/load-carla-map.py
+    restart: "no"
 
   sensing:
     image: ${SENSING_PERCEPTION_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception}
@@ -124,8 +155,11 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - carla-interface
@@ -151,10 +185,12 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - sensing
@@ -183,6 +219,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - sensing

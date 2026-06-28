@@ -33,6 +33,8 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --base-paths \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_vehicle_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_launch \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch \

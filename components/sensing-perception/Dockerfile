@@ -26,6 +26,8 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       --dependency-types=buildtool --dependency-types=buildtool_export \
       --dependency-types=test
 
+# The CPU build skips this CUDA package, but upstream launch still resolves its
+# package share path while declaring defaults with CUDA disabled.
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
@@ -34,6 +36,25 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --base-paths ${COLCON_BASE_PATHS} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+    pkg_prefix=/opt/autoware/autoware_ground_segmentation_cuda && \
+    install -d \
+      "${pkg_prefix}/share/ament_index/resource_index/packages" \
+      "${pkg_prefix}/share/autoware_ground_segmentation_cuda" \
+      "${pkg_prefix}/share/colcon-core/packages" && \
+    touch "${pkg_prefix}/share/ament_index/resource_index/packages/autoware_ground_segmentation_cuda" && \
+    : > "${pkg_prefix}/share/colcon-core/packages/autoware_ground_segmentation_cuda" && \
+    printf '%s\n' \
+      'source;share/autoware_ground_segmentation_cuda/local_setup.dsv' \
+      > "${pkg_prefix}/share/autoware_ground_segmentation_cuda/package.dsv" && \
+    printf '%s\n' \
+      'prepend-non-duplicate;AMENT_PREFIX_PATH;' \
+      'prepend-non-duplicate;CMAKE_PREFIX_PATH;' \
+      > "${pkg_prefix}/share/autoware_ground_segmentation_cuda/local_setup.dsv" && \
+    cp -r \
+      /tmp/autoware/src/universe/autoware_universe/perception/autoware_ground_segmentation_cuda/config \
+      /tmp/autoware/src/universe/autoware_universe/perception/autoware_ground_segmentation_cuda/launch \
+      /tmp/autoware/src/universe/autoware_universe/perception/autoware_ground_segmentation_cuda/package.xml \
+      "${pkg_prefix}/share/autoware_ground_segmentation_cuda/" && \
     rm -rf build log
 
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \

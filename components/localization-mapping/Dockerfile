@@ -31,6 +31,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     . /opt/autoware/setup.sh && \
     colcon build \
       --base-paths \
+        /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_map_launch \
         /tmp/autoware/src/universe/autoware_universe/localization \

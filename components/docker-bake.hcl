@@ -51,6 +51,12 @@ function "sensing_base_paths" {
   result = join(" ", [
     "/tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch",
     "/tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description",
     "/tmp/autoware/src/universe/external/trt_batched_nms",
     "/tmp/autoware/src/universe/external/bevdet_vendor",
     "/tmp/autoware/src/universe/external/cuda_blackboard",

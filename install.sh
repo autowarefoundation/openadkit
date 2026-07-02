@@ -103,8 +103,8 @@ check_os() {
         exit 1
     fi
 
-    if [[ "${VERSION_ID:-}" != "22.04" ]]; then
-        log_warn "Untested Ubuntu version: ${VERSION_ID:-unknown}. Validated on 22.04 (Jammy). Continuing anyway."
+    if [[ "${VERSION_ID:-}" != "22.04" && "${VERSION_ID:-}" != "24.04" ]]; then
+        log_warn "Untested Ubuntu version: ${VERSION_ID:-unknown}. Validated on 22.04 (Jammy) and 24.04 (Noble). Continuing anyway."
     fi
 }
 

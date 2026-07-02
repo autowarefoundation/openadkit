@@ -380,9 +380,9 @@ download_sample_data() {
 verify_installation() {
     log_info "Running post-install verification..."
 
-    # Verify Docker is usable in the current session
-    if ! sg docker -c "docker run --rm hello-world" &>/dev/null; then
-        log_error "Docker verification failed. Ensure your user is in the 'docker' group and the Docker daemon is running."
+    # Verify Docker is usable. The script runs with sudo, so docker is accessible.
+    if ! docker run --rm hello-world &>/dev/null; then
+        log_error "Docker verification failed. Ensure the Docker daemon is running."
         return 1
     fi
     log_info "Docker smoke test passed."
@@ -390,8 +390,8 @@ verify_installation() {
     # Verify NVIDIA runtime if requested and GPU is available
     if [ "$INSTALL_NVIDIA" = true ] && command -v nvidia-smi &>/dev/null; then
         log_info "Pulling NVIDIA CUDA test image for GPU verification..."
-        if sg docker -c "docker pull nvidia/cuda:12.2.0-base-ubuntu22.04" &>/dev/null; then
-            if sg docker -c "docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi" &>/dev/null; then
+        if docker pull nvidia/cuda:12.2.0-base-ubuntu22.04 &>/dev/null; then
+            if docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
                 log_info "NVIDIA GPU runtime verification passed."
             else
                 log_warn "NVIDIA GPU runtime verification failed. GPU containers may not work."
@@ -524,10 +524,17 @@ fi
 log_info "Installation completed."
 
 # If Docker was freshly installed, remind the user about group membership.
-# For non-interactive / pipe usage we can't newgrp, so print a clear note.
-if ! sg docker -c "docker version" &>/dev/null; then
+# The non-interactive / pipe usage can't newgrp, so print a clear note.
+if ! sudo -u "$TARGET_USER" docker version &>/dev/null; then
     log_warn "Your user is in the 'docker' group, but the change is not active in this shell."
     log_warn "Run the following command to use Docker without sudo in the current terminal:"
     echo "  newgrp docker"
     log_warn "Or log out and log back in for the change to take effect globally."
+fi
+
+# Remind about pipx binaries (vcs, etc.) if not on PATH.
+PIPX_BIN_DIR="${USER_HOME}/.local/bin"
+if ! command -v vcs &>/dev/null && [ -x "${PIPX_BIN_DIR}/vcs" ]; then
+    log_info "Run 'export PATH=\"\$HOME/.local/bin:\$PATH\"' to use vcs in this shell,"
+    log_info "or log out and back in for the change to take effect globally."
 fi

@@ -56,25 +56,57 @@ install tree.
 
 ## Building
 
-Local builds resolve cross-stage references within a single Bake graph. First
-prepare the Autoware source tree in the repository root, matching the shape CI
-uses:
+### End-to-End Workflow
+
+The following steps take you from a fresh clone to a running deployment using
+locally built images.
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
-# Import the upstream Autoware sources used by component Dockerfiles
+# 2. Install vcs2l (imports Autoware source for component Dockerfiles)
 pipx install vcs2l
+export PATH="$HOME/.local/bin:$PATH"
+
+# 3. Import Autoware sources
 git clone --depth 1 https://github.com/autowarefoundation/autoware.git
 mkdir -p autoware/src
 vcs import --shallow autoware/src < autoware/repositories/autoware.repos
 mkdir -p autoware/src/middleware/external
 touch autoware/src/middleware/external/.keep
+
+# 4. Build the universe-common base intermediate (~2 hours)
+docker buildx bake -f components/docker-bake.hcl universe-common
+
+# 5. Build and tag all component images (~2 hours)
+docker buildx bake -f components/docker-bake.hcl \
+  --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception \
+  --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping \
+  --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control \
+  --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system \
+  --set api.tags=ghcr.io/autowarefoundation/openadkit:api \
+  --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer \
+  --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator \
+  --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda \
+  --load \
+  component
+
+# 6. Start a deployment
+./install.sh sample-data planning-simulation
+cd deployments/planning-simulation
+docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
-Then build any group or target directly:
+The `--load` flag makes images available in the local Docker store (without it,
+Bake only populates the BuildKit cache).
+
+### Build Targets (Reference)
+
+To build only specific targets or groups, pass the group or target name as an
+argument to Bake. Local builds resolve cross-stage references within a single
+Bake graph.
 
 ```bash
 # Build everything (universe-common + all components)
@@ -86,12 +118,14 @@ docker buildx bake -f components/docker-bake.hcl universe-common
 # Build the component group
 docker buildx bake -f components/docker-bake.hcl component
 
-# Build a single component and load it into the local Docker image store
+# Build a single component
 docker buildx bake -f components/docker-bake.hcl \
   --set sensing-perception.tags=openadkit:sensing-perception \
   --load \
   sensing-perception
 ```
+
+### Build Variables
 
 The Bake file exposes a few variables, overridable via environment variables:
 

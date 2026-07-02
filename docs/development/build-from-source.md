@@ -66,21 +66,29 @@ locally built images.
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
-# 2. Install vcs2l (imports Autoware source for component Dockerfiles)
+# 2. Install host dependencies and sample data
+./install.sh --build-deps --download-samples --verify
+```
+
+Log out and back in (or run `newgrp docker`) for the docker group change to take
+effect, then continue:
+
+```bash
+# 3. Install vcs2l (imports Autoware source for component Dockerfiles)
 pipx install vcs2l
 export PATH="$HOME/.local/bin:$PATH"
 
-# 3. Import Autoware sources
+# 4. Import Autoware sources
 git clone --depth 1 https://github.com/autowarefoundation/autoware.git
 mkdir -p autoware/src
 vcs import --shallow autoware/src < autoware/repositories/autoware.repos
 mkdir -p autoware/src/middleware/external
 touch autoware/src/middleware/external/.keep
 
-# 4. Build the universe-common base intermediate (~2 hours)
+# 5. Build the universe-common base intermediate (~2 hours)
 docker buildx bake -f components/docker-bake.hcl universe-common
 
-# 5. Build and tag all component images (~2 hours)
+# 6. Build and tag all component images (~2 hours)
 docker buildx bake -f components/docker-bake.hcl \
   --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception \
   --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping \
@@ -93,7 +101,7 @@ docker buildx bake -f components/docker-bake.hcl \
   --load \
   component
 
-# 6. Start a deployment
+# 7. Start a deployment
 ./install.sh sample-data planning-simulation
 cd deployments/planning-simulation
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d

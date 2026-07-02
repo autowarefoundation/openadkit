@@ -19,6 +19,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 - An NVIDIA GPU — the CARLA server requires GPU rendering
 - A working host X display (usually `DISPLAY=:0`) with X access for local containers (e.g. `xhost +SI:localuser:root`)
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
+- **Ubuntu 22.04** — CARLA 0.9.16 is built on Unreal Engine 4.26, which has not been tested on Ubuntu 24.04. Users on 24.04 may encounter segfaults (Signal 11) at startup. See the [CARLA build docs](https://carla.readthedocs.io/en/0.9.16/build_linux) for details.
 
 !!! warning "GPU Required"
     Unlike the other deployments, CARLA itself is GPU-rendered. This deployment does not run on CPU-only machines.

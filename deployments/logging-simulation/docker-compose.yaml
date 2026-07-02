@@ -98,7 +98,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
     volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${ROSBAG_PATH}:/autoware_map/rosbag:ro
     command: >
       bash -c "ros2 bag info /autoware_map/rosbag -s ${ROSBAG_FORMAT} &&

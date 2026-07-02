@@ -5,12 +5,6 @@
 # `${COMPONENT_IMAGE:-<default>}` so the registry+tag lives here once; override a
 # COMPONENT_IMAGE var (e.g. for CUDA images) to swap an image without editing this
 # file. Do not run this file directly — run a deployment, which includes it.
-x-cyclonedds: &cyclonedds
-  environment:
-    - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
-  volumes:
-    - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
-
 services:
   map:
     image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
@@ -128,16 +122,22 @@ services:
       - map
       - planning
       - system
-    command: >
-      ros2 launch autoware_launch tier4_control_component.launch.xml
-      check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT}
-      component_wise_launch:=true
-      lateral_controller_mode:=${LATERAL_CONTROLLER_MODE}
-      longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE}
-      module_preset:=${CONTROL_MODULE_PRESET}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_id:=${VEHICLE_ID}
-      vehicle_model:=${VEHICLE_MODEL}
+    command:
+      - bash
+      - -lc
+      - |
+        sed -i "s/use_emergency_handling: true/use_emergency_handling: false/g" \
+          /opt/autoware/autoware_vehicle_cmd_gate/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml \
+          /opt/autoware/autoware_launch/share/autoware_launch/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml
+        exec ros2 launch autoware_launch tier4_control_component.launch.xml \
+          check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT} \
+          component_wise_launch:=true \
+          lateral_controller_mode:=${LATERAL_CONTROLLER_MODE} \
+          longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE} \
+          module_preset:=${CONTROL_MODULE_PRESET} \
+          use_sim_time:=${USE_SIM_TIME} \
+          vehicle_id:=${VEHICLE_ID} \
+          vehicle_model:=${VEHICLE_MODEL}
     restart: on-failure
 
   simulator:

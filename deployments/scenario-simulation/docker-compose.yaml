@@ -24,7 +24,9 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
     volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${OUTPUT_HOST_PATH}:${OUTPUT_DIRECTORY}
       - ${SCENARIO_HOST_DIR}:/scenarios:ro
       - ${MAP_PATH}:/autoware_map:ro

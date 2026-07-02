@@ -29,7 +29,8 @@ for entry in \
   if [ -f "${compose}" ] && grep -q '\.\./base/docker-compose\.yaml' "${compose}"; then
     mkdir -p "staging/${name}/base"
     cp "${base_dir}/docker-compose.yaml" "staging/${name}/base/docker-compose.yaml"
-    sed -i 's#\.\./base/docker-compose\.yaml#base/docker-compose.yaml#' "${compose}"
+    cp "${base_dir}/cyclonedds.xml" "staging/${name}/base/cyclonedds.xml"
+    sed -i 's#\.\./base/#base/#' "${compose}"
     env_file="staging/${name}/${name}.env"
     if [ -f "${env_file}" ]; then
       tmp="$(mktemp)"

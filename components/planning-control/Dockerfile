@@ -78,7 +78,4 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     rosdep install -y --from-paths /tmp /opt/autoware/*/share \
       --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/* && \
-    sed -i 's/use_emergency_handling: true/use_emergency_handling: false/g' \
-      /opt/autoware/autoware_vehicle_cmd_gate/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml \
-      /opt/autoware/autoware_launch/share/autoware_launch/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml
+    rm -rf /tmp/*

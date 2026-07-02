@@ -380,8 +380,10 @@ download_sample_data() {
 verify_installation() {
     log_info "Running post-install verification..."
 
-    # Verify Docker is usable. The script runs with sudo, so docker is accessible.
-    if ! docker run --rm hello-world &>/dev/null; then
+    # Verify Docker is usable. The script has sudo access (via require_sudo), so
+    # use sudo for docker commands — the target user may not be in the docker
+    # group until the next login.
+    if ! sudo docker run --rm hello-world &>/dev/null; then
         log_error "Docker verification failed. Ensure the Docker daemon is running."
         return 1
     fi
@@ -390,8 +392,8 @@ verify_installation() {
     # Verify NVIDIA runtime if requested and GPU is available
     if [ "$INSTALL_NVIDIA" = true ] && command -v nvidia-smi &>/dev/null; then
         log_info "Pulling NVIDIA CUDA test image for GPU verification..."
-        if docker pull nvidia/cuda:12.2.0-base-ubuntu22.04 &>/dev/null; then
-            if docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
+        if sudo docker pull nvidia/cuda:12.2.0-base-ubuntu22.04 &>/dev/null; then
+            if sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
                 log_info "NVIDIA GPU runtime verification passed."
             else
                 log_warn "NVIDIA GPU runtime verification failed. GPU containers may not work."

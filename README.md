@@ -22,6 +22,9 @@ cd openadkit
 # Install Docker (and NVIDIA Container Toolkit on supported hosts)
 ./install.sh
 
+# Activate the docker group (or log out and back in)
+newgrp docker
+
 # Start the planning-simulation deployment from the source tree
 cd deployments/planning-simulation
 ../../install.sh sample-data planning-simulation

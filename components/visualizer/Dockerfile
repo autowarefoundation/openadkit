@@ -95,7 +95,7 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     rm -f /tmp/virtualgl.deb
 
 # Need to expose VNC and NoVNC ports when running the container.
-EXPOSE 5900 6080
+EXPOSE 5999 6080
 
 # Add source commands to bash startup.
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \

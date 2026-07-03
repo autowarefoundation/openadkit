@@ -15,6 +15,7 @@ on:
       - "**/*.png"
       - "**/*.jpg"
       - "docs/assets/**"
+      - ".github/actions/build-docs/**"
   release:
     types:
       - published

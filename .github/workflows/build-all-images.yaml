@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
+      - '.github/actions/inject-ccache/**'
       - '.github/image-inventory.json'
       - '.github/scripts/**'
       - '.github/workflows/build-all-images.yaml'
@@ -613,7 +614,7 @@ jobs:
   notify-failure:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [prepare, build-common, build-components, create-manifests, capture-metadata]
+    needs: [prepare, build-common, build-components, build-carla-interface, create-manifests, capture-metadata]
     if: failure() && github.event_name == 'schedule'
     permissions:
       issues: write

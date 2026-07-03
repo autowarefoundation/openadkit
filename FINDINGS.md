@@ -5,6 +5,7 @@
 `diagnostic_graph_aggregator`'s `aggregator_node` should publish `/system/command_mode/availability` based on component health states, but it does not start in the system container. Without this topic, RViz never enables the "Auto" button because the upstream converter and AD API nodes see no availability data.
 
 This is an **upstream Autoware issue** — the `diagnostic_graph_aggregator` comes from `autoware_universe/system` and its launch integration is not owned by this repository. A fix requires either:
+
 - Debugging why `aggregator_node` fails to launch inside the container
 - Enabling `command_mode_switcher` + `command_mode_decider` via `use_control_command_gate=true` in `tier4_system_launch`
 

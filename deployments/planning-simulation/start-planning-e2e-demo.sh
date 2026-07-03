@@ -18,7 +18,7 @@ Options:
   --dry-run   Print planned commands without running them
   -h, --help  Show this help text
 EOF
-  exit 0
+  exit "${1:-0}"
 }
 
 DRY_RUN=false
@@ -26,10 +26,12 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=true ;;
     -h|--help) usage ;;
-    *) echo "Unknown option: $1" >&2; usage >&2 ;;
+    *) echo "Unknown option: $1" >&2; usage 1 >&2 ;;
   esac
   shift
 done
+
+cd "$SCRIPT_DIR"
 
 run() {
   if [ "$DRY_RUN" = true ]; then

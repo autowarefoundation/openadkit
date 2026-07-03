@@ -95,15 +95,17 @@ services:
     image: ghcr.io/autowarefoundation/openadkit:visualizer
     networks:
       - cloud_net
-    # Port-mapped so the host browser can reach noVNC. The visualizer's
-    # websockify is bound to loopback inside the container, so cloud_net
-    # traffic that reaches port 6080 inside the container is served locally
-    # and only the host's 6081 port is exposed externally.
+    # Under bridge networking, Docker forwards 127.0.0.1:6081 on the host to
+    # the container's bridge IP :6080. websockify must bind 0.0.0.0 inside the
+    # container so the forwarded traffic can reach it; the host-side
+    # 127.0.0.1 prefix keeps external access loopback-only. The VNC server
+    # is always loopback-only (vncserver -localhost in the entrypoint).
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
       - REMOTE_PASSWORD=${REMOTE_PASSWORD:?Set REMOTE_PASSWORD in .env before starting the visualizer}
       - USE_SIM_TIME=true
+      - WEBSOCKIFY_BIND=0.0.0.0
     ports:
       - "127.0.0.1:6081:6080"
     depends_on:

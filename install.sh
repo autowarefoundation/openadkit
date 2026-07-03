@@ -258,8 +258,10 @@ download_sample_data() {
 
     # Self-contained sample data fetcher used by host setup and release bundles.
     local S3_BASE="https://autoware-files.s3.us-west-2.amazonaws.com"
-    local TIER4_TAG="25.0.20"
-    local TIER4_RAW="https://raw.githubusercontent.com/tier4/scenario_simulator_v2/${TIER4_TAG}/map/kashiwanoha_map/map"
+    # Pin to the commit SHA that the 25.0.20 tag resolves to, not the mutable
+    # tag itself, so downloads are reproducible and checksums are stable.
+    local TIER4_SHA="63ccb1da6944a7be4427440bf200ad62281dc899"
+    local TIER4_RAW="https://raw.githubusercontent.com/tier4/scenario_simulator_v2/${TIER4_SHA}/map/kashiwanoha_map/map"
     local MAP_ROOT="${AUTOWARE_MAP_DIR:-${USER_HOME}/autoware_map}"
     local TMP
     TMP="$(mktemp -d)"
@@ -312,15 +314,23 @@ download_sample_data() {
             log_info "kashiwanoha_map already present at $target (use --force to re-download)"
             return 0
         fi
-        log_info "Downloading kashiwanoha_map (tier4 scenario_simulator_v2 @ ${TIER4_TAG}) ..."
+        log_info "Downloading kashiwanoha_map (tier4 scenario_simulator_v2 @ ${TIER4_SHA}) ..."
         local stage="${TMP}/kashiwanoha_map"
         mkdir -p "$stage"
-        local curl_args=() f
-        for f in lanelet2_map.osm pointcloud_map.pcd global_map_center.pcd.yaml \
-                 lanelet2_map_provider.osm.yaml map.map_publisher.yaml; do
-            curl_args+=(-o "${stage}/${f}" "${TIER4_RAW}/${f}")
+        local files=(
+            "lanelet2_map.osm:91a9126e561783c1dc833e4de84f4d667888cc0466eb5983660cff6c70dd316f"
+            "pointcloud_map.pcd:6ac84b21103b32ae43ac387d4905285442d250657f5ea100b12dfb59a1c758da"
+            "global_map_center.pcd.yaml:78168b167bf6f0d7e432392712798b8c0cee90fff75c5d1414c59b6f892e87d6"
+            "lanelet2_map_provider.osm.yaml:f03a11f7f10012b5d56851786a8fdd5511e8ac94b2892b0ed1e01a485a5edfff"
+            "map.map_publisher.yaml:68df5e92c9bb174178b018f5e10561b6c9019e14decdd2a02a9aebd784b181ab"
+        )
+        local entry name sum
+        for entry in "${files[@]}"; do
+            name="${entry%%:*}"
+            sum="${entry##*:}"
+            curl -fL --retry 3 -o "${stage}/${name}" "${TIER4_RAW}/${name}"
+            sha256_verify "${stage}/${name}" "$sum"
         done
-        curl -fL --retry 3 "${curl_args[@]}"
         mkdir -p "$MAP_ROOT"
         rm -rf "$target"
         mv "$stage" "$target"

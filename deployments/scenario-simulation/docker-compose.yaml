@@ -15,7 +15,7 @@ services:
 
   # Scenario-only service.
   scenario_simulator:
-    image: ${SCENARIO_SIMULATOR_IMAGE}
+    image: ${SCENARIO_SIMULATOR_IMAGE:-ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime}
     container_name: autoware-scenario-simulator
     network_mode: host
     init: true

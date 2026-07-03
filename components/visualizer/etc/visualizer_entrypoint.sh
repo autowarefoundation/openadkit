@@ -69,9 +69,12 @@ EOF
     mkdir -p ~/.vnc
     echo "$REMOTE_PASSWORD" | vncpasswd -f >~/.vnc/passwd && chmod 600 ~/.vnc/passwd
 
-    # Start VNC server with Openbox
+    # Start VNC server with Openbox. -localhost restricts the raw VNC port
+    # (5999) to loopback so only websockify (which connects to localhost:5999
+    # inside the container) can reach it. This is important under
+    # network_mode: host where the container's loopback == the host's.
     echo "Starting VNC server with Openbox..."
-    vncserver :99 -geometry 1024x768 -depth 16 -pixelformat rgb565
+    vncserver :99 -localhost -geometry 1024x768 -depth 16 -pixelformat rgb565
     VNC_RESULT=$?
 
     if [ $VNC_RESULT -ne 0 ]; then
@@ -95,22 +98,23 @@ EOF
       -days 365 \
       -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1
 
-    # Start NoVNC, bound to loopback only. The compose uses `network_mode: host`
-    # so the `ports:` mapping is ignored; websockify's default source_addr is
-    # `0.0.0.0` which would expose noVNC on every interface. Pass an explicit
-    # source_addr of 127.0.0.1 to bind to the loopback interface. To expose
-    # externally, change it to 0.0.0.0 and front the port with an authenticated
-    # reverse proxy.
+    # Start NoVNC. Under network_mode: host (base deployments) bind to
+    # loopback so noVNC is not exposed on every interface. Under bridge
+    # networking (zenoh-bridge) set WEBSOCKIFY_BIND=0.0.0.0 so Docker's port
+    # forwarding can reach websockify from the bridge interface; the host-side
+    # port mapping (127.0.0.1:6081:6080) still restricts external access to
+    # loopback. The VNC server is always loopback-only (see -localhost above).
     echo "Starting NoVNC..."
+    local websck_bind="${WEBSOCKIFY_BIND:-127.0.0.1}"
     websockify --daemon --web=/usr/share/novnc/ \
       --cert=/etc/ssl/certs/novnc.crt --key=/etc/ssl/private/novnc.key \
-      127.0.0.1:6080 localhost:5999
+      "${websck_bind}:6080" localhost:5999
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
     echo -e "\033[32mBrowser interface available at http://127.0.0.1:6080/vnc.html?resize=scale&autoconnect=true\033[0m"
     echo -e "\033[32mUse the REMOTE_PASSWORD configured in your env file.\033[0m"
-    echo -e "\033[32mThe websockify server is bound to 127.0.0.1 (loopback).\033[0m"
+    echo -e "\033[32mThe websockify server is bound to ${websck_bind}.\033[0m"
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
 }
 

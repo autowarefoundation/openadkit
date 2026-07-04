@@ -10,31 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/platforms/autosd/planning-simulator/">
+        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/includes/build-pipeline/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../../getting-started/versioning/">
       
       
-        <link rel="next" href="../../ewaol/">
+        <link rel="next" href="../visualizer-remote-access/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/autoware-foundation.png">
+      <link rel="icon" href="../../assets/images/autoware-foundation.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>AutoSD + Planning + Simulator - Open AD Kit</title>
+        <title>Build pipeline - Open AD Kit</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,11 +53,11 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/css/extra.css">
+      <link rel="stylesheet" href="../../assets/css/extra.css">
     
       <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -81,11 +81,6 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
-        
-        <a href="#autosd-planning-simulator" class="md-skip">
-          Skip to content
-        </a>
-      
     </div>
     <div data-md-component="announce">
       
@@ -98,7 +93,7 @@
               </button>
             
             
-  <a href="../../../getting-started/">
+  <a href="../../getting-started/">
     <span aria-hidden="true">🚀</span> New here? Follow the <strong>Getting Started</strong> guide to run your first deployment
   </a>
 
@@ -117,7 +112,7 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Open AD Kit" class="md-header__button md-logo" aria-label="Open AD Kit" data-md-component="logo">
+    <a href="../.." title="Open AD Kit" class="md-header__button md-logo" aria-label="Open AD Kit" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M135.2 117.4 109.1 192h293.8l-26.1-74.6c-4.5-12.8-16.6-21.4-30.2-21.4H165.4c-13.6 0-25.7 8.6-30.2 21.4m-95.6 79.4L74.8 96.3C88.3 57.8 124.6 32 165.4 32h181.2c40.8 0 77.1 25.8 90.6 64.3l35.2 100.5c23.2 9.6 39.6 32.5 39.6 59.2v192c0 17.7-14.3 32-32 32h-32c-17.7 0-32-14.3-32-32v-32H96v32c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32V256c0-26.7 16.4-49.6 39.6-59.2M128 304a32 32 0 1 0-64 0 32 32 0 1 0 64 0m288 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64"/></svg>
@@ -137,7 +132,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              AutoSD + Planning + Simulator
+              Build pipeline
             
           </span>
         </div>
@@ -246,7 +241,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../.." class="md-tabs__link">
+        <a href="../.." class="md-tabs__link">
           
   
   
@@ -268,7 +263,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/" class="md-tabs__link">
+        <a href="../../getting-started/" class="md-tabs__link">
           
   
   
@@ -290,7 +285,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../deployment/" class="md-tabs__link">
+        <a href="../../deployment/" class="md-tabs__link">
           
   
   
@@ -312,7 +307,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../components/" class="md-tabs__link">
+        <a href="../../components/" class="md-tabs__link">
           
   
   
@@ -330,13 +325,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../platforms/" class="md-tabs__link">
           
   
   
@@ -358,7 +351,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../development/" class="md-tabs__link">
+        <a href="../../development/" class="md-tabs__link">
           
   
   
@@ -380,7 +373,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../releases/" class="md-tabs__link">
+        <a href="../../releases/" class="md-tabs__link">
           
   
   
@@ -400,7 +393,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../roadmap/" class="md-tabs__link">
+      <a href="../../roadmap/" class="md-tabs__link">
         
   
   
@@ -441,7 +434,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Open AD Kit" class="md-nav__button md-logo" aria-label="Open AD Kit" data-md-component="logo">
+    <a href="../.." title="Open AD Kit" class="md-nav__button md-logo" aria-label="Open AD Kit" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M135.2 117.4 109.1 192h293.8l-26.1-74.6c-4.5-12.8-16.6-21.4-30.2-21.4H165.4c-13.6 0-25.7 8.6-30.2 21.4m-95.6 79.4L74.8 96.3C88.3 57.8 124.6 32 165.4 32h181.2c40.8 0 77.1 25.8 90.6 64.3l35.2 100.5c23.2 9.6 39.6 32.5 39.6 59.2v192c0 17.7-14.3 32-32 32h-32c-17.7 0-32-14.3-32-32v-32H96v32c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32V256c0-26.7 16.4-49.6 39.6-59.2M128 304a32 32 0 1 0-64 0 32 32 0 1 0 64 0m288 32a32 32 0 1 0 0-64 32 32 0 1 0 0 64"/></svg>
@@ -498,7 +491,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../.." class="md-nav__link ">
+            <a href="../.." class="md-nav__link ">
               
   
   
@@ -542,7 +535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../overview/" class="md-nav__link">
+      <a href="../../overview/" class="md-nav__link">
         
   
   
@@ -610,7 +603,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../getting-started/" class="md-nav__link ">
+            <a href="../../getting-started/" class="md-nav__link ">
               
   
   
@@ -654,7 +647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../getting-started/image-tags/" class="md-nav__link">
         
   
   
@@ -682,7 +675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/versioning/" class="md-nav__link">
+      <a href="../../getting-started/versioning/" class="md-nav__link">
         
   
   
@@ -710,7 +703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/release-flow/" class="md-nav__link">
+      <a href="../../getting-started/release-flow/" class="md-nav__link">
         
   
   
@@ -738,7 +731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
         
   
   
@@ -810,7 +803,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../deployment/" class="md-nav__link ">
+            <a href="../../deployment/" class="md-nav__link ">
               
   
   
@@ -879,7 +872,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../deployment/planning-simulation/" class="md-nav__link ">
+            <a href="../../deployment/planning-simulation/" class="md-nav__link ">
               
   
   
@@ -951,7 +944,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../deployment/scenario-simulation/" class="md-nav__link ">
+            <a href="../../deployment/scenario-simulation/" class="md-nav__link ">
               
   
   
@@ -1023,7 +1016,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../deployment/logging-simulation/" class="md-nav__link ">
+            <a href="../../deployment/logging-simulation/" class="md-nav__link ">
               
   
   
@@ -1095,7 +1088,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../deployment/carla-simulation/" class="md-nav__link ">
+            <a href="../../deployment/carla-simulation/" class="md-nav__link ">
               
   
   
@@ -1167,7 +1160,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../deployment/zenoh-bridge/" class="md-nav__link ">
+            <a href="../../deployment/zenoh-bridge/" class="md-nav__link ">
               
   
   
@@ -1214,7 +1207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../deployment/custom-deployment/" class="md-nav__link">
+      <a href="../../deployment/custom-deployment/" class="md-nav__link">
         
   
   
@@ -1296,7 +1289,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../components/" class="md-nav__link ">
+            <a href="../../components/" class="md-nav__link ">
               
   
   
@@ -1340,7 +1333,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/sensing/" class="md-nav__link">
+      <a href="../../components/sensing/" class="md-nav__link">
         
   
   
@@ -1368,7 +1361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/perception/" class="md-nav__link">
+      <a href="../../components/perception/" class="md-nav__link">
         
   
   
@@ -1396,7 +1389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/mapping/" class="md-nav__link">
+      <a href="../../components/mapping/" class="md-nav__link">
         
   
   
@@ -1424,7 +1417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/localization/" class="md-nav__link">
+      <a href="../../components/localization/" class="md-nav__link">
         
   
   
@@ -1452,7 +1445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/planning/" class="md-nav__link">
+      <a href="../../components/planning/" class="md-nav__link">
         
   
   
@@ -1480,7 +1473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/control/" class="md-nav__link">
+      <a href="../../components/control/" class="md-nav__link">
         
   
   
@@ -1508,7 +1501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/vehicle-system/" class="md-nav__link">
+      <a href="../../components/vehicle-system/" class="md-nav__link">
         
   
   
@@ -1536,7 +1529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/api/" class="md-nav__link">
+      <a href="../../components/api/" class="md-nav__link">
         
   
   
@@ -1564,7 +1557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/simulator/" class="md-nav__link">
+      <a href="../../components/simulator/" class="md-nav__link">
         
   
   
@@ -1592,7 +1585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/visualizer/" class="md-nav__link">
+      <a href="../../components/visualizer/" class="md-nav__link">
         
   
   
@@ -1620,7 +1613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../components/carla-interface/" class="md-nav__link">
+      <a href="../../components/carla-interface/" class="md-nav__link">
         
   
   
@@ -1652,8 +1645,6 @@
       
   
   
-    
-  
   
   
     
@@ -1673,23 +1664,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../platforms/" class="md-nav__link ">
               
   
   
@@ -1707,13 +1697,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1730,8 +1720,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1749,21 +1737,20 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../platforms/autosd/" class="md-nav__link ">
               
   
   
@@ -1781,13 +1768,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1804,8 +1791,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1824,15 +1809,17 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./" class="md-nav__link md-nav__link--active">
+            <a href="../../platforms/autosd/planning-simulator/" class="md-nav__link ">
               
   
   
@@ -1851,7 +1838,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1899,13 +1886,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1915,7 +1899,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../ewaol/" class="md-nav__link ">
+            <a href="../../platforms/ewaol/" class="md-nav__link ">
               
   
   
@@ -1974,13 +1958,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1990,7 +1971,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../hardware/" class="md-nav__link ">
+            <a href="../../platforms/hardware/" class="md-nav__link ">
               
   
   
@@ -2073,7 +2054,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../development/" class="md-nav__link ">
+            <a href="../../development/" class="md-nav__link ">
               
   
   
@@ -2117,7 +2098,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/build-from-source/" class="md-nav__link">
+      <a href="../../development/build-from-source/" class="md-nav__link">
         
   
   
@@ -2145,7 +2126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../development/contributing/" class="md-nav__link">
+      <a href="../../development/contributing/" class="md-nav__link">
         
   
   
@@ -2205,7 +2186,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../releases/" class="md-nav__link ">
+            <a href="../../releases/" class="md-nav__link ">
               
   
   
@@ -2251,7 +2232,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../roadmap/" class="md-nav__link">
+      <a href="../../roadmap/" class="md-nav__link">
         
   
   
@@ -2290,82 +2271,6 @@
   
   
   
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#repository-location" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repository Location
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quadlet-services" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quadlet Services
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Workflow
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#expected-outcome" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Expected Outcome
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
   
 </nav>
                   </div>
@@ -2382,7 +2287,7 @@
 
 
   
-    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/platforms/autosd/planning-simulator/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/includes/build-pipeline.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2390,119 +2295,20 @@
   
 
 
-<h1 id="autosd-planning-simulator">AutoSD + Planning + Simulator<a class="headerlink" href="#autosd-planning-simulator" title="Permanent link">#</a></h1>
-<div class="admonition abstract">
-<p>This deployment demonstrates how to run and validate Autoware planning and simulation workflows inside AutoSD using systemd-managed containers (Quadlet) and Podman.</p>
-</div>
-<h2 id="repository-location">Repository Location<a class="headerlink" href="#repository-location" title="Permanent link">#</a></h2>
-<p>Runnable assets live under <a href="https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/planning-simulator"><code>platforms/autosd/planning-simulator/</code></a> in the Open AD Kit repository.</p>
-<table>
-<thead>
-<tr>
-<th>Folder</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>aib/</code></td>
-<td>Automotive Image Builder manifest files (<code>image.aib.yml</code>, <code>vars.yml</code>) to build an AutoSD OS image</td>
-</tr>
-<tr>
-<td><code>components/container-files/</code></td>
-<td>Quadlet unit files for Podman containers and the shared pod</td>
-</tr>
-<tr>
-<td><code>components/systemd/</code></td>
-<td>systemd oneshot service for map extraction</td>
-</tr>
-<tr>
-<td><code>components/scripts/</code></td>
-<td>Helper scripts installed into the AutoSD image</td>
-</tr>
-</tbody>
-</table>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
-<p>Before using this deployment, build and boot an AutoSD image following the <a href="../">AutoSD Platform Overview</a> guide. You need:</p>
-<ul>
-<li>Docker or Podman and QEMU (for the containerized image builder workflow)</li>
-<li>An RPM-based host if running Automotive Image Builder directly on the host</li>
-</ul>
-<h2 id="quadlet-services">Quadlet Services<a class="headerlink" href="#quadlet-services" title="Permanent link">#</a></h2>
-<p>After boot, systemd starts the following services defined under <code>components/</code>:</p>
-<table>
-<thead>
-<tr>
-<th>Service</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>awf-oak-map.service</code></td>
-<td>Oneshot</td>
-<td>Extracts the bundled Kashiwanoha map to <code>/opt/tier4/kashiwanoha_map</code></td>
-</tr>
-<tr>
-<td><code>awf-oak-planning.container</code></td>
-<td>Container</td>
-<td>Runs the Autoware planning stack with scenario simulation enabled</td>
-</tr>
-<tr>
-<td><code>awf-oak-simulator.container</code></td>
-<td>Container</td>
-<td>Runs the TIER IV Scenario Simulator with the bundled example scenario</td>
-</tr>
-<tr>
-<td><code>awf-oak.pod</code></td>
-<td>Pod</td>
-<td>Shared Podman pod for co-located planning and simulator containers</td>
-</tr>
-</tbody>
-</table>
-<div class="admonition note">
-<p class="admonition-title">Unit naming</p>
-<p>Quadlet <code>.container</code> files register with systemd as <code>.service</code> units. The table lists the source unit files (<code>awf-oak-planning.container</code>); when querying them with <code>systemctl</code>, use the generated service name (<code>awf-oak-planning.service</code>). Both names refer to the same unit.</p>
-</div>
-<p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code>, including the noVNC RViz2 visualizer. The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario.</p>
-<h2 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">#</a></h2>
-<ol>
-<li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code> (see <a href="../#building-an-autosd-image">AutoSD build instructions</a>)</li>
-<li>Boot the image on QEMU or target hardware</li>
-<li>
-<p>Confirm the Quadlet services are active:</p>
-<div class="highlight"><pre><span></span><code>systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-map.service
-systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-planning.service
-systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator.service
-</code></pre></div>
-</li>
-<li>
-<p>Access the visualizer via the exposed noVNC endpoint and run the planning simulation workflow</p>
-</li>
-</ol>
-<pre class="mermaid"><code>graph LR
-    Host[AutoSD Host] --&gt; MapSvc[awf-oak-map.service]
-    MapSvc --&gt; Systemd[Systemd + Quadlet]
-    Systemd --&gt; Podman[Podman Pod]
-    Podman --&gt; PC[awf-oak-planning]
-    Podman --&gt; SIM[awf-oak-simulator]
-    PC --&gt; VIZ[noVNC RViz2]</code></pre>
-<h2 id="expected-outcome">Expected Outcome<a class="headerlink" href="#expected-outcome" title="Permanent link">#</a></h2>
-<p>Once all services are running, you can:</p>
-<ul>
-<li>Set initial and goal poses in the noVNC RViz2 interface</li>
-<li>Observe the Autoware planning stack responding to the scenario simulator environment</li>
-<li>Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware</li>
-</ul>
-<p>For a Docker Compose equivalent on a development laptop, see the <a href="../../../deployment/planning-simulation/">Planning Simulation deployment</a>.</p>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
-<ul>
-<li><a href="../">AutoSD Platform Overview</a></li>
-<li><a href="../../../deployment/planning-simulation/">Planning Simulation deployment</a></li>
-<li><a href="../../../deployment/">Open AD Kit Deployments</a></li>
-<li><a href="../../../components/">Components Overview</a></li>
-</ul>
+  <h1>Build pipeline</h1>
+
+<pre class="mermaid"><code>flowchart TB
+    UP["autoware:core-devel / core&lt;br/&gt;autoware:base-cuda-{devel,runtime}"] --&gt; UC["universe-common"]
+    UC --&gt; SP["sensing-perception"]
+    UC --&gt; LM["localization-mapping"]
+    UC --&gt; PC["planning-control"]
+    UC --&gt; VS["vehicle-system"]
+    UC --&gt; API["api"]
+    UC --&gt; VIZ["visualizer"]
+    UC --&gt; SIM["simulator"]
+    UP --&gt; SPC["sensing-perception-cuda"]
+    UC --&gt; SPC
+    SIM --&gt; CARLA["carla-interface"]</code></pre>
 
 
 
@@ -2540,7 +2346,7 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: AutoSD + Open AD Kit">
+          <a href="../../getting-started/versioning/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Versioning &amp;amp; Support Policy">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2550,20 +2356,20 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
                 Previous
               </span>
               <div class="md-ellipsis">
-                AutoSD + Open AD Kit
+                Versioning &amp; Support Policy
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../ewaol/" class="md-footer__link md-footer__link--next" aria-label="Next: EWAOL">
+          <a href="../visualizer-remote-access/" class="md-footer__link md-footer__link--next" aria-label="Next: Visualizer remote access">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                EWAOL
+                Visualizer remote access
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -2604,10 +2410,10 @@ systemctl<span class="w"> </span>status<span class="w"> </span>awf-oak-simulator
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

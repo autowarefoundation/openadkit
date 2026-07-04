@@ -1,0 +1,107 @@
+name: setup-build-env
+# Shared build-environment setup for Docker image build jobs.
+#
+# Encapsulates the checkout + Autoware source + Buildx + registry login
+# sequence that is identical across build-common, build-components, and
+# build-single-image. Each build job calls this action once, then proceeds
+# to its target-specific steps (metadata, cache, bake).
+#
+# Usage:
+#   - uses: ./.github/actions/setup-build-env
+#     with:
+#       autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+#       build-tag: ${{ needs.prepare.outputs.build_tag }}
+#       registry: ${{ env.REGISTRY }}
+#       registry-username: ${{ github.actor }}
+#       registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+description: Set up build environment (checkout, Autoware source, Buildx, registry login)
+
+inputs:
+  autoware-ref:
+    description: Autoware git ref to checkout (branch, tag, or SHA)
+    required: false
+    default: main
+  build-tag:
+    description: Build tag used in lockfile artifact name
+    required: false
+    default: ""
+  registry:
+    description: Container registry URL (e.g. ghcr.io)
+    required: true
+  registry-username:
+    description: Registry username
+    required: true
+  registry-password:
+    description: Registry password or token
+    required: true
+  free-disk:
+    description: Whether to free disk space (set to false for lightweight builds)
+    required: false
+    default: "true"
+  setup-autoware:
+    description: Whether to checkout Autoware source and pull dependencies
+    required: false
+    default: "true"
+  with-middleware:
+    description: Whether to create middleware/external/.keep (needed by universe-common)
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout OpenADKit repository
+      uses: actions/checkout@v6
+
+    - name: Free Disk Space (Ubuntu)
+      if: inputs.free-disk == 'true'
+      uses: ./.github/actions/free-disk-space
+
+    - name: Install jq and vcs2l
+      if: inputs.setup-autoware == 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq pipx
+        pipx install vcs2l
+      shell: bash
+
+    - name: Checkout Autoware repository
+      if: inputs.setup-autoware == 'true'
+      uses: actions/checkout@v6
+      with:
+        repository: autowarefoundation/autoware
+        ref: ${{ inputs.autoware-ref }}
+        path: autoware
+        fetch-depth: 1
+
+    - name: Download Autoware dependency lockfile
+      if: inputs.setup-autoware == 'true' && inputs.build-tag != ''
+      uses: actions/download-artifact@v4
+      with:
+        name: autoware-lock-${{ inputs.build-tag }}
+        path: autoware-lock
+
+    - name: Pull Autoware Source
+      if: inputs.setup-autoware == 'true'
+      run: |
+        set -euo pipefail
+        mkdir -p autoware/src
+        vcs import --shallow autoware/src < autoware-lock/autoware-lock.repos
+        if [ "${{ inputs.with-middleware }}" = "true" ]; then
+          # Some Autoware refs do not provide middleware sources, but
+          # components/universe-common/Dockerfile bind-mounts this path.
+          mkdir -p autoware/src/middleware/external
+          touch autoware/src/middleware/external/.keep
+        fi
+      shell: bash
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.registry-username }}
+        password: ${{ inputs.registry-password }}

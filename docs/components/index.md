@@ -147,7 +147,7 @@ Open AD Kit images are built with `docker buildx bake` using
 [`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl).
 The build graph is:
 
-```
+```text
 upstream autoware:core-devel / core / base-cuda-{devel,runtime}
         │
         ▼

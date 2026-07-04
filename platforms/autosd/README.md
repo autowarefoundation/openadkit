@@ -29,4 +29,3 @@ Canonical build, run, and QEMU instructions live in the docs site:
 **<https://autowarefoundation.github.io/openadkit/platforms/autosd/>**
 
 See that page for current steps; this README only summarizes the folder layout.
-

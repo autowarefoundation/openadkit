@@ -37,4 +37,3 @@ flowchart LR
 - [Getting Started](getting-started/index.md) — Set up your environment
 - [Development](development/index.md) — Build from source and contribute
 - [Releases](releases/index.md) — Current release status
-

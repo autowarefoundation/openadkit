@@ -75,25 +75,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install yamllint
+        run: pip install yamllint
+
       - name: Run yamllint
-        uses: reviewdog/action-yamllint@f01d8a48fd8d89f89895499fca2cff09f9e9e8c0 # v1.21.0
-        with:
-          # github-pr-check is fork-safe: on read-only tokens (PRs from forks)
-          # reviewdog falls back to GitHub Actions annotations instead of the
-          # Review API, which github-pr-review cannot do.
-          reporter: github-pr-check
-          fail_on_error: true
-          yamllint_flags: >-
-            .github/workflows/
-            .github/actions/
-            .github/ISSUE_TEMPLATE/
-            .github/DISCUSSION_TEMPLATE/
-            .github/dependabot.yaml
-            .github/stale.yml
-            .github/sync-files.yaml
-            deployments/
-            platforms/
-            mkdocs.yaml
+        run: |
+          yamllint --format github -c .yamllint.yaml \
+            .github/workflows/ \
+            .github/actions/ \
+            .github/ISSUE_TEMPLATE/ \
+            .github/DISCUSSION_TEMPLATE/ \
+            .github/dependabot.yaml \
+            .github/stale.yml \
+            .github/sync-files.yaml \
+            deployments/ \
+            platforms/ \
+            mkdocs.yaml \
             docs/
 
   markdownlint:
@@ -104,13 +101,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run markdownlint
-        uses: reviewdog/action-markdownlint@3667398db9118d7e78f7a63d10e26ce454ba5f58 # v0.26.2
-        with:
-          # github-pr-check is fork-safe: on read-only tokens (PRs from forks)
-          # reviewdog falls back to GitHub Actions annotations instead of the
-          # Review API, which github-pr-review cannot do.
-          reporter: github-pr-check
-          fail_on_error: true
+        run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'
 
   compose-config:
     runs-on: ubuntu-latest

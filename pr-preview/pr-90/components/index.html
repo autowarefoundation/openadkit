@@ -2687,15 +2687,16 @@ arm64}</code> matrix through staged jobs — <code>prepare</code>, then <code>bu
 <code>build-components</code> — so each layer is pushed before the
 layer that depends on it. A final <code>create-manifests</code> job stitches the
 per-arch tags into multi-arch manifests via the <code>combine-multi-arch-images</code>
-composite action. <code>release-all-images.yaml</code> runs on a schedule to track
-Autoware release tags and build the matching single-arch release images.</p>
+composite action. <code>release.yaml</code> is a manually dispatched workflow that
+promotes a validated, scanned <code>build-all-images</code> run to a stable Open AD
+Kit release tag (it does not rebuild images).</p>
 <h2 id="open-ad-kit-roadmap">Open AD Kit Roadmap<a class="headerlink" href="#open-ad-kit-roadmap" title="Permanent link">#</a></h2>
 <p>Open AD Kit tracks Autoware's architecture evolution upstream, but its own roadmap is focused on <strong>deployment</strong> — containerization, platform support, release trust, and CI/CD — rather than on the autonomy algorithms themselves. The goal is to package whatever Autoware ships into clean, composable, deployment-ready images.</p>
 <div class="admonition note">
 <p class="admonition-title">Roadmap</p>
 <p>The 2026–2027 Open AD Kit roadmap has been ratified and is published in the repository. See the <a href="../roadmap/">Roadmap</a> for the full release ladder. Current focus areas include:</p>
 <ul>
-<li><strong>Containerization</strong> — Splitting the monolithic stack into focused component images and retiring <code>autoware:universe</code> fallbacks (see deployment <em>Known Limitations</em>).</li>
+<li><strong>Containerization</strong> — Splitting the monolithic stack into focused component images and retiring <code>autoware:universe</code> fallbacks (see <a href="../deployment/logging-simulation/#known-limitations">Logging Simulation Known Limitations</a> and <a href="../deployment/zenoh-bridge/#known-limitations">Zenoh Bridge Known Limitations</a>).</li>
 <li><strong>Platform support</strong> — Expanding verified coverage across edge and cloud targets (see <a href="../platforms/">Platforms</a>).</li>
 <li><strong>Release trust and CI/CD</strong> — Multi-architecture builds, image scanning, and a reproducible release flow (see <a href="../getting-started/release-flow/">Release Flow</a>).</li>
 </ul>

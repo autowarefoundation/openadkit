@@ -2215,6 +2215,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Building">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#end-to-end-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        End-to-End Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-targets-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Targets (Reference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2455,6 +2494,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Building">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#end-to-end-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        End-to-End Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-targets-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Targets (Reference)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2570,22 +2648,56 @@ install tree.</p>
 </table>
 <p><code>carla-interface</code> is an <strong>amd64-only</strong> member of the <code>component</code> group, built on top of the <code>simulator</code> image and published as <code>ghcr.io/autowarefoundation/openadkit:carla-interface</code>.</p>
 <h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">#</a></h2>
-<p>Local builds resolve cross-stage references within a single Bake graph. First
-prepare the Autoware source tree in the repository root, matching the shape CI
-uses:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Clone the repository</span>
+<h3 id="end-to-end-workflow">End-to-End Workflow<a class="headerlink" href="#end-to-end-workflow" title="Permanent link">#</a></h3>
+<p>The following steps take you from a fresh clone to a running deployment using
+locally built images.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Clone the repository</span>
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
 <span class="nb">cd</span><span class="w"> </span>openadkit
 
-<span class="c1"># Import the upstream Autoware sources used by component Dockerfiles</span>
+<span class="c1"># 2. Install host dependencies and sample data</span>
+./install.sh<span class="w"> </span>--build-deps<span class="w"> </span>--download-samples<span class="w"> </span>--verify
+</code></pre></div>
+<p>Log out and back in (or run <code>newgrp docker</code>) for the docker group change to take
+effect, then continue:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 3. Install vcs2l (imports Autoware source for component Dockerfiles)</span>
 pipx<span class="w"> </span>install<span class="w"> </span>vcs2l
+<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.local/bin:</span><span class="nv">$PATH</span><span class="s2">&quot;</span>
+
+<span class="c1"># 4. Import Autoware sources</span>
 git<span class="w"> </span>clone<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>https://github.com/autowarefoundation/autoware.git
 mkdir<span class="w"> </span>-p<span class="w"> </span>autoware/src
 vcs<span class="w"> </span>import<span class="w"> </span>--shallow<span class="w"> </span>autoware/src<span class="w"> </span>&lt;<span class="w"> </span>autoware/repositories/autoware.repos
 mkdir<span class="w"> </span>-p<span class="w"> </span>autoware/src/middleware/external
 touch<span class="w"> </span>autoware/src/middleware/external/.keep
+
+<span class="c1"># 5. Build the universe-common base intermediate (~2 hours)</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>universe-common
+
+<span class="c1"># 6. Build and tag all component images (~2 hours)</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>sensing-perception.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:sensing-perception<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>localization-mapping.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:localization-mapping<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>planning-control.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:planning-control<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>vehicle-system.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:vehicle-system<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>api.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:api<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>visualizer.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:visualizer<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>simulator.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:simulator<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--set<span class="w"> </span>sensing-perception-cuda.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--load<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>component
+
+<span class="c1"># 7. Start a deployment</span>
+./install.sh<span class="w"> </span>sample-data<span class="w"> </span>planning-simulation
+<span class="nb">cd</span><span class="w"> </span>deployments/planning-simulation
+docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
-<p>Then build any group or target directly:</p>
+<p>The <code>--load</code> flag makes images available in the local Docker store (without it,
+Bake only populates the BuildKit cache).</p>
+<h3 id="build-targets-reference">Build Targets (Reference)<a class="headerlink" href="#build-targets-reference" title="Permanent link">#</a></h3>
+<p>To build only specific targets or groups, pass the group or target name as an
+argument to Bake. Local builds resolve cross-stage references within a single
+Bake graph.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Build everything (universe-common + all components)</span>
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl
 
@@ -2595,12 +2707,13 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 <span class="c1"># Build the component group</span>
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component
 
-<span class="c1"># Build a single component and load it into the local Docker image store</span>
+<span class="c1"># Build a single component</span>
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--set<span class="w"> </span>sensing-perception.tags<span class="o">=</span>openadkit:sensing-perception<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--load<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>sensing-perception
 </code></pre></div>
+<h3 id="build-variables">Build Variables<a class="headerlink" href="#build-variables" title="Permanent link">#</a></h3>
 <p>The Bake file exposes a few variables, overridable via environment variables:</p>
 <table>
 <thead>

@@ -2502,10 +2502,10 @@
 </ul>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Docker Engine (set up via <code>setup.sh</code>, below)</li>
+<li>Docker Engine (set up via <code>install.sh</code>, below)</li>
 <li>NVIDIA Container Toolkit <strong>highly recommended</strong> (for GPU-accelerated sensing and perception)</li>
 <li>Logging simulation map and rosbag (downloaded below)</li>
-<li>Autoware artifacts (downloaded via <code>setup.sh</code>)</li>
+<li>Autoware artifacts (downloaded via <code>install.sh</code>)</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">GPU Strongly Recommended</p>
@@ -2514,7 +2514,7 @@
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
 <p>No <code>git clone</code> required.</p>
 <h3 id="1-set-up-the-environment-download-autoware-artifacts-one-time">1. Set up the environment + download Autoware artifacts (one-time)<a class="headerlink" href="#1-set-up-the-environment-download-autoware-artifacts-one-time" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--download-artifacts
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--download-artifacts
 </code></pre></div>
 <p>This installs Docker / the NVIDIA Container Toolkit and downloads the perception artifacts into <code>${HOME}/autoware_data</code> (mounted into the sensing and perception containers).</p>
 <h3 id="2-download-the-deployment-bundle">2. Download the deployment bundle<a class="headerlink" href="#2-download-the-deployment-bundle" title="Permanent link">#</a></h3>
@@ -2523,10 +2523,10 @@
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/logging-simulation/</code> folder from a cloned repository instead.</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/logging-simulation/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data logging-simulation</code> to fetch the map and rosbag.</p>
 </div>
 <h3 id="3-download-the-demo-map-and-rosbag">3. Download the demo map and rosbag<a class="headerlink" href="#3-download-the-demo-map-and-rosbag" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>./fetch-sample-data.sh<span class="w"> </span>logging-simulation
+<div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>logging-simulation
 </code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">About the rosbag</p>
@@ -2552,7 +2552,7 @@
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yaml<span class="w"> </span>-f<span class="w"> </span>docker-compose.gpu.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.gpu.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
-<p>This swaps in the <code>sensing-perception-cuda</code> image and reserves the GPU for the <code>sensing</code> and <code>perception</code> services. It requires the NVIDIA Container Toolkit (installed by <code>setup.sh</code> by default).</p>
+<p>This swaps in the <code>sensing-perception-cuda</code> image and reserves the GPU for the <code>sensing</code> and <code>perception</code> services. It requires the NVIDIA Container Toolkit (installed by <code>install.sh</code> by default).</p>
 </div>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>
@@ -2591,7 +2591,7 @@
 </tr>
 <tr>
 <td><code>file not found</code> for map/rosbag</td>
-<td>Re-run <code>./fetch-sample-data.sh logging-simulation</code> to (re)download into <code>~/autoware_map</code></td>
+<td>Re-run <code>./install.sh sample-data logging-simulation --force</code> to re-download into <code>~/autoware_map</code></td>
 </tr>
 <tr>
 <td>Very slow perception</td>
@@ -2611,8 +2611,9 @@
 <pre class="mermaid"><code>flowchart LR
     Rosbag[Rosbag File] --&gt; SP[sensing-perception]
     SP --&gt; LM[localization-mapping]
-    LM --&gt; PC[planning-control]
-    PC --&gt; Viz[visualizer]</code></pre>
+    LM --&gt; P[planning]
+    P --&gt; C[control]
+    C --&gt; Viz[visualizer]</code></pre>
 <h2 id="known-limitations">Known Limitations<a class="headerlink" href="#known-limitations" title="Permanent link">#</a></h2>
 <p>The <code>rosbag</code> service in this deployment uses the upstream <code>ghcr.io/autowarefoundation/autoware:universe</code> image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture. An Open AD Kit component image for rosbag playback will be available in a future release.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>

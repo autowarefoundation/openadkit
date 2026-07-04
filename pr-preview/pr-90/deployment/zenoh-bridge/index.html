@@ -2853,21 +2853,21 @@
     Bridge3 --&gt; V3[Vehicle 3]</code></pre>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Docker Engine + Docker Compose (set up via <code>setup.sh</code>, below)</li>
+<li>Docker Engine + Docker Compose (set up via <code>install.sh</code>, below)</li>
 <li>Stable internet connection for pulling images</li>
 </ul>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
 <h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
 <h3 id="2-download-the-deployment-bundle-and-demo-map">2. Download the deployment bundle and demo map<a class="headerlink" href="#2-download-the-deployment-bundle-and-demo-map" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
 <span class="nb">cd</span><span class="w"> </span>zenoh-bridge
-./fetch-sample-data.sh<span class="w"> </span>zenoh-bridge
+./install.sh<span class="w"> </span>sample-data<span class="w"> </span>zenoh-bridge
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/zenoh-bridge/</code> folder from a cloned repository instead.</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/zenoh-bridge/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data zenoh-bridge</code> to fetch the map.</p>
 </div>
 <h3 id="3-verify-directory-structure">3. Verify Directory Structure<a class="headerlink" href="#3-verify-directory-structure" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>.
@@ -2878,7 +2878,7 @@
 ├── edge.sh
 ├── common.sh
 ├── run_teleop.sh
-├── fetch-sample-data.sh      # included in the release bundle
+├── install.sh                # included in the release bundle
 ├── teleop/
 │   └── teleop_config.yaml
 └── config/
@@ -2912,13 +2912,18 @@
 <td>(none)</td>
 </tr>
 <tr>
+<td><code>ZENOH_ROUTER_BIND_IP</code></td>
+<td>Host interface for the cloud Zenoh router. Use <code>0.0.0.0</code> only when remote edge hosts must connect.</td>
+<td><code>127.0.0.1</code></td>
+</tr>
+<tr>
 <td><code>SCENARIO_SIMULATION</code></td>
 <td>Enable scenario simulator (<code>true</code>/<code>false</code>)</td>
 <td><code>true</code></td>
 </tr>
 </tbody>
 </table>
-<p>For <strong>split topology</strong> (multi-machine), you must set <code>CLOUD_IP</code> to the actual IP of the cloud machine. See <a href="#option-a-split-topology-recommended">Option A: Split Topology</a> below.</p>
+<p>For <strong>split topology</strong> (multi-machine), set <code>ZENOH_ROUTER_BIND_IP=0.0.0.0</code> on the cloud machine and set <code>CLOUD_IP</code> on the edge machine to the actual IP of the cloud machine. Restrict TCP 7448 with a firewall, VPN, or trusted network. See <a href="#option-a-split-topology-recommended">Option A: Split Topology</a> below.</p>
 <h2 id="starting-the-system">Starting the System<a class="headerlink" href="#starting-the-system" title="Permanent link">#</a></h2>
 <h3 id="option-a-split-topology-recommended">Option A: Split Topology (Recommended)<a class="headerlink" href="#option-a-split-topology-recommended" title="Permanent link">#</a></h3>
 <p>Separate Edge and Cloud components to simulate a real-world distributed environment.</p>
@@ -2946,6 +2951,7 @@
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">CLOUD_IP</span><span class="o">=</span><span class="m">192</span>.168.1.100
 ./edge.sh
 </code></pre></div>
+<p>Before starting the cloud side for a multi-machine deployment, set <code>ZENOH_ROUTER_BIND_IP=0.0.0.0</code> in <code>.env</code> or export it in the shell. This exposes TCP 7448 on the cloud host; keep it limited to trusted networks.</p>
 <h3 id="monitor-startup-logs">Monitor Startup Logs<a class="headerlink" href="#monitor-startup-logs" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f
 </code></pre></div>
@@ -2980,7 +2986,7 @@
 <span class="c1"># Stop everything</span>
 docker<span class="w"> </span>compose<span class="w"> </span>down
 </code></pre></div>
-<p>The map is mounted read-only from <code>~/autoware_map/kashiwanoha_map</code> on the host, so stopping the stack leaves it untouched. Re-fetch it any time with <code>./fetch-sample-data.sh zenoh-bridge</code>.</p>
+<p>The map is mounted read-only from <code>~/autoware_map/kashiwanoha_map</code> on the host, so stopping the stack leaves it untouched. Re-fetch it any time with <code>./install.sh sample-data zenoh-bridge --force</code>.</p>
 <h2 id="teleoperation-optional">Teleoperation (Optional)<a class="headerlink" href="#teleoperation-optional" title="Permanent link">#</a></h2>
 <p>A containerized terminal-based teleoperation interface lets you drive the vehicle manually from the cloud side.</p>
 <h3 id="1-start-the-teleop-backend">1. Start the Teleop Backend<a class="headerlink" href="#1-start-the-teleop-backend" title="Permanent link">#</a></h3>

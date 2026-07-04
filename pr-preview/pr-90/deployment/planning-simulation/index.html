@@ -2491,7 +2491,7 @@
 </ul>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Docker Engine (set up via <code>setup.sh</code>, below)</li>
+<li>Docker Engine (set up via <code>install.sh</code>, below)</li>
 <li>Planning simulation map (downloaded below)</li>
 </ul>
 <div class="admonition tip">
@@ -2501,7 +2501,7 @@
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
 <p>No <code>git clone</code> required — set up Docker, then download the self-contained deployment bundle and its demo map.</p>
 <h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
 <h3 id="2-download-the-deployment-bundle">2. Download the deployment bundle<a class="headerlink" href="#2-download-the-deployment-bundle" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
@@ -2509,10 +2509,10 @@
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/planning-simulation/</code> folder from a cloned repository instead.</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/planning-simulation/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data planning-simulation</code> to fetch the map.</p>
 </div>
 <h3 id="3-download-the-demo-map">3. Download the demo map<a class="headerlink" href="#3-download-the-demo-map" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>./fetch-sample-data.sh<span class="w"> </span>planning-simulation
+<div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>planning-simulation
 </code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">About this map</p>
@@ -2566,7 +2566,7 @@
 </tr>
 <tr>
 <td><code>file not found</code> error</td>
-<td>Re-run <code>./fetch-sample-data.sh planning-simulation</code> to (re)download the map into <code>~/autoware_map</code></td>
+<td>Re-run <code>./install.sh sample-data planning-simulation --force</code> to re-download the map into <code>~/autoware_map</code></td>
 </tr>
 <tr>
 <td>Port 6080 in use</td>
@@ -2581,12 +2581,14 @@
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>graph LR
     subgraph Host["Single Host"]
-        PC[planning-control]
+        P[planning]
+        C[control]
         VIZ[visualizer]
     end
 
-    Map[~/autoware_map] --&gt; PC
-    PC &lt;--&gt;|ROS 2 DDS| VIZ</code></pre>
+    Map[~/autoware_map] --&gt; P
+    P --&gt; C
+    P &lt;--&gt;|ROS 2 DDS| VIZ</code></pre>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="../scenario-simulation/">Scenario Simulation</a> — Test with predefined traffic scenarios</li>

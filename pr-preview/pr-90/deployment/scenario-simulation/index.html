@@ -2519,7 +2519,7 @@
 </ul>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Docker Engine (set up via <code>setup.sh</code>, below)</li>
+<li>Docker Engine (set up via <code>install.sh</code>, below)</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Use the Correct Map</p>
@@ -2528,7 +2528,7 @@
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
 <p>No <code>git clone</code> required.</p>
 <h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/setup.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
 <h3 id="2-download-the-deployment-bundle">2. Download the deployment bundle<a class="headerlink" href="#2-download-the-deployment-bundle" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
@@ -2536,10 +2536,10 @@
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/scenario-simulation/</code> folder from a cloned repository instead.</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/scenario-simulation/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data scenario-simulation</code> to fetch the map.</p>
 </div>
 <h3 id="3-download-the-kashiwanoha-map">3. Download the Kashiwanoha map<a class="headerlink" href="#3-download-the-kashiwanoha-map" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>./fetch-sample-data.sh<span class="w"> </span>scenario-simulation
+<div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>scenario-simulation
 </code></pre></div>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
 <p>Edit <code>scenario-simulation.env</code> to customize the deployment:</p>
@@ -2655,7 +2655,7 @@
 <tbody>
 <tr>
 <td>Scenario does not start</td>
-<td>Ensure the map was fetched: re-run <code>./fetch-sample-data.sh scenario-simulation</code></td>
+<td>Ensure the map was fetched: re-run <code>./install.sh sample-data scenario-simulation --force</code></td>
 </tr>
 <tr>
 <td><code>setMap() for invalid version map</code></td>
@@ -2674,14 +2674,20 @@
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>graph LR
     subgraph Host["Single Host"]
-        A[autoware]
-        S[scenario_simulator]
-        V[visualizer]
+        M[localization-mapping]
+        PC[planning-control]
+        VS[vehicle-system]
+        SIM[simulator]
+        API[api]
+        VIZ[visualizer]
+        SS[scenario_simulator]
     end
 
-    Map[~/autoware_map] --&gt; A
-    S &lt;--&gt;|ROS 2 DDS| A
-    A &lt;--&gt;|ROS 2 DDS| V</code></pre>
+    Map[~/autoware_map] --&gt; M
+    M --&gt; PC
+    SS &lt;--&gt;|ROS 2 DDS| SIM
+    SIM --&gt; PC
+    PC --&gt; VIZ</code></pre>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/">Scenario test simulation</a> — Official Autoware scenario simulation guide</li>

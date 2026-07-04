@@ -2,6 +2,8 @@ name: build-all-images
 
 on:
   push:
+    branches:
+      - main
     paths:
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'

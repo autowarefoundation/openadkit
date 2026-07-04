@@ -24,59 +24,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  shellcheck:
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Run ShellCheck
+      - name: Install tools
+        run: |
+          pip install yamllint pytest
+          curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash
+          bash /tmp/actionlint.sh
+
+      - name: Run shellcheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
         with:
           severity: error
 
-  actionlint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@6fb7acc99f4a1008869fa8a0f09cfca740837d9d # v1.72.0
-        with:
-          # github-pr-check is fork-safe: on read-only tokens (PRs from forks)
-          # reviewdog falls back to GitHub Actions annotations instead of the
-          # Review API, which github-pr-review cannot do.
-          reporter: github-pr-check
-          fail_on_error: true
+        run: ./actionlint
 
-  hadolint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Run Hadolint
+      - name: Run hadolint
         uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
           dockerfile: Dockerfile*
           recursive: true
           config: .hadolint.yaml
-
-  yamllint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install yamllint
-        run: pip install yamllint
 
       - name: Run yamllint
         run: |
@@ -93,22 +67,8 @@ jobs:
             mkdocs.yaml \
             docs/
 
-  markdownlint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
       - name: Run markdownlint
         run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'
-
-  compose-config:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
 
       - name: Install Docker Compose v5.2+
         # The ubuntu-latest runner ships an older compose plugin that rejects
@@ -116,7 +76,7 @@ jobs:
         # Install the latest release that supports the compose-spec include/merge.
         run: bash .github/scripts/install-compose.sh
 
-      - name: Validate documented Docker Compose files
+      - name: Validate Docker Compose files
         # `docker compose config -q` parses, interpolates, and schema-validates
         # each documented stack with its sample env file. It does not pull images.
         run: |
@@ -146,13 +106,6 @@ jobs:
           validate deployments/carla-simulation    --env-file ../base/base.env --env-file carla-simulation.env
           validate deployments/zenoh-bridge          --env-file .env
           exit "${fail}"
-
-  bake-validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -188,16 +141,6 @@ jobs:
           docker buildx bake -f components/docker-bake.hcl --print universe-common-devel \
             > /dev/null
           exit "${fail}"
-
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pytest
-        run: pip install pytest
 
       - name: Run Python tests
         run: pytest .github/scripts/

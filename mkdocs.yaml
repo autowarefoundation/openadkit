@@ -76,13 +76,6 @@ plugins:
         contributing/index.md: development/contributing.md
         hardware/index.md: platforms/hardware/index.md
         tools/index.md: development/index.md
-        deployment/samples/planning-simulation/index.md: deployment/planning-simulation/index.md
-        deployment/samples/scenario-simulation/index.md: deployment/scenario-simulation/index.md
-        deployment/samples/logging-simulation/index.md: deployment/logging-simulation/index.md
-        deployment/samples/carla-simulation/index.md: deployment/carla-simulation/index.md
-        deployment/demos/zenoh-bridge/index.md: deployment/zenoh-bridge/index.md
-        deployment/samples/index.md: deployment/index.md
-        deployment/demos/index.md: deployment/index.md
   - search
 
 markdown_extensions:
@@ -108,3 +101,4 @@ markdown_extensions:
   - toc:
       permalink: "#"
       toc_depth: 3
+      title: "On this page"

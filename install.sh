@@ -74,6 +74,17 @@ log_info()  { echo -e "${CLR_GREEN}[INFO]${CLR_RESET} $*"; }
 log_warn()  { echo -e "${CLR_YELLOW}[WARN]${CLR_RESET} $*"; }
 log_error() { echo -e "${CLR_RED}[ERROR]${CLR_RESET} $*"; }
 
+PIPX_BIN_DIR="${USER_HOME}/.local/bin"
+
+ensure_pipx_on_path() {
+    sudo -u "$TARGET_USER" python3 -m pipx ensurepath
+    case ":${PATH}:" in
+        *":${PIPX_BIN_DIR}:") ;;
+        *) PATH="${PIPX_BIN_DIR}:${PATH}" ;;
+    esac
+    export PATH
+}
+
 require_sudo() {
     if [[ $EUID -eq 0 ]]; then
         return 0
@@ -190,13 +201,7 @@ install_build_dependencies() {
     sudo -u "$TARGET_USER" pipx install --force vcs2l
 
     # Ensure pipx binaries are on PATH in this shell invocation
-    PIPX_BIN_DIR="${USER_HOME}/.local/bin"
-    sudo -u "$TARGET_USER" python3 -m pipx ensurepath
-    case ":${PATH}:" in
-        *":${PIPX_BIN_DIR}:") ;;
-        *) PATH="${PIPX_BIN_DIR}:${PATH}" ;;
-    esac
-    export PATH
+    ensure_pipx_on_path
 
     if command -v vcs &>/dev/null; then
         log_info "vcs ($(vcs --version)) is now available."
@@ -217,13 +222,7 @@ download_autoware_artifacts() {
     sudo apt-get install -y pipx
 
     # Ensure pipx binaries are on PATH in this shell invocation
-    PIPX_BIN_DIR="${USER_HOME}/.local/bin"
-    sudo -u "$TARGET_USER" python3 -m pipx ensurepath
-    case ":${PATH}:" in
-        *":${PIPX_BIN_DIR}:") ;;
-        *) PATH="${PIPX_BIN_DIR}:${PATH}" ;;
-    esac
-    export PATH
+    ensure_pipx_on_path
 
     sudo -u "$TARGET_USER" pipx install --include-deps --force "ansible==6.*"
 
@@ -545,7 +544,6 @@ if ! sudo -u "$TARGET_USER" docker version &>/dev/null; then
 fi
 
 # Remind about pipx binaries (vcs, etc.) if not on PATH.
-PIPX_BIN_DIR="${USER_HOME}/.local/bin"
 if ! command -v vcs &>/dev/null && [ -x "${PIPX_BIN_DIR}/vcs" ]; then
     log_info "Run 'export PATH=\"\$HOME/.local/bin:\$PATH\"' to use vcs in this shell,"
     log_info "or log out and back in for the change to take effect globally."

@@ -149,8 +149,8 @@ jobs:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
           bake-target: docker-metadata-action-universe-common-devel
           tags: |
-            type=raw,value=universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            type=raw,value=universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
           flavor: |
             latest=false
 
@@ -161,8 +161,8 @@ jobs:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
           bake-target: docker-metadata-action-universe-common
           tags: |
-            type=raw,value=universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            type=raw,value=universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
           flavor: |
             latest=false
 
@@ -239,8 +239,8 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
 
       - name: Prune BuildKit cache mount lineage (main only)
         if: env.IS_MAIN_PUSH == 'true'
@@ -292,8 +292,8 @@ jobs:
           images: ${{ env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
           tags: |
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
           flavor: |
             latest=false
 
@@ -334,8 +334,8 @@ jobs:
           set: |
             *.platform=${{ matrix.platform }}
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
@@ -343,8 +343,8 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
 
       - name: Prune BuildKit cache mount lineage (main only)
         if: env.IS_MAIN_PUSH == 'true'
@@ -386,8 +386,8 @@ jobs:
           images: ${{ env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
           tags: |
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable={{is_default_branch}}
+            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
           flavor: |
             latest=false
 

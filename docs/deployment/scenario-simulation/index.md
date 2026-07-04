@@ -90,16 +90,6 @@ docker compose --env-file scenario-simulation.env up -d
 
 Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds for required Autoware map and API endpoints before launching.
 
-## Access the Visualizer
-
-Open your browser and navigate to:
-
-```text
-http://localhost:6080/vnc.html
-```
-
-Use the default password **`openadkit`**.
-
 --8<-- "includes/visualizer-remote-access.md"
 
 ## Stop the Deployment

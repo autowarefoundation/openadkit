@@ -8,20 +8,7 @@ Autoware uses a **Core / Universe** architecture. **Core** contains rigorously r
 
 ## Build Pipeline
 
-```mermaid
-flowchart TB
-    UP["autoware:core-devel / core<br/>autoware:base-cuda-{devel,runtime}"] --> UC["universe-common"]
-    UC --> SP["sensing-perception"]
-    UC --> LM["localization-mapping"]
-    UC --> PC["planning-control"]
-    UC --> VS["vehicle-system"]
-    UC --> API["api"]
-    UC --> VIZ["visualizer"]
-    UC --> SIM["simulator"]
-    UP --> SPC["sensing-perception-cuda"]
-    UC --> SPC
-    SIM --> CARLA["carla-interface"]
-```
+--8<-- "includes/build-pipeline.md"
 
 `universe-common` is an Open AD Kit-owned thin intermediate built on top of the
 upstream `autoware:core-devel`/`core` images. The bake groups and build commands

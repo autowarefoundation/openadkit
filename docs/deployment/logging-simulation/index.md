@@ -80,16 +80,6 @@ Wait approximately 10 seconds for the containers to initialize.
 
     This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `install.sh` by default).
 
-## Access the Visualizer
-
-Open your browser and navigate to:
-
-```text
-http://localhost:6080/vnc.html
-```
-
-Use the default password **`openadkit`**.
-
 --8<-- "includes/visualizer-remote-access.md"
 
 ## Start the Rosbag Playback

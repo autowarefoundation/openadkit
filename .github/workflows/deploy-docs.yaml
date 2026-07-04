@@ -15,6 +15,8 @@ on:
       - "**/*.png"
       - "**/*.jpg"
       - "docs/assets/**"
+      - "docs/overrides/**"
+      - "**/*.pages"
       - ".github/actions/build-docs/**"
   release:
     types:

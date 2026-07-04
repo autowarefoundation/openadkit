@@ -33,20 +33,36 @@ If you are a member of the Autoware Foundation contributing to active developmen
 
 ### Local CI Commands
 
-Run the full lint suite before pushing:
+Run the full lint suite before pushing. These commands mirror what CI runs in `.github/workflows/lint.yaml`:
 
 ```bash
 # Shell scripts
 git ls-files '*.sh' | xargs shellcheck --severity=error
 
-# GitHub Actions workflows
-actionlint .github/workflows/*.yaml
+# GitHub Actions workflows (no glob — picks up .github/actions/ composites too)
+./actionlint
 
 # Dockerfiles
-hadolint **/Dockerfile*
+hadolint --config .hadolint.yaml **/Dockerfile*
 
 # YAML files
-yamllint .github/workflows/ .github/actions/ deployments/ mkdocs.yaml docs/
+yamllint -c .yamllint.yaml \
+  .github/workflows/ .github/actions/ .github/ISSUE_TEMPLATE/ \
+  .github/DISCUSSION_TEMPLATE/ .github/dependabot.yaml .github/stale.yml \
+  .github/sync-files.yaml deployments/ platforms/ mkdocs.yaml docs/
+
+# Markdown
+npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'
+
+# Python tests + shell tests
+pytest .github/scripts/
+bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
+bash .github/scripts/tests/test_report_manifests.sh
+
+# Docker Compose (per-sample, with both env files — base first, last wins)
+export REMOTE_PASSWORD="ci-validate"
+( cd deployments/planning-simulation && \
+  docker compose --env-file ../base/base.env --env-file planning-simulation.env config -q )
 
 # Documentation (local build, from the repository root)
 pip install -r docs/requirements.txt

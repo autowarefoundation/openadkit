@@ -22,20 +22,7 @@ Images are built with [Docker Bake](https://docs.docker.com/build/bake/). All ta
 
 The build is staged: the `universe-common` intermediate builds on top of the upstream Autoware images, and the component images build *from* `universe-common`.
 
-```mermaid
-flowchart TB
-    UP["autoware:core-devel / core<br/>autoware:base-cuda-{devel,runtime}"] --> UC["universe-common"]
-    UC --> SP["sensing-perception"]
-    UC --> LM["localization-mapping"]
-    UC --> PC["planning-control"]
-    UC --> VS["vehicle-system"]
-    UC --> API["api"]
-    UC --> VIZ["visualizer"]
-    UC --> SIM["simulator"]
-    UP --> SPC["sensing-perception-cuda"]
-    UC --> SPC
-    SIM --> CARLA["carla-interface"]
-```
+--8<-- "includes/build-pipeline.md"
 
 `universe-common` is an Open AD Kit-owned thin intermediate that compiles only the
 universe-common slice of Autoware on top of the upstream `core-devel`/`core`

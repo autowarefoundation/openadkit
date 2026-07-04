@@ -1,3 +1,13 @@
+## Access the Visualizer
+
+Open your browser and navigate to:
+
+```text
+http://localhost:6080/vnc.html
+```
+
+Use the default password **`openadkit`**.
+
 !!! tip "Remote Access"
     The visualizer runs under `network_mode: host`, so `ports:` is ignored and the loopback bind (`127.0.0.1:6080`) lives in the visualizer entrypoint. To reach noVNC from another machine, either forward the port over SSH:
 

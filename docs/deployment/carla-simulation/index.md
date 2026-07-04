@@ -63,16 +63,6 @@ The helper script:
 
 The default behavior is **no-drive**: set a route and engage manually in RViz2.
 
-## Access the Visualizer
-
-Open your browser and navigate to:
-
-```text
-http://localhost:6080/vnc.html
-```
-
-Use the default password **`openadkit`**.
-
 --8<-- "includes/visualizer-remote-access.md"
 
 In RViz2:

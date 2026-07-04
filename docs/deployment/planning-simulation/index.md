@@ -63,17 +63,9 @@ docker compose --env-file planning-simulation.env up -d
 
 Wait approximately 10 seconds for the containers to initialize.
 
-## Access the Visualizer
-
-Open your browser and navigate to:
-
-```text
-http://localhost:6080/vnc.html
-```
-
-Use the default password **`openadkit`** to access the visualizer. The RViz2 interface may take a few additional seconds to fully load.
-
 --8<-- "includes/visualizer-remote-access.md"
+
+The RViz2 interface may take a few additional seconds to fully load.
 
 ## Run the Simulation
 

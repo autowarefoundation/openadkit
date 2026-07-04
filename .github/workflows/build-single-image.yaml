@@ -181,6 +181,9 @@ jobs:
       matrix:
         target: ${{ fromJson(needs.prepare.outputs.targets_json) }}
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
       - name: Set up build environment
         uses: ./.github/actions/setup-build-env
         with:

@@ -125,6 +125,9 @@ jobs:
       max-parallel: 8
       matrix: ${{ fromJson(needs.prepare.outputs.common_matrix) }}
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
       - name: Set up build environment
         uses: ./.github/actions/setup-build-env
         with:
@@ -265,6 +268,9 @@ jobs:
       max-parallel: 8
       matrix: ${{ fromJson(needs.prepare.outputs.component_matrix) }}
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+
       - name: Set up build environment
         uses: ./.github/actions/setup-build-env
         with:

@@ -1,12 +1,13 @@
 name: setup-build-env
 # Shared build-environment setup for Docker image build jobs.
 #
-# Encapsulates the checkout + Autoware source + Buildx + registry login
-# sequence that is identical across build-common, build-components, and
-# build-single-image. Each build job calls this action once, then proceeds
-# to its target-specific steps (metadata, cache, bake).
+# Encapsulates the Autoware source + Buildx + registry login sequence that is
+# identical across build-common, build-components, and build-single-image.
+# Each build job must run actions/checkout BEFORE calling this action (GitHub
+# needs the repo on disk to resolve the local composite action path).
 #
 # Usage:
+#   - uses: actions/checkout@v6
 #   - uses: ./.github/actions/setup-build-env
 #     with:
 #       autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
@@ -15,7 +16,7 @@ name: setup-build-env
 #       registry-username: ${{ github.actor }}
 #       registry-password: ${{ secrets.GITHUB_TOKEN }}
 
-description: Set up build environment (checkout, Autoware source, Buildx, registry login)
+description: Set up build environment (Autoware source, Buildx, registry login)
 
 inputs:
   autoware-ref:
@@ -51,9 +52,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout OpenADKit repository
-      uses: actions/checkout@v6
-
     - name: Free Disk Space (Ubuntu)
       if: inputs.free-disk == 'true'
       uses: ./.github/actions/free-disk-space

@@ -27,11 +27,13 @@ Access the visualizer at `http://localhost:6081`.
 
 ### Monolithic
 
+Set `REMOTE_PASSWORD` in `.env` (required — the visualizer refuses to start without it), then:
+
 ```bash
 docker compose up -d
 ```
 
-*Cloned repo: run `../../install.sh` instead; pass `--env-file ../base/base.env` before the deployment env file.*
+*Cloned repo: run `../../install.sh` instead.*
 
 ## Teleoperation
 

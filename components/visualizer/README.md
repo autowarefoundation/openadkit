@@ -9,10 +9,12 @@ For full visualizer settings and deployment context, see the [Open AD Kit Docs â
 ## Standalone Run
 
 ```bash
-docker run --rm --name visualizer -p 6080:6080 \
+docker run --rm --name visualizer --network host \
   -e REMOTE_PASSWORD=yourpassword \
   ghcr.io/autowarefoundation/openadkit:visualizer
 ```
+
+The visualizer binds websockify to loopback (`127.0.0.1:6080`) by default, so `--network host` is required for standalone runs. Under host networking, `-p` is a no-op and the browser reaches noVNC at `https://localhost:6080/vnc.html`. For bridge networking, set `WEBSOCKIFY_BIND=0.0.0.0` and use `-p 6080:6080`.
 
 ## Settings
 
@@ -21,12 +23,13 @@ docker run --rm --name visualizer -p 6080:6080 \
 | `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | Any valid path | RViz configuration file inside the container |
 | `REMOTE_DISPLAY` | `true` | `true`, `false` | Browser-based display (recommended). Set `false` for local RViz2 |
 | `REMOTE_PASSWORD` | â€” (required) | Any string | Password for the remote display; the container exits if unset |
+| `WEBSOCKIFY_BIND` | `127.0.0.1` | IP address | Address websockify binds to. Set to `0.0.0.0` under bridge networking so Docker port forwarding can reach it |
 
 ## Example with Custom Settings
 
 ```bash
 docker run --rm --name visualizer \
-  -p 6080:6080 \
+  --network host \
   -e RVIZ_CONFIG=/opt/autoware/autoware_launch/share/autoware_launch/rviz/custom.rviz \
   -e REMOTE_PASSWORD=mysecurepass \
   ghcr.io/autowarefoundation/openadkit:visualizer

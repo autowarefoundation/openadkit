@@ -29,13 +29,13 @@ After boot, systemd starts the following services defined under `components/`:
 |---------|------|-------------|
 | `awf-oak-map.service` | Oneshot | Extracts the bundled Kashiwanoha map to `/opt/tier4/kashiwanoha_map` |
 | `awf-oak-planning.container` | Container | Runs the Autoware planning stack with scenario simulation enabled |
-| `awf-oak-simulator.container` | Container | Runs the TIER IV Scenario Simulator with the bundled example scenario |
+| `awf-oak-simulator.container` | Container (oneshot) | Runs the TIER IV Scenario Simulator once against the bundled `sample.yaml` scenario, then exits |
 | `awf-oak.pod` | Pod | Shared Podman pod for co-located planning and simulator containers |
 
 !!! note "Unit naming"
     Quadlet `.container` files register with systemd as `.service` units. The table lists the source unit files (`awf-oak-planning.container`); when querying them with `systemctl`, use the generated service name (`awf-oak-planning.service`). Both names refer to the same unit.
 
-The planning container launches `planning_simulator.launch.xml` with the extracted map mounted at `/etc/awf/map` and RViz disabled (`rviz:=false`). The simulator container runs `scenario_test_runner` against the bundled `sample.yaml` scenario.
+The planning container launches `planning_simulator.launch.xml` with the extracted map mounted at `/etc/awf/map` and RViz disabled (`rviz:=false`). The simulator container runs `scenario_test_runner` against the bundled `sample.yaml` scenario. The simulator is a `Type=oneshot` service — it runs the scenario once (up to ~180 seconds) and then exits. After completion, `systemctl status awf-oak-simulator.service` shows `inactive (dead)`, which is expected, not a failure. The planning container stays running.
 
 ## Workflow
 

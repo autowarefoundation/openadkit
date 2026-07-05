@@ -2397,6 +2397,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#base-overlay-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Base + Overlay Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2518,9 +2535,25 @@
 <ol>
 <li><strong>Component images</strong> are pulled from the GitHub Container Registry</li>
 <li><strong>Environment files</strong> (<code>.env</code>) configure runtime parameters</li>
-<li><strong>Docker Compose</strong> orchestrates containers on a single host</li>
+<li><strong>Docker Compose</strong> orchestrates containers on a single host (or across two hosts for the Zenoh bridge)</li>
 <li><strong>Optional: Zenoh bridge</strong> connects distributed ROS 2 domains for remote operation</li>
 </ol>
+<h3 id="base-overlay-model">Base + Overlay Model<a class="headerlink" href="#base-overlay-model" title="Permanent link">#</a></h3>
+<p>Four of the five deployments (planning, scenario, logging, carla) build on a shared <strong>base</strong> (<code>deployments/base/</code>):</p>
+<ul>
+<li><code>deployments/base/docker-compose.yaml</code> defines shared services (map, planning, vehicle, system, control, simulator, api, visualizer).</li>
+<li>Each deployment uses Compose <code>include:</code> to pull in the base, then adds only its delta (e.g. <code>scenario_simulator</code> service, GPU overlays).</li>
+<li><code>deployments/base/base.env</code> holds shared defaults; each deployment adds a <code>&lt;name&gt;.env</code> with its overrides.</li>
+<li>
+<p>From a cloned repo, run with <strong>two</strong> <code>--env-file</code>s (base first, sample second — last wins):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+</li>
+</ul>
+<ul>
+<li>Release bundles vendor <code>base/</code> and merge both env files into a single <code>&lt;name&gt;.env</code>, so bundles run with one <code>--env-file</code>.</li>
+<li><strong>Zenoh bridge</strong> is self-contained — it does not include the base and uses its own <code>.env</code>.</li>
+</ul>
 <pre class="mermaid"><code>graph LR
     subgraph Single["Single Machine"]
         S1[Planning Simulation]

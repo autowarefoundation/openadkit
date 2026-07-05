@@ -2797,13 +2797,15 @@ make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </spa
 <div class="highlight"><pre><span></span><code><span class="c1"># Documentation build</span>
 make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </span>build
 
-<span class="c1"># Docker Compose validation</span>
-docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>deployments/base/docker-compose.yaml<span class="w"> </span>config<span class="w"> </span>-q
+<span class="c1"># Docker Compose validation (per-sample, with both env files — base first, last wins)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">REMOTE_PASSWORD</span><span class="o">=</span><span class="s2">&quot;ci-validate&quot;</span>
+<span class="o">(</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>deployments/planning-simulation<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>config<span class="w"> </span>-q<span class="w"> </span><span class="o">)</span>
 
 <span class="c1"># Python tests</span>
 pytest<span class="w"> </span>.github/scripts/
 </code></pre></div>
-<p>Fix any failures before pushing. This saves reviewer time and CI minutes.</p>
+<p>For the complete lint suite (shellcheck, actionlint, hadolint, yamllint, markdownlint) and all deployment validations, see the top-level <a href="https://github.com/autowarefoundation/openadkit/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> file.</p>
 <pre class="mermaid"><code>flowchart LR
     Fork --&gt; Clone --&gt; Branch --&gt; Develop --&gt; Commit --&gt; Push --&gt; PR</code></pre>
 <h2 id="community">Community<a class="headerlink" href="#community" title="Permanent link">#</a></h2>

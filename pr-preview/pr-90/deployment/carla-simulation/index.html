@@ -2475,7 +2475,7 @@
 <h2 id="what-you-will-see">What You Will See<a class="headerlink" href="#what-you-will-see" title="Permanent link">#</a></h2>
 <p>After starting the deployment, the CARLA server renders the <code>Town01</code> world and the Autoware stack perceives and drives within it:</p>
 <ul>
-<li>CARLA sensor data (LiDAR, cameras, IMU, GNSS) translated into Autoware ROS 2 messages</li>
+<li>CARLA sensor data (LiDAR, IMU, GNSS) translated into Autoware ROS 2 messages (cameras are defined but disabled by default; uncomment entries in <code>sensor_mapping.yaml</code> to enable them)</li>
 <li>The full perception, localization, and planning pipeline operating on simulated sensors</li>
 <li>Autoware control commands actuating the CARLA ego vehicle in closed loop</li>
 <li>Full RViz2 visualization via the noVNC browser interface</li>

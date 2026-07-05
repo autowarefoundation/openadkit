@@ -35,7 +35,7 @@ Typical resource usage:
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Provides API access during rosbag replay
 - [CARLA Simulation](../deployment/carla-simulation/index.md) — API for CARLA-specific vehicle commands and state
 
-All deployments include the `api` container because it is the standard entry point for external interaction with the Autoware stack.
+All simulation deployments (Planning, Scenario, Logging, CARLA) include the `api` container because it is the standard entry point for external interaction with the Autoware stack. The Zenoh Bridge deployment uses the monolithic `autoware:universe` image instead.
 
 ## Related
 

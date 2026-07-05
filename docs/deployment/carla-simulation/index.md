@@ -51,7 +51,7 @@ cd carla-simulation
 ```
 
 !!! note "Cloned repository"
-    If running from a cloned repository, ensure you have also sourced `../base/base.env` so that shared variables such as `ROS_DOMAIN_ID` and `REMOTE_PASSWORD` are set.
+    If running from a cloned repository, the helper script automatically loads `../base/base.env` alongside `carla-simulation.env` so that shared variables such as `ROS_DOMAIN_ID` and `REMOTE_PASSWORD` are set.
 
 The helper script:
 

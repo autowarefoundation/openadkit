@@ -57,6 +57,7 @@ universe-common slice of Autoware on top of upstream `core-devel`/`core`.
 
 | Group | Description | Targets |
 |-------|-------------|---------|
+| `default` | Meta-group: builds everything | `universe-common` + `component` groups |
 | `universe-common` | Thin intermediate layer | `universe-common-devel`, `universe-common` |
 | `component` | Component images (incl. CUDA) | `sensing-perception`, `sensing-perception-cuda`, `localization-mapping`, `planning-control`, `vehicle-system`, `api`, `visualizer`, `simulator`, `carla-interface` |
 

@@ -10,7 +10,7 @@ flowchart LR
 
 ## Prerequisites
 
-Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on the committed host profile — **Ubuntu 22.04 (Jammy) with ROS 2 Humble**. Install everything with the included [`install.sh`](https://github.com/autowarefoundation/openadkit/blob/main/install.sh) script instead of following separate install guides:
+Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on **Ubuntu 22.04 (Jammy) and 24.04 (Noble)** with ROS 2 Humble. Install everything with the included [`install.sh`](https://github.com/autowarefoundation/openadkit/blob/main/install.sh) script instead of following separate install guides:
 
 | Component | When you need it | How to install |
 |-----------|------------------|----------------|
@@ -67,4 +67,4 @@ ls -la ~/autoware_data
 
 - [Run your first deployment](../deployment/planning-simulation/index.md) — Start with the Planning Simulation
 - [Learn about components](../components/index.md) — Understand the Open AD Kit architecture
-- [Choose a platform](../platforms/index.md) — Deploy to AutoSD, EWAOL, or your local machine
+- [Choose a platform](../platforms/index.md) — Deploy to AutoSD or your local machine

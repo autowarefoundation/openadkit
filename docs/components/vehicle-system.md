@@ -47,7 +47,7 @@ Typical resource usage for both services combined:
 - [Logging Simulation](../deployment/logging-simulation/index.md)
 - [CARLA Simulation](../deployment/carla-simulation/index.md)
 
-All deployments use the `vehicle-system` image because every running stack requires both vehicle actuation and system-level health monitoring.
+All simulation deployments (Planning, Scenario, Logging, CARLA) use the `vehicle-system` image because every running stack requires both vehicle actuation and system-level health monitoring. The Zenoh Bridge deployment uses the monolithic `autoware:universe` image instead.
 
 ## Related
 

@@ -81,7 +81,7 @@ Wait approximately 10 seconds for the containers to initialize.
       --env-file logging-simulation.env --env-file logging-simulation.gpu.env up -d
     ```
 
-    This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `install.sh` by default).
+    This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `install.sh` by default). The `sensing-perception-cuda` image is published for `linux/amd64` only.
 
 --8<-- "includes/visualizer-remote-access.md"
 

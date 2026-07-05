@@ -151,7 +151,7 @@ upstream `base-cuda-{devel,runtime}` and additionally grafts in the
 `universe-common` install tree (so it has both CUDA toolkit access and the
 universe-common compiled packages).
 
-`carla-interface` is an amd64-only component image built on top of
+`carla-interface` is an amd64-only, Humble-only component image built on top of
 `simulator`; it is part of the `component` bake group but is published for
 amd64 only.
 

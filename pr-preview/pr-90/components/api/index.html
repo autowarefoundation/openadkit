@@ -2485,7 +2485,7 @@
 <li><a href="../../deployment/logging-simulation/">Logging Simulation</a> — Provides API access during rosbag replay</li>
 <li><a href="../../deployment/carla-simulation/">CARLA Simulation</a> — API for CARLA-specific vehicle commands and state</li>
 </ul>
-<p>All deployments include the <code>api</code> container because it is the standard entry point for external interaction with the Autoware stack.</p>
+<p>All simulation deployments (Planning, Scenario, Logging, CARLA) include the <code>api</code> container because it is the standard entry point for external interaction with the Autoware stack. The Zenoh Bridge deployment uses the monolithic <code>autoware:universe</code> image instead.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/">Autoware Interface design document</a></li>

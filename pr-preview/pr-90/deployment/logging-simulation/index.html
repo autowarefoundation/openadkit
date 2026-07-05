@@ -2557,7 +2557,7 @@ from a clone you need both so shared variables like <code>ROS_DOMAIN_ID</code> a
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yaml<span class="w"> </span>-f<span class="w"> </span>docker-compose.gpu.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.gpu.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
-<p>This swaps in the <code>sensing-perception-cuda</code> image and reserves the GPU for the <code>sensing</code> and <code>perception</code> services. It requires the NVIDIA Container Toolkit (installed by <code>install.sh</code> by default).</p>
+<p>This swaps in the <code>sensing-perception-cuda</code> image and reserves the GPU for the <code>sensing</code> and <code>perception</code> services. It requires the NVIDIA Container Toolkit (installed by <code>install.sh</code> by default). The <code>sensing-perception-cuda</code> image is published for <code>linux/amd64</code> only.</p>
 </div>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>

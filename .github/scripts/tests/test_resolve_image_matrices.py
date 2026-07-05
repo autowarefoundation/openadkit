@@ -65,7 +65,7 @@ def test_old_outputs_removed():
     assert "single_arch_component_targets" not in m
 
 
-def test_cli_emits_exactly_three_keys():
+def test_cli_emits_exactly_four_keys():
     out = subprocess.run(
         [sys.executable, ".github/scripts/resolve_image_matrices.py"],
         capture_output=True, text=True, check=True,

@@ -9,7 +9,7 @@ The `visualizer` image provides a **browser-accessible RViz2 environment** via n
 The `visualizer` image bundles the following tools and capabilities:
 
 - **noVNC web server** — Browser-based VNC client served over HTTPS (port 6080) with a self-signed SSL certificate for encrypted access
-- **TigerVNC standalone server** — Native VNC backend (port 5900) that renders the desktop session
+- **TigerVNC standalone server** — Native VNC backend (port 5999, loopback-only) that renders the desktop session
 - **Openbox window manager** — Minimal X11 window manager to host RViz2 and other GUI tools
 - **RViz2** — Official ROS 2 visualization tool pre-configured with Autoware display plugins for:
   - Detected objects and predicted trajectories
@@ -17,7 +17,7 @@ The `visualizer` image bundles the following tools and capabilities:
   - Occupancy grid maps and point cloud data
   - Lane boundaries, traffic lights, and map markers
   - Vehicle state and diagnostic displays
-- **SSL certificate for noVNC** — Pre-generated certificate for secure browser connections
+- **SSL certificate for noVNC** — Runtime-generated self-signed certificate created on each container start for secure browser connections
 - **Autoware visualization plugins** — Custom RViz2 plugins for Autoware-specific message types (e.g., `autoware_perception_msgs`, `autoware_planning_msgs`)
 
 Typical resource usage:
@@ -32,7 +32,7 @@ The following environment variables can be configured when launching the visuali
 
 | Variable | Default Value | Possible Values | Description |
 |----------|---------------|-----------------|-------------|
-| `RVIZ_CONFIG` | `/opt/autoware/share/autoware_launch/rviz/autoware.rviz` | Any valid path | The full path to the RViz2 configuration file inside the container |
+| `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | Any valid path | The full path to the RViz2 configuration file inside the container |
 | `REMOTE_DISPLAY` | `true` | `true`, `false` | **(Recommended)** Browser-based RViz2 display accessible from any device. Set to `false` to launch a local RViz2 display |
 | `REMOTE_PASSWORD` | — (required) | Any string without special characters | Password for the remote display. Required when `REMOTE_DISPLAY=true` (the default); the container exits if unset |
 

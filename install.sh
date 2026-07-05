@@ -120,6 +120,11 @@ check_os() {
 }
 
 install_nvidia_container_toolkit() {
+    if command -v nvidia-ctk &>/dev/null; then
+        log_info "NVIDIA Container Toolkit is already installed ($(nvidia-ctk --version)). Skipping."
+        return
+    fi
+
     log_info "Installing NVIDIA Container Toolkit..."
 
     # Remove any pre-existing repo configuration to avoid duplicate entries
@@ -244,6 +249,7 @@ download_autoware_artifacts() {
     sudo chown -R "${TARGET_USER}:" "$data_dir"
 
     # Clean up clone
+    cd - >/dev/null
     rm -rf "$autoware_tmp"
 
     log_info "Autoware artifacts downloaded to ${data_dir}."
@@ -331,8 +337,16 @@ download_sample_data() {
             sha256_verify "${stage}/${name}" "$sum"
         done
         mkdir -p "$MAP_ROOT"
-        rm -rf "$target"
-        mv "$stage" "$target"
+        if [ -d "$target" ]; then
+            mv "$target" "${target}.old"
+        fi
+        if mv "$stage" "$target"; then
+            rm -rf "${target}.old"
+        else
+            mv "${target}.old" "$target" 2>/dev/null || true
+            log_error "Failed to move $stage to $target"
+            return 1
+        fi
         log_info "kashiwanoha_map -> $target"
     }
 

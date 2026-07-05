@@ -28,8 +28,7 @@ If you are a member of the Autoware Foundation contributing to active developmen
 ### Branch Strategy
 
 - `main` — stable, production-ready code
-- `docs-consistency` (and similar) — active development branches merged into `main` via PR
-- Feature branches — use `feat/`, `fix/`, `refactor/` prefixes
+- `feat/...`, `fix/...`, `refactor/...` — active development branches merged into `main` via PR
 
 ### Local CI Commands
 

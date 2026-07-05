@@ -18,7 +18,7 @@ docker run --rm --name visualizer -p 6080:6080 \
 
 | Variable | Default | Options | Description |
 |----------|---------|---------|-------------|
-| `RVIZ_CONFIG` | `/opt/autoware/share/autoware_launch/rviz/autoware.rviz` | Any valid path | RViz configuration file inside the container |
+| `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | Any valid path | RViz configuration file inside the container |
 | `REMOTE_DISPLAY` | `true` | `true`, `false` | Browser-based display (recommended). Set `false` for local RViz2 |
 | `REMOTE_PASSWORD` | — (required) | Any string | Password for the remote display; the container exits if unset |
 
@@ -27,7 +27,7 @@ docker run --rm --name visualizer -p 6080:6080 \
 ```bash
 docker run --rm --name visualizer \
   -p 6080:6080 \
-  -e RVIZ_CONFIG=/opt/autoware/share/autoware_launch/rviz/custom.rviz \
+  -e RVIZ_CONFIG=/opt/autoware/autoware_launch/share/autoware_launch/rviz/custom.rviz \
   -e REMOTE_PASSWORD=mysecurepass \
   ghcr.io/autowarefoundation/openadkit:visualizer
 ```

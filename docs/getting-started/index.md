@@ -37,7 +37,7 @@ This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requ
 Each deployment is downloaded as a self-contained bundle — see [Deployments](../deployment/index.md).
 
 !!! warning "First release pending"
-    Open AD Kit has not published its first stable release yet. Until release bundles are available, clone this repository and run from the `deployments/<sample>/` folders.
+    Open AD Kit has not published its first stable release yet. Until release bundles are available, clone this repository and run from the `deployments/<deployment>/` folders.
 
 ## Verify Your Installation
 

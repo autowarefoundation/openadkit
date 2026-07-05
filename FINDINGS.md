@@ -14,8 +14,7 @@ This is an **upstream Autoware issue** — the `diagnostic_graph_aggregator` com
 ```bash
 ros2 topic pub --once /system/command_mode/availability \
   tier4_system_msgs/msg/CommandModeAvailability \
-  '{items: [{mode: 1001, available: true}, {mode: 1002, available: true}, \
-            {mode: 1003, available: true}, {mode: 1004, available: true}]}'
+  '{items: [{mode: 1001, available: true}, {mode: 1002, available: true}, {mode: 1003, available: true}, {mode: 1004, available: true}]}'
 ```
 
 All other issues found during this audit have been fixed in code. This is the only remaining blocker.

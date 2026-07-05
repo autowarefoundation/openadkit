@@ -4,7 +4,6 @@
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Load .env into the environment. Call before parsing flags so that
@@ -39,7 +38,7 @@ run_compose() {
 
     local cmd="${1:-up}"
     shift
-    local args="$@"
+    local args="$*"
 
     echo -e "${YELLOW}[${context_name}]${NC} Target Services: ${GREEN}${target_services}${NC}"
 

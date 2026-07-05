@@ -31,7 +31,7 @@ block-beta
     UC --> API
     UC --> VIZ
     UC --> SIM
-    UC --> CARLA
+    SIM --> CARLA
     UP --> SPC
     UC --> SPC
 

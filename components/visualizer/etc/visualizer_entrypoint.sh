@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # cspell:ignore openbox, VNC, tigervnc, novnc, websockify, newkey, xstartup, pixelformat, AUTHTOKEN, authtoken, vncserver, autoconnect, vncpasswd
 # shellcheck disable=SC1090,SC1091
+set -euo pipefail
 
 # Check if RVIZ_CONFIG is provided
-if [ -z "$RVIZ_CONFIG" ]; then
+if [ -z "${RVIZ_CONFIG:-}" ]; then
     echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz\e[0m"
     RVIZ_CONFIG="/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz"
     export RVIZ_CONFIG
 fi
 
-if [ -z "$USE_SIM_TIME" ]; then
+if [ -z "${USE_SIM_TIME:-}" ]; then
     echo -e "\e[31mUSE_SIM_TIME is not set defaulting to false\e[0m"
     USE_SIM_TIME="false"
     export USE_SIM_TIME
@@ -62,7 +63,7 @@ EOF
     echo "/usr/local/bin/start-rviz2.sh" >>/etc/xdg/openbox/autostart
 
     # Configure VNC password
-    if [ -z "$REMOTE_PASSWORD" ]; then
+    if [ -z "${REMOTE_PASSWORD:-}" ]; then
         echo -e "\e[31mREMOTE_PASSWORD is not set. Please set it before starting.\e[0m"
         exit 1
     fi
@@ -74,12 +75,9 @@ EOF
     # inside the container) can reach it. This is important under
     # network_mode: host where the container's loopback == the host's.
     echo "Starting VNC server with Openbox..."
-    vncserver :99 -localhost -geometry 1024x768 -depth 16 -pixelformat rgb565
-    VNC_RESULT=$?
-
-    if [ $VNC_RESULT -ne 0 ]; then
-        echo "Failed to start VNC server (exit code: $VNC_RESULT)"
-        exit $VNC_RESULT
+    if ! vncserver :99 -localhost -geometry 1024x768 -depth 16 -pixelformat rgb565; then
+        echo "Failed to start VNC server"
+        exit 1
     fi
 
     # Set the DISPLAY variable to match VNC server
@@ -92,11 +90,14 @@ EOF
     # certificate baked into the image).
     echo "Generating TLS certificate for NoVNC..."
     mkdir -p /etc/ssl/private /etc/ssl/certs
-    openssl req -x509 -nodes -newkey rsa:2048 \
+    if ! openssl req -x509 -nodes -newkey rsa:2048 \
       -keyout /etc/ssl/private/novnc.key \
       -out /etc/ssl/certs/novnc.crt \
       -days 365 \
-      -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1
+      -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1; then
+        echo "Failed to generate TLS certificate for NoVNC"
+        exit 1
+    fi
 
     # Start NoVNC. Under network_mode: host (base deployments) bind to
     # loopback so noVNC is not exposed on every interface. Under bridge
@@ -106,9 +107,12 @@ EOF
     # loopback. The VNC server is always loopback-only (see -localhost above).
     echo "Starting NoVNC..."
     local websck_bind="${WEBSOCKIFY_BIND:-127.0.0.1}"
-    websockify --daemon --web=/usr/share/novnc/ \
+    if ! websockify --daemon --web=/usr/share/novnc/ \
       --cert=/etc/ssl/certs/novnc.crt --key=/etc/ssl/private/novnc.key \
-      "${websck_bind}:6080" localhost:5999
+      "${websck_bind}:6080" localhost:5999; then
+        echo "Failed to start websockify (NoVNC server)"
+        exit 1
+    fi
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
@@ -119,11 +123,12 @@ EOF
 }
 
 # Source ROS and Autoware setup files
-source "/opt/ros/$ROS_DISTRO/setup.bash"
+: "${ROS_DISTRO:?ROS_DISTRO must be set (e.g. humble)}"
+source "/opt/ros/${ROS_DISTRO}/setup.bash"
 source "/opt/autoware/setup.bash"
 
 # Execute passed command if provided, otherwise launch rviz2
-if [ "$REMOTE_DISPLAY" == "false" ]; then
+if [ "${REMOTE_DISPLAY:-true}" == "false" ]; then
     echo "Launching local rviz2 display"
     [ $# -eq 0 ] && rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
     exec "$@"

@@ -35,7 +35,7 @@ After boot, systemd starts the following services defined under `components/`:
 !!! note "Unit naming"
     Quadlet `.container` files register with systemd as `.service` units. The table lists the source unit files (`awf-oak-planning.container`); when querying them with `systemctl`, use the generated service name (`awf-oak-planning.service`). Both names refer to the same unit.
 
-The planning container launches `planning_simulator.launch.xml` with the extracted map mounted at `/etc/awf/map`, including the noVNC RViz2 visualizer. The simulator container runs `scenario_test_runner` against the bundled `sample.yaml` scenario.
+The planning container launches `planning_simulator.launch.xml` with the extracted map mounted at `/etc/awf/map` and RViz disabled (`rviz:=false`). The simulator container runs `scenario_test_runner` against the bundled `sample.yaml` scenario.
 
 ## Workflow
 
@@ -49,7 +49,12 @@ The planning container launches `planning_simulator.launch.xml` with the extract
    systemctl status awf-oak-simulator.service
    ```
 
-4. Access the visualizer via the exposed noVNC endpoint and run the planning simulation workflow
+4. Verify the planning and simulator services are running and observe logs:
+
+   ```bash
+   journalctl -u awf-oak-planning.service -f
+   journalctl -u awf-oak-simulator.service -f
+   ```
 
 ```mermaid
 graph LR
@@ -58,18 +63,16 @@ graph LR
     Systemd --> Podman[Podman Pod]
     Podman --> PC[awf-oak-planning]
     Podman --> SIM[awf-oak-simulator]
-    PC --> VIZ[noVNC RViz2]
 ```
 
 ## Expected Outcome
 
 Once all services are running, you can:
 
-- Set initial and goal poses in the noVNC RViz2 interface
-- Observe the Autoware planning stack responding to the scenario simulator environment
+- Observe the Autoware planning stack responding to the scenario simulator environment via service logs
 - Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware
 
-For a Docker Compose equivalent on a development laptop, see the [Planning Simulation deployment](../../../deployment/planning-simulation/index.md).
+For a Docker Compose equivalent with a browser-accessible RViz2 visualizer, see the [Planning Simulation deployment](../../../deployment/planning-simulation/index.md).
 
 ## Related
 

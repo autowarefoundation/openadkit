@@ -24,9 +24,6 @@ __pycache__/
 # MkDocs
 /site/
 
-# Generated docs
-docs/releases/index.md
-
 # rviz Screen Capture
 capture/
 

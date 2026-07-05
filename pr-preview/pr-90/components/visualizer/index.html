@@ -2481,7 +2481,7 @@
 <p>The <code>visualizer</code> image bundles the following tools and capabilities:</p>
 <ul>
 <li><strong>noVNC web server</strong> — Browser-based VNC client served over HTTPS (port 6080) with a self-signed SSL certificate for encrypted access</li>
-<li><strong>TigerVNC standalone server</strong> — Native VNC backend (port 5900) that renders the desktop session</li>
+<li><strong>TigerVNC standalone server</strong> — Native VNC backend (port 5999, loopback-only) that renders the desktop session</li>
 <li><strong>Openbox window manager</strong> — Minimal X11 window manager to host RViz2 and other GUI tools</li>
 <li><strong>RViz2</strong> — Official ROS 2 visualization tool pre-configured with Autoware display plugins for:<ul>
 <li>Detected objects and predicted trajectories</li>
@@ -2491,7 +2491,7 @@
 <li>Vehicle state and diagnostic displays</li>
 </ul>
 </li>
-<li><strong>SSL certificate for noVNC</strong> — Pre-generated certificate for secure browser connections</li>
+<li><strong>SSL certificate for noVNC</strong> — Runtime-generated self-signed certificate created on each container start for secure browser connections</li>
 <li><strong>Autoware visualization plugins</strong> — Custom RViz2 plugins for Autoware-specific message types (e.g., <code>autoware_perception_msgs</code>, <code>autoware_planning_msgs</code>)</li>
 </ul>
 <p>Typical resource usage:</p>
@@ -2514,7 +2514,7 @@
 <tbody>
 <tr>
 <td><code>RVIZ_CONFIG</code></td>
-<td><code>/opt/autoware/share/autoware_launch/rviz/autoware.rviz</code></td>
+<td><code>/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz</code></td>
 <td>Any valid path</td>
 <td>The full path to the RViz2 configuration file inside the container</td>
 </tr>

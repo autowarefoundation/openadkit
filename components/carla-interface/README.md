@@ -2,8 +2,10 @@
 
 This image packages Autoware's CARLA interface with the CARLA 0.9.16 Python API for the CARLA e2e sample.
 
+The image has no default launch command — run it via the [CARLA Simulation deployment](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/) compose file, which provides the full parameter set:
+
 ```bash
-docker run --rm --network host ghcr.io/autowarefoundation/openadkit:carla-interface
+docker compose --env-file carla-simulation.env up -d
 ```
 
 The image is built by GitHub Actions as part of the component pipeline from `components/docker-bake.hcl`.

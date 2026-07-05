@@ -19,7 +19,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 - An NVIDIA GPU — the CARLA server requires GPU rendering
 - A working host X display (usually `DISPLAY=:0`) with X access for local containers (e.g. `xhost +SI:localuser:root`)
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
-- **Ubuntu 22.04** — CARLA 0.9.16 is built on Unreal Engine 4.26, which has not been tested on Ubuntu 24.04. Users on 24.04 may encounter segfaults (Signal 11) at startup. See the [CARLA build docs](https://carla.readthedocs.io/en/0.9.16/build_linux) for details.
+- **Ubuntu 22.04** — CARLA 0.9.16 is built on Unreal Engine 4.26, which has not been tested on Ubuntu 24.04 (see the [CARLA build docs](https://carla.readthedocs.io/en/0.9.16/build_linux)). Users on 24.04 have reported segfaults (Signal 11) at startup.
 
 !!! warning "GPU Required"
     Unlike the other deployments, CARLA itself is GPU-rendered. This deployment does not run on CPU-only machines.
@@ -62,6 +62,19 @@ The helper script:
 - Verifies localization, CARLA LiDAR data, and the CARLA ego actor
 
 The default behavior is **no-drive**: set a route and engage manually in RViz2.
+
+### Sensor Configuration
+
+The `sensor_mapping.yaml` file controls which CARLA sensors are bridged into Autoware. By default, only LiDAR, IMU, and GNSS are enabled. Cameras are defined but commented out — uncomment entries in `sensor_mapping.yaml` to enable them.
+
+### Kernel UDP Buffers
+
+The helper script automatically raises kernel UDP buffer limits. If you prefer to set them manually:
+
+```bash
+sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
+  net.core.rmem_default=134217728 net.core.wmem_default=134217728
+```
 
 --8<-- "includes/visualizer-remote-access.md"
 
@@ -114,7 +127,7 @@ flowchart LR
         VIZ[visualizer]
     end
 
-    C -->|LiDAR, camera, GNSS| CI
+    C -->|LiDAR, IMU, GNSS| CI
     CI --> S
     S --> P
     M --> L

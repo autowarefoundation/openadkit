@@ -53,8 +53,8 @@ Edit `scenario-simulation.env` to customize the deployment:
 |----------|-------------|---------|
 | `SCENARIO_SIMULATION` | Enable scenario simulator mode | `true` |
 | `SCENARIO` | Scenario file path inside the container | (bundled example) |
-| `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` | `./scenarios/` |
-| `OUTPUT_HOST_PATH` | Host directory for simulation results | `./output/` |
+| `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` | `./scenarios` |
+| `OUTPUT_HOST_PATH` | Host directory for simulation results | `./output` |
 | `OUTPUT_DIRECTORY` | Container path for simulation results | `/autoware/scenario-sim/output` |
 | `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image tag | `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime` (pinned in `scenario-simulation.env`) |
 | `SCENARIO_READY_TIMEOUT` | Max seconds to wait for Autoware readiness | 300 |
@@ -74,7 +74,7 @@ To run your own scenario:
 3. Simulation results are saved to `OUTPUT_HOST_PATH` (default: `./output/`)
 
 !!! tip "Custom Maps"
-    Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, update `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE`, and ensure the files exist under `MAP_PATH` before starting.
+    Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, update `MAP_PATH` (in `scenario-simulation.env`) and `LANELET2_MAP_FILE` / `POINTCLOUD_MAP_FILE` (in `base.env` for cloned-repo users), and ensure the files exist under `MAP_PATH` before starting.
 
 ## Start the Deployment
 
@@ -88,7 +88,7 @@ docker compose --env-file scenario-simulation.env up -d
     If running from a cloned repository rather than a release bundle, pass both env files:
     `docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d`
 
-Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds for required Autoware map and API endpoints before launching.
+Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an `INITIALIZE_DURATION` of 90 seconds before launching.
 
 --8<-- "includes/visualizer-remote-access.md"
 
@@ -121,7 +121,8 @@ graph LR
     subgraph Host["Single Host"]
         M[localization-mapping]
         PC[planning-control]
-        VS[vehicle-system]
+        V[vehicle]
+        S[system]
         SIM[simulator]
         API[api]
         VIZ[visualizer]
@@ -129,11 +130,23 @@ graph LR
     end
 
     Map[~/autoware_map] --> M
+    M --> API
     M --> PC
     SS <-->|ROS 2 DDS| SIM
     SIM --> PC
+    S --> PC
+    V --> PC
     PC --> VIZ
 ```
+
+### Advanced Configuration
+
+The `config/` directory contains parameter files mounted into the containers:
+
+- `config/mrm_handler.param.yaml` — MRM (Minimum Risk Maneuver) timeouts and behavior, mounted into the `system` service
+- `config/default_adapi.param.yaml` — ADAPI parameter overrides, mounted into the `api` service
+
+Edit these files to tune MRM and API behavior without rebuilding images.
 
 ## Related
 

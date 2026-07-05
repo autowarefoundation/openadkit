@@ -10,7 +10,7 @@ Runnable assets live under [`platforms/autosd/planning-simulator/`](https://gith
 | Folder | Contents |
 |--------|----------|
 | `aib/` | Automotive Image Builder manifest files (`image.aib.yml`, `vars.yml`) to build an AutoSD OS image |
-| `components/container-files/` | Quadlet unit files for Podman containers and the shared pod |
+| `components/container-files/` | Quadlet unit files for Podman containers, the shared pod, and the shared environment file (`awf-oak.env`) |
 | `components/systemd/` | systemd oneshot service for map extraction |
 | `components/scripts/` | Helper scripts installed into the AutoSD image |
 
@@ -36,6 +36,8 @@ After boot, systemd starts the following services defined under `components/`:
     Quadlet `.container` files register with systemd as `.service` units. The table lists the source unit files (`awf-oak-planning.container`); when querying them with `systemctl`, use the generated service name (`awf-oak-planning.service`). Both names refer to the same unit.
 
 The planning container launches `planning_simulator.launch.xml` with the extracted map mounted at `/etc/awf/map` and RViz disabled (`rviz:=false`). The simulator container runs `scenario_test_runner` against the bundled `sample.yaml` scenario. The simulator is a `Type=oneshot` service — it runs the scenario once (up to ~180 seconds) and then exits. After completion, `systemctl status awf-oak-simulator.service` shows `inactive (dead)`, which is expected, not a failure. The planning container stays running.
+
+Both containers source `awf-oak.env`, which sets `ROS_DOMAIN_ID=26` and `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Use these values when running additional ROS 2 nodes alongside the deployment.
 
 ## Workflow
 

@@ -176,14 +176,18 @@ empty uses upstream's plain `<name>-<distro>` multi-arch tag.
 ## CI pipeline
 
 `build-all-images.yaml` builds the universe-common graph on pushes,
-schedules, and manual dispatch. It walks the `{humble, jazzy} × {amd64,
-arm64}` matrix through staged jobs — `prepare`, then `build-common` and
-`build-components` — so each layer is pushed before the
-layer that depends on it. A final `create-manifests` job stitches the
-per-arch tags into multi-arch manifests via the `combine-multi-arch-images`
-composite action. `release.yaml` is a manually dispatched workflow that
-promotes a validated, scanned `build-all-images` run to a stable Open AD
-Kit release tag (it does not rebuild images).
+schedules, and manual dispatch. It walks the matrix defined in
+`.github/image-inventory.json` through staged jobs — `prepare`, then
+`build-common` and `build-components`, then `build-carla-interface` (which
+depends on `simulator`) — so each layer is pushed before the
+layer that depends on it. The matrix is per-image: most targets build for
+`{humble, jazzy} × {amd64, arm64}`, but `sensing-perception-cuda` is
+amd64-only and `carla-interface` is amd64 + Humble only. A final
+`create-manifests` job stitches the per-arch tags into multi-arch
+manifests via the `combine-multi-arch-images` composite action.
+`release.yaml` is a manually dispatched workflow that promotes a
+validated, scanned `build-all-images` run to a stable Open AD Kit release
+tag (it does not rebuild images).
 
 ## Open AD Kit Roadmap
 

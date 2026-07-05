@@ -17,7 +17,7 @@ AutoSD brings different features into the table, such as:
 
 This folder contains a per use-case structure on how to deploy/run Open AD Kit in AutoSD, with each folder containing at least:
 
-* quadlet files to define containerized services to  be managed by podman and systemd
+* quadlet files to define containerized services to be managed by podman and systemd
 * automotive-image-builder files to build an AutoSD image(s)
 
 * [planning-simulator](./planning-simulator/README.md): Run planning and simulator services in containers (pre-built)

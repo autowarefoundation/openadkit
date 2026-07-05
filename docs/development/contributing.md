@@ -130,14 +130,16 @@ Run the same checks CI runs to catch issues early:
 # Documentation build
 make -C docs build
 
-# Docker Compose validation
-docker compose -f deployments/base/docker-compose.yaml config -q
+# Docker Compose validation (per-sample, with both env files — base first, last wins)
+export REMOTE_PASSWORD="ci-validate"
+( cd deployments/planning-simulation && \
+  docker compose --env-file ../base/base.env --env-file planning-simulation.env config -q )
 
 # Python tests
 pytest .github/scripts/
 ```
 
-Fix any failures before pushing. This saves reviewer time and CI minutes.
+For the complete lint suite (shellcheck, actionlint, hadolint, yamllint, markdownlint) and all deployment validations, see the top-level [CONTRIBUTING.md](https://github.com/autowarefoundation/openadkit/blob/main/CONTRIBUTING.md) file.
 
 ```mermaid
 flowchart LR

@@ -76,8 +76,24 @@ All deployments share a common pattern:
 
 1. **Component images** are pulled from the GitHub Container Registry
 2. **Environment files** (`.env`) configure runtime parameters
-3. **Docker Compose** orchestrates containers on a single host
+3. **Docker Compose** orchestrates containers on a single host (or across two hosts for the Zenoh bridge)
 4. **Optional: Zenoh bridge** connects distributed ROS 2 domains for remote operation
+
+### Base + Overlay Model
+
+Four of the five deployments (planning, scenario, logging, carla) build on a shared **base** (`deployments/base/`):
+
+- `deployments/base/docker-compose.yaml` defines shared services (map, planning, vehicle, system, control, simulator, api, visualizer).
+- Each deployment uses Compose `include:` to pull in the base, then adds only its delta (e.g. `scenario_simulator` service, GPU overlays).
+- `deployments/base/base.env` holds shared defaults; each deployment adds a `<name>.env` with its overrides.
+- From a cloned repo, run with **two** `--env-file`s (base first, sample second — last wins):
+
+  ```bash
+  docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
+  ```
+
+- Release bundles vendor `base/` and merge both env files into a single `<name>.env`, so bundles run with one `--env-file`.
+- **Zenoh bridge** is self-contained — it does not include the base and uses its own `.env`.
 
 ```mermaid
 graph LR

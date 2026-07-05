@@ -87,7 +87,7 @@ graph TD
 - **`config/zenoh-bridge-ros2dds.json5`** — Defines bridge mode, endpoints, and topic filtering rules. Filtering allows precise bandwidth control by excluding high-frequency or irrelevant topics.
 
 !!! warning "Prevent DDS Cross-Traffic"
-    When bridging two ROS 2 domains, ensure they cannot discover each other via native DDS multicast. Use `ROS_DOMAIN_ID` separation or configure `CYCLONEDDS_URI` to restrict interfaces. Otherwise, topics may be duplicated across both networks.
+    When bridging two ROS 2 domains, ensure they cannot discover each other via native DDS multicast. The compose file enforces domain separation via `ROS_DOMAIN_ID`: edge services use `0`, cloud services use `1`. The Zenoh bridges carry messages across this boundary over `zenoh_net`. Alternatively, configure `CYCLONEDDS_URI` to restrict interfaces. Otherwise, topics may be duplicated across both networks.
 
 ### Multi-Vehicle Namespace Support
 
@@ -177,12 +177,14 @@ For **split topology** (multi-machine), set `ZENOH_ROUTER_BIND_IP=0.0.0.0` on th
 Separate Edge and Cloud components to simulate a real-world distributed environment.
 
 ```bash
-# Terminal 1: Start Edge components (Autoware, Simulator, Edge Bridge)
-./edge.sh up -d
-
-# Terminal 2: Start Cloud components (Visualizer, Cloud Bridge)
+# Terminal 1: Start Cloud components (Visualizer, Cloud Bridge)
 ./cloud.sh up -d
+
+# Terminal 2: Start Edge components (Autoware, Simulator, Edge Bridge)
+./edge.sh up -d
 ```
+
+Start the cloud side first so the edge Zenoh bridge can connect to the cloud router immediately. If edge starts before cloud, the bridge retries until the router is available.
 
 ### Option B: Monolithic Deployment
 
@@ -215,7 +217,7 @@ export CLOUD_IP=192.168.1.100
 ./edge.sh
 ```
 
-Before starting the cloud side for a multi-machine deployment, set `ZENOH_ROUTER_BIND_IP=0.0.0.0` in `.env` or export it in the shell. This exposes TCP 7448 on the cloud host; keep it limited to trusted networks.
+Before starting the cloud side for a multi-machine deployment, set `ZENOH_ROUTER_BIND_IP=0.0.0.0` in `.env`. This exposes TCP 7448 on the cloud host; keep it limited to trusted networks. (The value must be set in `.env` — `cloud.sh` sources `.env` on startup, which overwrites any shell export.)
 
 ### Monitor Startup Logs
 

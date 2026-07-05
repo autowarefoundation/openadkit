@@ -153,7 +153,7 @@ AutoSD's mixed-criticality architecture maps naturally to Open AD Kit's componen
 
 <div class="oak-component-item">
 <strong>BlueChi + Quadlet</strong>
-<span>Container orchestration via systemd units. Each Open AD Kit component maps to a Quadlet service file managed by BlueChi.</span>
+<span>Container orchestration via systemd units. Each Open AD Kit component maps to a Quadlet service file managed by systemd (BlueChi is available for multi-host orchestration on production deployments).</span>
 </div>
 
 </div>

@@ -55,8 +55,8 @@ Edit `scenario-simulation.env` to customize the deployment:
 | `SCENARIO` | Scenario file path inside the container | (bundled example) |
 | `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` | `./scenarios/` |
 | `OUTPUT_HOST_PATH` | Host directory for simulation results | `./output/` |
-| `OUTPUT_DIRECTORY` | Container path for simulation results | — |
-| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image tag | (pinned in `.env`) |
+| `OUTPUT_DIRECTORY` | Container path for simulation results | `/autoware/scenario-sim/output` |
+| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image tag | `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime` (pinned in `scenario-simulation.env`) |
 | `SCENARIO_READY_TIMEOUT` | Max seconds to wait for Autoware readiness | 300 |
 | `MAP_PATH` | Host map directory mounted into containers | `~/autoware_map/kashiwanoha_map` |
 

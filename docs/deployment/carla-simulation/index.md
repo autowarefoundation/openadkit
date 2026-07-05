@@ -7,7 +7,7 @@
 
 After starting the deployment, the CARLA server renders the `Town01` world and the Autoware stack perceives and drives within it:
 
-- CARLA sensor data (LiDAR, cameras, IMU, GNSS) translated into Autoware ROS 2 messages
+- CARLA sensor data (LiDAR, IMU, GNSS) translated into Autoware ROS 2 messages (cameras are defined but disabled by default; uncomment entries in `sensor_mapping.yaml` to enable them)
 - The full perception, localization, and planning pipeline operating on simulated sensors
 - Autoware control commands actuating the CARLA ego vehicle in closed loop
 - Full RViz2 visualization via the noVNC browser interface

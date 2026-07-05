@@ -4,6 +4,7 @@ site_url: https://autowarefoundation.github.io/openadkit/
 repo_url: https://github.com/autowarefoundation/openadkit
 edit_uri: edit/main/docs/
 docs_dir: docs
+strict: true
 copyright: Copyright &copy; 2026 The Autoware Foundation
 
 theme:

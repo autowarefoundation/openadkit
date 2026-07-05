@@ -23,9 +23,9 @@ Typical resource usage:
 ## Used In
 
 - [Logging Simulation](../deployment/logging-simulation/index.md)
-- [Planning Simulation](../deployment/planning-simulation/index.md)
-- [Scenario Simulation](../deployment/scenario-simulation/index.md)
 - [CARLA Simulation](../deployment/carla-simulation/index.md)
+
+The `localization-mapping` image is also used for the `map` service in Planning and Scenario simulations, but the localization component itself (`tier4_localization_component.launch.xml`) runs only in Logging and CARLA. In Planning and Scenario, the simulator provides map→odom TF instead.
 
 ## Related
 

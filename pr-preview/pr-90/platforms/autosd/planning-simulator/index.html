@@ -2451,8 +2451,8 @@
 </tr>
 <tr>
 <td><code>awf-oak-simulator.container</code></td>
-<td>Container</td>
-<td>Runs the TIER IV Scenario Simulator with the bundled example scenario</td>
+<td>Container (oneshot)</td>
+<td>Runs the TIER IV Scenario Simulator once against the bundled <code>sample.yaml</code> scenario, then exits</td>
 </tr>
 <tr>
 <td><code>awf-oak.pod</code></td>
@@ -2465,7 +2465,7 @@
 <p class="admonition-title">Unit naming</p>
 <p>Quadlet <code>.container</code> files register with systemd as <code>.service</code> units. The table lists the source unit files (<code>awf-oak-planning.container</code>); when querying them with <code>systemctl</code>, use the generated service name (<code>awf-oak-planning.service</code>). Both names refer to the same unit.</p>
 </div>
-<p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code> and RViz disabled (<code>rviz:=false</code>). The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario.</p>
+<p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code> and RViz disabled (<code>rviz:=false</code>). The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario. The simulator is a <code>Type=oneshot</code> service — it runs the scenario once (up to ~180 seconds) and then exits. After completion, <code>systemctl status awf-oak-simulator.service</code> shows <code>inactive (dead)</code>, which is expected, not a failure. The planning container stays running.</p>
 <h2 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">#</a></h2>
 <ol>
 <li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code> (see <a href="../#building-an-autosd-image">AutoSD build instructions</a>)</li>

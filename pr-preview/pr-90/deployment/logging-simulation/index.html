@@ -2619,6 +2619,7 @@ from a clone you need both so shared variables like <code>ROS_DOMAIN_ID</code> a
     LM --&gt; P[planning]
     P --&gt; C[control]
     C --&gt; Viz[visualizer]</code></pre>
+<p>Simplified data flow above; the full stack also runs <code>map</code>, <code>system</code>, <code>vehicle</code>, <code>simulator</code>, and <code>api</code> support services.</p>
 <h2 id="known-limitations">Known Limitations<a class="headerlink" href="#known-limitations" title="Permanent link">#</a></h2>
 <p>The <code>rosbag</code> service in this deployment uses the upstream <code>ghcr.io/autowarefoundation/autoware:universe</code> image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture. An Open AD Kit component image for rosbag playback will be available in a future release.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>

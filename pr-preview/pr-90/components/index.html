@@ -2684,14 +2684,18 @@ images are built against. CI sets it from a repository Variable; leaving it
 empty uses upstream's plain <code>&lt;name&gt;-&lt;distro&gt;</code> multi-arch tag.</p>
 <h2 id="ci-pipeline">CI pipeline<a class="headerlink" href="#ci-pipeline" title="Permanent link">#</a></h2>
 <p><code>build-all-images.yaml</code> builds the universe-common graph on pushes,
-schedules, and manual dispatch. It walks the <code>{humble, jazzy} × {amd64,
-arm64}</code> matrix through staged jobs — <code>prepare</code>, then <code>build-common</code> and
-<code>build-components</code> — so each layer is pushed before the
-layer that depends on it. A final <code>create-manifests</code> job stitches the
-per-arch tags into multi-arch manifests via the <code>combine-multi-arch-images</code>
-composite action. <code>release.yaml</code> is a manually dispatched workflow that
-promotes a validated, scanned <code>build-all-images</code> run to a stable Open AD
-Kit release tag (it does not rebuild images).</p>
+schedules, and manual dispatch. It walks the matrix defined in
+<code>.github/image-inventory.json</code> through staged jobs — <code>prepare</code>, then
+<code>build-common</code> and <code>build-components</code>, then <code>build-carla-interface</code> (which
+depends on <code>simulator</code>) — so each layer is pushed before the
+layer that depends on it. The matrix is per-image: most targets build for
+<code>{humble, jazzy} × {amd64, arm64}</code>, but <code>sensing-perception-cuda</code> is
+amd64-only and <code>carla-interface</code> is amd64 + Humble only. A final
+<code>create-manifests</code> job stitches the per-arch tags into multi-arch
+manifests via the <code>combine-multi-arch-images</code> composite action.
+<code>release.yaml</code> is a manually dispatched workflow that promotes a
+validated, scanned <code>build-all-images</code> run to a stable Open AD Kit release
+tag (it does not rebuild images).</p>
 <h2 id="open-ad-kit-roadmap">Open AD Kit Roadmap<a class="headerlink" href="#open-ad-kit-roadmap" title="Permanent link">#</a></h2>
 <p>Open AD Kit tracks Autoware's architecture evolution upstream, but its own roadmap is focused on <strong>deployment</strong> — containerization, platform support, release trust, and CI/CD — rather than on the autonomy algorithms themselves. The goal is to package whatever Autoware ships into clean, composable, deployment-ready images.</p>
 <div class="admonition note">

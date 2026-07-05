@@ -2375,6 +2375,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Start the Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sensor-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensor Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kernel-udp-buffers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kernel UDP Buffers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2487,7 +2515,7 @@
 <li>An NVIDIA GPU — the CARLA server requires GPU rendering</li>
 <li>A working host X display (usually <code>DISPLAY=:0</code>) with X access for local containers (e.g. <code>xhost +SI:localuser:root</code>)</li>
 <li>Host NVIDIA Vulkan ICD at <code>/usr/share/vulkan/icd.d/nvidia_icd.json</code></li>
-<li><strong>Ubuntu 22.04</strong> — CARLA 0.9.16 is built on Unreal Engine 4.26, which has not been tested on Ubuntu 24.04. Users on 24.04 may encounter segfaults (Signal 11) at startup. See the <a href="https://carla.readthedocs.io/en/0.9.16/build_linux">CARLA build docs</a> for details.</li>
+<li><strong>Ubuntu 22.04</strong> — CARLA 0.9.16 is built on Unreal Engine 4.26, which has not been tested on Ubuntu 24.04 (see the <a href="https://carla.readthedocs.io/en/0.9.16/build_linux">CARLA build docs</a>). Users on 24.04 have reported segfaults (Signal 11) at startup.</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">GPU Required</p>
@@ -2522,6 +2550,13 @@
 <li>Verifies localization, CARLA LiDAR data, and the CARLA ego actor</li>
 </ul>
 <p>The default behavior is <strong>no-drive</strong>: set a route and engage manually in RViz2.</p>
+<h3 id="sensor-configuration">Sensor Configuration<a class="headerlink" href="#sensor-configuration" title="Permanent link">#</a></h3>
+<p>The <code>sensor_mapping.yaml</code> file controls which CARLA sensors are bridged into Autoware. By default, only LiDAR, IMU, and GNSS are enabled. Cameras are defined but commented out — uncomment entries in <code>sensor_mapping.yaml</code> to enable them.</p>
+<h3 id="kernel-udp-buffers">Kernel UDP Buffers<a class="headerlink" href="#kernel-udp-buffers" title="Permanent link">#</a></h3>
+<p>The helper script automatically raises kernel UDP buffer limits. If you prefer to set them manually:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>sysctl<span class="w"> </span>-w<span class="w"> </span>net.core.rmem_max<span class="o">=</span><span class="m">2147483647</span><span class="w"> </span>net.core.wmem_max<span class="o">=</span><span class="m">2147483647</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>net.core.rmem_default<span class="o">=</span><span class="m">134217728</span><span class="w"> </span>net.core.wmem_default<span class="o">=</span><span class="m">134217728</span>
+</code></pre></div>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html
@@ -2592,7 +2627,7 @@
         VIZ[visualizer]
     end
 
-    C --&gt;|LiDAR, camera, GNSS| CI
+    C --&gt;|LiDAR, IMU, GNSS| CI
     CI --&gt; S
     S --&gt; P
     M --&gt; L

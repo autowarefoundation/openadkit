@@ -2469,6 +2469,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#advanced-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2567,12 +2584,12 @@
 <tr>
 <td><code>SCENARIO_HOST_DIR</code></td>
 <td>Host directory mounted at <code>/scenarios</code></td>
-<td><code>./scenarios/</code></td>
+<td><code>./scenarios</code></td>
 </tr>
 <tr>
 <td><code>OUTPUT_HOST_PATH</code></td>
 <td>Host directory for simulation results</td>
-<td><code>./output/</code></td>
+<td><code>./output</code></td>
 </tr>
 <tr>
 <td><code>OUTPUT_DIRECTORY</code></td>
@@ -2611,7 +2628,7 @@
 </ol>
 <div class="admonition tip">
 <p class="admonition-title">Custom Maps</p>
-<p>Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, update <code>MAP_PATH</code>, <code>LANELET2_MAP_FILE</code>, and <code>POINTCLOUD_MAP_FILE</code>, and ensure the files exist under <code>MAP_PATH</code> before starting.</p>
+<p>Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, update <code>MAP_PATH</code> (in <code>scenario-simulation.env</code>) and <code>LANELET2_MAP_FILE</code> / <code>POINTCLOUD_MAP_FILE</code> (in <code>base.env</code> for cloned-repo users), and ensure the files exist under <code>MAP_PATH</code> before starting.</p>
 </div>
 <h2 id="start-the-deployment">Start the Deployment<a class="headerlink" href="#start-the-deployment" title="Permanent link">#</a></h2>
 <p>From the <code>scenario-simulation</code> directory, start the containers:</p>
@@ -2622,7 +2639,7 @@
 <p>If running from a cloned repository rather than a release bundle, pass both env files:
 <code>docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d</code></p>
 </div>
-<p>Wait approximately <strong>90 seconds</strong> for Autoware and the scenario simulator to initialize. The scenario runner waits up to <code>SCENARIO_READY_TIMEOUT</code> seconds for required Autoware map and API endpoints before launching.</p>
+<p>Wait approximately <strong>90 seconds</strong> for Autoware and the scenario simulator to initialize. The scenario runner waits up to <code>SCENARIO_READY_TIMEOUT</code> seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an <code>INITIALIZE_DURATION</code> of 90 seconds before launching.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>
 <div class="highlight"><pre><span></span><code>http://localhost:6080/vnc.html
@@ -2678,7 +2695,8 @@
     subgraph Host["Single Host"]
         M[localization-mapping]
         PC[planning-control]
-        VS[vehicle-system]
+        V[vehicle]
+        S[system]
         SIM[simulator]
         API[api]
         VIZ[visualizer]
@@ -2686,10 +2704,20 @@
     end
 
     Map[~/autoware_map] --&gt; M
+    M --&gt; API
     M --&gt; PC
     SS &lt;--&gt;|ROS 2 DDS| SIM
     SIM --&gt; PC
+    S --&gt; PC
+    V --&gt; PC
     PC --&gt; VIZ</code></pre>
+<h3 id="advanced-configuration">Advanced Configuration<a class="headerlink" href="#advanced-configuration" title="Permanent link">#</a></h3>
+<p>The <code>config/</code> directory contains parameter files mounted into the containers:</p>
+<ul>
+<li><code>config/mrm_handler.param.yaml</code> — MRM (Minimum Risk Maneuver) timeouts and behavior, mounted into the <code>system</code> service</li>
+<li><code>config/default_adapi.param.yaml</code> — ADAPI parameter overrides, mounted into the <code>api</code> service</li>
+</ul>
+<p>Edit these files to tune MRM and API behavior without rebuilding images.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/">Scenario test simulation</a> — Official Autoware scenario simulation guide</li>

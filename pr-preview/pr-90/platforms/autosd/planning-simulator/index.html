@@ -2410,7 +2410,7 @@
 </tr>
 <tr>
 <td><code>components/container-files/</code></td>
-<td>Quadlet unit files for Podman containers and the shared pod</td>
+<td>Quadlet unit files for Podman containers, the shared pod, and the shared environment file (<code>awf-oak.env</code>)</td>
 </tr>
 <tr>
 <td><code>components/systemd/</code></td>
@@ -2466,6 +2466,7 @@
 <p>Quadlet <code>.container</code> files register with systemd as <code>.service</code> units. The table lists the source unit files (<code>awf-oak-planning.container</code>); when querying them with <code>systemctl</code>, use the generated service name (<code>awf-oak-planning.service</code>). Both names refer to the same unit.</p>
 </div>
 <p>The planning container launches <code>planning_simulator.launch.xml</code> with the extracted map mounted at <code>/etc/awf/map</code> and RViz disabled (<code>rviz:=false</code>). The simulator container runs <code>scenario_test_runner</code> against the bundled <code>sample.yaml</code> scenario. The simulator is a <code>Type=oneshot</code> service — it runs the scenario once (up to ~180 seconds) and then exits. After completion, <code>systemctl status awf-oak-simulator.service</code> shows <code>inactive (dead)</code>, which is expected, not a failure. The planning container stays running.</p>
+<p>Both containers source <code>awf-oak.env</code>, which sets <code>ROS_DOMAIN_ID=26</code> and <code>RMW_IMPLEMENTATION=rmw_cyclonedds_cpp</code>. Use these values when running additional ROS 2 nodes alongside the deployment.</p>
 <h2 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">#</a></h2>
 <ol>
 <li>Build an AutoSD image with the Automotive Image Builder using the manifests in <code>aib/</code> (see <a href="../#building-an-autosd-image">AutoSD build instructions</a>)</li>

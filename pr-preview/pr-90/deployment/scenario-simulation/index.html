@@ -2636,8 +2636,11 @@
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Cloned repository</p>
-<p>If running from a cloned repository rather than a release bundle, pass both env files:
-<code>docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d</code></p>
+<p>If running from a cloned repository rather than a release bundle, prepend
+<code>--env-file ../base/base.env</code> to <strong>every</strong> <code>docker compose</code> command below
+(start and stop). The bundle merges both env files into one; from a clone
+you need both so shared variables like <code>ROS_DOMAIN_ID</code> and <code>VEHICLE_MODEL</code>
+resolve.</p>
 </div>
 <p>Wait approximately <strong>90 seconds</strong> for Autoware and the scenario simulator to initialize. The scenario runner waits up to <code>SCENARIO_READY_TIMEOUT</code> seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an <code>INITIALIZE_DURATION</code> of 90 seconds before launching.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>

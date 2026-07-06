@@ -2576,6 +2576,10 @@
 <li>Wait for routing and planning to become available</li>
 <li>Click <strong>Auto</strong> to engage autonomous driving</li>
 </ol>
+<div class="admonition note">
+<p class="admonition-title">Auto button not available?</p>
+<p>If the <strong>Auto</strong> button does not enable, the <code>/system/command_mode/availability</code> topic may not be published. See <a href="https://github.com/autowarefoundation/openadkit/blob/main/FINDINGS.md">FINDINGS.md</a> for a manual <code>ros2 topic pub</code> workaround. This is an upstream Autoware issue, not an Open AD Kit defect.</p>
+</div>
 <h2 id="optional-drive-check">Optional Drive Check<a class="headerlink" href="#optional-drive-check" title="Permanent link">#</a></h2>
 <p>To automatically set a short forward route, engage autonomous mode, and verify movement:</p>
 <div class="highlight"><pre><span></span><code>./start-carla-e2e-demo.sh<span class="w"> </span>--drive

@@ -2545,7 +2545,7 @@
 <li>Each deployment uses Compose <code>include:</code> to pull in the base, then adds only its delta (e.g. <code>scenario_simulator</code> service, GPU overlays).</li>
 <li><code>deployments/base/base.env</code> holds shared defaults; each deployment adds a <code>&lt;name&gt;.env</code> with its overrides.</li>
 <li>
-<p>From a cloned repo, run with <strong>two</strong> <code>--env-file</code>s (base first, sample second — last wins):</p>
+<p>From a cloned repo, run with <strong>two</strong> <code>--env-file</code>s (base first, <code>&lt;name&gt;.env</code> second — last wins):</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 </li>

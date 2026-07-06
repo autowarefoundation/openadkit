@@ -31,9 +31,12 @@ No `git clone` required.
 
 ### 2. Download the deployment bundle
 
-{{ bundle_download("scenario-simulation") }}
+```bash
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz | tar xz
+cd scenario-simulation
+```
 
-{{ first_release_note("scenario-simulation") }}
+--8<-- "includes/first-release-note.md"
 
 ### 3. Download the Kashiwanoha map
 
@@ -80,15 +83,17 @@ From the `scenario-simulation` directory, start the containers:
 docker compose --env-file scenario-simulation.env up -d
 ```
 
-{{ cloned_repo_env_note() }}
+--8<-- "includes/cloned-repo-env-note.md"
 
 Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an `INITIALIZE_DURATION` of 90 seconds before launching.
 
-{{ visualizer_access() }}
+--8<-- "includes/visualizer-remote-access.md"
 
 ## Stop the Deployment
 
-{{ compose_stop("scenario-simulation") }}
+```bash
+docker compose --env-file scenario-simulation.env down
+```
 
 ## Expected Behavior
 

@@ -36,9 +36,12 @@ This installs Docker / the NVIDIA Container Toolkit and downloads the perception
 
 ### 2. Download the deployment bundle
 
-{{ bundle_download("logging-simulation") }}
+```bash
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/logging-simulation.tar.gz | tar xz
+cd logging-simulation
+```
 
-{{ first_release_note("logging-simulation") }}
+--8<-- "includes/first-release-note.md"
 
 ### 3. Download the demo map and rosbag
 
@@ -60,7 +63,7 @@ From the `logging-simulation` directory, start the base containers:
 docker compose --env-file logging-simulation.env up -d
 ```
 
-{{ cloned_repo_env_note() }}
+--8<-- "includes/cloned-repo-env-note.md"
 
 Wait approximately 10 seconds for the containers to initialize.
 
@@ -74,7 +77,7 @@ Wait approximately 10 seconds for the containers to initialize.
 
     This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `install.sh` by default). The `sensing-perception-cuda` image is published for `linux/amd64` only.
 
-{{ visualizer_access() }}
+--8<-- "includes/visualizer-remote-access.md"
 
 ## Start the Rosbag Playback
 
@@ -90,7 +93,9 @@ Watch the RViz2 display as Autoware processes the replayed data in real time.
 
 To stop all containers including the rosbag profile:
 
-{{ compose_stop("logging-simulation", profile="rosbag") }}
+```bash
+docker compose --env-file logging-simulation.env --profile rosbag down
+```
 
 ## Troubleshooting
 
@@ -117,7 +122,7 @@ Simplified data flow above; the full stack also runs `map`, `system`, `vehicle`,
 
 ## Known Limitations
 
-{{ monolithic_image_note("rosbag") }}
+The `rosbag` service in this deployment uses the upstream `ghcr.io/autowarefoundation/autoware:universe` image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture; a component-based replacement will ship in a future release.
 
 ## Related
 

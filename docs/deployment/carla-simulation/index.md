@@ -36,9 +36,13 @@ No `git clone` required.
 
 ### 2. Download the deployment bundle
 
-{{ bundle_download("carla-simulation") }}
+```bash
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/carla-simulation.tar.gz | tar xz
+cd carla-simulation
+```
 
-{{ first_release_note("carla-simulation", sample_data=False) }}
+!!! note "Releases"
+    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/carla-simulation/` folder from a cloned repository instead.
 
 ## Start the Deployment
 
@@ -72,7 +76,7 @@ sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
   net.core.rmem_default=134217728 net.core.wmem_default=134217728
 ```
 
-{{ visualizer_access() }}
+--8<-- "includes/visualizer-remote-access.md"
 
 In RViz2:
 
@@ -99,7 +103,9 @@ To automatically set a short forward route, engage autonomous mode, and verify m
 
 ## Stop the Deployment
 
-{{ compose_stop("carla-simulation") }}
+```bash
+docker compose --env-file carla-simulation.env down
+```
 
 ## Troubleshooting
 

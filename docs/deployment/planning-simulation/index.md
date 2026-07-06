@@ -32,9 +32,12 @@ No `git clone` required — set up Docker, then download the self-contained depl
 
 ### 2. Download the deployment bundle
 
-{{ bundle_download("planning-simulation") }}
+```bash
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
+cd planning-simulation
+```
 
-{{ first_release_note("planning-simulation") }}
+--8<-- "includes/first-release-note.md"
 
 ### 3. Download the demo map
 
@@ -53,11 +56,11 @@ From the `planning-simulation` directory, start the containers:
 docker compose --env-file planning-simulation.env up -d
 ```
 
-{{ cloned_repo_env_note() }}
+--8<-- "includes/cloned-repo-env-note.md"
 
 Wait approximately 10 seconds for the containers to initialize.
 
-{{ visualizer_access() }}
+--8<-- "includes/visualizer-remote-access.md"
 
 The RViz2 interface may take a few additional seconds to fully load.
 
@@ -71,7 +74,9 @@ Once the visualizer is open, follow the [Autoware planning simulation instructio
 
 ## Stop the Deployment
 
-{{ compose_stop("planning-simulation") }}
+```bash
+docker compose --env-file planning-simulation.env down
+```
 
 ## Troubleshooting
 

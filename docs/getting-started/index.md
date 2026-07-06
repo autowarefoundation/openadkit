@@ -33,9 +33,12 @@ docker compose version
 
 ## 2. Download the Planning Simulation
 
-{{ bundle_download("planning-simulation") }}
+```bash
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
+cd planning-simulation
+```
 
-{{ first_release_note("planning-simulation") }}
+--8<-- "includes/first-release-note.md"
 
 Then fetch the demo map:
 
@@ -51,7 +54,7 @@ docker compose --env-file planning-simulation.env up -d
 
 Wait about 10 seconds for the containers to initialize.
 
-{{ visualizer_access() }}
+--8<-- "includes/visualizer-remote-access.md"
 
 ## 4. Drive
 

@@ -84,6 +84,9 @@ In RViz2:
 2. Wait for routing and planning to become available
 3. Click **Auto** to engage autonomous driving
 
+!!! note "Auto button not available?"
+    If the **Auto** button does not enable, the `/system/command_mode/availability` topic may not be published. See [FINDINGS.md](https://github.com/autowarefoundation/openadkit/blob/main/FINDINGS.md) for a manual `ros2 topic pub` workaround. This is an upstream Autoware issue, not an Open AD Kit defect.
+
 ## Optional Drive Check
 
 To automatically set a short forward route, engage autonomous mode, and verify movement:

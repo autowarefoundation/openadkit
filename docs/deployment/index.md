@@ -86,7 +86,7 @@ Four of the five deployments (planning, scenario, logging, carla) build on a sha
 - `deployments/base/docker-compose.yaml` defines shared services (map, planning, vehicle, system, control, simulator, api, visualizer).
 - Each deployment uses Compose `include:` to pull in the base, then adds only its delta (e.g. `scenario_simulator` service, GPU overlays).
 - `deployments/base/base.env` holds shared defaults; each deployment adds a `<name>.env` with its overrides.
-- From a cloned repo, run with **two** `--env-file`s (base first, sample second — last wins):
+- From a cloned repo, run with **two** `--env-file`s (base first, `<name>.env` second — last wins):
 
   ```bash
   docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d

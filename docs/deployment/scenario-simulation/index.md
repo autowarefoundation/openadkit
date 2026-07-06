@@ -85,8 +85,11 @@ docker compose --env-file scenario-simulation.env up -d
 ```
 
 !!! warning "Cloned repository"
-    If running from a cloned repository rather than a release bundle, pass both env files:
-    `docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d`
+    If running from a cloned repository rather than a release bundle, prepend
+    `--env-file ../base/base.env` to **every** `docker compose` command below
+    (start and stop). The bundle merges both env files into one; from a clone
+    you need both so shared variables like `ROS_DOMAIN_ID` and `VEHICLE_MODEL`
+    resolve.
 
 Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an `INITIALIZE_DURATION` of 90 seconds before launching.
 

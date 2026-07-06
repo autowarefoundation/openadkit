@@ -58,8 +58,11 @@ docker compose --env-file planning-simulation.env up -d
 ```
 
 !!! warning "Cloned repository"
-    If running from a cloned repository rather than a release bundle, pass both env files:
-    `docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d`
+    If running from a cloned repository rather than a release bundle, prepend
+    `--env-file ../base/base.env` to **every** `docker compose` command below
+    (start and stop). The bundle merges both env files into one; from a clone
+    you need both so shared variables like `ROS_DOMAIN_ID` and `VEHICLE_MODEL`
+    resolve.
 
 Wait approximately 10 seconds for the containers to initialize.
 

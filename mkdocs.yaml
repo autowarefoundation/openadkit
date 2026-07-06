@@ -60,6 +60,7 @@ plugins:
       regex:
         - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?jpg|(.*\.)?pages).*$
         - ^(.*/)?[^.]*$
+        - ^includes/.*\.md$
   - macros:
       # docs/macros.py: variables + catalog-generated tables.
       module_name: docs/macros

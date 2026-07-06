@@ -93,7 +93,7 @@ Create a `.env` file alongside your `docker-compose.yaml`:
 
 ```bash
 # Required
-ROS_DOMAIN_ID=0
+ROS_DOMAIN_ID=1
 
 # Optional: NVIDIA runtime (for GPU-accelerated images)
 # NVIDIA_VISIBLE_DEVICES=all

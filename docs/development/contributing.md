@@ -130,7 +130,7 @@ Run the same checks CI runs to catch issues early:
 # Documentation build
 make -C docs build
 
-# Docker Compose validation (per-sample, with both env files — base first, last wins)
+# Docker Compose validation (per-deployment, with both env files — base first, last wins)
 export REMOTE_PASSWORD="ci-validate"
 ( cd deployments/planning-simulation && \
   docker compose --env-file ../base/base.env --env-file planning-simulation.env config -q )

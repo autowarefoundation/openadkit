@@ -36,13 +36,9 @@ No `git clone` required.
 
 ### 2. Download the deployment bundle
 
-```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/carla-simulation.tar.gz | tar xz
-cd carla-simulation
-```
+{{ bundle_download("carla-simulation") }}
 
-!!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/carla-simulation/` folder from a cloned repository instead.
+{{ first_release_note("carla-simulation", sample_data=False) }}
 
 ## Start the Deployment
 
@@ -76,7 +72,7 @@ sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
   net.core.rmem_default=134217728 net.core.wmem_default=134217728
 ```
 
---8<-- "includes/visualizer-remote-access.md"
+{{ visualizer_access() }}
 
 In RViz2:
 
@@ -103,9 +99,7 @@ To automatically set a short forward route, engage autonomous mode, and verify m
 
 ## Stop the Deployment
 
-```bash
-docker compose --env-file carla-simulation.env down
-```
+{{ compose_stop("carla-simulation") }}
 
 ## Troubleshooting
 
@@ -113,8 +107,9 @@ docker compose --env-file carla-simulation.env down
 |-------|----------|
 | CARLA server fails to start | Verify the NVIDIA Container Toolkit is installed and `nvidia-smi` works |
 | Black or frozen CARLA window | Check host X access (`xhost +SI:localuser:root`) and the Vulkan ICD path |
-| Visualizer blank | Wait for all containers to initialize, then refresh the browser |
 | Ego vehicle does not move | Set a route with **2D Goal Pose** and click **Auto**, or use `--drive` |
+
+For Docker, GPU, and visualizer issues common to all deployments, see [Troubleshooting](../../getting-started/troubleshooting.md).
 
 ## Architecture
 

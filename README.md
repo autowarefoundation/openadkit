@@ -49,8 +49,8 @@ Open AD Kit includes several user-facing deployment configurations, each with it
 
 Images are published to GitHub Container Registry.
 
-- **[Container Image Tags](https://autowarefoundation.github.io/openadkit/getting-started/image-tags/)** - Tag taxonomy, examples, and pinning guidance
-- **[Release Flow](https://autowarefoundation.github.io/openadkit/getting-started/release-flow/)** - How maintainers promote existing builds at release time
+- **[Container Images & Versioning](https://autowarefoundation.github.io/openadkit/getting-started/container-images/)** - Tag taxonomy, versioning, and pinning guidance
+- **[Release Process](https://autowarefoundation.github.io/openadkit/development/build-from-source/#release-process)** - How maintainers promote existing builds at release time
 
 ## Documentation
 

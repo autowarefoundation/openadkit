@@ -76,6 +76,15 @@ plugins:
         contributing/index.md: development/contributing.md
         hardware/index.md: platforms/hardware/index.md
         tools/index.md: development/index.md
+        components/sensing.md: components/sensing-perception.md
+        components/perception.md: components/sensing-perception.md
+        components/localization.md: components/localization-mapping.md
+        components/mapping.md: components/localization-mapping.md
+        components/planning.md: components/planning-control.md
+        components/control.md: components/planning-control.md
+        getting-started/image-tags.md: getting-started/container-images.md
+        getting-started/versioning.md: getting-started/container-images.md
+        getting-started/release-flow.md: getting-started/container-images.md
   - search
 
 markdown_extensions:

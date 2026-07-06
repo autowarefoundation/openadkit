@@ -23,6 +23,10 @@ This page covers common issues and solutions when working with Open AD Kit.
 - Restart Docker: `sudo systemctl restart docker`
 - Check GPU availability: `nvidia-smi`
 
+### Perception is very slow
+
+- The sensing and perception pipeline is falling back to CPU. Install the NVIDIA Container Toolkit (`install.sh` does this by default) and, for Logging Simulation, start with the GPU overlay described on that page.
+
 ## Deployment Issues
 
 ### Visualizer shows blank screen
@@ -30,6 +34,14 @@ This page covers common issues and solutions when working with Open AD Kit.
 - Wait 10–30 seconds for containers to fully initialize
 - Check container logs: `docker compose --env-file <deployment>.env logs -f` (replace `<deployment>` with the actual env file name, e.g. `planning-simulation.env`)
 - Verify all required map files are present
+
+### Port 6080 or 6081 already in use
+
+- Stop the conflicting service. Most deployments run the visualizer under `network_mode: host`, which binds the port directly — `ports:` mappings in `docker-compose.yaml` are ignored in that mode.
+
+### Sample data `file not found`
+
+- Re-run the fetch with `--force` from the deployment directory: `./install.sh sample-data <deployment> --force` (e.g. `planning-simulation`). Data lands in `~/autoware_map`.
 
 ## Getting Help
 
@@ -39,5 +51,5 @@ This page covers common issues and solutions when working with Open AD Kit.
 ## Related
 
 - [Getting Started](index.md) — Quick start guide
-- [Container Image Tags](image-tags.md) — Understanding the tag schema
+- [Container Images & Versioning](container-images.md) — Tag schema and version policy
 - [Deployments](../deployment/index.md) — Self-contained deployments

@@ -128,5 +128,6 @@ docker compose down
 ## Related
 
 - [Component Overview](../components/index.md) — Understand the full OAK architecture
-- [Container Image Tags](../getting-started/image-tags.md) — Choose the right tag
+- [Troubleshooting](../getting-started/troubleshooting.md) — Docker, GPU, and visualizer issues
+- [Container Images & Versioning](../getting-started/container-images.md) — Choose the right tag
 - [Getting Started](../getting-started/index.md) — Environment setup

@@ -1,69 +1,74 @@
-# Getting Started
+# Quickstart
 
-This guide walks you through setting up your environment and running your first Open AD Kit deployment.
+From zero to a running Autoware planning simulation in about 10 minutes. No `git clone`, no GPU required.
 
 ```mermaid
 flowchart LR
-    A[Run install.sh] --> B[Verify Installation] --> C[Download a deployment]
+    A[Install] --> B[Download] --> C[Start] --> D[Drive]
 ```
 
 ## Prerequisites
 
-Open AD Kit runs on **Ubuntu** with Docker. The v2.0 quickstart is validated on **Ubuntu 22.04 (Jammy) and 24.04 (Noble)** with ROS 2 Humble. Install everything with the included [`install.sh`](https://github.com/autowarefoundation/openadkit/blob/main/install.sh) script instead of following separate install guides:
+- **Ubuntu 22.04 (Jammy) or 24.04 (Noble)** with `sudo` access
+- A web browser — the visualizer runs in it, no display server needed
 
-| Component | When you need it | How to install |
-|-----------|------------------|----------------|
-| **Docker Engine** | All deployments | `install.sh` (below) |
-| **NVIDIA Container Toolkit** | GPU-accelerated sensing and perception | Included by default; add `--no-nvidia` to skip |
-| **Autoware artifacts** | Sensing and perception samples (for example, [Logging Simulation](../deployment/logging-simulation/index.md)) | `install.sh --download-artifacts` |
+A GPU is **not** needed for this quickstart. For GPU-accelerated deployments and tested machines, see the full [hardware requirements](../platforms/hardware/index.md).
 
-## Set Up Your Environment
+## 1. Install Dependencies
 
-`install.sh` is self-contained — no `git clone` required. Run it directly:
+The included `install.sh` sets up Docker Engine and the NVIDIA Container Toolkit in one step:
 
 ```bash
 {{ install_command }}
 ```
 
-This installs Docker, the NVIDIA Container Toolkit, and other dependencies (requires sudo).
-
 !!! tip "Skip NVIDIA Toolkit"
-    Append `-s -- --no-nvidia` (i.e. `… | sudo bash -s -- --no-nvidia`) if you do not have an NVIDIA GPU. Otherwise the toolkit is **highly recommended** for sensing and perception performance.
+    Append `-s -- --no-nvidia` (i.e. `… | sudo bash -s -- --no-nvidia`) if you do not have an NVIDIA GPU. The toolkit is only needed for GPU-accelerated deployments.
 
-!!! info "Autoware artifacts"
-    For sensing/perception samples (e.g. [Logging Simulation](../deployment/logging-simulation/index.md)) that mount `${HOME}/autoware_data`, add `-s -- --download-artifacts`. This downloads artifacts and continues with Docker installation. For users who already have Docker and only need artifacts, run `./install.sh --download-artifacts` from a terminal; it will prompt for sudo if needed.
-
-Each deployment is downloaded as a self-contained bundle — see [Deployments](../deployment/index.md).
-
-!!! warning "First release pending"
-    Open AD Kit has not published its first stable release yet. Until release bundles are available, clone this repository and run from the `deployments/<deployment>/` folders.
-
-## Verify Your Installation
-
-After running `install.sh`, confirm your environment is ready:
+Confirm the environment is ready:
 
 ```bash
-# Check Docker
-docker --version
 docker compose version
-
-# Check NVIDIA toolkit (if installed)
-nvidia-ctk --version
-
-# Verify artifacts directory
-ls -la ~/autoware_data
 ```
 
-!!! success "Ready to Deploy"
-    If all checks pass, you are ready to run a deployment. See [Deployments](../deployment/index.md).
+## 2. Download the Planning Simulation
 
-## Reference
+{{ bundle_download("planning-simulation") }}
 
-- [Container Image Tags](image-tags.md) — Understanding the tag schema for choosing the right image
-- [Release Flow](release-flow.md) — How Open AD Kit releases are built, scanned, and promoted
+{{ first_release_note("planning-simulation") }}
+
+Then fetch the demo map:
+
+```bash
+./install.sh sample-data planning-simulation
+```
+
+## 3. Start It
+
+```bash
+docker compose --env-file planning-simulation.env up -d
+```
+
+Wait about 10 seconds for the containers to initialize.
+
+{{ visualizer_access() }}
+
+## 4. Drive
+
+In RViz2, follow the [Autoware planning simulation instructions](https://autowarefoundation.github.io/autoware-documentation/main/demos/planning-sim/lane-driving/#2-set-an-initial-pose-for-the-ego-vehicle) to:
+
+1. Set an **initial pose** for the ego vehicle
+2. Set a **goal pose** on the map
+3. Watch the vehicle plan and drive the route
+
+That's it — you are running Autoware. The full guide with configuration, architecture, and cloned-repo usage is at [Planning Simulation](../deployment/planning-simulation/index.md).
+
+If something goes wrong, see [Troubleshooting](troubleshooting.md).
 
 ## Next Steps
 
-- [Run your first deployment](../deployment/planning-simulation/index.md) — Start with the Planning Simulation
-- [Learn about components](../components/index.md) — Understand the Open AD Kit architecture
-- [Choose a platform](../platforms/index.md) — Deploy to AutoSD or your local machine
+**[Explore the other deployments](../deployment/index.md)** — scenario testing, rosbag replay, closed-loop CARLA, and distributed cloud-edge operation with Zenoh.
+
+- [Components](../components/index.md) — The architecture behind what you just ran
+- [Container Images & Versioning](container-images.md) — Tag schema and pinning guidance
+- [Custom Deployment](../deployment/custom-deployment.md) — Compose your own stack

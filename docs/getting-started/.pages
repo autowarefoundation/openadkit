@@ -1,6 +1,4 @@
 nav:
   - index.md
-  - image-tags.md
-  - versioning.md
-  - release-flow.md
-  - troubleshooting.md
+  - Images & Versioning: container-images.md
+  - Troubleshooting: troubleshooting.md

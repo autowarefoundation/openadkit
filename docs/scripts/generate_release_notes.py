@@ -100,8 +100,8 @@ def render_empty_state(repo: str) -> str:
             "    There are no published releases yet. While waiting for the first stable release, you can:",
             "",
             f"    - Pull images from [GitHub Container Registry](https://github.com/{repo}/pkgs/container/{image_name})",
-            "    - Use CI build tags as described in [Container Image Tags](../getting-started/image-tags.md)",
-            "    - Read how maintainers promote builds in [Release Flow](../getting-started/release-flow.md)",
+            "    - Use CI build tags as described in [Container Images & Versioning](../getting-started/container-images.md)",
+            "    - Read how maintainers promote builds in the [Release Process](../development/build-from-source.md#release-process)",
             f"    - [Watch releases on GitHub](https://github.com/{repo}/releases) for notifications",
             "",
         ]

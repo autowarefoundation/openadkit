@@ -127,14 +127,13 @@ flowchart TD
 
 ### 2. Download the deployment bundle and demo map
 
+{{ bundle_download("zenoh-bridge") }}
+
 ```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz | tar xz
-cd zenoh-bridge
 ./install.sh sample-data zenoh-bridge
 ```
 
-!!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/zenoh-bridge/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data zenoh-bridge` to fetch the map.
+{{ first_release_note("zenoh-bridge") }}
 
 ### 3. Verify directory structure
 
@@ -237,15 +236,7 @@ Run `docker ps` or `docker compose ps` to verify all containers are running:
 - `edge_zenoh_bridge`
 - `cloud_zenoh_bridge`
 
-### 2. Access the visualizer
-
-Open a web browser and navigate to:
-
-```text
-http://localhost:6081
-```
-
-Log in with the password you set as `REMOTE_PASSWORD` in `.env`.
+{{ visualizer_access(port=6081, password="REMOTE_PASSWORD", host_networking=False, heading="### 2. Access the visualizer") }}
 
 ### 3. Verify operation
 
@@ -345,7 +336,7 @@ For the edge side, the default simulation mode works, but pure control testing w
 
 ## Known Limitations
 
-The `autoware` service in this deployment uses the upstream `ghcr.io/autowarefoundation/autoware:universe` image rather than an Open AD Kit component image. This is a temporary monolithic fallback while Open AD Kit migrates from monolithic to component-based architecture. OAK component images for the full monolithic stack will be available in a future release.
+{{ monolithic_image_note("autoware") }}
 
 This demo also depends on third-party images that are **not** pinned to immutable tags: `eclipse/zenoh-bridge-ros2dds:latest` and the community `ghcr.io/evshary/autoware_manual_control` teleop image. They may change upstream without notice — pin them to a specific digest if you need a fully reproducible demo.
 

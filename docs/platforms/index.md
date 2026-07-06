@@ -40,37 +40,6 @@ flowchart LR
 
 </div>
 
-## SOAFEE Middleware Platforms
-
-### [AutoSD](autosd/index.md)
-
-<span class="oak-badge oak-badge--testing">Experimental</span> <span class="oak-badge oak-badge--supported">Runnable assets in repo</span>
-
-AutoSD is the upstream binary distribution that serves as the public, in-development preview of **Red Hat In-Vehicle Operating System (OS)**. It is built on CentOS Stream with an automotive-specific kernel (`kernel-automotive`) and provides mixed-criticality container orchestration via Podman, Quadlet, and BlueChi.
-
-Key capabilities:
-
-- **Mixed criticality**: Root partition for safety-critical containers, QM partition for non-critical workloads
-- **Atomic updates**: OSTree and composefs for immutable, rollback-capable system images
-- **Real-time kernel**: RT-optimized scheduling for deterministic autonomous driving functions
-- **Container-native**: Podman and Quadlet for systemd-managed container services
-
-### [EWAOL](ewaol/index.md)
-
-<span class="oak-badge oak-badge--neutral">Upstream reference</span>
-
-The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying edge workloads, delivered via the `meta-ewaol` Yocto layer. It was the original SOAFEE reference implementation.
-
-Key capabilities:
-
-- **Container-native runtime**: Docker and K3s orchestration on the edge
-- **Real-time Linux**: Deterministic scheduling
-- **Virtualization**: Xen support for mixed-criticality separation
-- **Cloud-to-edge parity**: Arm Neoverse N1 architecture on both AVA platform and AWS Graviton
-
-!!! note "Not a committed Open AD Kit target"
-    EWAOL is retained here as upstream SOAFEE background only. Open AD Kit's committed SOAFEE-aligned target is the **Arm Automotive Solutions reference stack / RD-1 AE FVP** (experimental; SOAFEE Integration Lab validation planned). This page documents EWAOL's upstream build/runtime instructions for reference; it is not a validated Open AD Kit deployment path.
-
 ## Development Platforms
 
 For local development and simulation, Open AD Kit supports:

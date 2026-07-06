@@ -31,13 +31,9 @@ No `git clone` required.
 
 ### 2. Download the deployment bundle
 
-```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz | tar xz
-cd scenario-simulation
-```
+{{ bundle_download("scenario-simulation") }}
 
-!!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/scenario-simulation/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data scenario-simulation` to fetch the map.
+{{ first_release_note("scenario-simulation") }}
 
 ### 3. Download the Kashiwanoha map
 
@@ -84,22 +80,15 @@ From the `scenario-simulation` directory, start the containers:
 docker compose --env-file scenario-simulation.env up -d
 ```
 
-!!! warning "Cloned repository"
-    If running from a cloned repository rather than a release bundle, prepend
-    `--env-file ../base/base.env` to **every** `docker compose` command below
-    (start and stop). The bundle merges both env files into one; from a clone
-    you need both so shared variables like `ROS_DOMAIN_ID` and `VEHICLE_MODEL`
-    resolve.
+{{ cloned_repo_env_note() }}
 
 Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an `INITIALIZE_DURATION` of 90 seconds before launching.
 
---8<-- "includes/visualizer-remote-access.md"
+{{ visualizer_access() }}
 
 ## Stop the Deployment
 
-```bash
-docker compose --env-file scenario-simulation.env down
-```
+{{ compose_stop("scenario-simulation") }}
 
 ## Expected Behavior
 
@@ -116,6 +105,8 @@ docker compose --env-file scenario-simulation.env down
 | `setMap() for invalid version map` | You are using the wrong map. Ensure Kashiwanoha is extracted, not `sample-map-planning` |
 | Visualizer blank | Wait up to 90 seconds for full initialization; containers depend on each other sequentially |
 | Missing results | Verify `OUTPUT_HOST_PATH` exists and is writable |
+
+For Docker, GPU, and visualizer issues common to all deployments, see [Troubleshooting](../../getting-started/troubleshooting.md).
 
 ## Architecture
 

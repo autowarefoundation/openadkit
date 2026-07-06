@@ -22,7 +22,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 :material-rocket-launch-outline:{ .oak-card-icon }
 
 <h3>Getting Started</h3>
-<p>Set up Docker, pull images, and run your first deployment in minutes.</p>
+<p>Run a planning simulation in about 10 minutes — no git clone, no GPU required.</p>
 <a href="getting-started/" class="md-button md-button--primary">Start Here</a>
 </div>
 

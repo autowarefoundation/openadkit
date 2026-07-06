@@ -103,4 +103,4 @@ flowchart LR
 - [Zenoh Bridge](zenoh-bridge/index.md) — Learn distributed deployment with ROS 2 bridging
 - [Build a custom deployment](custom-deployment.md)
 - [Learn about Open AD Kit components](../components/index.md)
-- [Understand container image tags](../getting-started/image-tags.md)
+- [Understand container image tags](../getting-started/container-images.md)

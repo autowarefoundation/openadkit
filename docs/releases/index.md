@@ -9,6 +9,6 @@ Published Open AD Kit releases are listed here, synchronized from
     There are no published releases yet. While waiting for the first stable release, you can:
 
     - Pull images from [GitHub Container Registry](https://github.com/autowarefoundation/openadkit/pkgs/container/openadkit)
-    - Use CI build tags as described in [Container Image Tags](../getting-started/image-tags.md)
-    - Read how maintainers promote builds in [Release Flow](../getting-started/release-flow.md)
+    - Use CI build tags as described in [Container Images & Versioning](../getting-started/container-images.md)
+    - Read how maintainers promote builds in the [Release Process](../development/build-from-source.md#release-process)
     - [Watch releases on GitHub](https://github.com/autowarefoundation/openadkit/releases) for notifications

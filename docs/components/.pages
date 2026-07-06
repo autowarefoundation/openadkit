@@ -1,11 +1,8 @@
 nav:
   - index.md
-  - Sensing: sensing.md
-  - Perception: perception.md
-  - Mapping: mapping.md
-  - Localization: localization.md
-  - Planning: planning.md
-  - Control: control.md
+  - Sensing & Perception: sensing-perception.md
+  - Localization & Mapping: localization-mapping.md
+  - Planning & Control: planning-control.md
   - Vehicle and System: vehicle-system.md
   - API: api.md
   - Simulator: simulator.md

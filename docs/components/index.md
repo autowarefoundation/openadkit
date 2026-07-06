@@ -12,7 +12,7 @@ Autoware uses a **Core / Universe** architecture. **Core** contains rigorously r
 
 `universe-common` is an Open AD Kit-owned thin intermediate built on top of the
 upstream `autoware:core-devel`/`core` images. The bake groups and build commands
-are documented under [Building from Source](#building-from-source) below.
+are documented in [Build from Source](../development/build-from-source.md).
 
 ## Interface Layers
 
@@ -63,33 +63,18 @@ Each Autoware function is packaged into a focused container image. Select a comp
 <div class="oak-component-grid">
 
 <div class="oak-component-item">
-<strong><a href="sensing/">Sensing</a></strong>
-<span>LiDAR, cameras, radar, ultrasonics, and GNSS-INS preprocessing.</span>
+<strong><a href="sensing-perception/">Sensing &amp; Perception</a></strong>
+<span>Sensor preprocessing plus object detection, tracking, and multi-sensor fusion.</span>
 </div>
 
 <div class="oak-component-item">
-<strong><a href="perception/">Perception</a></strong>
-<span>Object detection, tracking, and multi-sensor fusion.</span>
+<strong><a href="localization-mapping/">Localization &amp; Mapping</a></strong>
+<span>HD map serving plus GNSS, IMU, visual odometry, and LiDAR map matching.</span>
 </div>
 
 <div class="oak-component-item">
-<strong><a href="mapping/">Mapping</a></strong>
-<span>Loads and serves Lanelet2 vector maps and 3D point cloud maps.</span>
-</div>
-
-<div class="oak-component-item">
-<strong><a href="localization/">Localization</a></strong>
-<span>GNSS, IMU, visual odometry, and LiDAR map matching.</span>
-</div>
-
-<div class="oak-component-item">
-<strong><a href="planning/">Planning</a></strong>
-<span>Route, behavior, motion, and goal planning.</span>
-</div>
-
-<div class="oak-component-item">
-<strong><a href="control/">Control</a></strong>
-<span>PID and MPC trajectory tracking with vehicle actuation.</span>
+<strong><a href="planning-control/">Planning &amp; Control</a></strong>
+<span>Route, behavior, motion, and goal planning with PID/MPC trajectory tracking.</span>
 </div>
 
 <div class="oak-component-item">
@@ -123,87 +108,14 @@ Each Autoware function is packaged into a focused container image. Select a comp
 
 The published component images and their platforms. This table is generated from
 the image catalog (`.github/image-inventory.json`), so it always matches what CI
-builds. See [Container Image Tags](../getting-started/image-tags.md) for the tag
+builds. See [Container Images & Versioning](../getting-started/container-images.md) for the tag
 naming scheme.
 
 {{ component_table() }}
 
-## Building from Source
-
-Open AD Kit images are built with `docker buildx bake` using
-[`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl).
-The build graph is:
-
-```text
-upstream autoware:core-devel / core / base-cuda-{devel,runtime}
-        │
-        ▼
-universe-common  (openadkit-owned thin intermediate)
-        │
-        ▼
-seven non-CUDA component images (sensing-perception,
-localization-mapping, planning-control, vehicle-system,
-api, visualizer, simulator)
-```
-
-`sensing-perception-cuda` is a parallel CUDA branch: it inherits from
-upstream `base-cuda-{devel,runtime}` and additionally grafts in the
-`universe-common` install tree (so it has both CUDA toolkit access and the
-universe-common compiled packages).
-
-`carla-interface` is an amd64-only, Humble-only component image built on top of
-`simulator`; it is part of the `component` bake group but is published for
-amd64 only.
-
-The `universe-common` layer compiles only the universe-common slice of
-Autoware on top of upstream `core-devel`/`core`; everything below
-`universe-common` (base OS, ROS, core) is owned and built by upstream.
-
-### Bake Groups
-
-| Group | Targets |
-|-------|---------|
-| `default` | everything: `universe-common` + `component` |
-| `universe-common` | `universe-common-devel`, `universe-common` |
-| `component` | the seven non-CUDA component images plus `sensing-perception-cuda` and `carla-interface` |
-
-### Upstream Pin
-
-The `UPSTREAM_TAG` bake variable pins the upstream Autoware release the
-images are built against. CI sets it from a repository Variable; leaving it
-empty uses upstream's plain `<name>-<distro>` multi-arch tag.
-
-## CI Pipeline
-
-`build-all-images.yaml` builds the universe-common graph on pushes,
-schedules, and manual dispatch. It walks the matrix defined in
-`.github/image-inventory.json` through staged jobs — `prepare`, then
-`build-common` and `build-components`, then `build-carla-interface` (which
-depends on `simulator`) — so each layer is pushed before the
-layer that depends on it. The matrix is per-image: most targets build for
-`{humble, jazzy} × {amd64, arm64}`, but `sensing-perception-cuda` is
-amd64-only and `carla-interface` is amd64 + Humble only. A final
-`create-manifests` job stitches the per-arch tags into multi-arch
-manifests via the `combine-multi-arch-images` composite action.
-`release.yaml` is a manually dispatched workflow that promotes a
-validated, scanned `build-all-images` run to a stable Open AD Kit release
-tag (it does not rebuild images).
-
-## Open AD Kit Roadmap
-
-Open AD Kit tracks Autoware's architecture evolution upstream, but its own roadmap is focused on **deployment** — containerization, platform support, release trust, and CI/CD — rather than on the autonomy algorithms themselves. The goal is to package whatever Autoware ships into clean, composable, deployment-ready images.
-
-!!! note "Roadmap"
-    The 2026–2027 Open AD Kit roadmap has been ratified and is published in the repository. See the [Roadmap](../roadmap.md) for the full release ladder. Current focus areas include:
-
-    - **Containerization** — Splitting the monolithic stack into focused component images and retiring `autoware:universe` fallbacks (see [Logging Simulation Known Limitations](../deployment/logging-simulation/index.md#known-limitations) and [Zenoh Bridge Known Limitations](../deployment/zenoh-bridge/index.md#known-limitations)).
-    - **Platform support** — Expanding verified coverage across edge and cloud targets (see [Platforms](../platforms/index.md)).
-    - **Release trust and CI/CD** — Multi-architecture builds, image scanning, and a reproducible release flow (see [Release Flow](../getting-started/release-flow.md)).
-
-For Autoware's upstream autonomy direction, see the [Autoware architecture documentation](https://autowarefoundation.github.io/autoware-documentation/main/design/).
-
 ## Related
 
 - [Deployments](../deployment/index.md) — How to compose components into running systems
-- [Getting Started](../getting-started/index.md) — Quick start guide
+- [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
+- [Roadmap](../roadmap.md) — Release ladder and focus areas
 - [Supported Platforms](../platforms/index.md) — Where to deploy

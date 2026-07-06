@@ -32,13 +32,9 @@ No `git clone` required — set up Docker, then download the self-contained depl
 
 ### 2. Download the deployment bundle
 
-```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
-cd planning-simulation
-```
+{{ bundle_download("planning-simulation") }}
 
-!!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/planning-simulation/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data planning-simulation` to fetch the map.
+{{ first_release_note("planning-simulation") }}
 
 ### 3. Download the demo map
 
@@ -57,16 +53,11 @@ From the `planning-simulation` directory, start the containers:
 docker compose --env-file planning-simulation.env up -d
 ```
 
-!!! warning "Cloned repository"
-    If running from a cloned repository rather than a release bundle, prepend
-    `--env-file ../base/base.env` to **every** `docker compose` command below
-    (start and stop). The bundle merges both env files into one; from a clone
-    you need both so shared variables like `ROS_DOMAIN_ID` and `VEHICLE_MODEL`
-    resolve.
+{{ cloned_repo_env_note() }}
 
 Wait approximately 10 seconds for the containers to initialize.
 
---8<-- "includes/visualizer-remote-access.md"
+{{ visualizer_access() }}
 
 The RViz2 interface may take a few additional seconds to fully load.
 
@@ -80,18 +71,15 @@ Once the visualizer is open, follow the [Autoware planning simulation instructio
 
 ## Stop the Deployment
 
-```bash
-docker compose --env-file planning-simulation.env down
-```
+{{ compose_stop("planning-simulation") }}
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Blank visualizer screen | Wait 10-30 seconds for containers to fully initialize, then refresh the browser |
-| `file not found` error | Re-run `./install.sh sample-data planning-simulation --force` to re-download the map into `~/autoware_map` |
-| Port 6080 in use | Stop the conflicting service (host networking binds `:6080` directly; `ports:` mappings are ignored) |
 | Vehicle does not move after setting goal | Check that the initial pose is set correctly and the map is loaded in RViz2 |
+
+For Docker, GPU, and visualizer issues common to all deployments, see [Troubleshooting](../../getting-started/troubleshooting.md).
 
 ## Architecture
 

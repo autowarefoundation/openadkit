@@ -3,7 +3,7 @@
 This guide covers building Open AD Kit container images locally from the repository source.
 
 !!! note "Who needs this"
-    Building from source is for **maintainers and contributors**. Typical users should pull the pre-built images from GHCR — see [Container Image Tags](../getting-started/image-tags.md).
+    Building from source is for **maintainers and contributors**. Typical users should pull the pre-built images from GHCR — see [Container Images & Versioning](../getting-started/container-images.md).
 
 ## Prerequisites
 
@@ -143,8 +143,49 @@ ROS_DISTRO=humble UPSTREAM_TAG=1.8.0 \
 
 CI builds every target automatically via [`.github/workflows/build-all-images.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml), which invokes the same Bake file across a build matrix. The matrix (targets, platforms, ROS distros) is driven by [`.github/image-inventory.json`](https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json) — the source of truth for what gets built and on which architectures.
 
+The workflow runs staged jobs — `prepare`, then `build-common` and `build-components`, then `build-carla-interface` (which depends on `simulator`) — so each layer is pushed before the layer that depends on it. Most targets build for `{humble, jazzy} × {amd64, arm64}`; `sensing-perception-cuda` is amd64-only and `carla-interface` is amd64 + Humble only. A final `create-manifests` job stitches the per-arch tags into multi-arch manifests.
+
+## Release Process
+
+Open AD Kit releases are promoted from existing CI builds rather than rebuilt at release time. This ensures that the exact images validated during CI are the images that ship to users.
+
+<div class="oak-steps" markdown="1">
+
+- **Build all images**
+  Run the **`build-all-images`** GitHub Actions workflow from `main`. Stable releases must use an Autoware `X.Y.Z` tag; pre-releases may use an Autoware tag or full 40-character SHA.
+
+- **Record the build tag**
+  Keep the build summary's `build_tag`, formatted as `RUN_ID-RUN_ATTEMPT`.
+
+- **Scan the images**
+  Ensure the **`scan-images`** GitHub Actions workflow completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise trigger `scan-images` manually.
+  Scans check images for known CVEs.
+
+- **Promote and tag**
+  Run the **`release`** GitHub Actions workflow with the Open AD Kit `version` and the validated `build_tag`. This promotes the scanned images to stable release tags and updates latest aliases.
+
+</div>
+
+```mermaid
+flowchart LR
+    A[Build All Images] --> R[Record Build Tag]
+    R --> B[Scan Images]
+    B --> C[Promote & Tag]
+    C --> D[Update Aliases]
+```
+
+The resulting tag aliases are documented in [How Releases Are Tagged](../getting-started/container-images.md#how-releases-are-tagged).
+
+### Source of Truth
+
+The following artifacts are the canonical reference for release validation:
+
+- **Build metadata** — CI run logs and artifact manifests
+- **Scan metadata** — CVE scan results
+- **`.github/image-inventory.json`** — Canonical inventory of all published images and their tags
+
 ## Related
 
 - [Contributing](contributing.md) — How to submit your changes
 - [Components](../components/index.md) — What each image contains
-- [Container Image Tags](../getting-started/image-tags.md) — Pulling pre-built images
+- [Container Images & Versioning](../getting-started/container-images.md) — Pulling pre-built images

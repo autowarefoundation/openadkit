@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/development/contributing/">
+        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/getting-started/container-images/">
       
       
-        <link rel="prev" href="../build-from-source/">
+        <link rel="prev" href="../">
       
       
-        <link rel="next" href="../../releases/">
+        <link rel="next" href="../troubleshooting/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Contributing - Open AD Kit</title>
+        <title>Images & Versioning - Open AD Kit</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#contributing" class="md-skip">
+        <a href="#container-images-versioning" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +98,7 @@
               </button>
             
             
-  <a href="../../getting-started/">
+  <a href="../">
     <span aria-hidden="true">🚀</span> New here? Follow the <strong>Getting Started</strong> guide to run your first deployment
   </a>
 
@@ -136,7 +136,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Contributing
+              Images & Versioning
             
           </span>
         </div>
@@ -263,11 +263,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../getting-started/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -351,13 +353,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../development/" class="md-tabs__link">
           
   
   
@@ -572,6 +572,8 @@
       
   
   
+    
+  
   
   
     
@@ -589,22 +591,23 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../getting-started/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -622,13 +625,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -645,10 +648,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../getting-started/container-images/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Images & Versioning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -664,6 +694,144 @@
   
 
       </a>
+      
+        
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tag-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tag Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cuda-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a Tag
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choosing a Tag">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decision-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-autoware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to Autoware
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ros-2-distro-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROS 2 Distro Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-supported-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "Supported" Means
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-releases-are-tagged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Releases Are Tagged
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -676,7 +844,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../troubleshooting/" class="md-nav__link">
         
   
   
@@ -1877,8 +2045,6 @@
       
   
   
-    
-  
   
   
     
@@ -1896,23 +2062,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../development/" class="md-nav__link ">
               
   
   
@@ -1930,13 +2095,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1956,7 +2121,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build-from-source/" class="md-nav__link">
+      <a href="../../development/build-from-source/" class="md-nav__link">
         
   
   
@@ -1981,37 +2146,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Contributing
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../development/contributing/" class="md-nav__link">
         
   
   
@@ -2027,177 +2165,6 @@
   
 
       </a>
-      
-        
-
-  
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#developer-certificate-of-origin-dco" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Developer Certificate of Origin (DCO)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-contribute" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to Contribute
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="How to Contribute">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-fork-the-repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Fork the Repository
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-set-up-your-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Set Up Your Environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-create-a-branch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Create a Branch
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-make-your-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Make Your Changes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-commit-with-conventional-commits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Commit with Conventional Commits
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-push-and-open-a-pull-request" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Push and Open a Pull Request
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contribution-workflow-summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contribution Workflow Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#validate-before-pushing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validate Before Pushing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#community" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Community
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#code-of-conduct" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Code of Conduct
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2337,10 +2304,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
+  <a href="#tag-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        License
+        Tag Reference
       
     </span>
   </a>
@@ -2348,10 +2315,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#developer-certificate-of-origin-dco" class="md-nav__link">
+  <a href="#cuda-images" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Developer Certificate of Origin (DCO)
+        CUDA Images
       
     </span>
   </a>
@@ -2359,77 +2326,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-contribute" class="md-nav__link">
+  <a href="#choosing-a-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How to Contribute
+        Choosing a Tag
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="How to Contribute">
+    <nav class="md-nav" aria-label="Choosing a Tag">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-fork-the-repository" class="md-nav__link">
+  <a href="#decision-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Fork the Repository
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-set-up-your-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Set Up Your Environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-create-a-branch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Create a Branch
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-make-your-changes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Make Your Changes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-commit-with-conventional-commits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Commit with Conventional Commits
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-push-and-open-a-pull-request" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Push and Open a Pull Request
+        Decision Flow
       
     </span>
   </a>
@@ -2442,10 +2354,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#contribution-workflow-summary" class="md-nav__link">
+  <a href="#versioning" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Contribution Workflow Summary
+        Versioning
       
     </span>
   </a>
@@ -2453,10 +2365,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#validate-before-pushing" class="md-nav__link">
+  <a href="#relationship-to-autoware" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Validate Before Pushing
+        Relationship to Autoware
       
     </span>
   </a>
@@ -2464,10 +2376,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#community" class="md-nav__link">
+  <a href="#ros-2-distro-support" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Community
+        ROS 2 Distro Support
       
     </span>
   </a>
@@ -2475,10 +2387,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#code-of-conduct" class="md-nav__link">
+  <a href="#what-supported-means" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Code of Conduct
+        What "Supported" Means
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-releases-are-tagged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Releases Are Tagged
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
       
     </span>
   </a>
@@ -2502,7 +2436,7 @@
 
 
   
-    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/development/contributing.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/getting-started/container-images.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2510,161 +2444,195 @@
   
 
 
-<h1 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">#</a></h1>
-<p>Thank you for your interest in contributing to Open AD Kit. This project is part of the <a href="https://www.autoware.org/">Autoware Foundation</a> ecosystem, and we welcome contributions from individuals and organizations worldwide.</p>
-<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">#</a></h2>
-<p>Open AD Kit is licensed under the <strong>Apache License 2.0</strong>. By contributing, you agree that your contributions will be licensed under the same terms.</p>
-<div class="admonition note">
-<p class="admonition-title">No CLA Required</p>
-<p>The Autoware Foundation does <strong>not</strong> require a Contributor License Agreement (CLA). Contributions are accepted under the Apache 2.0 license terms.</p>
-</div>
-<h2 id="developer-certificate-of-origin-dco">Developer Certificate of Origin (DCO)<a class="headerlink" href="#developer-certificate-of-origin-dco" title="Permanent link">#</a></h2>
-<p>All commits must include a <strong>Signed-off-by</strong> line to certify that you have the right to submit the code under the Apache 2.0 license:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Sign off automatically when committing</span>
-git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: add new deployment&quot;</span>
-</code></pre></div>
-<p>The sign-off is a simple line at the end of the commit message:</p>
-<div class="highlight"><pre><span></span><code>Signed-off-by: Your Name &lt;your.email@example.com&gt;
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">DCO Enforcement</p>
-<p>Pull requests without proper DCO sign-off will not be merged. The CI checks enforce this requirement automatically.</p>
-</div>
-<h2 id="how-to-contribute">How to Contribute<a class="headerlink" href="#how-to-contribute" title="Permanent link">#</a></h2>
-<h3 id="1-fork-the-repository">1. Fork the Repository<a class="headerlink" href="#1-fork-the-repository" title="Permanent link">#</a></h3>
-<p>Create your own fork of the <a href="https://github.com/autowarefoundation/openadkit">Open AD Kit repository</a> on GitHub.</p>
-<h3 id="2-set-up-your-environment">2. Set Up Your Environment<a class="headerlink" href="#2-set-up-your-environment" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Clone your fork</span>
-git<span class="w"> </span>clone<span class="w"> </span>https://github.com/YOUR_USERNAME/openadkit.git
-<span class="nb">cd</span><span class="w"> </span>openadkit
-
-<span class="c1"># Add the upstream remote</span>
-git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
-</code></pre></div>
-<h3 id="3-create-a-branch">3. Create a Branch<a class="headerlink" href="#3-create-a-branch" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Make sure you are on the latest main branch first</span>
-git<span class="w"> </span>checkout<span class="w"> </span>main
-git<span class="w"> </span>pull<span class="w"> </span>upstream<span class="w"> </span>main
-
-<span class="c1"># Create your feature branch</span>
-git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feat/your-feature-name
-</code></pre></div>
-<p>Use descriptive branch names that reflect the change:</p>
-<ul>
-<li><code>feat/</code> — New features or enhancements</li>
-<li><code>fix/</code> — Bug fixes</li>
-<li><code>docs/</code> — Documentation improvements</li>
-<li><code>refactor/</code> — Code refactoring</li>
-</ul>
-<h3 id="4-make-your-changes">4. Make Your Changes<a class="headerlink" href="#4-make-your-changes" title="Permanent link">#</a></h3>
-<p>Follow the existing code style and documentation conventions. For documentation changes, preview them locally:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Build the MkDocs container image (run once)</span>
-make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </span>prepare
-
-<span class="c1"># Serve the docs site</span>
-make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </span>serve
-</code></pre></div>
-<h3 id="5-commit-with-conventional-commits">5. Commit with Conventional Commits<a class="headerlink" href="#5-commit-with-conventional-commits" title="Permanent link">#</a></h3>
-<p>Use <a href="https://www.conventionalcommits.org/">Conventional Commits</a> for all commit messages and PR titles:</p>
+<h1 id="container-images-versioning">Container Images &amp; Versioning<a class="headerlink" href="#container-images-versioning" title="Permanent link">#</a></h1>
+<p>Open AD Kit publishes images to the GitHub Container Registry (<code>ghcr.io/autowarefoundation/openadkit</code>). This page is the canonical reference for the tag schema, the version scheme, and what "supported" means.</p>
+<h2 id="tag-reference">Tag Reference<a class="headerlink" href="#tag-reference" title="Permanent link">#</a></h2>
 <table>
 <thead>
 <tr>
-<th>Type</th>
+<th>Tag Pattern</th>
+<th>Example</th>
 <th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Stable release</strong></td>
+<td><code>planning-control-humble-v2.0.0</code></td>
+<td>Immutable release tag. Use this when you need a fully reproducible deployment.</td>
+</tr>
+<tr>
+<td><strong>Latest stable alias</strong></td>
+<td><code>planning-control-humble</code></td>
+<td>Always resolves to the latest stable release for the specified ROS distro.</td>
+</tr>
+<tr>
+<td><strong>Latest stable + suffix</strong></td>
+<td><code>planning-control-humble-latest</code></td>
+<td>Same as above, explicit.</td>
+</tr>
+<tr>
+<td><strong>Default ROS distro alias</strong></td>
+<td><code>planning-control</code></td>
+<td>Convenience alias that resolves to the current default ROS distro (Humble).</td>
+</tr>
+<tr>
+<td><strong>Default + latest suffix</strong></td>
+<td><code>planning-control-latest</code></td>
+<td>Explicit default-distro latest alias.</td>
+</tr>
+<tr>
+<td><strong>Immutable build tag</strong></td>
+<td><code>planning-control-humble-123456789-1</code></td>
+<td>Pin to a specific CI build. Format: <code>&lt;target&gt;-&lt;ros_distro&gt;-&lt;run_id&gt;-&lt;run_attempt&gt;</code>.</td>
+</tr>
+<tr>
+<td><strong>CI development alias</strong></td>
+<td><code>planning-control-amd64-humble</code></td>
+<td>Per-platform mutable tag used during CI. <strong>Do not use for pinned deployments.</strong></td>
+</tr>
+<tr>
+<td><strong>Pre-release</strong></td>
+<td><code>planning-control-humble-v2.0.0-rc.1</code></td>
+<td>Pre-release tag for testing. Pre-releases do not update latest stable aliases.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">ROS 2 distributions</p>
+<p>Examples use <strong>Humble</strong> (the current default). <strong>Jazzy</strong> images are published in parallel — substitute <code>-jazzy</code> for <code>-humble</code> in any tag (e.g. <code>planning-control-jazzy</code>, <code>planning-control-jazzy-v2.0.0</code>).</p>
+</div>
+<h2 id="cuda-images">CUDA Images<a class="headerlink" href="#cuda-images" title="Permanent link">#</a></h2>
+<p>CUDA-enabled variants follow the same patterns but are <strong>amd64-only</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Tag Pattern</th>
 <th>Example</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>feat</code></td>
-<td>New feature</td>
-<td><code>feat: add carla-interface container</code></td>
+<td>Stable release</td>
+<td><code>sensing-perception-cuda-humble-v2.0.0</code></td>
 </tr>
 <tr>
-<td><code>fix</code></td>
-<td>Bug fix</td>
-<td><code>fix: resolve zenoh bridge port conflict</code></td>
-</tr>
-<tr>
-<td><code>docs</code></td>
-<td>Documentation only</td>
-<td><code>docs: update hardware requirements</code></td>
-</tr>
-<tr>
-<td><code>style</code></td>
-<td>Formatting, no code change</td>
-<td><code>style: format docker-compose files</code></td>
-</tr>
-<tr>
-<td><code>refactor</code></td>
-<td>Code restructuring</td>
-<td><code>refactor: simplify build pipeline</code></td>
-</tr>
-<tr>
-<td><code>test</code></td>
-<td>Adding or updating tests</td>
-<td><code>test: add scenario simulation test</code></td>
-</tr>
-<tr>
-<td><code>chore</code></td>
-<td>Maintenance tasks</td>
-<td><code>chore: update CI workflow</code></td>
+<td>Latest alias</td>
+<td><code>sensing-perception-cuda-humble</code></td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: add new deployment for logging simulation&quot;</span>
-</code></pre></div>
-<h3 id="6-push-and-open-a-pull-request">6. Push and Open a Pull Request<a class="headerlink" href="#6-push-and-open-a-pull-request" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feat/your-feature-name
-</code></pre></div>
-<p>Open a pull request against the <code>main</code> branch of the upstream repository. The PR description should include:</p>
+<h2 id="choosing-a-tag">Choosing a Tag<a class="headerlink" href="#choosing-a-tag" title="Permanent link">#</a></h2>
+<div class="oak-callout">
+<p><strong>Production / reproducible deployments</strong> — Use a stable release tag (<code>vX.Y.Z</code>).</p>
+<p><strong>Development / latest features</strong> — Use a latest stable alias (<code>&lt;target&gt;-&lt;ros_distro&gt;</code>).</p>
+<p><strong>Quick start / deployments</strong> — Use a default ROS distro alias (<code>&lt;target&gt;</code>).</p>
+<p><strong>Never pin to CI development aliases</strong> (<code>*-amd64-*</code>) — Do not use mutable per-platform tags in committed deployment files.</p>
+</div>
+<h3 id="decision-flow">Decision Flow<a class="headerlink" href="#decision-flow" title="Permanent link">#</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    A{Need fully reproducible&lt;br/&gt;deployment?} --&gt;|Yes| B[Use stable release tag&lt;br/&gt;vX.Y.Z]
+    A --&gt;|No| C{Need specific&lt;br/&gt;ROS distro?}
+    C --&gt;|Yes| D[Use latest stable alias&lt;br/&gt;&amp;lt;target&amp;gt;-&amp;lt;ros_distro&amp;gt;]
+    C --&gt;|No| E[Use default alias&lt;br/&gt;&amp;lt;target&amp;gt;]</code></pre>
+<h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">#</a></h2>
+<p>Open AD Kit releases use <a href="https://semver.org/">Semantic Versioning</a>: <code>vMAJOR.MINOR.PATCH</code> (for example, <code>v2.0.0</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Increments when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MAJOR</strong></td>
+<td>A backward-incompatible change to the public deployment surface — image taxonomy, documented compose/deployment layout, or removal of a supported platform/variant.</td>
+</tr>
+<tr>
+<td><strong>MINOR</strong></td>
+<td>New backward-compatible capability — additional components, platforms, deployments, or CI/release machinery.</td>
+</tr>
+<tr>
+<td><strong>PATCH</strong></td>
+<td>Backward-compatible fixes — bug fixes, security/CVE remediation, image refreshes, and documentation corrections within the same release surface.</td>
+</tr>
+</tbody>
+</table>
+<p>The Open AD Kit version is <strong>independent of the Autoware version</strong> it packages: a single Open AD Kit release pins a specific upstream Autoware release (see below), and a new Autoware release does not automatically change the Open AD Kit version.</p>
+<h2 id="relationship-to-autoware">Relationship to Autoware<a class="headerlink" href="#relationship-to-autoware" title="Permanent link">#</a></h2>
+<p>Each Open AD Kit release pins a specific upstream <strong>Autoware semver meta-release</strong> and records it in the release:</p>
 <ul>
-<li><strong>What</strong> changed and <strong>why</strong></li>
-<li><strong>How</strong> it was tested</li>
-<li>Any <strong>breaking changes</strong> or migration notes</li>
+<li>Stable Open AD Kit releases pin an Autoware <code>X.Y.Z</code> meta-release tag.</li>
+<li><code>v2.0.0</code> pins Autoware <strong>1.8.0</strong>.</li>
 </ul>
+<p>A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published release details are listed on the <a href="../../releases/">Releases</a> page; how the tags are structured is in the <a href="#tag-reference">Tag Reference</a> above.</p>
+<h2 id="ros-2-distro-support">ROS 2 Distro Support<a class="headerlink" href="#ros-2-distro-support" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Distro</th>
+<th>Status at v2.0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Humble</strong></td>
+<td>Default, documented path.</td>
+</tr>
+<tr>
+<td><strong>Jazzy</strong></td>
+<td>Built and published <strong>in parallel</strong> wherever the <code>amd64</code>+<code>arm64</code> matrix is green.</td>
+</tr>
+</tbody>
+</table>
+<p>Each release pins its ROS distro(s), and Humble and Jazzy are built while both matrices are green. Jazzy is promoted to the primary documented path at the first release with a sustained green Jazzy <code>amd64</code>+<code>arm64</code> matrix. Distro support tracks the upstream ROS 2 lifecycle — a distro is supported by Open AD Kit only while it is supported upstream.</p>
+<h2 id="what-supported-means">What "Supported" Means<a class="headerlink" href="#what-supported-means" title="Permanent link">#</a></h2>
+<ul>
+<li><strong>Releases</strong> — The latest stable release is supported. Fixes (including security/CVE remediation) land in a new patch or minor release rather than being backported to older tags. Stable release tags are immutable; see <a href="#choosing-a-tag">Choosing a Tag</a> for pinning guidance.</li>
+<li><strong>Platforms</strong> — Support is tiered (committed / experimental / best-effort / unsupported). A variant that does not pass its build/validation gate is dropped from the support matrix rather than shipped as if it worked. See <a href="../../platforms/">Supported Platforms</a> for the current, honest matrix.</li>
+<li><strong>No certification claims</strong> — "Supported" refers to build, deployment, and validation in a non-certified environment. Open AD Kit makes no safety-certification, functional-safety, or production-readiness claims.</li>
+</ul>
+<h2 id="how-releases-are-tagged">How Releases Are Tagged<a class="headerlink" href="#how-releases-are-tagged" title="Permanent link">#</a></h2>
+<p>Releases are promoted from existing CI builds rather than rebuilt at release time, so the exact images validated during CI are the images that ship. When a release workflow runs, the following tag aliases are updated:</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Build tag</td>
+<td>Stable release</td>
+<td><code>planning-control-humble-123456789-1</code> → <code>planning-control-humble-v2.0.0</code></td>
+</tr>
+<tr>
+<td>Stable release</td>
+<td>Latest alias</td>
+<td><code>planning-control-humble-v2.0.0</code> → <code>planning-control-humble</code></td>
+</tr>
+<tr>
+<td>Latest alias</td>
+<td>Default alias</td>
+<td><code>planning-control-humble</code> → <code>planning-control</code></td>
+</tr>
+</tbody>
+</table>
 <div class="admonition info">
-<p class="admonition-title">Large Changes</p>
-<p>For significant changes (new features, architectural modifications), please open a GitHub Discussion first to align with maintainers before submitting a PR.</p>
+<p class="admonition-title">Pre-Releases</p>
+<p>Pre-release tags (e.g., <code>-rc.1</code>) are published but <strong>do not update</strong> latest stable aliases. This prevents prerelease images from being pulled by default aliases.</p>
 </div>
-<h2 id="contribution-workflow-summary">Contribution Workflow Summary<a class="headerlink" href="#contribution-workflow-summary" title="Permanent link">#</a></h2>
-<div class="oak-steps">
+<p>Maintainer workflow steps are documented in the <a href="../../development/build-from-source/#release-process">Release Process</a>.</p>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
-<li><strong>Fork</strong> the repository on GitHub</li>
-<li><strong>Clone</strong> your fork and set up the development environment</li>
-<li><strong>Branch</strong> from <code>main</code> with a descriptive name</li>
-<li><strong>Develop</strong> your changes following project conventions</li>
-<li><strong>Commit</strong> with DCO sign-off and Conventional Commit format</li>
-<li><strong>Push</strong> your branch to your fork</li>
-<li><strong>Validate</strong> before opening a PR (see below)</li>
-<li><strong>Open a Pull Request</strong> against <code>main</code> with a clear description</li>
+<li><a href="../">Quickstart</a> — Environment setup and first deployment</li>
+<li><a href="../../releases/">Releases</a> — Published release details</li>
+<li><a href="../../development/build-from-source/">Build from Source</a> — Building images locally</li>
+<li><a href="../troubleshooting/">Troubleshooting</a> — Common issues</li>
 </ul>
-</div>
-<h2 id="validate-before-pushing">Validate Before Pushing<a class="headerlink" href="#validate-before-pushing" title="Permanent link">#</a></h2>
-<p>Run the same checks CI runs to catch issues early:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Documentation build</span>
-make<span class="w"> </span>-C<span class="w"> </span>docs<span class="w"> </span>build
-
-<span class="c1"># Docker Compose validation (per-deployment, with both env files — base first, last wins)</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">REMOTE_PASSWORD</span><span class="o">=</span><span class="s2">&quot;ci-validate&quot;</span>
-<span class="o">(</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>deployments/planning-simulation<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>config<span class="w"> </span>-q<span class="w"> </span><span class="o">)</span>
-
-<span class="c1"># Python tests</span>
-pytest<span class="w"> </span>.github/scripts/
-</code></pre></div>
-<p>For the complete lint suite (shellcheck, actionlint, hadolint, yamllint, markdownlint) and all deployment validations, see the top-level <a href="https://github.com/autowarefoundation/openadkit/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> file.</p>
-<pre class="mermaid"><code>flowchart LR
-    Fork --&gt; Clone --&gt; Branch --&gt; Develop --&gt; Commit --&gt; Push --&gt; PR</code></pre>
-<h2 id="community">Community<a class="headerlink" href="#community" title="Permanent link">#</a></h2>
-<ul>
-<li><a href="https://discord.gg/Q94UsPvReQ">Autoware Foundation Discord</a> — Real-time discussion and support</li>
-<li><a href="https://autowarefoundation.github.io/autoware-documentation/main/contributing/">Autoware Documentation — Contributing</a> — Foundation-wide contribution guidelines</li>
-<li><a href="https://github.com/autowarefoundation/openadkit/issues">GitHub Issues</a> — Bug reports and feature requests</li>
-<li><a href="https://github.com/autowarefoundation/openadkit/discussions">GitHub Discussions</a> — Design proposals and community questions</li>
-</ul>
-<h2 id="code-of-conduct">Code of Conduct<a class="headerlink" href="#code-of-conduct" title="Permanent link">#</a></h2>
-<p>All contributors are expected to adhere to the <a href="https://github.com/autowarefoundation/openadkit/blob/main/CODE_OF_CONDUCT.md">Autoware Foundation Code of Conduct</a>, which fosters an open, welcoming, and harassment-free environment.</p>
 
 
 
@@ -2702,7 +2670,7 @@ pytest<span class="w"> </span>.github/scripts/
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../build-from-source/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Build from Source">
+          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Quickstart">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2712,20 +2680,20 @@ pytest<span class="w"> </span>.github/scripts/
                 Previous
               </span>
               <div class="md-ellipsis">
-                Build from Source
+                Quickstart
               </div>
             </div>
           </a>
         
         
           
-          <a href="../../releases/" class="md-footer__link md-footer__link--next" aria-label="Next: Releases">
+          <a href="../troubleshooting/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Releases
+                Troubleshooting
               </div>
             </div>
             <div class="md-footer__button md-icon">

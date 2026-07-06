@@ -585,10 +585,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -652,70 +648,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../getting-started/container-images/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Container Image Tags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/versioning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Versioning &amp; Support Policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/release-flow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Flow
+    Images & Versioning
   
 
     
@@ -1287,12 +1227,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1356,14 +1290,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/sensing/" class="md-nav__link">
+      <a href="../../components/sensing-perception/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensing
+    Sensing & Perception
   
 
     
@@ -1384,14 +1318,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/perception/" class="md-nav__link">
+      <a href="../../components/localization-mapping/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Perception
+    Localization & Mapping
   
 
     
@@ -1412,98 +1346,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/mapping/" class="md-nav__link">
+      <a href="../../components/planning-control/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Mapping
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/localization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Localization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/planning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Planning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/control/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Control
+    Planning & Control
   
 
     
@@ -2607,15 +2457,12 @@
 <td>Check host X access (<code>xhost +SI:localuser:root</code>) and the Vulkan ICD path</td>
 </tr>
 <tr>
-<td>Visualizer blank</td>
-<td>Wait for all containers to initialize, then refresh the browser</td>
-</tr>
-<tr>
 <td>Ego vehicle does not move</td>
 <td>Set a route with <strong>2D Goal Pose</strong> and click <strong>Auto</strong>, or use <code>--drive</code></td>
 </tr>
 </tbody>
 </table>
+<p>For Docker, GPU, and visualizer issues common to all deployments, see <a href="../../getting-started/troubleshooting/">Troubleshooting</a>.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
 <p>The CARLA simulation connects the Unreal Engine simulator to the full Autoware stack through a dedicated bridge:</p>
 <pre class="mermaid"><code>flowchart LR

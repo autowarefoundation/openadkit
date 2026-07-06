@@ -731,10 +731,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -798,70 +794,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/image-tags/" class="md-nav__link">
+      <a href="../getting-started/container-images/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Container Image Tags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../getting-started/versioning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Versioning &amp; Support Policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../getting-started/release-flow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Flow
+    Images & Versioning
   
 
     
@@ -1415,12 +1355,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1484,14 +1418,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/sensing/" class="md-nav__link">
+      <a href="../components/sensing-perception/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensing
+    Sensing & Perception
   
 
     
@@ -1512,14 +1446,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/perception/" class="md-nav__link">
+      <a href="../components/localization-mapping/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Perception
+    Localization & Mapping
   
 
     
@@ -1540,98 +1474,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/mapping/" class="md-nav__link">
+      <a href="../components/planning-control/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Mapping
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/localization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Localization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/planning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Planning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/control/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Control
+    Planning & Control
   
 
     
@@ -2588,12 +2438,12 @@
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h2>
 <p>Open AD Kit runs Autoware as a pipeline of containerized components. Each container handles one stage of autonomous driving, and the stages communicate over ROS 2 DDS on the host network:</p>
 <ol>
-<li><a href="../components/sensing/"><strong>Sensing</strong></a> captures and preprocesses raw sensor data (LiDAR, camera, IMU).</li>
-<li><a href="../components/perception/"><strong>Perception</strong></a> detects and tracks objects, traffic lights, and drivable space.</li>
-<li><a href="../components/mapping/"><strong>Mapping</strong></a> serves high-definition map data that the rest of the stack consumes.</li>
-<li><a href="../components/localization/"><strong>Localization</strong></a> determines the vehicle's exact position on the map.</li>
-<li><a href="../components/planning/"><strong>Planning</strong></a> computes a safe, feasible trajectory to the goal.</li>
-<li><a href="../components/control/"><strong>Control</strong></a> converts that trajectory into throttle, brake, and steering commands.</li>
+<li><a href="../components/sensing-perception/"><strong>Sensing</strong></a> captures and preprocesses raw sensor data (LiDAR, camera, IMU).</li>
+<li><a href="../components/sensing-perception/"><strong>Perception</strong></a> detects and tracks objects, traffic lights, and drivable space.</li>
+<li><a href="../components/localization-mapping/"><strong>Mapping</strong></a> serves high-definition map data that the rest of the stack consumes.</li>
+<li><a href="../components/localization-mapping/"><strong>Localization</strong></a> determines the vehicle's exact position on the map.</li>
+<li><a href="../components/planning-control/"><strong>Planning</strong></a> computes a safe, feasible trajectory to the goal.</li>
+<li><a href="../components/planning-control/"><strong>Control</strong></a> converts that trajectory into throttle, brake, and steering commands.</li>
 <li><a href="../components/vehicle-system/"><strong>Vehicle System</strong></a> bridges those commands to the actual vehicle or simulator.</li>
 </ol>
 <p>A <strong>deployment</strong> is a Docker Compose file that starts the subset of these containers needed for a specific task — for example, planning simulation starts only planning, control, and visualization, while logging simulation adds sensing and perception to replay real sensor data. For the full picture, see <a href="../components/">Components</a> and <a href="../deployment/">Deployment</a>.</p>
@@ -2657,13 +2507,13 @@
         
         
           
-          <a href="../getting-started/" class="md-footer__link md-footer__link--next" aria-label="Next: Getting Started">
+          <a href="../getting-started/" class="md-footer__link md-footer__link--next" aria-label="Next: Quickstart">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Getting Started
+                Quickstart
               </div>
             </div>
             <div class="md-footer__button md-icon">

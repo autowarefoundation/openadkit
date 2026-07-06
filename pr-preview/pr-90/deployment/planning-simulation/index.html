@@ -585,10 +585,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -652,70 +648,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../getting-started/container-images/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Container Image Tags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/versioning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Versioning &amp; Support Policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/release-flow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Flow
+    Images & Versioning
   
 
     
@@ -1287,12 +1227,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1356,14 +1290,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/sensing/" class="md-nav__link">
+      <a href="../../components/sensing-perception/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensing
+    Sensing & Perception
   
 
     
@@ -1384,14 +1318,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/perception/" class="md-nav__link">
+      <a href="../../components/localization-mapping/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Perception
+    Localization & Mapping
   
 
     
@@ -1412,98 +1346,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/mapping/" class="md-nav__link">
+      <a href="../../components/planning-control/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Mapping
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/localization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Localization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/planning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Planning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/control/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Control
+    Planning & Control
   
 
     
@@ -2509,7 +2359,7 @@
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/planning-simulation/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data planning-simulation</code> to fetch the map.</p>
+<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the matching <code>deployments/&lt;deployment&gt;/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data &lt;deployment&gt;</code> to fetch the sample data.</p>
 </div>
 <h3 id="3-download-the-demo-map">3. Download the demo map<a class="headerlink" href="#3-download-the-demo-map" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>planning-simulation
@@ -2524,11 +2374,7 @@
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Cloned repository</p>
-<p>If running from a cloned repository rather than a release bundle, prepend
-<code>--env-file ../base/base.env</code> to <strong>every</strong> <code>docker compose</code> command below
-(start and stop). The bundle merges both env files into one; from a clone
-you need both so shared variables like <code>ROS_DOMAIN_ID</code> and <code>VEHICLE_MODEL</code>
-resolve.</p>
+<p>If running from a cloned repository rather than a release bundle, prepend <code>--env-file ../base/base.env</code> to <strong>every</strong> <code>docker compose</code> command on this page. Release bundles merge both env files into one; from a clone you need both so shared variables such as <code>ROS_DOMAIN_ID</code> and <code>REMOTE_PASSWORD</code> resolve.</p>
 </div>
 <p>Wait approximately 10 seconds for the containers to initialize.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
@@ -2565,23 +2411,12 @@ resolve.</p>
 </thead>
 <tbody>
 <tr>
-<td>Blank visualizer screen</td>
-<td>Wait 10-30 seconds for containers to fully initialize, then refresh the browser</td>
-</tr>
-<tr>
-<td><code>file not found</code> error</td>
-<td>Re-run <code>./install.sh sample-data planning-simulation --force</code> to re-download the map into <code>~/autoware_map</code></td>
-</tr>
-<tr>
-<td>Port 6080 in use</td>
-<td>Stop the conflicting service (host networking binds <code>:6080</code> directly; <code>ports:</code> mappings are ignored)</td>
-</tr>
-<tr>
 <td>Vehicle does not move after setting goal</td>
 <td>Check that the initial pose is set correctly and the map is loaded in RViz2</td>
 </tr>
 </tbody>
 </table>
+<p>For Docker, GPU, and visualizer issues common to all deployments, see <a href="../../getting-started/troubleshooting/">Troubleshooting</a>.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart LR
     subgraph Host["Single Host"]

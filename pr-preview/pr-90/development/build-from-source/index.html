@@ -585,10 +585,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -652,70 +648,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../getting-started/container-images/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Container Image Tags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/versioning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Versioning &amp; Support Policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/release-flow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Flow
+    Images & Versioning
   
 
     
@@ -1269,12 +1209,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1338,14 +1272,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/sensing/" class="md-nav__link">
+      <a href="../../components/sensing-perception/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensing
+    Sensing & Perception
   
 
     
@@ -1366,14 +1300,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/perception/" class="md-nav__link">
+      <a href="../../components/localization-mapping/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Perception
+    Localization & Mapping
   
 
     
@@ -1394,98 +1328,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/mapping/" class="md-nav__link">
+      <a href="../../components/planning-control/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Mapping
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/localization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Localization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/planning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Planning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/control/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Control
+    Planning & Control
   
 
     
@@ -2268,6 +2118,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release Process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-of-truth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source of Truth
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2549,6 +2427,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#release-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Release Process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Release Process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-of-truth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source of Truth
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2588,7 +2494,7 @@
 <p>This guide covers building Open AD Kit container images locally from the repository source.</p>
 <div class="admonition note">
 <p class="admonition-title">Who needs this</p>
-<p>Building from source is for <strong>maintainers and contributors</strong>. Typical users should pull the pre-built images from GHCR — see <a href="../../getting-started/image-tags/">Container Image Tags</a>.</p>
+<p>Building from source is for <strong>maintainers and contributors</strong>. Typical users should pull the pre-built images from GHCR — see <a href="../../getting-started/container-images/">Container Images &amp; Versioning</a>.</p>
 </div>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
@@ -2753,11 +2659,46 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 </div>
 <h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">#</a></h2>
 <p>CI builds every target automatically via <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml"><code>.github/workflows/build-all-images.yaml</code></a>, which invokes the same Bake file across a build matrix. The matrix (targets, platforms, ROS distros) is driven by <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json"><code>.github/image-inventory.json</code></a> — the source of truth for what gets built and on which architectures.</p>
+<p>The workflow runs staged jobs — <code>prepare</code>, then <code>build-common</code> and <code>build-components</code>, then <code>build-carla-interface</code> (which depends on <code>simulator</code>) — so each layer is pushed before the layer that depends on it. Most targets build for <code>{humble, jazzy} × {amd64, arm64}</code>; <code>sensing-perception-cuda</code> is amd64-only and <code>carla-interface</code> is amd64 + Humble only. A final <code>create-manifests</code> job stitches the per-arch tags into multi-arch manifests.</p>
+<h2 id="release-process">Release Process<a class="headerlink" href="#release-process" title="Permanent link">#</a></h2>
+<p>Open AD Kit releases are promoted from existing CI builds rather than rebuilt at release time. This ensures that the exact images validated during CI are the images that ship to users.</p>
+<div class="oak-steps">
+<ul>
+<li><strong>Build all images</strong>
+  Run the <strong><code>build-all-images</code></strong> GitHub Actions workflow from <code>main</code>. Stable releases must use an Autoware <code>X.Y.Z</code> tag; pre-releases may use an Autoware tag or full 40-character SHA.</li>
+</ul>
+<ul>
+<li><strong>Record the build tag</strong>
+  Keep the build summary's <code>build_tag</code>, formatted as <code>RUN_ID-RUN_ATTEMPT</code>.</li>
+</ul>
+<ul>
+<li><strong>Scan the images</strong>
+  Ensure the <strong><code>scan-images</code></strong> GitHub Actions workflow completes successfully for that <code>build_tag</code>. Scheduled builds request scans automatically; otherwise trigger <code>scan-images</code> manually.
+  Scans check images for known CVEs.</li>
+</ul>
+<ul>
+<li><strong>Promote and tag</strong>
+  Run the <strong><code>release</code></strong> GitHub Actions workflow with the Open AD Kit <code>version</code> and the validated <code>build_tag</code>. This promotes the scanned images to stable release tags and updates latest aliases.</li>
+</ul>
+</div>
+<pre class="mermaid"><code>flowchart LR
+    A[Build All Images] --&gt; R[Record Build Tag]
+    R --&gt; B[Scan Images]
+    B --&gt; C[Promote &amp; Tag]
+    C --&gt; D[Update Aliases]</code></pre>
+<p>The resulting tag aliases are documented in <a href="../../getting-started/container-images/#how-releases-are-tagged">How Releases Are Tagged</a>.</p>
+<h3 id="source-of-truth">Source of Truth<a class="headerlink" href="#source-of-truth" title="Permanent link">#</a></h3>
+<p>The following artifacts are the canonical reference for release validation:</p>
+<ul>
+<li><strong>Build metadata</strong> — CI run logs and artifact manifests</li>
+<li><strong>Scan metadata</strong> — CVE scan results</li>
+<li><strong><code>.github/image-inventory.json</code></strong> — Canonical inventory of all published images and their tags</li>
+</ul>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="../contributing/">Contributing</a> — How to submit your changes</li>
 <li><a href="../../components/">Components</a> — What each image contains</li>
-<li><a href="../../getting-started/image-tags/">Container Image Tags</a> — Pulling pre-built images</li>
+<li><a href="../../getting-started/container-images/">Container Images &amp; Versioning</a> — Pulling pre-built images</li>
 </ul>
 
 

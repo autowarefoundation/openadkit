@@ -585,10 +585,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -652,70 +648,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/image-tags/" class="md-nav__link">
+      <a href="../getting-started/container-images/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Container Image Tags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../getting-started/versioning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Versioning &amp; Support Policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../getting-started/release-flow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Flow
+    Images & Versioning
   
 
     
@@ -1269,12 +1209,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1338,14 +1272,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/sensing/" class="md-nav__link">
+      <a href="../components/sensing-perception/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensing
+    Sensing & Perception
   
 
     
@@ -1366,14 +1300,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/perception/" class="md-nav__link">
+      <a href="../components/localization-mapping/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Perception
+    Localization & Mapping
   
 
     
@@ -1394,98 +1328,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../components/mapping/" class="md-nav__link">
+      <a href="../components/planning-control/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Mapping
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/localization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Localization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/planning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Planning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../components/control/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Control
+    Planning & Control
   
 
     
@@ -2337,45 +2187,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#soafee-middleware-platforms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SOAFEE Middleware Platforms
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="SOAFEE Middleware Platforms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#autosd_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AutoSD
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ewaol_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        EWAOL
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#development-platforms" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2448,31 +2259,6 @@
 <p>Edge Workload Abstraction and Orchestration Layer — Arm's container-centric Yocto framework. Upstream SOAFEE reference, retained as background; not a committed Open AD Kit target.</p>
 <p><a href="ewaol/" class="md-button">View EWAOL Docs</a></p>
 </div>
-</div>
-<h2 id="soafee-middleware-platforms">SOAFEE Middleware Platforms<a class="headerlink" href="#soafee-middleware-platforms" title="Permanent link">#</a></h2>
-<h3 id="autosd_1"><a href="autosd/">AutoSD</a><a class="headerlink" href="#autosd_1" title="Permanent link">#</a></h3>
-<p><span class="oak-badge oak-badge--testing">Experimental</span> <span class="oak-badge oak-badge--supported">Runnable assets in repo</span></p>
-<p>AutoSD is the upstream binary distribution that serves as the public, in-development preview of <strong>Red Hat In-Vehicle Operating System (OS)</strong>. It is built on CentOS Stream with an automotive-specific kernel (<code>kernel-automotive</code>) and provides mixed-criticality container orchestration via Podman, Quadlet, and BlueChi.</p>
-<p>Key capabilities:</p>
-<ul>
-<li><strong>Mixed criticality</strong>: Root partition for safety-critical containers, QM partition for non-critical workloads</li>
-<li><strong>Atomic updates</strong>: OSTree and composefs for immutable, rollback-capable system images</li>
-<li><strong>Real-time kernel</strong>: RT-optimized scheduling for deterministic autonomous driving functions</li>
-<li><strong>Container-native</strong>: Podman and Quadlet for systemd-managed container services</li>
-</ul>
-<h3 id="ewaol_1"><a href="ewaol/">EWAOL</a><a class="headerlink" href="#ewaol_1" title="Permanent link">#</a></h3>
-<p><span class="oak-badge oak-badge--neutral">Upstream reference</span></p>
-<p>The Edge Workload Abstraction and Orchestration Layer (EWAOL) is a standards-based, container-centric framework for deploying edge workloads, delivered via the <code>meta-ewaol</code> Yocto layer. It was the original SOAFEE reference implementation.</p>
-<p>Key capabilities:</p>
-<ul>
-<li><strong>Container-native runtime</strong>: Docker and K3s orchestration on the edge</li>
-<li><strong>Real-time Linux</strong>: Deterministic scheduling</li>
-<li><strong>Virtualization</strong>: Xen support for mixed-criticality separation</li>
-<li><strong>Cloud-to-edge parity</strong>: Arm Neoverse N1 architecture on both AVA platform and AWS Graviton</li>
-</ul>
-<div class="admonition note">
-<p class="admonition-title">Not a committed Open AD Kit target</p>
-<p>EWAOL is retained here as upstream SOAFEE background only. Open AD Kit's committed SOAFEE-aligned target is the <strong>Arm Automotive Solutions reference stack / RD-1 AE FVP</strong> (experimental; SOAFEE Integration Lab validation planned). This page documents EWAOL's upstream build/runtime instructions for reference; it is not a validated Open AD Kit deployment path.</p>
 </div>
 <h2 id="development-platforms">Development Platforms<a class="headerlink" href="#development-platforms" title="Permanent link">#</a></h2>
 <p>For local development and simulation, Open AD Kit supports:</p>

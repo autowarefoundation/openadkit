@@ -585,10 +585,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -652,70 +648,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/image-tags/" class="md-nav__link">
+      <a href="../../getting-started/container-images/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Container Image Tags
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/versioning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Versioning &amp; Support Policy
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../getting-started/release-flow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Release Flow
+    Images & Versioning
   
 
     
@@ -1269,12 +1209,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1338,14 +1272,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/sensing/" class="md-nav__link">
+      <a href="../../components/sensing-perception/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensing
+    Sensing & Perception
   
 
     
@@ -1366,14 +1300,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/perception/" class="md-nav__link">
+      <a href="../../components/localization-mapping/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Perception
+    Localization & Mapping
   
 
     
@@ -1394,98 +1328,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../components/mapping/" class="md-nav__link">
+      <a href="../../components/planning-control/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Mapping
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/localization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Localization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/planning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Planning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../components/control/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Control
+    Planning & Control
   
 
     
@@ -2320,43 +2170,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-capabilities" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Capabilities
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#upstream-documented-platforms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upstream-Documented Platforms
       
     </span>
   </a>
@@ -2407,64 +2224,15 @@
 <p><span class="oak-badge oak-badge--neutral">Upstream reference</span></p>
 <div class="admonition note">
 <p class="admonition-title">Not a committed Open AD Kit target</p>
-<p>EWAOL is retained as upstream SOAFEE background. Open AD Kit's committed SOAFEE-aligned target is the <strong>Arm Automotive Solutions reference stack / RD-1 AE FVP</strong>. This page documents EWAOL's upstream build/runtime instructions for the ADLINK AADP-AVA platform for reference only; it is not a validated Open AD Kit deployment path.</p>
+<p>EWAOL is retained as upstream SOAFEE background. Open AD Kit's committed SOAFEE-aligned target is the <strong>Arm Automotive Solutions reference stack / RD-1 AE FVP</strong>. EWAOL-specific deployment assets are <strong>not yet present</strong> in this repository; this page is a pointer to the upstream project, not a validated Open AD Kit deployment path.</p>
 </div>
-<p><strong>This repository:</strong> EWAOL-specific deployment assets and container orchestration files are <strong>not yet present</strong> in this repository.</p>
 <h2 id="what-is-ewaol">What is EWAOL?<a class="headerlink" href="#what-is-ewaol" title="Permanent link">#</a></h2>
-<p>EWAOL is delivered via the <code>meta-ewaol</code> Yocto layer and organizes the stack into three layers:</p>
-<ol>
-<li><strong>User-defined containerized workloads</strong> — Deployed by end users (e.g., Open AD Kit components)</li>
-<li><strong>EWAOL Linux filesystem</strong> — Core services including Docker, K3s, and Xen virtualization</li>
-<li><strong>Platform-specific system software</strong> — Firmware, bootloader, OS, and optional Xen hypervisor</li>
-</ol>
-<p>It provides runtime parity between edge hardware (ADLINK AVA with Ampere Altra / Arm Neoverse N1) and cloud instances (AWS Graviton), making it ideal for hybrid development and deployment workflows.</p>
-<h2 id="key-capabilities">Key Capabilities<a class="headerlink" href="#key-capabilities" title="Permanent link">#</a></h2>
-<ul>
-<li><strong>Container-native runtime</strong> with Docker and K3s orchestration</li>
-<li><strong>Real-time Linux</strong> with deterministic scheduling for time-sensitive workloads</li>
-<li><strong>Virtualization support</strong> via Xen for mixed-criticality separation</li>
-<li><strong>Yocto-based build system</strong> using <code>kas</code> for reproducible image generation</li>
-<li><strong>Cloud-to-edge parity</strong> with Arm Neoverse N1 architecture on both AVA and AWS Graviton</li>
-</ul>
-<h2 id="build-overview">Build Overview<a class="headerlink" href="#build-overview" title="Permanent link">#</a></h2>
-<p>EWAOL images are built with the Yocto <a href="https://kas.readthedocs.io/"><code>kas</code></a> tool. EWAOL-specific <code>kas</code> configuration files are <strong>not yet available in this repository</strong> — they are being added progressively. Once they land, the build will follow the standard <code>kas</code> pattern:</p>
-<div class="highlight"><pre><span></span><code>kas<span class="w"> </span>build<span class="w"> </span>kas/ewaol-ava.yml
-</code></pre></div>
-<p>The build produces a bootable image that can be flashed to the AVA platform. After boot, Autoware components run as containerized workloads under K3s. Until the repository assets land, follow the upstream EWAOL user guide linked below.</p>
-<pre class="mermaid"><code>flowchart LR
-    A[kas Configuration] --&gt; B[Yocto Build]
-    B --&gt; C[Flash AVA]
-    C --&gt; D[Boot]
-    D --&gt; E[K3s Cluster]
-    E --&gt; F[Autoware Containers]</code></pre>
+<p>EWAOL is delivered via the <code>meta-ewaol</code> Yocto layer and provides a container-native edge runtime (Docker and K3s, with optional Xen virtualization for mixed-criticality separation). It offers runtime parity between edge hardware (ADLINK AVA with Arm Neoverse N1) and cloud instances (AWS Graviton), making it suited to hybrid development and deployment workflows.</p>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h2>
-<p>For the EWAOL installation and runtime guide, see the upstream documentation:</p>
+<p>For installation and runtime instructions, see the upstream documentation:</p>
 <ul>
 <li><a href="https://ewaol.docs.arm.com/en/kirkstone-dev/user_guide/reproduce.html">EWAOL User Guide</a></li>
 </ul>
-<h2 id="upstream-documented-platforms">Upstream-Documented Platforms<a class="headerlink" href="#upstream-documented-platforms" title="Permanent link">#</a></h2>
-<p>These platforms are documented by the upstream EWAOL project (not validated by Open AD Kit):</p>
-<table>
-<thead>
-<tr>
-<th>Platform</th>
-<th>Architecture</th>
-<th>Source</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>ADLINK AADP-AVA</td>
-<td>arm64 (Ampere Altra, Neoverse N1)</td>
-<td>Upstream EWAOL</td>
-</tr>
-<tr>
-<td>AWS EC2 Graviton</td>
-<td>arm64 (Neoverse N1 equivalent)</td>
-<td>Upstream EWAOL</td>
-</tr>
-</tbody>
-</table>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="../">Supported Platforms overview</a></li>

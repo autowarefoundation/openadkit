@@ -96,7 +96,7 @@ docker compose --env-file planning-simulation.env down
 ## Architecture
 
 ```mermaid
-graph LR
+flowchart LR
     subgraph Host["Single Host"]
         P[planning]
         C[control]

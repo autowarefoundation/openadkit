@@ -59,7 +59,7 @@ Both containers source `awf-oak.env`, which sets `ROS_DOMAIN_ID=26` and `RMW_IMP
    ```
 
 ```mermaid
-graph LR
+flowchart LR
     Host[AutoSD Host] --> MapSvc[awf-oak-map.service]
     MapSvc --> Systemd[Systemd + Quadlet]
     Systemd --> Podman[Podman Pod]

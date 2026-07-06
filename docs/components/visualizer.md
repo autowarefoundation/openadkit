@@ -42,7 +42,7 @@ The following environment variables can be configured when launching the visuali
 - [Scenario Simulation](../deployment/scenario-simulation/index.md) — Displays scenario-driven traffic, ego vehicle behavior, and obstacle interactions
 - [Logging Simulation](../deployment/logging-simulation/index.md) — Replays rosbag data with full perception, localization, and planning visualization
 - [CARLA Simulation](../deployment/carla-simulation/index.md) — Visualizes the CARLA closed-loop simulation
-- [Zenoh Bridge Demo](../deployment/zenoh-bridge/index.md) — Remote visualization across isolated ROS 2 domains via Zenoh bridging
+- [Zenoh Bridge](../deployment/zenoh-bridge/index.md) — Remote visualization across isolated ROS 2 domains via Zenoh bridging
 
 ## Related
 

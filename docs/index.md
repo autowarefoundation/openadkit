@@ -4,7 +4,7 @@
 A modular, container-based distribution of <a href="https://github.com/autowarefoundation/autoware">Autoware</a> for building autonomous driving systems from simulation and development through to in-vehicle deployment.
 </p>
 
-## Explore
+## Explore { .oak-eyebrow }
 
 <div class="oak-card-grid oak-nav-grid" markdown="1">
 
@@ -14,7 +14,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 <h3>Overview</h3>
 <p>Learn what Open AD Kit is, why it exists, and how it relates to Autoware.</p>
-<a href="overview/" class="md-button">Read overview</a>
+<a href="overview/" class="md-button">Read Overview</a>
 </div>
 
 <div class="oak-card oak-nav-card" markdown="1">
@@ -23,7 +23,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 <h3>Getting Started</h3>
 <p>Set up Docker, pull images, and run your first deployment in minutes.</p>
-<a href="getting-started/" class="md-button md-button--primary">Start here</a>
+<a href="getting-started/" class="md-button md-button--primary">Start Here</a>
 </div>
 
 <div class="oak-card oak-nav-card" markdown="1">
@@ -32,7 +32,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 <h3>Deployment</h3>
 <p>Ready-to-run deployments for simulation and AD stacks.</p>
-<a href="deployment/" class="md-button">View deployment</a>
+<a href="deployment/" class="md-button">View Deployment</a>
 </div>
 
 <div class="oak-card oak-nav-card" markdown="1">

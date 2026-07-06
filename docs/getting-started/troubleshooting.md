@@ -36,7 +36,7 @@ This page covers common issues and solutions when working with Open AD Kit.
 - [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues)
 - [Autoware Foundation Discord](https://discord.gg/Q94UsPvReQ)
 
-<h2 class="oak-eyebrow" id="related">Related</h2>
+## Related
 
 - [Getting Started](index.md) — Quick start guide
 - [Container Image Tags](image-tags.md) — Understanding the tag schema

@@ -1,6 +1,6 @@
 # Supported Platforms
 
-**Deployments** ([../deployment/index.md](../deployment/index.md)) provide local development and simulation on Ubuntu using Docker Compose.
+[**Deployments**](../deployment/index.md) provide local development and simulation on Ubuntu using Docker Compose.
 **Platforms** provide edge-deployment targets for production automotive operating systems such as AutoSD.
 
 As Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle ecosystem, it tracks multiple platform directions aligned with cloud-native, software-defined vehicle principles.
@@ -11,7 +11,7 @@ As Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the s
     Read more about the [benefits of open standards in automotive development](https://www.soafee.io/blog/2025/the-benefits-of-open-standards-in-automotive-development/).
 
 ```mermaid
-graph LR
+flowchart LR
     OAK[Open AD Kit<br/>First Blueprint] --> DENSO[DENSO AVP Blueprint]
     OAK --> RH[Red Hat AutoSD Blueprint]
 ```

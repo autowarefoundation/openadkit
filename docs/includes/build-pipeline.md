@@ -1,6 +1,7 @@
 ```mermaid
-flowchart TB
-    UP["autoware:core-devel / core<br/>autoware:base-cuda-{devel,runtime}"] --> UC["universe-common"]
+flowchart LR
+    CORE["autoware:core-devel / core"] --> UC["universe-common"]
+    CUDA["autoware:base-cuda-{devel,runtime}"] --> SPC["sensing-perception-cuda"]
     UC --> SP["sensing-perception"]
     UC --> LM["localization-mapping"]
     UC --> PC["planning-control"]
@@ -8,7 +9,6 @@ flowchart TB
     UC --> API["api"]
     UC --> VIZ["visualizer"]
     UC --> SIM["simulator"]
-    UP --> SPC["sensing-perception-cuda"]
     UC --> SPC
     SIM --> CARLA["carla-interface"]
 ```

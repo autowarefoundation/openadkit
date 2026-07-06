@@ -51,7 +51,7 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 
 </div>
 
-## How it works
+## How It Works
 
 Open AD Kit runs Autoware as a pipeline of containerized components. Each container handles one stage of autonomous driving, and the stages communicate over ROS 2 DDS on the host network:
 

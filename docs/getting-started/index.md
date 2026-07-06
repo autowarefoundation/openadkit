@@ -5,7 +5,6 @@ This guide walks you through setting up your environment and running your first 
 ```mermaid
 flowchart LR
     A[Run install.sh] --> B[Verify Installation] --> C[Download a deployment]
-    A -.->|Optional| D["--no-nvidia"]
 ```
 
 ## Prerequisites
@@ -58,12 +57,12 @@ ls -la ~/autoware_data
 !!! success "Ready to Deploy"
     If all checks pass, you are ready to run a deployment. See [Deployments](../deployment/index.md).
 
-<h2 class="oak-eyebrow" id="reference">Reference</h2>
+## Reference
 
 - [Container Image Tags](image-tags.md) — Understanding the tag schema for choosing the right image
 - [Release Flow](release-flow.md) — How Open AD Kit releases are built, scanned, and promoted
 
-<h2 class="oak-eyebrow" id="next-steps">Next Steps</h2>
+## Next Steps
 
 - [Run your first deployment](../deployment/planning-simulation/index.md) — Start with the Planning Simulation
 - [Learn about components](../components/index.md) — Understand the Open AD Kit architecture

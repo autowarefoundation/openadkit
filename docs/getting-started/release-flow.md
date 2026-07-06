@@ -52,7 +52,7 @@ When a release workflow runs, the following tag aliases are updated:
 !!! info "Pre-Releases"
     Pre-release tags (e.g., `-rc.1`) are published but **do not update** latest stable aliases. This prevents prerelease images from being pulled by default aliases.
 
-<h2 class="oak-eyebrow" id="related">Related</h2>
+## Related
 
 - [Container Image Tags](image-tags.md) — Understanding the tag schema
 - [Getting Started](index.md) — Quick start guide

@@ -120,7 +120,7 @@ docker compose --env-file scenario-simulation.env down
 ## Architecture
 
 ```mermaid
-graph LR
+flowchart LR
     subgraph Host["Single Host"]
         M[localization-mapping]
         PC[planning-control]

@@ -159,7 +159,7 @@ AutoSD's mixed-criticality architecture maps naturally to Open AD Kit's componen
 </div>
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph Root["Root Partition (Safety-Critical)"]
         R1[Planning]
         R2[Control]
@@ -175,7 +175,7 @@ graph TB
     OSTree --> QM
 ```
 
-## Related Documentation
+## Related
 
 - [CentOS Automotive SIG Documentation](https://sigs.centos.org/automotive/latest/)
 - [AutoSD Features and Concepts](https://sigs.centos.org/automotive/latest/features-and-concepts/)

@@ -53,13 +53,13 @@ ghcr.io/autowarefoundation/openadkit
 
 ```mermaid
 flowchart TD
-    A[Need fully reproducible deployment?] -->|Yes| B[Use stable release tag<br>vX.Y.Z]
-    A -->|No| C[Need specific ROS distro?]
-    C -->|Yes| D[Use latest stable alias<br>&lt;target&gt;-&lt;ros_distro&gt;]
-    C -->|No| E[Use default alias<br>&lt;target&gt;]
+    A{Need fully reproducible<br/>deployment?} -->|Yes| B[Use stable release tag<br/>vX.Y.Z]
+    A -->|No| C{Need specific<br/>ROS distro?}
+    C -->|Yes| D[Use latest stable alias<br/>&lt;target&gt;-&lt;ros_distro&gt;]
+    C -->|No| E[Use default alias<br/>&lt;target&gt;]
 ```
 
-<h2 class="oak-eyebrow" id="related">Related</h2>
+## Related
 
 - [Getting Started](index.md) — Environment setup and first deployment
 - [Release Flow](release-flow.md) — How tags are created and promoted

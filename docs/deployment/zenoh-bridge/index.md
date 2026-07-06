@@ -1,4 +1,4 @@
-# Zenoh Bridge Demo
+# Zenoh Bridge
 
 !!! abstract ""
     This demo demonstrates a distributed deployment pattern for Open AD Kit: separating compute-intensive components (perception, planning, simulation) on an edge server from lightweight visualization and control on a remote machine. Zenoh bridges the two isolated ROS 2 environments with high-performance, low-latency communication.
@@ -40,15 +40,15 @@ The system decouples the monolithic stack into two domains:
 ### Architecture Diagram
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph CloudSide["Cloud Side (User Machine)"]
         direction LR
 
         subgraph CloudNet[cloud_net Network]
             direction TB
 
-            visualizer["**Visualizer**<br><br>RViz2 via noVNC<br>Browser Remote Desktop"]
-            cloud_bridge["**Cloud Zenoh Bridge**<br><br>Router<br>Listens on TCP"]
+            visualizer["Visualizer<br/>RViz2 via noVNC"]
+            cloud_bridge["Cloud Zenoh Bridge<br/>Router, listens on TCP"]
 
             visualizer -->|"ROS 2 DDS"| cloud_bridge
         end
@@ -60,9 +60,9 @@ graph TD
         subgraph EdgeNet[edge_net Network]
             direction TB
 
-            autoware["**Autoware**<br><br>Perception, Planning, Control"]
-            scenario_simulator["**Scenario Simulator**<br><br>Virtual Environment<br>Sensor Data"]
-            edge_bridge["**Edge Zenoh Bridge**<br><br>Client<br>Converts DDS ↔ Zenoh"]
+            autoware["Autoware<br/>Perception, Planning, Control"]
+            scenario_simulator["Scenario Simulator<br/>Virtual Environment, Sensor Data"]
+            edge_bridge["Edge Zenoh Bridge<br/>Client, converts DDS ↔ Zenoh"]
 
             autoware <-->|"ROS 2 DDS"| scenario_simulator
             autoware -->|"ROS 2 DDS"| edge_bridge
@@ -70,8 +70,8 @@ graph TD
         end
     end
 
-    user[fa:fa-user User] -->|"HTTP (Port 6081)"| visualizer
-    edge_bridge -->|"Zenoh Protocol<br>over zenoh_net"| cloud_bridge
+    user[User] -->|"HTTP (Port 6081)"| visualizer
+    edge_bridge -->|"Zenoh Protocol<br/>over zenoh_net"| cloud_bridge
 ```
 
 ### Network Isolation and Communication Bridge
@@ -102,7 +102,7 @@ Zenoh supports **namespace-based multi-vehicle management** by assigning a uniqu
 This allows a single cloud visualizer or fleet management station to connect to multiple vehicles without reconfiguring ROS nodes on each vehicle. The `zenoh_autoware_fms` prototype demonstrates this pattern on ADLINK ADM-AL30 hardware.
 
 ```mermaid
-graph TD
+flowchart TD
     Cloud[Cloud Visualizer / FMS] --> Bridge1[Zenoh Bridge /bot1]
     Cloud --> Bridge2[Zenoh Bridge /bot2]
     Cloud --> Bridge3[Zenoh Bridge /bot3]
@@ -136,7 +136,7 @@ cd zenoh-bridge
 !!! note "Releases"
     Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/zenoh-bridge/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data zenoh-bridge` to fetch the map.
 
-### 3. Verify Directory Structure
+### 3. Verify directory structure
 
 ```text
 .
@@ -156,7 +156,7 @@ cd zenoh-bridge
 
 Modify `config/zenoh-bridge-ros2dds.json5` to filter topics as needed.
 
-### 4. Configure Environment Variables
+### 4. Configure environment variables
 
 Edit the `.env` file to customize your deployment. Key variables:
 
@@ -200,7 +200,7 @@ The initial launch may take several minutes to download images.
 
 Deploy on separate machines (e.g., one Cloud, one Edge):
 
-**1. Cloud Machine:**
+#### 1. Cloud machine
 
 ```bash
 ./cloud.sh
@@ -210,7 +210,7 @@ Deploy on separate machines (e.g., one Cloud, one Edge):
 #        - 192.168.1.100
 ```
 
-**2. Edge Machine:**
+#### 2. Edge machine
 
 ```bash
 export CLOUD_IP=192.168.1.100
@@ -227,7 +227,7 @@ docker compose logs -f
 
 ## Verification and Usage
 
-### 1. Check Container Status
+### 1. Check container status
 
 Run `docker ps` or `docker compose ps` to verify all containers are running:
 
@@ -237,7 +237,7 @@ Run `docker ps` or `docker compose ps` to verify all containers are running:
 - `edge_zenoh_bridge`
 - `cloud_zenoh_bridge`
 
-### 2. Access the Visualizer
+### 2. Access the visualizer
 
 Open a web browser and navigate to:
 
@@ -247,13 +247,13 @@ http://localhost:6081
 
 Log in with the password you set as `REMOTE_PASSWORD` in `.env`.
 
-### 3. Verify Operation
+### 3. Verify operation
 
 - The noVNC interface should display RViz2.
 - If **Global Status** in the RViz2 Displays panel shows `OK` (green), the system is running correctly. You should see maps, the vehicle model, and simulated objects.
 - If it shows **Warning**, see the troubleshooting section below.
 
-### 4. Stop the System
+### 4. Stop the system
 
 ```bash
 # Stop Cloud

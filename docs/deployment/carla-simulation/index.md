@@ -50,7 +50,7 @@ cd carla-simulation
 ./start-carla-e2e-demo.sh
 ```
 
-!!! note "Cloned repository"
+!!! note "Cloned repository — handled automatically"
     If running from a cloned repository, the helper script automatically loads `../base/base.env` alongside `carla-simulation.env` so that shared variables such as `ROS_DOMAIN_ID` and `REMOTE_PASSWORD` are set.
 
 The helper script:
@@ -85,7 +85,13 @@ In RViz2:
 3. Click **Auto** to engage autonomous driving
 
 !!! note "Auto button not available?"
-    If the **Auto** button does not enable, the `/system/command_mode/availability` topic may not be published. See [FINDINGS.md](https://github.com/autowarefoundation/openadkit/blob/main/FINDINGS.md) for a manual `ros2 topic pub` workaround. This is an upstream Autoware issue, not an Open AD Kit defect.
+    If the **Auto** button does not enable, the `/system/command_mode/availability` topic may not be published. This is an upstream Autoware issue, not an Open AD Kit defect. As a workaround, publish the availability manually inside the system container:
+
+    ```bash
+    ros2 topic pub --once /system/command_mode/availability \
+      tier4_system_msgs/msg/CommandModeAvailability \
+      '{items: [{mode: 1001, available: true}, {mode: 1002, available: true}, {mode: 1003, available: true}, {mode: 1004, available: true}]}'
+    ```
 
 ## Optional Drive Check
 

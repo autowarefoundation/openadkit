@@ -12,7 +12,7 @@ Autoware uses a **Core / Universe** architecture. **Core** contains rigorously r
 
 `universe-common` is an Open AD Kit-owned thin intermediate built on top of the
 upstream `autoware:core-devel`/`core` images. The bake groups and build commands
-are documented under [Building from source](#building-from-source) below.
+are documented under [Building from Source](#building-from-source) below.
 
 ## Interface Layers
 
@@ -38,7 +38,7 @@ Autoware defines three formal interface categories that govern how components co
 </div>
 
 ```mermaid
-graph LR
+flowchart LR
     subgraph AD_API["AD API (External)"]
         A1[ROS 2 Services / Topics]
     end
@@ -128,7 +128,7 @@ naming scheme.
 
 {{ component_table() }}
 
-## Building from source
+## Building from Source
 
 Open AD Kit images are built with `docker buildx bake` using
 [`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl).
@@ -159,7 +159,7 @@ The `universe-common` layer compiles only the universe-common slice of
 Autoware on top of upstream `core-devel`/`core`; everything below
 `universe-common` (base OS, ROS, core) is owned and built by upstream.
 
-### Bake groups
+### Bake Groups
 
 | Group | Targets |
 |-------|---------|
@@ -167,13 +167,13 @@ Autoware on top of upstream `core-devel`/`core`; everything below
 | `universe-common` | `universe-common-devel`, `universe-common` |
 | `component` | the seven non-CUDA component images plus `sensing-perception-cuda` and `carla-interface` |
 
-### Upstream pin
+### Upstream Pin
 
 The `UPSTREAM_TAG` bake variable pins the upstream Autoware release the
 images are built against. CI sets it from a repository Variable; leaving it
 empty uses upstream's plain `<name>-<distro>` multi-arch tag.
 
-## CI pipeline
+## CI Pipeline
 
 `build-all-images.yaml` builds the universe-common graph on pushes,
 schedules, and manual dispatch. It walks the matrix defined in

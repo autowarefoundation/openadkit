@@ -15,7 +15,7 @@ Deployments are defined using container orchestration files (typically `docker-c
 <h3>Planning Simulation</h3>
 <p>Run the Autoware planning stack against a pre-recorded point cloud map. Set a goal pose and watch the vehicle plan and follow a trajectory in a virtual environment.</p>
 <p><span class="oak-badge oak-badge--neutral">Single Machine</span> <span class="oak-badge oak-badge--supported">GPU Optional</span></p>
-<a href="planning-simulation/" class="md-button">Run Planning Simulation</a>
+<a href="planning-simulation/" class="md-button md-button--primary">Run Planning Simulation</a>
 </div>
 
 <div class="oak-card" markdown="1">
@@ -60,15 +60,7 @@ Deployments are defined using container orchestration files (typically `docker-c
 
 </div>
 
-## Choosing a Deployment
-
-| Deployment | Purpose | Scope |
-|-----------|---------|-------|
-| [Planning Simulation](planning-simulation/index.md) | Run Autoware planning stack with a pre-recorded map | Single machine |
-| [Scenario Simulation](scenario-simulation/index.md) | Execute predefined scenarios with TIER IV Scenario Simulator | Single machine |
-| [Logging Simulation](logging-simulation/index.md) | Replay recorded sensor data (rosbag) through the AD stack | Single machine |
-| [CARLA Simulation](carla-simulation/index.md) | Closed-loop end-to-end simulation with the CARLA simulator | Single machine |
-| [Zenoh Bridge](zenoh-bridge/index.md) | Distributed cloud-edge visualization with ROS 2 bridging | Multi-machine |
+New to Open AD Kit? Start with [Planning Simulation](planning-simulation/index.md) — it is the simplest deployment and runs on any machine.
 
 ## Architecture
 
@@ -96,18 +88,13 @@ Four of the five deployments (planning, scenario, logging, carla) build on a sha
 - **Zenoh bridge** is self-contained — it does not include the base and uses its own `.env`.
 
 ```mermaid
-graph LR
-    subgraph Single["Single Machine"]
-        S1[Planning Simulation]
-        S2[Scenario Simulation]
-        S3[Logging Simulation]
-        S4[CARLA Simulation]
-    end
-
-    subgraph Distributed["Distributed"]
-        D1[Edge: Autoware + Simulator]
-        D2[Cloud: Visualizer + Bridge]
-    end
+flowchart LR
+    BASE["deployments/base/<br/>shared services + base.env"]
+    BASE --> S1[Planning Simulation]
+    BASE --> S2[Scenario Simulation]
+    BASE --> S3[Logging Simulation]
+    BASE --> S4[CARLA Simulation]
+    ZB[Zenoh Bridge] -.->|self-contained| ZB2[Edge + Cloud hosts]
 ```
 
 ## Next Steps

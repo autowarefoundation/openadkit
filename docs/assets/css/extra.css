@@ -194,8 +194,6 @@
   margin: 0 0 1.5rem;
 }
 
-.md-typeset h2#explore,
-.md-typeset h2#why-open-ad-kit,
 .md-typeset h2.oak-eyebrow {
   margin-top: 2.5rem;
   font-size: 0.85rem;
@@ -224,8 +222,6 @@
   color: rgba(255, 255, 255, 0.72);
 }
 
-[data-md-color-scheme="slate"] .md-typeset h2#explore,
-[data-md-color-scheme="slate"] .md-typeset h2#why-open-ad-kit,
 [data-md-color-scheme="slate"] .md-typeset h2.oak-eyebrow {
   color: rgba(255, 255, 255, 0.45);
 }
@@ -368,12 +364,6 @@
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
-.oak-badge--planned {
-  background-color: rgba(139, 139, 139, 0.08);
-  color: #666;
-  border: 1px solid #ddd;
-}
-
 .oak-badge--supported {
   background-color: rgba(79, 142, 247, 0.1);
   color: #1d4ed8;
@@ -472,6 +462,14 @@
 }
 
 /* --------------------------------------------------------------------------
+   Header logo — black line-art PNG; invert on dark header
+   -------------------------------------------------------------------------- */
+[data-md-color-scheme="slate"] .md-header__button.md-logo img,
+[data-md-color-scheme="slate"] .md-nav__button.md-logo img {
+  filter: invert(1);
+}
+
+/* --------------------------------------------------------------------------
    Dark Mode Overrides
    -------------------------------------------------------------------------- */
 [data-md-color-scheme="slate"] .md-typeset h2 {
@@ -496,10 +494,6 @@
 
 [data-md-color-scheme="slate"] .oak-badge--testing {
   color: #fbbf24;
-}
-
-[data-md-color-scheme="slate"] .oak-badge--planned {
-  color: rgba(255, 255, 255, 0.6);
 }
 
 [data-md-color-scheme="slate"] .oak-badge--supported {

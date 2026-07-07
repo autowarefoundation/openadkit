@@ -2272,7 +2272,7 @@
 Bundles include <code>install.sh</code> and a merged env file so every command runs from the extracted directory. See each <a href="../deployment/">deployment page</a> for details.</p>
 </div>
 <p>Then fetch the demo map (~500 MB download):</p>
-<div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>planning-simulation
+<div class="highlight"><pre><span></span><code>../../install.sh<span class="w"> </span>sample-data<span class="w"> </span>planning-simulation
 </code></pre></div>
 <h2 id="3-start-it">3. Start It<a class="headerlink" href="#3-start-it" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d

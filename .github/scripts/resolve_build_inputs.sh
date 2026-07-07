@@ -43,11 +43,15 @@ if [ "${autoware_ref_type}" = "ref" ]; then
 fi
 
 git -C autoware-metadata fetch --filter=blob:none --no-tags --force origin "${fetch_ref}"
+# Fetch all tags so git describe can find the nearest semver tag.
+git -C autoware-metadata fetch --tags --force origin
 git -C autoware-metadata checkout --detach FETCH_HEAD
 
 autoware_ref=$(git -C autoware-metadata rev-parse HEAD)
 autoware_base_version=$(
-  git -C autoware-metadata describe --tags --match '[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || true
+  git -C autoware-metadata describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null \
+    || git -C autoware-metadata describe --tags --match '[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null \
+    || true
 )
 [ -n "${autoware_base_version}" ] || {
   echo "Could not infer Autoware base version from ${autoware_input_ref}" >&2

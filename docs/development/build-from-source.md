@@ -146,6 +146,8 @@ CI builds every target automatically via [`.github/workflows/build-all-images.ya
 
 The workflow runs staged jobs — `prepare`, then `build-common` and `build-components`, then `build-carla-interface` (which depends on `simulator`) — so each layer is pushed before the layer that depends on it. Most targets build for `{humble, jazzy} × {amd64, arm64}`; `sensing-perception-cuda` is amd64-only and `carla-interface` is amd64 + Humble only. A final `create-manifests` job stitches the per-arch tags into multi-arch manifests.
 
+If a scheduled build fails, a `notify-failure` job creates a GitHub issue with the run URL so maintainers are notified without polling the Actions tab. Failure notifications are only created for scheduled builds, not for push or manual triggers.
+
 ## Release Process
 
 Open AD Kit releases are promoted from existing CI builds rather than rebuilt at release time. This ensures that the exact images validated during CI are the images that ship to users.

@@ -11,7 +11,7 @@ Open AD Kit publishes images to the GitHub Container Registry (`{{ registry }}`)
 | **Latest stable + suffix** | `planning-control-humble-latest` | Same as above, explicit. |
 | **Default ROS distro alias** | `planning-control` | Convenience alias that resolves to the current default ROS distro ({{ default_distro_title }}). |
 | **Default + latest suffix** | `planning-control-latest` | Explicit default-distro latest alias. |
-| **Immutable build tag** | `planning-control-humble-123456789-1` | Pin to a specific CI build. Format: `<target>-<ros_distro>-<run_id>-<run_attempt>`. |
+| **Immutable build tag** | `planning-control-humble-123456789-1` | Pin to a specific CI build. Format: `<target>-<ros_distro>-<run_id>-<run_attempt>`. Per-platform variants include the platform label (e.g. `planning-control-amd64-humble-123456789-1`), but prefer the multi-arch tag for portability. |
 | **CI development alias** | `planning-control-amd64-humble` | Per-platform mutable tag used during CI. **Do not use for pinned deployments.** |
 | **Pre-release** | `planning-control-humble-v2.0.0-rc.1` | Pre-release tag for testing. Pre-releases do not update latest stable aliases. |
 

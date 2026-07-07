@@ -11,7 +11,10 @@ set -euo pipefail
 
 mkdir -p ~/.docker/cli-plugins
 
+# Use GITHUB_TOKEN if available to avoid GitHub API rate limiting.
+token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 latest_tag=$(curl -fsSL --retry 3 --retry-delay 1 \
+  ${token:+-H "Authorization: token ${token}"} \
   https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name')
 
 # Map runner architecture to Compose release artifact name.

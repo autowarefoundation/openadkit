@@ -23,6 +23,7 @@ serve: prepare-if-missing generate-release-notes
 # Refresh release notes from GitHub Releases (runs inside the docs container).
 # Non-fatal: when offline or rate-limited, the site still builds — the
 # Releases page is simply skipped until the next successful refresh.
+# Set GITHUB_TOKEN in your shell to authenticate (avoids API rate limiting).
 generate-release-notes:
 	@docker run --rm -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) -e GITHUB_TOKEN mkdocs-dev \
 		python docs/scripts/generate_release_notes.py \

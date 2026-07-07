@@ -17,7 +17,7 @@ set -euo pipefail
 : "${MAX_GB:?MAX_GB is required}"
 
 max_bytes=$((MAX_GB * 1000 * 1000 * 1000))
-gh cache list --repo "$GITHUB_REPOSITORY" --key "$CACHE_KEY_PREFIX" --limit 100 --json key,sizeInBytes \
+gh cache list --repo "$GITHUB_REPOSITORY" --key "$CACHE_KEY_PREFIX" --limit 200 --json key,sizeInBytes \
   | jq -r --arg keep "$KEEP_KEY" --argjson max "$max_bytes" \
       '.[] | select(.key != $keep or .sizeInBytes > $max) | .key' \
   | while read -r key; do

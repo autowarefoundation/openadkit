@@ -2594,30 +2594,40 @@ Each release records its pinned Autoware version in the release notes.</li>
 <li><strong>No certification claims</strong> — "Supported" refers to build, deployment, and validation in a non-certified environment. Open AD Kit makes no safety-certification, functional-safety, or production-readiness claims.</li>
 </ul>
 <h2 id="how-releases-are-tagged">How Releases Are Tagged<a class="headerlink" href="#how-releases-are-tagged" title="Permanent link">#</a></h2>
-<p>Releases are promoted from existing CI builds rather than rebuilt at release time, so the exact images validated during CI are the images that ship. When a release workflow runs, the following tag aliases are updated:</p>
+<p>Releases are promoted from existing CI builds rather than rebuilt at release time, so the exact images validated during CI are the images that ship. When a release workflow runs, each tag alias is created independently from the promoted image digest:</p>
 <table>
 <thead>
 <tr>
-<th>From</th>
-<th>To</th>
+<th>Alias</th>
 <th>Example</th>
+<th>Condition</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Build tag</td>
 <td>Stable release</td>
-<td><code>planning-control-humble-123456789-1</code> → <code>planning-control-humble-v2.0.0</code></td>
+<td><code>planning-control-humble-v2.0.0</code></td>
+<td>Always created</td>
 </tr>
 <tr>
-<td>Stable release</td>
-<td>Latest alias</td>
-<td><code>planning-control-humble-v2.0.0</code> → <code>planning-control-humble</code></td>
+<td>Latest per-distro</td>
+<td><code>planning-control-humble</code></td>
+<td>Stable releases only</td>
 </tr>
 <tr>
-<td>Latest alias</td>
-<td>Default alias</td>
-<td><code>planning-control-humble</code> → <code>planning-control</code></td>
+<td>Latest per-distro + suffix</td>
+<td><code>planning-control-humble-latest</code></td>
+<td>Stable releases only</td>
+</tr>
+<tr>
+<td>Default distro alias</td>
+<td><code>planning-control</code></td>
+<td>Stable releases, only for the default ROS distro</td>
+</tr>
+<tr>
+<td>Default distro + suffix</td>
+<td><code>planning-control-latest</code></td>
+<td>Stable releases, only for the default ROS distro</td>
 </tr>
 </tbody>
 </table>

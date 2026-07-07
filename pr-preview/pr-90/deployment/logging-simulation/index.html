@@ -2199,10 +2199,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-download-the-deployment-bundle" class="md-nav__link">
+  <a href="#2-clone-the-repository" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Download the deployment bundle
+        2. Clone the repository
       
     </span>
   </a>
@@ -2362,21 +2362,20 @@
 <p>This deployment runs the full sensing and perception pipeline. Without a GPU, performance will be significantly degraded. An NVIDIA GPU with 4 GB+ VRAM is strongly recommended.</p>
 </div>
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
-<p>No <code>git clone</code> required.</p>
 <h3 id="1-set-up-the-environment-download-autoware-artifacts-one-time">1. Set up the environment + download Autoware artifacts (one-time)<a class="headerlink" href="#1-set-up-the-environment-download-autoware-artifacts-one-time" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--download-artifacts
 </code></pre></div>
 <p>This installs Docker / the NVIDIA Container Toolkit and downloads the perception artifacts into <code>${HOME}/autoware_data</code> (mounted into the sensing and perception containers).</p>
-<h3 id="2-download-the-deployment-bundle">2. Download the deployment bundle<a class="headerlink" href="#2-download-the-deployment-bundle" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/logging-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
-<span class="nb">cd</span><span class="w"> </span>logging-simulation
+<h3 id="2-clone-the-repository">2. Clone the repository<a class="headerlink" href="#2-clone-the-repository" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
+<span class="nb">cd</span><span class="w"> </span>openadkit/deployments/logging-simulation
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the matching <code>deployments/&lt;deployment&gt;/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data &lt;deployment&gt;</code> to fetch the sample data.</p>
+<div class="admonition tip">
+<p class="admonition-title">Release bundles</p>
+<p>Once a release is published, you can download a self-contained <code>.tar.gz</code> via <code>curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/&lt;deployment&gt;.tar.gz | tar xz</code>. Bundles include <code>install.sh</code> and a merged env file so every command runs from the extracted directory.</p>
 </div>
 <h3 id="3-download-the-demo-map-and-rosbag">3. Download the demo map and rosbag<a class="headerlink" href="#3-download-the-demo-map-and-rosbag" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>logging-simulation
+<div class="highlight"><pre><span></span><code>../../install.sh<span class="w"> </span>sample-data<span class="w"> </span>logging-simulation
 </code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">About the rosbag</p>
@@ -2388,12 +2387,8 @@
 </div>
 <h2 id="start-the-deployment">Start the Deployment<a class="headerlink" href="#start-the-deployment" title="Permanent link">#</a></h2>
 <p>From the <code>logging-simulation</code> directory, start the base containers:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Cloned repository</p>
-<p>If running from a cloned repository rather than a release bundle, prepend <code>--env-file ../base/base.env</code> to <strong>every</strong> <code>docker compose</code> command on this page. Release bundles merge both env files into one; from a clone you need both so shared variables such as <code>ROS_DOMAIN_ID</code> and <code>REMOTE_PASSWORD</code> resolve.</p>
-</div>
 <p>Wait approximately 10 seconds for the containers to initialize.</p>
 <div class="admonition tip">
 <p class="admonition-title">GPU acceleration (recommended)</p>
@@ -2423,7 +2418,7 @@
 <p>Watch the RViz2 display as Autoware processes the replayed data in real time.</p>
 <h2 id="stop-the-deployment">Stop the Deployment<a class="headerlink" href="#stop-the-deployment" title="Permanent link">#</a></h2>
 <p>To stop all containers including the rosbag profile:</p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>--profile<span class="w"> </span>rosbag<span class="w"> </span>down
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>logging-simulation.env<span class="w"> </span>--profile<span class="w"> </span>rosbag<span class="w"> </span>down
 </code></pre></div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
 <table>
@@ -2440,7 +2435,7 @@
 </tr>
 <tr>
 <td><code>file not found</code> for map/rosbag</td>
-<td>Re-run <code>./install.sh sample-data logging-simulation --force</code> to re-download into <code>~/autoware_map</code></td>
+<td>Re-run <code>../../install.sh sample-data logging-simulation --force</code> to re-download into <code>~/autoware_map</code></td>
 </tr>
 <tr>
 <td>No objects detected</td>

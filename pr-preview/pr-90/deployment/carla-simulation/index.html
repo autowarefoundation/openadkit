@@ -2199,10 +2199,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-download-the-deployment-bundle" class="md-nav__link">
+  <a href="#2-clone-the-repository" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Download the deployment bundle
+        2. Clone the repository
       
     </span>
   </a>
@@ -2370,17 +2370,16 @@
 <p>Unlike the other deployments, CARLA itself is GPU-rendered. This deployment does not run on CPU-only machines.</p>
 </div>
 <h2 id="before-you-start">Before You Start<a class="headerlink" href="#before-you-start" title="Permanent link">#</a></h2>
-<p>No <code>git clone</code> required.</p>
 <h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
-<h3 id="2-download-the-deployment-bundle">2. Download the deployment bundle<a class="headerlink" href="#2-download-the-deployment-bundle" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/carla-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
-<span class="nb">cd</span><span class="w"> </span>carla-simulation
+<h3 id="2-clone-the-repository">2. Clone the repository<a class="headerlink" href="#2-clone-the-repository" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
+<span class="nb">cd</span><span class="w"> </span>openadkit/deployments/carla-simulation
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the <code>deployments/carla-simulation/</code> folder from a cloned repository instead.</p>
+<div class="admonition tip">
+<p class="admonition-title">Release bundles</p>
+<p>Once a release is published, you can download a self-contained <code>.tar.gz</code> via <code>curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/&lt;deployment&gt;.tar.gz | tar xz</code>. Bundles include <code>install.sh</code> and a merged env file so every command runs from the extracted directory.</p>
 </div>
 <h2 id="start-the-deployment">Start the Deployment<a class="headerlink" href="#start-the-deployment" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>./start-carla-e2e-demo.sh
@@ -2437,7 +2436,7 @@
 <div class="highlight"><pre><span></span><code>./start-carla-e2e-demo.sh<span class="w"> </span>--drive
 </code></pre></div>
 <h2 id="stop-the-deployment">Stop the Deployment<a class="headerlink" href="#stop-the-deployment" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>carla-simulation.env<span class="w"> </span>down
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>carla-simulation.env<span class="w"> </span>down
 </code></pre></div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
 <table>

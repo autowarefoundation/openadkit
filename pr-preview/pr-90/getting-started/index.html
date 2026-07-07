@@ -2161,10 +2161,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-download-the-planning-simulation" class="md-nav__link">
+  <a href="#2-get-the-deployment-files" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Download the Planning Simulation
+        2. Get the Deployment Files
       
     </span>
   </a>
@@ -2241,7 +2241,7 @@
 
 
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">#</a></h1>
-<p>From zero to a running Autoware planning simulation in about 10 minutes. No <code>git clone</code>, no GPU required.</p>
+<p>From zero to a running Autoware planning simulation in about 10 minutes. No GPU required.</p>
 <pre class="mermaid"><code>flowchart LR
     A[Install] --&gt; B[Download] --&gt; C[Start] --&gt; D[Drive]</code></pre>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
@@ -2261,19 +2261,21 @@
 <p>Confirm the environment is ready:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>version
 </code></pre></div>
-<h2 id="2-download-the-planning-simulation">2. Download the Planning Simulation<a class="headerlink" href="#2-download-the-planning-simulation" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
-<span class="nb">cd</span><span class="w"> </span>planning-simulation
+<h2 id="2-get-the-deployment-files">2. Get the Deployment Files<a class="headerlink" href="#2-get-the-deployment-files" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
+<span class="nb">cd</span><span class="w"> </span>openadkit/deployments/planning-simulation
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the matching <code>deployments/&lt;deployment&gt;/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data &lt;deployment&gt;</code> to fetch the sample data.</p>
+<div class="admonition tip">
+<p class="admonition-title">Prefer a release bundle?</p>
+<p>Once a release is published, you can download a self-contained <code>.tar.gz</code> instead of cloning:
+<code>curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz</code>
+Bundles include <code>install.sh</code> and a merged env file so every command runs from the extracted directory. See each <a href="../deployment/">deployment page</a> for details.</p>
 </div>
 <p>Then fetch the demo map:</p>
 <div class="highlight"><pre><span></span><code>./install.sh<span class="w"> </span>sample-data<span class="w"> </span>planning-simulation
 </code></pre></div>
 <h2 id="3-start-it">3. Start It<a class="headerlink" href="#3-start-it" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>--env-file<span class="w"> </span>../base/base.env<span class="w"> </span>--env-file<span class="w"> </span>planning-simulation.env<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 <p>Wait about 10 seconds for the containers to initialize.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
@@ -2298,6 +2300,14 @@
 </ol>
 <p>That's it — you are running Autoware. The full guide with configuration, architecture, and cloned-repo usage is at <a href="../deployment/planning-simulation/">Planning Simulation</a>.</p>
 <p>If something goes wrong, see <a href="troubleshooting/">Troubleshooting</a>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Release Bundles</p>
+<p>Once a release is published, you can download a self-contained bundle and skip the <code>git clone</code>:
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
+<span class="nb">cd</span><span class="w"> </span>planning-simulation
+</code></pre></div>
+The bundle includes <code>install.sh</code> and a merged env file, so every command runs from the extracted directory.</p>
+</div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">#</a></h2>
 <p><strong><a href="../deployment/">Explore the other deployments</a></strong> — scenario testing, rosbag replay, closed-loop CARLA, and distributed cloud-edge operation with Zenoh.</p>
 <ul>

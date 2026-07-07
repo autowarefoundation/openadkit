@@ -2271,10 +2271,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-download-the-deployment-bundle-and-demo-map" class="md-nav__link">
+  <a href="#2-clone-the-repository-and-download-the-demo-map" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Download the deployment bundle and demo map
+        2. Clone the repository and download the demo map
       
     </span>
   </a>
@@ -2710,14 +2710,14 @@
 <h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
 </code></pre></div>
-<h3 id="2-download-the-deployment-bundle-and-demo-map">2. Download the deployment bundle and demo map<a class="headerlink" href="#2-download-the-deployment-bundle-and-demo-map" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz
-<span class="nb">cd</span><span class="w"> </span>zenoh-bridge
-./install.sh<span class="w"> </span>sample-data<span class="w"> </span>zenoh-bridge
+<h3 id="2-clone-the-repository-and-download-the-demo-map">2. Clone the repository and download the demo map<a class="headerlink" href="#2-clone-the-repository-and-download-the-demo-map" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
+<span class="nb">cd</span><span class="w"> </span>openadkit/deployments/zenoh-bridge
+../../install.sh<span class="w"> </span>sample-data<span class="w"> </span>zenoh-bridge
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Releases</p>
-<p>Deployment bundles ship as assets on each <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>. Until the first official release is published, developers can use the matching <code>deployments/&lt;deployment&gt;/</code> folder from a cloned repository instead; from that folder, run <code>../../install.sh sample-data &lt;deployment&gt;</code> to fetch the sample data.</p>
+<div class="admonition tip">
+<p class="admonition-title">Release bundles</p>
+<p>Once a release is published, you can download a self-contained <code>.tar.gz</code> via <code>curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/&lt;deployment&gt;.tar.gz | tar xz</code>. Bundles include <code>install.sh</code> and a merged env file so every command runs from the extracted directory.</p>
 </div>
 <h3 id="3-verify-directory-structure">3. Verify directory structure<a class="headerlink" href="#3-verify-directory-structure" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>.

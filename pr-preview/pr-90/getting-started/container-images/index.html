@@ -2500,7 +2500,7 @@
 </table>
 <div class="admonition note">
 <p class="admonition-title">ROS 2 distributions</p>
-<p>Examples use <strong>Humble</strong> (the current default). <strong>Jazzy</strong> images are published in parallel — substitute <code>-jazzy</code> for <code>-humble</code> in any tag (e.g. <code>planning-control-jazzy</code>, <code>planning-control-jazzy-v2.0.0</code>).</p>
+<p>Examples use <strong>Humble</strong> (the current default). <strong>Jazzy</strong> images are published in parallel for most components — substitute <code>-jazzy</code> for <code>-humble</code> in tags (e.g. <code>planning-control-jazzy</code>, <code>planning-control-jazzy-v2.0.0</code>). Some components (e.g. <code>carla-interface</code>) are Humble-only; their tags have no Jazzy equivalent.</p>
 </div>
 <h2 id="cuda-images">CUDA Images<a class="headerlink" href="#cuda-images" title="Permanent link">#</a></h2>
 <p>CUDA-enabled variants follow the same patterns but are <strong>amd64-only</strong>:</p>
@@ -2563,8 +2563,8 @@
 <h2 id="relationship-to-autoware">Relationship to Autoware<a class="headerlink" href="#relationship-to-autoware" title="Permanent link">#</a></h2>
 <p>Each Open AD Kit release pins a specific upstream <strong>Autoware semver meta-release</strong> and records it in the release:</p>
 <ul>
-<li>Stable Open AD Kit releases pin an Autoware <code>X.Y.Z</code> meta-release tag.</li>
-<li><code>v2.0.0</code> pins Autoware <strong>1.8.0</strong>.</li>
+<li>Stable Open AD Kit releases pin an Autoware <code>X.Y.Z</code> meta-release tag.
+Each release records its pinned Autoware version in the release notes.</li>
 </ul>
 <p>A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published release details are listed on the <a href="../../releases/">Releases</a> page; how the tags are structured is in the <a href="#tag-reference">Tag Reference</a> above.</p>
 <h2 id="ros-2-distro-support">ROS 2 Distro Support<a class="headerlink" href="#ros-2-distro-support" title="Permanent link">#</a></h2>

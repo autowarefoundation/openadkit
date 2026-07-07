@@ -33,7 +33,7 @@ cd deployments/planning-simulation
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
-Open the noVNC visualizer at `http://localhost:6080/vnc.html` (password: `openadkit`).
+Open the noVNC visualizer at `https://localhost:6080/vnc.html` (password: `openadkit`; accept the self-signed certificate warning).
 
 For artifact downloads (logging-simulation's perception models), run `./install.sh --download-artifacts`. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
 

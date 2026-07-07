@@ -61,8 +61,6 @@ From the `logging-simulation` directory, start the base containers:
 docker compose --env-file ../base/base.env --env-file logging-simulation.env up -d
 ```
 
-
-
 Wait approximately 10 seconds for the containers to initialize.
 
 !!! tip "GPU acceleration (recommended)"
@@ -82,7 +80,7 @@ Wait approximately 10 seconds for the containers to initialize.
 To begin replaying the recorded sensor data, start the rosbag container:
 
 ```bash
-docker compose --env-file logging-simulation.env up rosbag -d
+docker compose --env-file ../base/base.env --env-file logging-simulation.env up rosbag -d
 ```
 
 Watch the RViz2 display as Autoware processes the replayed data in real time.

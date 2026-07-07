@@ -14,8 +14,12 @@ on:
         description: 'Build tag to promote (e.g. 123456789-1)'
         required: true
       default_ros_distro:
-        description: 'ROS distro to use for bare tag aliases (e.g. humble)'
+        description: 'ROS distro to use for bare tag aliases'
         required: false
+        type: choice
+        options:
+          - humble
+          - jazzy
         default: humble
 
 concurrency:
@@ -61,6 +65,7 @@ jobs:
         env:
           BUILD_TAG: ${{ inputs.build_tag }}
           VERSION: ${{ inputs.version }}
+          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/validate_release.sh
         shell: bash

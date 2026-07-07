@@ -34,6 +34,10 @@ validate_inputs() {
     || fail "Invalid build_tag format '${BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT"
   [ "${GITHUB_REF}" = "refs/heads/main" ] \
     || fail "Release must be triggered from main branch (got ${GITHUB_REF})"
+  case "${DEFAULT_ROS_DISTRO:-humble}" in
+    humble|jazzy) ;;
+    *) fail "Invalid default_ros_distro '${DEFAULT_ROS_DISTRO}': must be one of humble, jazzy" ;;
+  esac
 }
 
 resolve_latest_alias_policy() {

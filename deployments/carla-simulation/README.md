@@ -44,5 +44,5 @@ The helper downloads map assets, starts CARLA, Autoware modules, and the RViz vi
 ## Stop
 
 ```bash
-docker compose --env-file carla-simulation.env down
+docker compose --env-file ../base/base.env --env-file carla-simulation.env down
 ```

@@ -42,9 +42,10 @@ if [ "${autoware_ref_type}" = "ref" ]; then
   exit 1
 fi
 
-git -C autoware-metadata fetch --filter=blob:none --no-tags --force origin "${fetch_ref}"
-# Fetch all tags so git describe can find the nearest semver tag.
-git -C autoware-metadata fetch --tags --force origin
+# Fetch the requested ref plus all tags so git describe can find the nearest semver tag.
+# A single fetch keeps FETCH_HEAD pointed at the requested ref; a bare "git fetch --tags"
+# would clobber FETCH_HEAD with the remote default branch and silently build from main.
+git -C autoware-metadata fetch --filter=blob:none --tags --force origin "${fetch_ref}"
 git -C autoware-metadata checkout --detach FETCH_HEAD
 
 autoware_ref=$(git -C autoware-metadata rev-parse HEAD)

@@ -37,7 +37,7 @@ jobs:
       - name: Install tools
         run: |
           pip install yamllint pytest
-          curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/b5a6ea5521ac1562b4dc2c3c66efb4f09d9956ba/scripts/download-actionlint.bash
+          curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash
           bash /tmp/actionlint.sh
 
       - name: Run shellcheck

@@ -205,6 +205,7 @@ Each alias is created independently from the digest — there is no sequential r
 #### GitHub Release
 
 The `release-github` job:
+
 1. Creates release notes with a provenance table and image digest list
 2. Creates or verifies the git tag (fails if tag exists at a different commit)
 3. Packages all 5 deployment bundles (`.tar.gz` with `install.sh`, vendored `base/`, merged env file)

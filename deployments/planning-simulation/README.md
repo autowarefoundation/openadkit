@@ -11,8 +11,8 @@ For complete operational instructions, see the canonical documentation:
 ## Quick Start
 
 ```bash
-./install.sh sample-data planning-simulation
-docker compose --env-file planning-simulation.env up -d
+../../install.sh sample-data planning-simulation
+docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
-*Cloned repo: run `../../install.sh` instead; pass `--env-file ../base/base.env` before the deployment env file.*
+*Release bundle: from the extracted directory, run `./install.sh sample-data planning-simulation` and `docker compose --env-file planning-simulation.env up -d` (the bundle ships a merged env file).*

@@ -123,7 +123,7 @@ EOF
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
-    echo -e "\033[32mBrowser interface available at http://127.0.0.1:6080/vnc.html?resize=scale&autoconnect=true\033[0m"
+    echo -e "\033[32mBrowser interface available at https://127.0.0.1:6080/vnc.html?resize=scale&autoconnect=true\033[0m"
     echo -e "\033[32mUse the REMOTE_PASSWORD configured in your env file.\033[0m"
     echo -e "\033[32mThe websockify server is bound to ${websck_bind}.\033[0m"
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"

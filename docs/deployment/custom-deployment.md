@@ -77,7 +77,7 @@ services:
       - USE_SIM_TIME=true
 ```
 
-With host networking, the visualizer is reachable directly at `http://localhost:6080/vnc.html`.
+With host networking, the visualizer is reachable directly at `https://localhost:6080/vnc.html` (accept the self-signed certificate warning).
 
 !!! warning "Patterns to keep"
     - Components are launched with `ros2 launch autoware_launch tier4_<component>_component.launch.xml component_wise_launch:=true ...` — there are no per-component ROS packages named after the images.

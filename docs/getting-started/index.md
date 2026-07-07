@@ -40,7 +40,7 @@ cd openadkit/deployments/planning-simulation
 
 --8<-- "includes/zip-release-note.md"
 
-Then fetch the demo map:
+Then fetch the demo map (~500 MB download):
 
 ```bash
 ./install.sh sample-data planning-simulation

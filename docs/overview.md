@@ -6,7 +6,7 @@
 
 ## What is Open AD Kit
 
-Open AD Kit packages the [Autoware](https://github.com/autowarefoundation/autoware) autonomous driving stack as a set of focused, independently deployable container images. Rather than shipping one monolithic image, it splits the stack along the AD pipeline — sensing, perception, localization, mapping, planning, control, and supporting services — so you can run only what a given workload needs.
+Open AD Kit packages the [Autoware](https://github.com/autowarefoundation/autoware) autonomous driving stack as a set of focused, independently deployable container images. Rather than shipping one monolithic image, it splits the stack along the AD pipeline — sensing, perception, localization, mapping, planning, control, API, simulation, visualization, and CARLA bridge services — so you can run only what a given workload needs.
 
 Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packages upstream software into composable container images, defines deployment configurations, integrates with target platforms and vehicle systems, and maintains the build, test, and release tooling needed to run consistently from simulation through in-vehicle deployment.
 

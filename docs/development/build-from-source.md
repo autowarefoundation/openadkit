@@ -84,6 +84,7 @@ docker buildx bake -f components/docker-bake.hcl \
   --set api.tags=ghcr.io/autowarefoundation/openadkit:api \
   --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer \
   --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator \
+  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface \
   --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda \
   --load \
   component

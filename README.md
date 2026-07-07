@@ -9,7 +9,7 @@
 
 </div>
 
-Open AD Kit is the first [SOAFEE](https://soafee.io/) blueprint for deploying [Autoware](https://github.com/autowarefoundation/autoware) as containerized, cloud/edge-ready software-defined vehicle components.
+Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for deploying [Autoware](https://github.com/autowarefoundation/autoware) as containerized, cloud/edge-ready software-defined vehicle components.
 
 This repository provides the component images, deployment configurations, release bundles, and CI metadata needed to run and ship Autoware-based stacks more predictably.
 

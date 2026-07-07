@@ -32,7 +32,7 @@ If you are a member of the Autoware Foundation contributing to active developmen
 
 ### Local CI Commands
 
-Run the full lint suite before pushing. These commands mirror what CI runs in `.github/workflows/lint.yaml`:
+Run the full lint suite before pushing. These commands mirror (and extend) what CI runs in `.github/workflows/lint.yaml`:
 
 ```bash
 # Shell scripts

@@ -124,7 +124,7 @@ jobs:
 
       - name: Upload scan results to GitHub Security
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
           category: ${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}

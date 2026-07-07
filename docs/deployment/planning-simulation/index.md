@@ -22,19 +22,17 @@ After starting the deployment, you will access a noVNC-based RViz2 visualizer in
 
 ## Before You Start
 
-No `git clone` required — set up Docker, then download the self-contained deployment bundle and its demo map.
-
 ### 1. Set up the environment (one-time)
 
 ```bash
 {{ install_command }}
 ```
 
-### 2. Download the deployment bundle
+### 2. Clone the repository
 
 ```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
-cd planning-simulation
+git clone https://github.com/autowarefoundation/openadkit.git
+cd openadkit/deployments/planning-simulation
 ```
 
 --8<-- "includes/first-release-note.md"
@@ -42,7 +40,7 @@ cd planning-simulation
 ### 3. Download the demo map
 
 ```bash
-./install.sh sample-data planning-simulation
+../../install.sh sample-data planning-simulation
 ```
 
 !!! info "About this map"
@@ -53,7 +51,7 @@ cd planning-simulation
 From the `planning-simulation` directory, start the containers:
 
 ```bash
-docker compose --env-file planning-simulation.env up -d
+docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
 --8<-- "includes/cloned-repo-env-note.md"
@@ -75,7 +73,7 @@ Once the visualizer is open, follow the [Autoware planning simulation instructio
 ## Stop the Deployment
 
 ```bash
-docker compose --env-file planning-simulation.env down
+docker compose --env-file ../base/base.env --env-file planning-simulation.env down
 ```
 
 ## Troubleshooting

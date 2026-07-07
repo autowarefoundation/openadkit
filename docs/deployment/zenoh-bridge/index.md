@@ -125,12 +125,12 @@ flowchart TD
 {{ install_command }}
 ```
 
-### 2. Download the deployment bundle and demo map
+### 2. Clone the repository and download the demo map
 
 ```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/zenoh-bridge.tar.gz | tar xz
-cd zenoh-bridge
-./install.sh sample-data zenoh-bridge
+git clone https://github.com/autowarefoundation/openadkit.git
+cd openadkit/deployments/zenoh-bridge
+../../install.sh sample-data zenoh-bridge
 ```
 
 --8<-- "includes/first-release-note.md"

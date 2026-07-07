@@ -39,9 +39,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # The production site is always built from main, regardless of which
-          # trigger fired (a release tag may point at an older commit).
-          ref: main
+          # Push to main: builds the latest docs.
+          # Release published: builds docs from the release tag (github.ref is
+          #   refs/tags/<version>), so the doc page matches the release snapshot.
+          # workflow_dispatch: builds from the default branch.
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
 
       - name: Build docs
         uses: ./.github/actions/build-docs

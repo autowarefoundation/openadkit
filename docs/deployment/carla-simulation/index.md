@@ -26,23 +26,20 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 
 ## Before You Start
 
-No `git clone` required.
-
 ### 1. Set up the environment (one-time)
 
 ```bash
 {{ install_command }}
 ```
 
-### 2. Download the deployment bundle
+### 2. Clone the repository
 
 ```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/carla-simulation.tar.gz | tar xz
-cd carla-simulation
+git clone https://github.com/autowarefoundation/openadkit.git
+cd openadkit/deployments/carla-simulation
 ```
 
-!!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the `deployments/carla-simulation/` folder from a cloned repository instead.
+--8<-- "includes/first-release-note.md"
 
 ## Start the Deployment
 
@@ -104,7 +101,7 @@ To automatically set a short forward route, engage autonomous mode, and verify m
 ## Stop the Deployment
 
 ```bash
-docker compose --env-file carla-simulation.env down
+docker compose --env-file ../base/base.env --env-file carla-simulation.env down
 ```
 
 ## Troubleshooting

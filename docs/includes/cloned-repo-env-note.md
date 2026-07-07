@@ -1,2 +1,2 @@
-!!! warning "Cloned repository"
-    If running from a cloned repository rather than a release bundle, prepend `--env-file ../base/base.env` to **every** `docker compose` command on this page. Release bundles merge both env files into one; from a clone you need both so shared variables such as `ROS_DOMAIN_ID` and `REMOTE_PASSWORD` resolve.
+!!! info "Environment file ordering"
+    Commands on this page pass `--env-file ../base/base.env` before the deployment env file. The base file provides shared defaults; the deployment file overrides them. Release bundles merge both into one file so they use a single `--env-file`.

@@ -16,7 +16,7 @@ Open AD Kit publishes images to the GitHub Container Registry (`{{ registry }}`)
 | **Pre-release** | `planning-control-humble-v2.0.0-rc.1` | Pre-release tag for testing. Pre-releases do not update latest stable aliases. |
 
 !!! note "ROS 2 distributions"
-    Examples use **{{ default_distro_title }}** (the current default). **Jazzy** images are published in parallel — substitute `-jazzy` for `-humble` in any tag (e.g. `planning-control-jazzy`, `planning-control-jazzy-v2.0.0`).
+    Examples use **{{ default_distro_title }}** (the current default). **Jazzy** images are published in parallel for most components — substitute `-jazzy` for `-humble` in tags (e.g. `planning-control-jazzy`, `planning-control-jazzy-v2.0.0`). Some components (e.g. `carla-interface`) are Humble-only; their tags have no Jazzy equivalent.
 
 ## CUDA Images
 
@@ -68,7 +68,7 @@ The Open AD Kit version is **independent of the Autoware version** it packages: 
 Each Open AD Kit release pins a specific upstream **Autoware semver meta-release** and records it in the release:
 
 - Stable Open AD Kit releases pin an Autoware `X.Y.Z` meta-release tag.
-- `v2.0.0` pins Autoware **1.8.0**.
+Each release records its pinned Autoware version in the release notes.
 
 A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published release details are listed on the [Releases](../releases/index.md) page; how the tags are structured is in the [Tag Reference](#tag-reference) above.
 

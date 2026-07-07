@@ -1,2 +1,2 @@
-!!! note "Releases"
-    Deployment bundles ship as assets on each [GitHub Release](https://github.com/autowarefoundation/openadkit/releases). Until the first official release is published, developers can use the matching `deployments/<deployment>/` folder from a cloned repository instead; from that folder, run `../../install.sh sample-data <deployment>` to fetch the sample data.
+!!! tip "Release bundles"
+    Once a release is published, you can download a self-contained `.tar.gz` via `curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/<deployment>.tar.gz | tar xz`. Bundles include `install.sh` and a merged env file so every command runs from the extracted directory.

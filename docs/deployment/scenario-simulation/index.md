@@ -21,19 +21,17 @@ After starting the deployment, the scenario simulator generates a virtual traffi
 
 ## Before You Start
 
-No `git clone` required.
-
 ### 1. Set up the environment (one-time)
 
 ```bash
 {{ install_command }}
 ```
 
-### 2. Download the deployment bundle
+### 2. Clone the repository
 
 ```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz | tar xz
-cd scenario-simulation
+git clone https://github.com/autowarefoundation/openadkit.git
+cd openadkit/deployments/scenario-simulation
 ```
 
 --8<-- "includes/first-release-note.md"
@@ -41,7 +39,7 @@ cd scenario-simulation
 ### 3. Download the Kashiwanoha map
 
 ```bash
-./install.sh sample-data scenario-simulation
+../../install.sh sample-data scenario-simulation
 ```
 
 ## Configuration
@@ -80,7 +78,7 @@ To run your own scenario:
 From the `scenario-simulation` directory, start the containers:
 
 ```bash
-docker compose --env-file scenario-simulation.env up -d
+docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d
 ```
 
 --8<-- "includes/cloned-repo-env-note.md"
@@ -92,7 +90,7 @@ Wait approximately **90 seconds** for Autoware and the scenario simulator to ini
 ## Stop the Deployment
 
 ```bash
-docker compose --env-file scenario-simulation.env down
+docker compose --env-file ../base/base.env --env-file scenario-simulation.env down
 ```
 
 ## Expected Behavior

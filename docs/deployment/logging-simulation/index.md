@@ -24,8 +24,6 @@ After starting the deployment and playing the rosbag, you will observe the Autow
 
 ## Before You Start
 
-No `git clone` required.
-
 ### 1. Set up the environment + download Autoware artifacts (one-time)
 
 ```bash
@@ -34,11 +32,11 @@ No `git clone` required.
 
 This installs Docker / the NVIDIA Container Toolkit and downloads the perception artifacts into `${HOME}/autoware_data` (mounted into the sensing and perception containers).
 
-### 2. Download the deployment bundle
+### 2. Clone the repository
 
 ```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/logging-simulation.tar.gz | tar xz
-cd logging-simulation
+git clone https://github.com/autowarefoundation/openadkit.git
+cd openadkit/deployments/logging-simulation
 ```
 
 --8<-- "includes/first-release-note.md"
@@ -46,7 +44,7 @@ cd logging-simulation
 ### 3. Download the demo map and rosbag
 
 ```bash
-./install.sh sample-data logging-simulation
+../../install.sh sample-data logging-simulation
 ```
 
 !!! info "About the rosbag"
@@ -60,10 +58,10 @@ cd logging-simulation
 From the `logging-simulation` directory, start the base containers:
 
 ```bash
-docker compose --env-file logging-simulation.env up -d
+docker compose --env-file ../base/base.env --env-file logging-simulation.env up -d
 ```
 
---8<-- "includes/cloned-repo-env-note.md"
+
 
 Wait approximately 10 seconds for the containers to initialize.
 
@@ -94,7 +92,7 @@ Watch the RViz2 display as Autoware processes the replayed data in real time.
 To stop all containers including the rosbag profile:
 
 ```bash
-docker compose --env-file logging-simulation.env --profile rosbag down
+docker compose --env-file ../base/base.env --env-file logging-simulation.env --profile rosbag down
 ```
 
 ## Troubleshooting
@@ -102,7 +100,7 @@ docker compose --env-file logging-simulation.env --profile rosbag down
 | Issue | Solution |
 |-------|----------|
 | Containers fail to start | Verify `~/autoware_data` exists and contains the downloaded artifacts |
-| `file not found` for map/rosbag | Re-run `./install.sh sample-data logging-simulation --force` to re-download into `~/autoware_map` |
+| `file not found` for map/rosbag | Re-run `../../install.sh sample-data logging-simulation --force` to re-download into `~/autoware_map` |
 | No objects detected | The rosbag lacks image data. This is expected for the demo rosbag. |
 
 For Docker, GPU, and visualizer issues common to all deployments, see [Troubleshooting](../../getting-started/troubleshooting.md).

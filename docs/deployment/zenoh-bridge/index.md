@@ -70,7 +70,7 @@ flowchart TD
         end
     end
 
-    user[User] -->|"HTTP (Port 6081)"| visualizer
+    user[User] -->|"HTTPS (Port 6081)"| visualizer
     edge_bridge -->|"Zenoh Protocol<br/>over zenoh_net"| cloud_bridge
 ```
 
@@ -241,8 +241,10 @@ Run `docker ps` or `docker compose ps` to verify all containers are running:
 Open a web browser and navigate to:
 
 ```text
-http://localhost:6081
+https://localhost:6081/vnc.html
 ```
+
+The connection uses a self-signed certificate; dismiss the browser privacy warning to continue.
 
 Log in with the password you set as `REMOTE_PASSWORD` in `.env`.
 
@@ -334,7 +336,7 @@ For the edge side, the default simulation mode works, but pure control testing w
 
 **Cause:** Ports `6081` (noVNC), `7448` (cloud Zenoh router), or `7447` (edge Zenoh bridge) are in use.
 
-**Solution:** Stop the conflicting program, or modify `docker-compose.yaml`. For example, change `6081:6080` to `8080:6080` and access via `http://localhost:8080`.
+**Solution:** Stop the conflicting program, or modify `docker-compose.yaml`. For example, change `6081:6080` to `8080:6080` and access via `https://localhost:8080/vnc.html`.
 
 ### Container Fails to Start with `file not found`
 

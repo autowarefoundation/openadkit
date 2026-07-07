@@ -23,7 +23,7 @@ Set a password in `.env`, then start each side in its own terminal:
 ./cloud.sh up -d
 ```
 
-Access the visualizer at `http://localhost:6081`.
+Access the visualizer at `https://localhost:6081/vnc.html` (accept the self-signed certificate warning).
 
 ### Monolithic
 

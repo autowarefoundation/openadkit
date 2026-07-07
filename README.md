@@ -22,8 +22,10 @@ cd openadkit
 # Install Docker (and NVIDIA Container Toolkit on supported hosts)
 ./install.sh
 
-# Activate the docker group (or log out and back in)
-newgrp docker
+# Add your user to the docker group (log out and back in, or use sudo)
+sudo usermod -aG docker $USER
+echo "Log out and back in for group changes to take effect, or prefix docker commands with 'sudo'."
+echo ""
 
 # Start the planning-simulation deployment from the source tree
 cd deployments/planning-simulation

@@ -68,6 +68,15 @@ jobs:
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
 
+      - name: Validate upstream tag pinning
+        if: ${{ vars.UPSTREAM_TAG == '' }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::UPSTREAM_TAG is not set. Manual builds must pin an upstream Autoware release tag (e.g. 1.8.0) so images are reproducible."
+            exit 1
+          fi
+          echo "::warning::UPSTREAM_TAG is not set. Build will use unpinned upstream images (latest <name>-<distro> tags). Set vars.UPSTREAM_TAG in the repository or organization variables for reproducible builds."
+
       - name: Resolve image inventory
         id: inventory
         run: |

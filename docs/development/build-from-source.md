@@ -150,6 +150,17 @@ The workflow runs staged jobs — `prepare`, then `build-common` and `build-comp
 
 Open AD Kit releases are promoted from existing CI builds rather than rebuilt at release time. This ensures that the exact images validated during CI are the images that ship to users.
 
+### Before You Release
+
+Before running the release pipeline, verify:
+
+- **`vars.UPSTREAM_TAG`** is set in the repository or organization Variables on GitHub. This pins upstream Autoware base images to a specific release (e.g. `1.8.0`). Without it, images compile against unpinned upstream tags.
+- **GHCR packages** are accessible: `ghcr.io/autowarefoundation/openadkit`, `ghcr.io/autowarefoundation/openadkit-common`, and the build cache repo `ghcr.io/autowarefoundation/openadkit-buildcache` must accept pushes from CI.
+- **A successful build** exists: `build-all-images` completed on `main` with the desired `autoware_ref`. The build summary shows a `build_tag` and confirms release eligibility.
+- **A successful scan** exists: `scan-images` completed and **passed** for that `build_tag`.
+
+### Workflow Steps
+
 <div class="oak-steps" markdown="1">
 
 - **Build all images**

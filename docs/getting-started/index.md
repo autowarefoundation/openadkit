@@ -43,7 +43,7 @@ cd openadkit/deployments/planning-simulation
 Then fetch the demo map (~500 MB download):
 
 ```bash
-./install.sh sample-data planning-simulation
+../../install.sh sample-data planning-simulation
 ```
 
 ## 3. Start It

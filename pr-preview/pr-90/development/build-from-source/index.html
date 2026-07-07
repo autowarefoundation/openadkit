@@ -2808,11 +2808,13 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 </ul>
 <p>Each alias is created independently from the digest — there is no sequential retagging.</p>
 <h4 id="github-release">GitHub Release<a class="headerlink" href="#github-release" title="Permanent link">#</a></h4>
-<p>The <code>release-github</code> job:
-1. Creates release notes with a provenance table and image digest list
-2. Creates or verifies the git tag (fails if tag exists at a different commit)
-3. Packages all 5 deployment bundles (<code>.tar.gz</code> with <code>install.sh</code>, vendored <code>base/</code>, merged env file)
-4. Creates or updates the GitHub Release with bundles and metadata as release assets</p>
+<p>The <code>release-github</code> job:</p>
+<ol>
+<li>Creates release notes with a provenance table and image digest list</li>
+<li>Creates or verifies the git tag (fails if tag exists at a different commit)</li>
+<li>Packages all 5 deployment bundles (<code>.tar.gz</code> with <code>install.sh</code>, vendored <code>base/</code>, merged env file)</li>
+<li>Creates or updates the GitHub Release with bundles and metadata as release assets</li>
+</ol>
 <pre class="mermaid"><code>flowchart LR
     A[Build All Images] --&gt; R[Record Build Tag]
     R --&gt; B[Scan Images]

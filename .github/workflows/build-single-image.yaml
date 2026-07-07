@@ -1,5 +1,8 @@
 name: build-single-image
 
+permissions:
+  contents: read
+
 # Lightweight single-image build for PR checks and manual debugging.
 #
 # Triggers:
@@ -198,7 +201,7 @@ jobs:
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
@@ -249,7 +252,7 @@ jobs:
           skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
 
       - name: Build ${{ matrix.target }}
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
           UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}

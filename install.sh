@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+USE_COLOR=true
+if [[ ! -t 1 ]]; then
+  USE_COLOR=false
+fi
+
 CLR_GREEN="\033[32m"
 CLR_RED="\033[31m"
 CLR_YELLOW="\033[33m"
@@ -70,9 +75,9 @@ Examples:
 EOF
 }
 
-log_info()  { echo -e "${CLR_GREEN}[INFO]${CLR_RESET} $*"; }
-log_warn()  { echo -e "${CLR_YELLOW}[WARN]${CLR_RESET} $*"; }
-log_error() { echo -e "${CLR_RED}[ERROR]${CLR_RESET} $*"; }
+log_info()  { if [ "$USE_COLOR" = true ]; then echo -e "${CLR_GREEN}[INFO]${CLR_RESET} $*"; else echo "[INFO] $*"; fi; }
+log_warn()  { if [ "$USE_COLOR" = true ]; then echo -e "${CLR_YELLOW}[WARN]${CLR_RESET} $*"; else echo "[WARN] $*"; fi; }
+log_error() { if [ "$USE_COLOR" = true ]; then echo -e "${CLR_RED}[ERROR]${CLR_RESET} $*"; else echo "[ERROR] $*"; fi; }
 
 PIPX_BIN_DIR="${USER_HOME}/.local/bin"
 
@@ -337,13 +342,8 @@ download_sample_data() {
             sha256_verify "${stage}/${name}" "$sum"
         done
         mkdir -p "$MAP_ROOT"
-        if [ -d "$target" ]; then
-            mv "$target" "${target}.old"
-        fi
-        if mv "$stage" "$target"; then
-            rm -rf "${target}.old"
-        else
-            mv "${target}.old" "$target" 2>/dev/null || true
+        rm -rf "$target"
+        if ! mv "$stage" "$target"; then
             log_error "Failed to move $stage to $target"
             return 1
         fi

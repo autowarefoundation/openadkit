@@ -3,6 +3,13 @@
 # shellcheck disable=SC1090,SC1091
 set -euo pipefail
 
+cleanup() {
+    echo "Shutting down VNC and websockify..."
+    pkill websockify 2>/dev/null || true
+    vncserver -kill :99 2>/dev/null || true
+}
+trap cleanup EXIT SIGTERM SIGINT
+
 # Check if RVIZ_CONFIG is provided
 if [ -z "${RVIZ_CONFIG:-}" ]; then
     echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz\e[0m"

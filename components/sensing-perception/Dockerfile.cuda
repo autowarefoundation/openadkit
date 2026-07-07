@@ -72,7 +72,8 @@ COPY --parents --chown=${USERNAME}:${USERNAME} \
     autoware/src/**/package.xml \
     /tmp/
 
-RUN --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     rosdep install -y --from-paths /tmp /opt/autoware/*/share \

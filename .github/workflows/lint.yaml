@@ -1,5 +1,8 @@
 name: lint
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     paths:
@@ -34,7 +37,7 @@ jobs:
       - name: Install tools
         run: |
           pip install yamllint pytest
-          curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash
+          curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/b5a6ea5521ac1562b4dc2c3c66efb4f09d9956ba/scripts/download-actionlint.bash
           bash /tmp/actionlint.sh
 
       - name: Run shellcheck
@@ -108,7 +111,7 @@ jobs:
           exit "${fail}"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Validate bake.hcl parses and COLCON_BASE_PATHS is single-source
         # `docker buildx bake --print` parses the HCL and resolves every target

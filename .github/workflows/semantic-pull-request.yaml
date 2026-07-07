@@ -20,4 +20,8 @@ jobs:
     # timeout-minutes cannot be set on jobs that call a reusable workflow
     # (actionlint enforces this); the upstream workflow controls its own
     # timeout, so the 6-hour GHA default is fine for this sync'd template.
-    uses: autowarefoundation/autoware-github-actions/.github/workflows/semantic-pull-request.yaml@v1
+    # WARNING: This file is synced from autowarefoundation/sync-file-templates.
+    # The SHA below pins the reusable workflow. When updating, re-pin to the
+    # commit SHA of the desired v1 tag from:
+    #   https://github.com/autowarefoundation/autoware-github-actions
+    uses: autowarefoundation/autoware-github-actions/.github/workflows/semantic-pull-request.yaml@c10bb685cf5ca5e8213a92b35a87d5534c47f1fa # v1

@@ -20,6 +20,7 @@ is_stable_release=false
 release_sha=""
 run_id=""
 run_attempt=""
+readonly BUILD_AGE_MAX_DAYS=90
 
 fail() {
   echo "$*" >&2
@@ -83,9 +84,9 @@ validate_build_run() {
 
   created_epoch=$(date -u -d "${created_at}" +%s)
   now_epoch=$(date -u +%s)
-  max_age_seconds=$((90 * 24 * 60 * 60))
+  max_age_seconds=$((BUILD_AGE_MAX_DAYS * 24 * 60 * 60))
   if [ $((now_epoch - created_epoch)) -gt "${max_age_seconds}" ]; then
-    fail "Build ${BUILD_TAG} is older than 90 days and is no longer promotable"
+    fail "Build ${BUILD_TAG} is older than ${BUILD_AGE_MAX_DAYS} days and is no longer promotable"
   fi
 }
 

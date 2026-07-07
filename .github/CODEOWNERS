@@ -4,4 +4,4 @@ deployments/** @mitsudome-r @oguzkaganozt
 platforms/** @mitsudome-r @oguzkaganozt
 
 .github/** @oguzkaganozt @youtalk
-mkdocs.yaml @mitsudome-r @oguzkaganozt
+/mkdocs.yaml @mitsudome-r @oguzkaganozt

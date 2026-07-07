@@ -144,7 +144,7 @@ jobs:
 
       - name: Extract metadata for openadkit-common:universe-common-devel
         id: meta-universe-common-devel
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
           bake-target: docker-metadata-action-universe-common-devel
@@ -156,7 +156,7 @@ jobs:
 
       - name: Extract metadata for openadkit-common:universe-common
         id: meta-universe-common
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
           bake-target: docker-metadata-action-universe-common
@@ -217,7 +217,7 @@ jobs:
           skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
 
       - name: Build and push universe-common images
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
           UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
@@ -287,7 +287,7 @@ jobs:
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
@@ -321,7 +321,7 @@ jobs:
           skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
 
       - name: Build and push ${{ matrix.target }}
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
           UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
@@ -370,10 +370,10 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -381,7 +381,7 @@ jobs:
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
@@ -392,7 +392,7 @@ jobs:
             latest=false
 
       - name: Build and push ${{ matrix.target }}
-        uses: docker/bake-action@v5
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
         with:
@@ -432,7 +432,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Create multi-arch manifest for ${{ matrix.target }} (${{ matrix.ros-distro }})
         uses: ./.github/actions/combine-multi-arch-images
@@ -447,6 +447,7 @@ jobs:
 
   manifest-report:
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     needs: [prepare, create-manifests]
     if: ${{ !cancelled() }}
     permissions:
@@ -457,10 +458,10 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -500,10 +501,10 @@ jobs:
           path: build-metadata
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}

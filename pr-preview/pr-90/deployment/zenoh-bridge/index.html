@@ -2668,7 +2668,7 @@
         end
     end
 
-    user[User] --&gt;|"HTTP (Port 6081)"| visualizer
+    user[User] --&gt;|"HTTPS (Port 6081)"| visualizer
     edge_bridge --&gt;|"Zenoh Protocol&lt;br/&gt;over zenoh_net"| cloud_bridge</code></pre>
 <h3 id="network-isolation-and-communication-bridge">Network Isolation and Communication Bridge<a class="headerlink" href="#network-isolation-and-communication-bridge" title="Permanent link">#</a></h3>
 <ul>
@@ -2818,8 +2818,9 @@
 </ul>
 <h3 id="2-access-the-visualizer">2. Access the visualizer<a class="headerlink" href="#2-access-the-visualizer" title="Permanent link">#</a></h3>
 <p>Open a web browser and navigate to:</p>
-<div class="highlight"><pre><span></span><code>http://localhost:6081
+<div class="highlight"><pre><span></span><code>https://localhost:6081/vnc.html
 </code></pre></div>
+<p>The connection uses a self-signed certificate; dismiss the browser privacy warning to continue.</p>
 <p>Log in with the password you set as <code>REMOTE_PASSWORD</code> in <code>.env</code>.</p>
 <h3 id="3-verify-operation">3. Verify operation<a class="headerlink" href="#3-verify-operation" title="Permanent link">#</a></h3>
 <ul>
@@ -2942,7 +2943,7 @@ sleep<span class="w"> </span><span class="m">15</span>
 </ol>
 <h3 id="port-conflict-port-is-already-allocated">Port Conflict (Port is already allocated)<a class="headerlink" href="#port-conflict-port-is-already-allocated" title="Permanent link">#</a></h3>
 <p><strong>Cause:</strong> Ports <code>6081</code> (noVNC), <code>7448</code> (cloud Zenoh router), or <code>7447</code> (edge Zenoh bridge) are in use.</p>
-<p><strong>Solution:</strong> Stop the conflicting program, or modify <code>docker-compose.yaml</code>. For example, change <code>6081:6080</code> to <code>8080:6080</code> and access via <code>http://localhost:8080</code>.</p>
+<p><strong>Solution:</strong> Stop the conflicting program, or modify <code>docker-compose.yaml</code>. For example, change <code>6081:6080</code> to <code>8080:6080</code> and access via <code>https://localhost:8080/vnc.html</code>.</p>
 <h3 id="container-fails-to-start-with-file-not-found">Container Fails to Start with <code>file not found</code><a class="headerlink" href="#container-fails-to-start-with-file-not-found" title="Permanent link">#</a></h3>
 <p><strong>Cause:</strong> <code>config/zenoh-bridge-ros2dds.json5</code> is missing or inaccessible.</p>
 <p><strong>Solution:</strong> Verify the <code>config</code> directory and file exist. On Linux/macOS, check file permissions to ensure Docker can read them.</p>

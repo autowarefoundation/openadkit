@@ -89,13 +89,15 @@ Each release pins its ROS distro(s), and Humble and Jazzy are built while both m
 
 ## How Releases Are Tagged
 
-Releases are promoted from existing CI builds rather than rebuilt at release time, so the exact images validated during CI are the images that ship. When a release workflow runs, the following tag aliases are updated:
+Releases are promoted from existing CI builds rather than rebuilt at release time, so the exact images validated during CI are the images that ship. When a release workflow runs, each tag alias is created independently from the promoted image digest:
 
-| From | To | Example |
-|------|-----|---------|
-| Build tag | Stable release | `planning-control-humble-123456789-1` → `planning-control-humble-v2.0.0` |
-| Stable release | Latest alias | `planning-control-humble-v2.0.0` → `planning-control-humble` |
-| Latest alias | Default alias | `planning-control-humble` → `planning-control` |
+| Alias | Example | Condition |
+|-------|---------|-----------|
+| Stable release | `planning-control-humble-v2.0.0` | Always created |
+| Latest per-distro | `planning-control-humble` | Stable releases only |
+| Latest per-distro + suffix | `planning-control-humble-latest` | Stable releases only |
+| Default distro alias | `planning-control` | Stable releases, only for the default ROS distro |
+| Default distro + suffix | `planning-control-latest` | Stable releases, only for the default ROS distro |
 
 !!! info "Pre-Releases"
     Pre-release tags (e.g., `-rc.1`) are published but **do not update** latest stable aliases. This prevents prerelease images from being pulled by default aliases.

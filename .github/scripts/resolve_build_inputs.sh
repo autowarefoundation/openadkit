@@ -37,7 +37,12 @@ elif printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
   autoware_ref_type="sha"
 fi
 
-git -C autoware-metadata fetch --filter=blob:none --tags --force origin "${fetch_ref}"
+if [ "${autoware_ref_type}" = "ref" ]; then
+  echo "Could not resolve '${autoware_input_ref}' as a branch, tag, or SHA in the Autoware repository" >&2
+  exit 1
+fi
+
+git -C autoware-metadata fetch --filter=blob:none --no-tags --force origin "${fetch_ref}"
 git -C autoware-metadata checkout --detach FETCH_HEAD
 
 autoware_ref=$(git -C autoware-metadata rev-parse HEAD)

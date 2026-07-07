@@ -85,6 +85,11 @@ runs:
       run: |
         set -euo pipefail
         mkdir -p autoware/src
+        if [ ! -f autoware-lock/autoware-lock.repos ]; then
+          echo "Autoware lockfile not found at autoware-lock/autoware-lock.repos" >&2
+          echo "This happens when build-tag is empty. Ensure build-tag is set when setup-autoware is true." >&2
+          exit 1
+        fi
         vcs import --shallow autoware/src < autoware-lock/autoware-lock.repos
         if [ "${{ inputs.with-middleware }}" = "true" ]; then
           # Some Autoware refs do not provide middleware sources, but

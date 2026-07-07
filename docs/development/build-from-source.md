@@ -161,22 +161,52 @@ Before running the release pipeline, verify:
 
 ### Workflow Steps
 
-<div class="oak-steps" markdown="1">
+The release workflow (`.github/workflows/release.yaml`) has three jobs that run sequentially:
 
-- **Build all images**
-  Run the **`build-all-images`** GitHub Actions workflow from `main`. Stable releases must use an Autoware `X.Y.Z` tag; pre-releases may use an Autoware tag or full 40-character SHA.
+1. **validate** — Downloads build metadata and scan results, then runs 12 validation gates before any images are tagged.
+2. **release-images** — Promotes image digests to release tags.
+3. **release-github** — Creates the git tag, packages deployment bundles, and creates the GitHub Release.
 
-- **Record the build tag**
-  Keep the build summary's `build_tag`, formatted as `RUN_ID-RUN_ATTEMPT`.
+#### Validation Gates
 
-- **Scan the images**
-  Ensure the **`scan-images`** GitHub Actions workflow completes successfully for that `build_tag`. Scheduled builds request scans automatically; otherwise trigger `scan-images` manually.
-  Scans check images for known CVEs.
+Before any image is tagged, the `validate` job (`.github/scripts/validate_release.sh`) checks:
 
-- **Promote and tag**
-  Run the **`release`** GitHub Actions workflow with the Open AD Kit `version` and the validated `build_tag`. This promotes the scanned images to stable release tags and updates latest aliases.
+| # | Gate | What it verifies |
+|---|------|------------------|
+| 1 | **Version format** | `vX.Y.Z` for stable, `vX.Y.Z-prerelease` for pre-release |
+| 2 | **Build tag format** | Must match `RUN_ID-RUN_ATTEMPT` |
+| 3 | **Source branch** | Release must run from `main` |
+| 4 | **Alias policy** | If a newer stable release already exists, latest aliases won't be updated |
+| 5 | **Build provenance** | The build tag must reference a completed, successful `build-all-images` run on `main` |
+| 6 | **Build age** | Build must be less than 90 days old |
+| 7 | **Scan results** | A passing `scan-images` run must exist for the build; scan metadata is validated against the build metadata |
+| 8 | **Metadata schema** | 15+ fields in `build-metadata.json` are validated (types, formats, SHA256 lengths) |
+| 9 | **File integrity** | SHA256 of `autoware-lock.repos` and `image-inventory.json` must match the metadata |
+| 10 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build — no missing, no extras |
+| 11 | **Scan coverage** | Every image digest and platform must have a scan result |
+| 12 | **Registry integrity** | Build images must still exist in GHCR with matching digests; release tags must not conflict with existing tags at different digests |
 
-</div>
+If all 12 gates pass, the workflow proceeds to tag promotion.
+
+#### Tag Promotion
+
+The `release-images` job iterates over every image in the build metadata and creates release tags directly from the promoted digest:
+
+- Stable release tag: `<repo>:<target>-<distro>-v<version>`
+- Per-distro alias: `<repo>:<target>-<distro>` (stable releases only)
+- Per-distro latest: `<repo>:<target>-<distro>-latest`
+- Default alias: `<repo>:<target>` (only for the default ROS distro)
+- Default latest: `<repo>:<target>-latest`
+
+Each alias is created independently from the digest — there is no sequential retagging.
+
+#### GitHub Release
+
+The `release-github` job:
+1. Creates release notes with a provenance table and image digest list
+2. Creates or verifies the git tag (fails if tag exists at a different commit)
+3. Packages all 5 deployment bundles (`.tar.gz` with `install.sh`, vendored `base/`, merged env file)
+4. Creates or updates the GitHub Release with bundles and metadata as release assets
 
 ```mermaid
 flowchart LR

@@ -19,6 +19,7 @@ def ls_remote(url, ref):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        timeout=30,
     )
     if result.returncode != 0 or not result.stdout.strip():
         return None

@@ -429,7 +429,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     needs: [prepare, build-common, build-components, build-carla-interface]
-    if: ${{ !cancelled() }}
+    if: success()
     permissions:
       contents: read
       packages: write

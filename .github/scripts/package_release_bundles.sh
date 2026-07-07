@@ -45,6 +45,26 @@ for entry in \
     fi
   fi
 
+  # Pin Open AD Kit image refs to immutable release tags so a downloaded
+  # bundle stays reproducible after future releases repoint the bare aliases.
+  # Third-party images (autoware:universe, zenoh-bridge:latest, etc.) are left
+  # untouched — pinning those is tracked separately.
+  if [ -n "${VERSION:-}" ] && [ -n "${DEFAULT_ROS_DISTRO:-}" ]; then
+    echo "Pinning Open AD Kit image refs to ${DEFAULT_ROS_DISTRO}-${VERSION}"
+    for f in \
+      "staging/${name}/docker-compose.yaml" \
+      "staging/${name}/docker-compose."*.yaml \
+      "staging/${name}/base/docker-compose.yaml" \
+      "staging/${name}/${name}.env" \
+      "staging/${name}/${name}."*.env \
+      "staging/${name}/.env"; do
+      [ -f "${f}" ] || continue
+      sed -i -E "s#(ghcr\.io/autowarefoundation/openadkit:)([a-z-]+)#\1\2-${DEFAULT_ROS_DISTRO}-${VERSION}#g" "${f}"
+    done
+  else
+    echo "VERSION/DEFAULT_ROS_DISTRO not set; skipping image pinning"
+  fi
+
   env_file="staging/${name}/${name}.env"
   if [ -f "${env_file}" ]; then
     echo "::group::validate ${name}"

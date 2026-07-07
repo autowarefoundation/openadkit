@@ -189,6 +189,9 @@ jobs:
         run: bash .github/scripts/install-compose.sh
 
       - name: Package deployment bundles
+        env:
+          VERSION: ${{ inputs.version }}
+          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
         run: bash .github/scripts/package_release_bundles.sh
         shell: bash
 

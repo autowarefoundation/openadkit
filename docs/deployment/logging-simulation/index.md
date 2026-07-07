@@ -70,7 +70,7 @@ Wait approximately 10 seconds for the containers to initialize.
 
     ```bash
     docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml \
-      --env-file logging-simulation.env --env-file logging-simulation.gpu.env up -d
+      --env-file ../base/base.env --env-file logging-simulation.env --env-file logging-simulation.gpu.env up -d
     ```
 
     This swaps in the `sensing-perception-cuda` image and reserves the GPU for the `sensing` and `perception` services. It requires the NVIDIA Container Toolkit (installed by `install.sh` by default). The `sensing-perception-cuda` image is published for `linux/amd64` only.

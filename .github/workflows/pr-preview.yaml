@@ -9,6 +9,7 @@ on:
       - closed
     paths:
       - mkdocs.yaml
+      - install.sh
       - docs/macros.py
       - .github/image-inventory.json
       - docs/requirements.txt
@@ -39,6 +40,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Build docs
         uses: ./.github/actions/build-docs

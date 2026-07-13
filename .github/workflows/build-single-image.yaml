@@ -6,26 +6,31 @@ permissions:
 # Lightweight single-image build for PR checks and manual debugging.
 #
 # Triggers:
-#   - pull_request: only when component Dockerfiles (or COPY'd files) change.
-#     Builds only the changed targets with --load (no GHCR push), amd64 only.
+#   - pull_request: when component or shared build-graph inputs change.
+#     Builds affected targets with --load, then scans them (no push), amd64 only.
 #     Fork-safe: uses GITHUB_TOKEN (read-only for public GHCR pulls).
 #   - workflow_dispatch: manual single-target or multi-target build.
-#     Optionally pushes to GHCR with a SHA-tagged image.
+#     Optionally pushes a run-tagged image to GHCR.
 #
 # This workflow does NOT replace build-all-images.yaml for releases.
-# It validates that a Dockerfile change produces a buildable image
+# It validates that affected build inputs produce buildable images
 # without running the full 32+ job pipeline.
 
 on:
   pull_request:
     paths:
       - "components/**"
+      - ".github/image-inventory.json"
+      - ".github/scripts/export_autoware_lock.py"
+      - ".github/scripts/resolve_build_inputs.sh"
+      - ".github/actions/free-disk-space/**"
+      - ".github/actions/inject-ccache/**"
       - ".github/actions/setup-build-env/**"
       - ".github/workflows/build-single-image.yaml"
   workflow_dispatch:
     inputs:
       target:
-        description: "Bake target to build (e.g. visualizer, sensing-perception). Empty = auto-detect from changed files."
+        description: "Space-separated Bake targets (e.g. visualizer sensing-perception). Empty = auto-detect relevant changes."
         required: false
         default: ""
       ros-distro:
@@ -59,6 +64,9 @@ jobs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       targets_json: ${{ steps.detect.outputs.targets_json }}
       setup_autoware: ${{ steps.detect.outputs.setup_autoware }}
+      with_middleware: ${{ steps.detect.outputs.with_middleware }}
+      use_local_common: ${{ steps.detect.outputs.use_local_common }}
+      use_local_simulator: ${{ steps.detect.outputs.use_local_simulator }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
@@ -95,78 +103,158 @@ jobs:
       - name: Detect changed targets
         id: detect
         env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
           TARGET_INPUT: ${{ inputs.target }}
         run: |
           set -euo pipefail
 
-          # Map changed files to bake targets.
-          # universe-common/Dockerfile affects the base — build both stages.
-          # simulator/Dockerfile also affects carla-interface (FROM simulator).
-          # visualizer/etc/* are COPY'd into the visualizer image.
+          all_targets=$(jq -r '.images[].target' .github/image-inventory.json | xargs)
+          targets=""
+          build_input_matched=false
+          use_local_common=false
+          use_local_simulator=false
+
           if [ -n "${TARGET_INPUT}" ]; then
-            # workflow_dispatch with explicit target
+            for requested_target in ${TARGET_INPUT}; do
+              if ! jq -e --arg target "${requested_target}" \
+                '.images[] | select(.target == $target)' \
+                .github/image-inventory.json > /dev/null; then
+                echo "Unknown Bake target: ${requested_target}" >&2
+                exit 1
+              fi
+            done
             targets="${TARGET_INPUT}"
           else
-            # PR: auto-detect from changed files
-            changed_files=$(git diff --name-only origin/main...HEAD -- components/ || true)
-            echo "Changed files:" >&2
-            echo "$changed_files" >&2
+            if [ "${EVENT_NAME}" = "pull_request" ]; then
+              if [ -z "${BASE_SHA}" ]; then
+                echo "Pull request base SHA is unavailable" >&2
+                exit 1
+              fi
+              diff_base="${BASE_SHA}"
+            else
+              diff_base=$(git rev-parse HEAD^)
+            fi
 
-            targets=""
-            for f in $changed_files; do
-              case "$f" in
-                components/universe-common/Dockerfile)
-                  targets="$targets universe-common-devel universe-common" ;;
+            changed_files=$(git diff --name-only "${diff_base}...HEAD")
+            echo "Changed files:" >&2
+            echo "${changed_files}" >&2
+
+            while IFS= read -r changed_file; do
+              [ -n "${changed_file}" ] || continue
+              case "${changed_file}" in
+                components/docker-bake.hcl)
+                  targets="${targets} ${all_targets}"
+                  build_input_matched=true
+                  use_local_common=true
+                  use_local_simulator=true
+                  ;;
+                components/README.md|components/*/README.md)
+                  ;;
+                components/universe-common/*)
+                  targets="${targets} universe-common-devel universe-common"
+                  build_input_matched=true
+                  use_local_common=true
+                  ;;
                 components/sensing-perception/Dockerfile)
-                  targets="$targets sensing-perception" ;;
+                  targets="${targets} sensing-perception"
+                  build_input_matched=true
+                  ;;
                 components/sensing-perception/Dockerfile.cuda)
-                  targets="$targets sensing-perception-cuda" ;;
-                components/localization-mapping/Dockerfile)
-                  targets="$targets localization-mapping" ;;
-                components/planning-control/Dockerfile)
-                  targets="$targets planning-control" ;;
-                components/vehicle-system/Dockerfile)
-                  targets="$targets vehicle-system" ;;
-                components/api/Dockerfile)
-                  targets="$targets api" ;;
-                components/visualizer/Dockerfile|components/visualizer/etc/*)
-                  targets="$targets visualizer" ;;
-                components/simulator/Dockerfile)
-                  targets="$targets simulator carla-interface" ;;
-                components/carla-interface/Dockerfile)
-                  targets="$targets carla-interface" ;;
+                  targets="${targets} sensing-perception-cuda"
+                  build_input_matched=true
+                  ;;
+                components/sensing-perception/*)
+                  targets="${targets} sensing-perception sensing-perception-cuda"
+                  build_input_matched=true
+                  ;;
+                components/localization-mapping/*)
+                  targets="${targets} localization-mapping"
+                  build_input_matched=true
+                  ;;
+                components/planning-control/*)
+                  targets="${targets} planning-control"
+                  build_input_matched=true
+                  ;;
+                components/vehicle-system/*)
+                  targets="${targets} vehicle-system"
+                  build_input_matched=true
+                  ;;
+                components/api/*)
+                  targets="${targets} api"
+                  build_input_matched=true
+                  ;;
+                components/visualizer/*)
+                  targets="${targets} visualizer"
+                  build_input_matched=true
+                  ;;
+                components/simulator/*)
+                  targets="${targets} simulator carla-interface"
+                  build_input_matched=true
+                  use_local_simulator=true
+                  ;;
+                components/carla-interface/*)
+                  targets="${targets} carla-interface"
+                  build_input_matched=true
+                  ;;
+                .github/image-inventory.json|\
+                .github/scripts/export_autoware_lock.py|\
+                .github/scripts/resolve_build_inputs.sh|\
+                .github/actions/free-disk-space/*|\
+                .github/actions/inject-ccache/*|\
+                .github/actions/setup-build-env/*|\
+                .github/workflows/build-single-image.yaml)
+                  targets="${targets} ${all_targets}"
+                  build_input_matched=true
+                  ;;
+                components/*)
+                  echo "Unmapped component build input: ${changed_file}" >&2
+                  exit 1
+                  ;;
                 *)
-                  # README, docker-bake.hcl, etc. — no build needed
                   ;;
               esac
-            done
+            done <<< "${changed_files}"
           fi
 
-          # Dedupe and trim
-          targets=$(echo "$targets" | tr ' ' '\n' | sort -u | grep -v '^$' || true)
-          targets=$(echo "$targets" | tr '\n' ' ' | xargs)
+          targets=$(tr ' ' '\n' <<< "${targets}" | sort -u | xargs)
 
-          # Determine if Autoware source is needed.
-          # carla-interface is the only target that does NOT need Autoware source
-          # (it builds FROM the simulator image with apt+pip only).
-          # If only carla-interface changed, skip Autoware checkout entirely.
-          setup_autoware="true"
-          non_carla=$(echo "$targets" | tr ' ' '\n' | grep -v '^carla-interface$' | xargs || true)
-          if [ -z "$non_carla" ] && [ -n "$targets" ]; then
-            setup_autoware="false"
+          if [ "${build_input_matched}" = true ] && [ -z "${targets}" ]; then
+            echo "A build-affecting path matched but produced no Bake targets" >&2
+            exit 1
           fi
 
-          # Convert to JSON array for matrix
-          if [ -z "$targets" ]; then
+          setup_autoware=false
+          with_middleware=false
+          for target in ${targets}; do
+            if [ "${target}" != "carla-interface" ]; then
+              setup_autoware=true
+            fi
+            case "${target}" in
+              universe-common-devel|universe-common)
+                with_middleware=true
+                ;;
+            esac
+          done
+
+          if [ -z "${targets}" ]; then
             targets_json="[]"
           else
-            targets_json=$(echo "$targets" | tr ' ' '\n' | jq -R . | jq -s -c .)
+            targets_json=$(tr ' ' '\n' <<< "${targets}" | jq -R . | jq -s -c .)
           fi
 
-          echo "targets_json=$targets_json" >> "$GITHUB_OUTPUT"
-          echo "setup_autoware=$setup_autoware" >> "$GITHUB_OUTPUT"
-          echo "Detected targets: '$targets'" >&2
-          echo "setup_autoware: $setup_autoware" >&2
+          {
+            echo "targets_json=${targets_json}"
+            echo "setup_autoware=${setup_autoware}"
+            echo "with_middleware=${with_middleware}"
+            echo "use_local_common=${use_local_common}"
+            echo "use_local_simulator=${use_local_simulator}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Detected targets: '${targets}'" >&2
+          echo "setup_autoware: ${setup_autoware}" >&2
+          echo "with_middleware: ${with_middleware}" >&2
+          echo "use_local_common: ${use_local_common}" >&2
+          echo "use_local_simulator: ${use_local_simulator}" >&2
         shell: bash
 
   build:
@@ -197,13 +285,13 @@ jobs:
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' }}
           setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' }}
-          with-middleware: false
+          with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' }}
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
+          images: ${{ startsWith(matrix.target, 'universe-common') && env.IMAGE_PREFIX_COMMON || env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
           tags: |
             type=raw,value=${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-pr${{ github.event.pull_request.number || github.run_id }}
@@ -223,17 +311,6 @@ jobs:
           runtime_tag="universe-common-amd64-${distro}"
           echo "devel_context=docker-image://${IMAGE_PREFIX_COMMON}:${devel_tag}" >> "$GITHUB_OUTPUT"
           echo "runtime_context=docker-image://${IMAGE_PREFIX_COMMON}:${runtime_tag}" >> "$GITHUB_OUTPUT"
-        shell: bash
-
-      - name: Resolve carla-interface simulator context
-        id: sim_context
-        if: matrix.target == 'carla-interface'
-        env:
-          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
-        run: |
-          set -euo pipefail
-          distro="${ROS_DISTRO:-humble}"
-          echo "simulator_image=${IMAGE_PREFIX_COMPONENT}:simulator-amd64-${distro}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Restore BuildKit cache mounts
@@ -262,10 +339,20 @@ jobs:
             ${{ steps.meta.outputs.bake-file }}
           targets: ${{ matrix.target }}
           push: ${{ github.event_name == 'workflow_dispatch' && inputs.push }}
+          load: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.push) }}
           set: |
             *.platform=linux/amd64
             *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
-            *.contexts.universe-common-devel=${{ steps.contexts.outputs.devel_context }}
-            *.contexts.universe-common=${{ steps.contexts.outputs.runtime_context }}
-            ${{ matrix.target == 'carla-interface' && format('*.args.SIMULATOR_IMAGE={0}:simulator-amd64-{1}', env.IMAGE_PREFIX_COMPONENT, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.prepare.outputs.use_local_common != 'true' && format('*.contexts.universe-common-devel={0}', steps.contexts.outputs.devel_context) || '' }}
+            ${{ needs.prepare.outputs.use_local_common != 'true' && format('*.contexts.universe-common={0}', steps.contexts.outputs.runtime_context) || '' }}
+            ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.args.SIMULATOR_IMAGE={0}:simulator-amd64-{1}', env.IMAGE_PREFIX_COMPONENT, inputs.ros-distro || 'humble') || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
+
+      - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.meta.outputs.tags }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH

@@ -18,6 +18,10 @@ for entry in \
   rm -rf "staging/${name}"
   cp -a "${dir}" "staging/${name}"
 
+  if [ "${name}" = "zenoh-bridge" ] && [ -f "staging/${name}/.env.example" ]; then
+    cp "staging/${name}/.env.example" "staging/${name}/.env"
+  fi
+
   # carla-simulation downloads its own assets via start-carla-e2e-demo.sh.
   if [ "${name}" != "carla-simulation" ]; then
     cp "${install}" "staging/${name}/install.sh"
@@ -30,7 +34,7 @@ for entry in \
     mkdir -p "staging/${name}/base"
     cp "${base_dir}/docker-compose.yaml" "staging/${name}/base/docker-compose.yaml"
     cp "${base_dir}/cyclonedds.xml" "staging/${name}/base/cyclonedds.xml"
-    sed -i 's#\.\./base/#base/#' "${compose}"
+    sed -i 's#\.\./base/#./base/#' "${compose}"
     env_file="staging/${name}/${name}.env"
     if [ -f "${env_file}" ]; then
       tmp="$(mktemp)"
@@ -50,7 +54,11 @@ for entry in \
   # Third-party images (autoware:universe, zenoh-bridge:latest, etc.) are left
   # untouched — pinning those is tracked separately.
   if [ -n "${VERSION:-}" ] && [ -n "${DEFAULT_ROS_DISTRO:-}" ]; then
-    echo "Pinning Open AD Kit image refs to ${DEFAULT_ROS_DISTRO}-${VERSION}"
+    bundle_ros_distro="${DEFAULT_ROS_DISTRO}"
+    if [ "${name}" = "carla-simulation" ]; then
+      bundle_ros_distro=humble
+    fi
+    echo "Pinning Open AD Kit image refs to ${bundle_ros_distro}-${VERSION}"
     for f in \
       "staging/${name}/docker-compose.yaml" \
       "staging/${name}/docker-compose."*.yaml \
@@ -59,7 +67,7 @@ for entry in \
       "staging/${name}/${name}."*.env \
       "staging/${name}/.env"; do
       [ -f "${f}" ] || continue
-      sed -i -E "s#(ghcr\.io/autowarefoundation/openadkit:)([a-z-]+)#\1\2-${DEFAULT_ROS_DISTRO}-${VERSION}#g" "${f}"
+      sed -i -E "s#(ghcr\.io/autowarefoundation/openadkit:)([a-z-]+)#\1\2-${bundle_ros_distro}-${VERSION}#g" "${f}"
     done
   else
     echo "VERSION/DEFAULT_ROS_DISTRO not set; skipping image pinning"

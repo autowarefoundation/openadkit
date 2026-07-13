@@ -97,19 +97,20 @@ target "docker-metadata-action-simulator" {}
 target "docker-metadata-action-carla-interface" {}
 
 // Common base for both universe-common stages. The Dockerfile has FROM lines
-// for both ${CORE_DEVEL_IMAGE} (devel stage) and ${CORE_IMAGE} (runtime
+// for both ${CORE_DEVEL_IMAGE} (devel stage) and ${BASE_IMAGE} (runtime
 // stage), so BuildKit needs both ARGs and both contexts resolved at parse
-// time regardless of which target stage is being built — mirrors upstream's
-// `_universe-base` / `_universe-cuda-base` inheritable pattern.
+// time regardless of which target stage is being built. The runtime starts
+// from the lean base and copies the compiled core/common tree from devel;
+// inheriting upstream core would retain its development files in final layers.
 target "_universe-common-base" {
   dockerfile = "components/universe-common/Dockerfile"
   contexts = {
     autoware-core-devel = upstream("core-devel")
-    autoware-core       = upstream("core")
+    autoware-base       = upstream("base")
   }
   args = {
     CORE_DEVEL_IMAGE = "autoware-core-devel"
-    CORE_IMAGE       = "autoware-core"
+    BASE_IMAGE       = "autoware-base"
     ROS_DISTRO       = ROS_DISTRO
   }
 }
@@ -200,7 +201,14 @@ target "sensing-perception-cuda" {
 }
 
 target "carla-interface" {
-  inherits = ["docker-metadata-action-carla-interface"]
+  inherits   = ["docker-metadata-action-carla-interface"]
   dockerfile = "components/carla-interface/Dockerfile"
-  target = "carla-interface"
+  target     = "carla-interface"
+  contexts = {
+    simulator = ctx("simulator")
+  }
+  args = {
+    SIMULATOR_IMAGE = "simulator"
+    ROS_DISTRO      = ROS_DISTRO
+  }
 }

@@ -11,12 +11,16 @@ For complete operational instructions, see the canonical documentation:
 ## Quick Start
 
 ```bash
+cp .env.example .env
 ./install.sh sample-data zenoh-bridge
 ```
 
+Set `REMOTE_PASSWORD` in `.env` before starting. Docker Compose reads this file
+without sourcing it; exported shell variables take precedence.
+
 ### Split Topology (Recommended)
 
-Set a password in `.env`, then start each side in its own terminal:
+Start each side in its own terminal:
 
 ```bash
 ./edge.sh up -d
@@ -25,9 +29,11 @@ Set a password in `.env`, then start each side in its own terminal:
 
 Access the visualizer at `https://localhost:6081/vnc.html` (accept the self-signed certificate warning).
 
-### Monolithic
+For separate machines, expose TCP 7448 only on an exact VPN/private-interface
+address and restrict it to trusted peers. Zenoh transport is not authenticated
+or encrypted; `REMOTE_PASSWORD` protects only the noVNC visualizer.
 
-Set `REMOTE_PASSWORD` in `.env` (required — the visualizer refuses to start without it), then:
+### Monolithic
 
 ```bash
 docker compose up -d

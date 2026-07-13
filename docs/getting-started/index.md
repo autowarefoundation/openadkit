@@ -23,7 +23,7 @@ The included `install.sh` sets up Docker Engine and the NVIDIA Container Toolkit
 ```
 
 !!! tip "Skip NVIDIA Toolkit"
-    Append `-s -- --no-nvidia` (i.e. `… | sudo bash -s -- --no-nvidia`) if you do not have an NVIDIA GPU. The toolkit is only needed for GPU-accelerated deployments.
+    Append `--no-nvidia` to the final command (`install_openadkit --no-nvidia`) if you do not have an NVIDIA GPU. The toolkit is only needed for GPU-accelerated deployments.
 
 Confirm the environment is ready:
 

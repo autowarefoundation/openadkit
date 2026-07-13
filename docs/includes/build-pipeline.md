@@ -1,6 +1,6 @@
 ```mermaid
 flowchart LR
-    CORE["autoware:core-devel / core"] --> UC["universe-common"]
+    CORE["autoware:core-devel (build)<br/>autoware:base (runtime)"] --> UC["universe-common"]
     CUDA["autoware:base-cuda-{devel,runtime}"] --> SPC["sensing-perception-cuda"]
     UC --> SP["sensing-perception"]
     UC --> LM["localization-mapping"]

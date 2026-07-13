@@ -17,6 +17,7 @@ on:
       - '**/docker-compose*.yaml'
       - '**/docker-compose*.yml'
       - '**/*.env'
+      - '**/*.env.example'
       - 'components/**/*.hcl'
       - 'mkdocs.yaml'
       - 'docs/**/*.yaml'
@@ -84,8 +85,8 @@ jobs:
         # each documented stack with its sample env file. It does not pull images.
         run: |
           set -euo pipefail
-          # zenoh-bridge requires a non-empty REMOTE_PASSWORD (its .env leaves it
-          # blank on purpose); a shell value overrides the blank for validation.
+          # zenoh-bridge requires a non-empty REMOTE_PASSWORD (its example env
+          # leaves it blank on purpose); a shell value overrides it for validation.
           export REMOTE_PASSWORD="ci-validate"
           fail=0
           validate() {
@@ -107,7 +108,7 @@ jobs:
           validate deployments/logging-simulation  --env-file ../base/base.env --env-file logging-simulation.env
           validate deployments/logging-simulation  --env-file ../base/base.env --env-file logging-simulation.env --env-file logging-simulation.gpu.env -f docker-compose.yaml -f docker-compose.gpu.yaml
           validate deployments/carla-simulation    --env-file ../base/base.env --env-file carla-simulation.env
-          validate deployments/zenoh-bridge          --env-file .env
+          validate deployments/zenoh-bridge          --env-file .env.example
           exit "${fail}"
 
       - name: Set up Docker Buildx
@@ -151,4 +152,5 @@ jobs:
       - name: Run shell tests
         run: |
           bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
+          bash .github/scripts/tests/test_install_docker_capabilities.sh
           bash .github/scripts/tests/test_report_manifests.sh

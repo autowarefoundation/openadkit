@@ -27,7 +27,7 @@ After starting the deployment and playing the rosbag, you will observe the Autow
 ### 1. Set up the environment + download Autoware artifacts (one-time)
 
 ```bash
-{{ install_command }} -s -- --download-artifacts
+{{ install_command }} --download-artifacts
 ```
 
 This installs Docker / the NVIDIA Container Toolkit and downloads the perception artifacts into `${HOME}/autoware_data` (mounted into the sensing and perception containers).

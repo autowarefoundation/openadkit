@@ -85,7 +85,7 @@ Four of the five deployments (planning, scenario, logging, carla) build on a sha
   ```
 
 - Release bundles vendor `base/` and merge both env files into a single `<name>.env`, so bundles run with one `--env-file`.
-- **Zenoh bridge** is self-contained — it does not include the base and uses its own `.env`.
+- **Zenoh bridge** is self-contained — it does not include the base. Copy its `.env.example` to the local, untracked `.env` before use.
 
 ```mermaid
 flowchart LR

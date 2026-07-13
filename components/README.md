@@ -12,7 +12,7 @@ For **complete component documentation**, architecture overview, and visualizer 
 block-beta
     columns 8
 
-    space:3 UP["autoware:core-devel / core<br/>autoware:base-cuda-{devel,runtime}"]:2 space:3
+    space:3 UP["autoware:core-devel / base<br/>autoware:base-cuda-{devel,runtime}"]:2 space:3
 
     space:8
 
@@ -51,7 +51,8 @@ block-beta
 Images are built with `docker buildx bake` from
 [`components/docker-bake.hcl`](docker-bake.hcl). The `universe-common`
 layer is an openadkit-owned thin intermediate that compiles the
-universe-common slice of Autoware on top of upstream `core-devel`/`core`.
+universe-common slice of Autoware with upstream `core-devel` and packages the
+result on the lean upstream `base` runtime image.
 
 ### Bake groups
 

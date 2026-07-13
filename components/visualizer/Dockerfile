@@ -53,20 +53,23 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-COPY --from=visualizer-devel /opt/autoware /opt/autoware
-RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
+RUN --mount=from=visualizer-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    cp -a /mnt/autoware/. /opt/autoware/ && \
+    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
+    bash /tmp/runtime-cleanup.sh opt
 
-COPY --parents --chown=${USERNAME}:${USERNAME} \
-    autoware/src/**/package.xml \
-    /tmp/
-
-RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/*
+    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
+    rosdep install -y --from-paths /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-cleanup.sh
 
 # Install VNC / NoVNC / Openbox stack and simulation tooling.
 USER root

@@ -14,8 +14,11 @@ inserted with pymdownx snippets (`--8<--`) — keep markdown in markdown files,
 not in Python strings.
 """
 
+import hashlib
 import json
 import os
+import re
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -28,17 +31,38 @@ REGISTRY = "ghcr.io/autowarefoundation/openadkit"
 # published default changes, change it here only.
 DEFAULT_DISTRO = "humble"
 
-# Derive the branch/tag from the build environment so release docs point to
-# the matching script. Falls back to "main" for local builds.
-# PR merge refs (e.g. "42/merge") are not valid for raw.githubusercontent.com,
-# so we fall back to "main" when the ref contains a slash.
-_raw_ref = os.environ.get("GITHUB_REF_NAME", "main")
-INSTALL_BRANCH = "main" if "/" in _raw_ref else _raw_ref
+# CI sets this to the exact checked-out commit. Local builds resolve HEAD so the
+# rendered command never downloads a mutable branch.
+INSTALL_REF = os.environ.get("OPENADKIT_INSTALL_REF")
+if not INSTALL_REF:
+    try:
+        INSTALL_REF = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "Set OPENADKIT_INSTALL_REF to the commit SHA used for this docs build"
+        ) from exc
+if not re.fullmatch(r"[0-9a-fA-F]{40,64}", INSTALL_REF):
+    raise RuntimeError("OPENADKIT_INSTALL_REF must be a full commit SHA")
+
+INSTALL_SHA256 = hashlib.sha256((REPO_ROOT / "install.sh").read_bytes()).hexdigest()
 
 INSTALL_COMMAND = (
-    "curl -fsSL "
-    f"https://raw.githubusercontent.com/autowarefoundation/openadkit/{INSTALL_BRANCH}/install.sh "
-    "| sudo bash"
+    "install_openadkit() (\n"
+    "  set -eu\n"
+    '  install_tmp="$(mktemp)"\n'
+    "  trap 'rm -f \"$install_tmp\"' EXIT\n"
+    "  curl -fsSL --output \"$install_tmp\" "
+    f"https://raw.githubusercontent.com/autowarefoundation/openadkit/{INSTALL_REF}/install.sh\n"
+    f"  printf '%s  %s\\n' '{INSTALL_SHA256}' \"$install_tmp\" | sha256sum --check -\n"
+    '  sudo bash "$install_tmp" "$@"\n'
+    ")\n"
+    "install_openadkit"
 )
 
 

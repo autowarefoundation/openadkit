@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=skip=InvalidDefaultArgInFrom,UndefinedVar
 ARG CORE_DEVEL_IMAGE
-ARG CORE_IMAGE
+ARG BASE_IMAGE
 
 # =============================================================================
 # Stage: universe-common-devel
@@ -86,29 +86,34 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 # =============================================================================
 # Stage: universe-common
-# Runtime variant: exec deps + the compiled tree, on top of core.
+# Runtime variant: exec deps + the compiled tree, on top of the lean base.
 # =============================================================================
-FROM ${CORE_IMAGE} AS universe-common
+FROM ${BASE_IMAGE} AS universe-common
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-COPY --from=universe-common-devel /opt/acados /opt/acados
-COPY --from=universe-common-devel /opt/autoware /opt/autoware
-RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
+ENV AUTOWARE_RUNTIME=1
+RUN --mount=from=universe-common-devel,source=/opt/acados,target=/mnt/acados \
+    --mount=from=universe-common-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    cp -a /mnt/acados /opt/acados && \
+    cp -a /mnt/autoware /opt/autoware && \
+    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
+    bash /tmp/runtime-cleanup.sh opt
 
 ENV CMAKE_PREFIX_PATH="/opt/acados${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 ENV ACADOS_SOURCE_DIR="/opt/acados"
 ENV LD_LIBRARY_PATH="/opt/acados/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-COPY --parents --chown=${USERNAME}:${USERNAME} \
-    autoware/src/**/package.xml \
-    /tmp/
-
-RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/*
+    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
+    rosdep install -y --from-paths /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-cleanup.sh

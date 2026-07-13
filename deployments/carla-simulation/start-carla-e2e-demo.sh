@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REPO_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd)
+REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
 ENV_FILE=carla-simulation.env
 BASE_ENV_FILE=../base/base.env
 PYTHON_HELPER=$SCRIPT_DIR/carla_e2e_helper.py
@@ -174,10 +174,19 @@ build_image() {
     return 0
   fi
 
+  local bake_file="$REPO_ROOT/components/docker-bake.hcl"
+  local dockerfile="$REPO_ROOT/components/carla-interface/Dockerfile"
+  if [[ ! -f "$bake_file" || ! -f "$dockerfile" ]]; then
+    printf '%s\n' \
+      'Cannot use --build: component sources and components/docker-bake.hcl are not included in release bundles.' \
+      'Run without --build to use the published CARLA interface image, or run this script from a source checkout.' >&2
+    return 1
+  fi
+
   run docker buildx bake \
     --load \
     --progress=plain \
-    -f "$REPO_ROOT/components/docker-bake.hcl" \
+    -f "$bake_file" \
     --set "*.context=$REPO_ROOT" \
     --set "carla-interface.tags=$CARLA_INTERFACE_IMAGE" \
     --set "carla-interface.args.CARLA_PYTHON_VERSION=$CARLA_PYTHON_VERSION" \

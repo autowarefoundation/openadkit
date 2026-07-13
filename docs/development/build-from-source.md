@@ -25,8 +25,9 @@ The build is staged: the `universe-common` intermediate builds on top of the ups
 --8<-- "includes/build-pipeline.md"
 
 `universe-common` is an Open AD Kit-owned thin intermediate that compiles only the
-universe-common slice of Autoware on top of the upstream `core-devel`/`core`
-images; everything below it (base OS, ROS, core) is owned and built by upstream.
+universe-common slice of Autoware on upstream `core-devel`. Its runtime stage uses
+the lean upstream `base` image and copies in the compiled core/common install tree,
+so development files from `core-devel` do not enter published runtime layers.
 `sensing-perception-cuda` is a parallel CUDA branch that inherits from the
 upstream `base-cuda-{devel,runtime}` images and grafts in the `universe-common`
 install tree.

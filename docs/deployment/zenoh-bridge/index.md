@@ -82,7 +82,7 @@ flowchart TD
 
 ### Zenoh Bridge Configuration
 
-- **`cloud_zenoh_bridge`** — Acts as a **Router**, listening for client connections on **TCP 7448** (configured via `-l tcp/0.0.0.0:7448` in `docker-compose.yaml`).
+- **`cloud_zenoh_bridge`** — Acts as a **Router**, listening on TCP 7448 inside its container. The host publishes that port on `${ZENOH_ROUTER_BIND_IP}:7448`, which defaults to loopback.
 - **`edge_zenoh_bridge`** — Acts as a **Client**, connecting to the cloud router on port `7448` via `zenoh_net` (or `${CLOUD_IP}:7448` in multi-machine setups). It scans ROS 2 topics in `edge_net`, converts them to Zenoh, and forwards to the router. Its own local listener uses TCP 7447.
 - **`config/zenoh-bridge-ros2dds.json5`** — Defines bridge mode, endpoints, and topic filtering rules. Filtering allows precise bandwidth control by excluding high-frequency or irrelevant topics.
 
@@ -130,6 +130,7 @@ flowchart TD
 ```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit/deployments/zenoh-bridge
+cp .env.example .env
 ../../install.sh sample-data zenoh-bridge
 ```
 
@@ -141,7 +142,8 @@ cd openadkit/deployments/zenoh-bridge
 .
 ├── README.md
 ├── docker-compose.yaml
-├── .env
+├── .env.example
+├── .env                       # local configuration, not tracked
 ├── cloud.sh
 ├── edge.sh
 ├── common.sh
@@ -157,17 +159,20 @@ Modify `config/zenoh-bridge-ros2dds.json5` to filter topics as needed.
 
 ### 4. Configure environment variables
 
-Edit the `.env` file to customize your deployment. Key variables:
+Copy `.env.example` to `.env`, then edit `.env` to customize your deployment. Docker Compose parses `.env` as data; the helper scripts do not source or execute it. Variables exported in the calling shell take precedence over values in `.env`.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CLOUD_IP` | IP address or hostname of the cloud machine (used by edge bridge to connect) | `cloud_zenoh_bridge` (Docker DNS, single-host only) |
 | `MAP_PATH` | Host path to the map directory | `$HOME/autoware_map/kashiwanoha_map` |
-| `REMOTE_PASSWORD` | Password for noVNC visualizer (port 6080/6081). **Required — must be set before starting.** | (none) |
-| `ZENOH_ROUTER_BIND_IP` | Host interface for the cloud Zenoh router. Use `0.0.0.0` only when remote edge hosts must connect. | `127.0.0.1` |
+| `REMOTE_PASSWORD` | Password for the noVNC visualizer only (port 6080/6081). **Required — must be set before starting.** It does not protect Zenoh. | (none) |
+| `ZENOH_ROUTER_BIND_IP` | Host interface for the cloud Zenoh router. For remote use, set the exact VPN/private-interface address; wildcard binds are rejected by `cloud.sh`. | `127.0.0.1` |
 | `SCENARIO_SIMULATION` | Enable scenario simulator (`true`/`false`) | `true` |
 
-For **split topology** (multi-machine), set `ZENOH_ROUTER_BIND_IP=0.0.0.0` on the cloud machine and set `CLOUD_IP` on the edge machine to the actual IP of the cloud machine. Restrict TCP 7448 with a firewall, VPN, or trusted network. See [Option A: Split Topology](#option-a-split-topology-recommended) below.
+The scenario simulator, Autoware, and visualizer all use wall time in this deployment. `/clock` is intentionally not routed over Zenoh, and the visualizer sets `USE_SIM_TIME=false`.
+
+!!! warning "Zenoh transport is not secured"
+    TCP 7448 has no transport authentication or encryption in this demo. Keep the loopback default for single-host use. For a multi-machine deployment, first establish a VPN or private network, bind `ZENOH_ROUTER_BIND_IP` to the cloud machine's exact VPN/private-interface address (never `0.0.0.0`), and allow the port only from trusted VPN peers. `REMOTE_PASSWORD` protects only the noVNC session and does not protect Zenoh traffic.
 
 ## Starting the System
 
@@ -197,26 +202,25 @@ The initial launch may take several minutes to download images.
 
 ### Option C: Distributed Deployment (Multi-Machine)
 
-Deploy on separate machines (e.g., one Cloud, one Edge):
+Deploy on separate machines over a VPN or private network. In the examples below, `10.8.0.1` is the cloud machine's VPN-interface address.
 
 #### 1. Cloud machine
 
 ```bash
+export ZENOH_ROUTER_BIND_IP=10.8.0.1
 ./cloud.sh
 # [Info] Cloud services started.
-#        To connect from Edge, set CLOUD_IP to one of the following:
-#        [Public/Routable IPs]
-#        - 192.168.1.100
+#        Zenoh is bound to 10.8.0.1.
 ```
 
 #### 2. Edge machine
 
 ```bash
-export CLOUD_IP=192.168.1.100
+export CLOUD_IP=10.8.0.1
 ./edge.sh
 ```
 
-Before starting the cloud side for a multi-machine deployment, set `ZENOH_ROUTER_BIND_IP=0.0.0.0` in `.env`. This exposes TCP 7448 on the cloud host; keep it limited to trusted networks. (The value must be set in `.env` — `cloud.sh` sources `.env` on startup, which overwrites any shell export.)
+Configure the cloud firewall to allow TCP 7448 only through the VPN/private interface and only from the intended edge peers. The exported values above override `.env`; alternatively, put the same exact addresses in each machine's `.env`.
 
 ### Monitor Startup Logs
 

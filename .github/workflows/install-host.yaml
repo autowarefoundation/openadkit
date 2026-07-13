@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'install.sh'
+      - '.github/scripts/tests/test_install_docker_capabilities.sh'
       - '.github/workflows/install-host.yaml'
 
 concurrency:
@@ -16,16 +17,38 @@ concurrency:
 
 jobs:
   install-host:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
+    name: install-host (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Run install script
-        # Validate the non-NVIDIA path, which covers the majority of samples
-        # (planning, scenario, logging). NVIDIA installs add ~30-60s of apt
-        # traffic and can flake on network; the GPU path is exercised by the
-        # build-all-images and compose-config jobs downstream.
+      - name: Test Docker capability convergence
+        run: bash .github/scripts/tests/test_install_docker_capabilities.sh
+
+      - name: Install host dependencies from official packages
+        # Force installation only on this disposable runner so the test cannot
+        # pass solely because GitHub's preinstalled Docker happens to work.
         run: |
-          ./install.sh --no-nvidia
+          sudo env CI=true OPENADKIT_CI_FORCE_DOCKER_INSTALL=true \
+            ./install.sh --no-nvidia --verify
+
+      - name: Verify installed Docker capabilities
+        run: |
+          set -euo pipefail
+          docker --version
+          docker compose version
+          docker buildx version
+          sudo docker info > /dev/null
+          (
+            cd deployments/scenario-simulation
+            docker compose \
+              --env-file ../base/base.env \
+              --env-file scenario-simulation.env \
+              config -q
+          )

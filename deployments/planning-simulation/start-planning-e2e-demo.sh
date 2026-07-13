@@ -4,8 +4,15 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ENV_FILE=planning-simulation.env
-BASE_ENV_FILE=../base/base.env
+ENV_FILE="$SCRIPT_DIR/planning-simulation.env"
+
+if [ -f "$SCRIPT_DIR/base/docker-compose.yaml" ]; then
+  BASE_DIR="$SCRIPT_DIR/base"
+  ENV_ARGS=(--env-file "$ENV_FILE")
+else
+  BASE_DIR="$SCRIPT_DIR/../base"
+  ENV_ARGS=(--env-file "$BASE_DIR/base.env" --env-file "$ENV_FILE")
+fi
 
 usage() {
   cat <<'EOF'
@@ -44,7 +51,11 @@ run() {
 echo "=== Planning-simulation smoke test ==="
 
 echo "Checking required files..."
-for f in "$SCRIPT_DIR/$ENV_FILE" "$SCRIPT_DIR/../base/base.env" "$SCRIPT_DIR/../base/docker-compose.yaml" "$SCRIPT_DIR/../base/cyclonedds.xml"; do
+required_files=("$ENV_FILE" "$BASE_DIR/docker-compose.yaml" "$BASE_DIR/cyclonedds.xml")
+if [ "$BASE_DIR" = "$SCRIPT_DIR/../base" ]; then
+  required_files+=("$BASE_DIR/base.env")
+fi
+for f in "${required_files[@]}"; do
   if [ -f "$f" ]; then
     echo "  ok: $f"
   else
@@ -54,15 +65,19 @@ for f in "$SCRIPT_DIR/$ENV_FILE" "$SCRIPT_DIR/../base/base.env" "$SCRIPT_DIR/../
 done
 
 echo "Validating compose configuration..."
-run docker compose --env-file "$BASE_ENV_FILE" --env-file "$SCRIPT_DIR/$ENV_FILE" -f "$SCRIPT_DIR/docker-compose.yaml" config -q
+run docker compose "${ENV_ARGS[@]}" -f "$SCRIPT_DIR/docker-compose.yaml" config -q
 echo "  compose config: valid"
 
 echo "Smoke test passed."
 echo ""
 echo "To start the deployment:"
 echo "  cd $SCRIPT_DIR"
-echo "  docker compose --env-file $BASE_ENV_FILE --env-file $ENV_FILE up -d"
+printf '  docker compose'
+printf ' %q' "${ENV_ARGS[@]}"
+printf ' up -d\n'
 echo ""
 echo "To stop:"
 echo "  cd $SCRIPT_DIR"
-echo "  docker compose --env-file $BASE_ENV_FILE --env-file $ENV_FILE down"
+printf '  docker compose'
+printf ' %q' "${ENV_ARGS[@]}"
+printf ' down\n'

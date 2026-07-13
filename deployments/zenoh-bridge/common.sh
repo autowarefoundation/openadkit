@@ -4,14 +4,41 @@
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+# shellcheck disable=SC2034 # Used by cloud.sh after sourcing this file.
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Load .env into the environment. Call before parsing flags so that
-# command-line options override .env values.
-load_env() {
-    # shellcheck disable=SC1091
-    [ -f .env ] && { set -a; . ./.env; set +a; }
-    return 0
+# Read one simple dotenv assignment without evaluating it as shell code.
+# Exported variables take precedence, matching Docker Compose interpolation.
+read_dotenv_value() {
+    local name="$1"
+    local file="${2:-.env}"
+    local line value
+
+    [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 2
+    if [[ -v "$name" ]]; then
+        printf '%s\n' "${!name}"
+        return 0
+    fi
+    [[ -f "$file" ]] || return 1
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        if [[ "$line" =~ ^[[:space:]]*${name}[[:space:]]*=(.*)$ ]]; then
+            value="${BASH_REMATCH[1]}"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            if [[ ${#value} -ge 2 ]]; then
+                if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]] \
+                    || [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+                    value="${value:1:${#value}-2}"
+                fi
+            fi
+            printf '%s\n' "$value"
+            return 0
+        fi
+    done < "$file"
+    return 1
 }
 
 validate_args() {

@@ -104,7 +104,8 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
       - REMOTE_PASSWORD=${REMOTE_PASSWORD:?Set REMOTE_PASSWORD in .env before starting the visualizer}
-      - USE_SIM_TIME=true
+      # The edge scenario and Autoware use wall time; /clock is not routed.
+      - USE_SIM_TIME=false
       - WEBSOCKIFY_BIND=0.0.0.0
     ports:
       - "127.0.0.1:6081:6080"
@@ -115,8 +116,9 @@ services:
   cloud_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
     # Bridges cloud_net and zenoh_net. The 7448 listener is exposed to the
-    # host (and through CLOUD_IP to remote edge machines) via the bridge
-    # port mapping.
+    # host via the bridge port mapping. Remote use must bind an exact
+    # VPN/private-interface address because this endpoint has no transport
+    # authentication or encryption.
     networks:
       cloud_net:
         aliases:

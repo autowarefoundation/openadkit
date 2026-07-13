@@ -11,7 +11,7 @@ Autoware uses a **Core / Universe** architecture. **Core** contains rigorously r
 --8<-- "includes/build-pipeline.md"
 
 `universe-common` is an Open AD Kit-owned thin intermediate built on top of the
-upstream `autoware:core-devel`/`core` images. The bake groups and build commands
+upstream `autoware:core-devel`/`base` images. The bake groups and build commands
 are documented in [Build from Source](../development/build-from-source.md).
 
 ## Interface Layers

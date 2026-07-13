@@ -78,10 +78,52 @@ jobs:
           retention-days: 7
           overwrite: true
 
+  package-bundles:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    needs: validate
+    permissions:
+      contents: read
+    steps:
+      - name: Check out release scripts
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .github/scripts/install-compose.sh
+            .github/scripts/package_release_bundles.sh
+
+      - name: Check out repository at release SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.release_sha }}
+          path: src
+          sparse-checkout: |
+            install.sh
+            deployments
+
+      - name: Install Docker Compose v5.2+
+        run: bash .github/scripts/install-compose.sh
+
+      - name: Package and validate deployment bundles
+        env:
+          VERSION: ${{ inputs.version }}
+          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
+        run: bash .github/scripts/package_release_bundles.sh
+        shell: bash
+
+      - name: Upload deployment bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundles-${{ inputs.build_tag }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
   release-images:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    needs: validate
+    needs: [validate, package-bundles]
     environment: release
     permissions:
       actions: read
@@ -122,7 +164,7 @@ jobs:
   release-github:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    needs: [validate, release-images]
+    needs: [validate, package-bundles, release-images]
     environment: release
     permissions:
       actions: read
@@ -132,24 +174,19 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            .github/scripts/install-compose.sh
-            .github/scripts/package_release_bundles.sh
             .github/scripts/write_release_notes.sh
-
-      - name: Check out repository at release SHA
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.validate.outputs.release_sha }}
-          path: src
-          sparse-checkout: |
-            install.sh
-            deployments
 
       - name: Download validated release metadata
         uses: actions/download-artifact@v4
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
+
+      - name: Download deployment bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundles-${{ inputs.build_tag }}
+          path: dist
 
       - name: Create release metadata and notes
         env:
@@ -181,19 +218,6 @@ jobs:
             echo "Tag ${VERSION} exists at ${tag_sha}, expected ${RELEASE_SHA}" >&2
             exit 1
           fi
-        shell: bash
-
-      - name: Install Docker Compose v5.2+
-        # The ubuntu-22.04 runner ships an older compose plugin that rejects
-        # service overrides after `include:`. Install a recent release for
-        # bundle validation.
-        run: bash .github/scripts/install-compose.sh
-
-      - name: Package deployment bundles
-        env:
-          VERSION: ${{ inputs.version }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
-        run: bash .github/scripts/package_release_bundles.sh
         shell: bash
 
       - name: Create or update GitHub Release

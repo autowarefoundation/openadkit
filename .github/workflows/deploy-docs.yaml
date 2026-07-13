@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - mkdocs.yaml
+      - install.sh
       - docs/macros.py
       - .github/image-inventory.json
       - docs/requirements.txt

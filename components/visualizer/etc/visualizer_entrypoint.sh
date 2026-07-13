@@ -131,8 +131,10 @@ EOF
 
 # Source ROS and Autoware setup files
 : "${ROS_DISTRO:?ROS_DISTRO must be set (e.g. humble)}"
+set +u
 source "/opt/ros/${ROS_DISTRO}/setup.bash"
 source "/opt/autoware/setup.bash"
+set -u
 
 # Execute passed command if provided, otherwise launch rviz2
 if [ "${REMOTE_DISPLAY:-true}" == "false" ]; then

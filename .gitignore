@@ -24,6 +24,9 @@ __pycache__/
 # MkDocs
 /site/
 
+# Local deployment secrets and overrides
+/deployments/zenoh-bridge/.env
+
 # rviz Screen Capture
 capture/
 

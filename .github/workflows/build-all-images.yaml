@@ -118,7 +118,7 @@ jobs:
           retention-days: 90
 
   # =============================================================================
-  # Stage 1: Build universe-common images (on upstream Autoware core bases)
+  # Stage 1: Build universe-common images (core-devel build, lean base runtime)
   # =============================================================================
   build-common:
     needs: prepare
@@ -181,7 +181,7 @@ jobs:
           UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
         run: |
           set -euo pipefail
-          # universe-common surfaces core/core-devel; sensing-perception-cuda
+          # universe-common surfaces core-devel/base; sensing-perception-cuda
           # surfaces base-cuda-{devel,runtime}. Together they cover every
           # upstream base this build depends on, so a missing CUDA base fails
           # here instead of late in build-components.

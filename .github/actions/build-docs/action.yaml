@@ -31,6 +31,10 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
+    - name: Pin installer source ref
+      run: printf 'OPENADKIT_INSTALL_REF=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      shell: bash
+
     - name: Build with MkDocs
       run: mkdocs build --clean --verbose
       shell: bash

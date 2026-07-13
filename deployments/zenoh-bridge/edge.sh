@@ -21,7 +21,6 @@ show_help() {
 
 # Import common library
 source ./common.sh
-load_env
 
 # Define Edge services
 EDGE_SERVICES="autoware scenario_simulator edge_zenoh_bridge"
@@ -65,9 +64,19 @@ fi
 
 TARGET_SERVICES="$EDGE_SERVICES"
 
-# The map is mounted from the host (fetched beforehand), not extracted in-container.
-# .env is the single source for the path; compose interpolates the same variable.
-MAP_DIR="${MAP_PATH:?MAP_PATH not set — is .env present?}"
+# The map is mounted from the host. Compose reads .env directly; this narrow
+# parser obtains the same preflight value without executing dotenv as shell.
+if ! MAP_DIR=$(read_dotenv_value MAP_PATH); then
+    MAP_DIR="\$HOME/autoware_map/kashiwanoha_map"
+fi
+case "$MAP_DIR" in
+    "\$HOME"/*) MAP_DIR="${HOME}${MAP_DIR#\$HOME}" ;;
+    "\${HOME}"/*) MAP_DIR="${HOME}${MAP_DIR#\$\{HOME\}}" ;;
+esac
+if [[ -z "$MAP_DIR" ]]; then
+    echo -e "${RED}[Error]${NC} MAP_PATH is empty. Set it in the environment or .env."
+    exit 1
+fi
 if [ "$CMD" == "up" ]; then
     for map_file in lanelet2_map.osm pointcloud_map.pcd; do
         if [ ! -f "${MAP_DIR}/${map_file}" ]; then

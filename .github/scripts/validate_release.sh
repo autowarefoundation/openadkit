@@ -249,7 +249,7 @@ validate_inventory_coverage() {
     --arg common_repo "${IMAGE_PREFIX_COMMON}" \
     --arg component_repo "${IMAGE_PREFIX_COMPONENT}" '
     def repo_for($kind): if $kind == "common" then $common_repo elif $kind == "component" then $component_repo else error("unsupported repo kind") end;
-    def image_distros($global): (.ros_distros // $global)[];
+    def image_distros($global): .ros_distros // $global;
     .ros_distros as $global |
     .images[] |
     image_distros($global)[] as $distro |
@@ -383,16 +383,22 @@ write_outputs() {
   } >> "${GITHUB_OUTPUT}"
 }
 
-validate_inputs
-resolve_latest_alias_policy
-validate_build_run
-download_build_metadata
-select_scan_metadata
-validate_build_metadata_schema
-validate_metadata_files
-validate_inventory_coverage
-validate_scan_coverage
-validate_release_rules
-validate_git_tag
-validate_registry_conflicts
-write_outputs
+main() {
+  validate_inputs
+  resolve_latest_alias_policy
+  validate_build_run
+  download_build_metadata
+  select_scan_metadata
+  validate_build_metadata_schema
+  validate_metadata_files
+  validate_inventory_coverage
+  validate_scan_coverage
+  validate_release_rules
+  validate_git_tag
+  validate_registry_conflicts
+  write_outputs
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main
+fi

@@ -56,16 +56,16 @@ Options:
 
 Examples:
   # Install Docker + NVIDIA toolkit (default)
-  curl -fsSL .../install.sh | sudo bash
+  sudo ./install.sh
 
   # Install Docker only (no NVIDIA)
-  curl -fsSL .../install.sh | sudo bash -s -- --no-nvidia
+  sudo ./install.sh --no-nvidia
 
   # Download artifacts + install Docker
-  curl -fsSL .../install.sh | sudo bash -s -- --download-artifacts
+  sudo ./install.sh --download-artifacts
 
   # Full developer environment: Docker + NVIDIA + build deps + samples + verify
-  curl -fsSL .../install.sh | sudo bash -s -- --build-deps --download-samples --verify
+  sudo ./install.sh --build-deps --download-samples --verify
 
   # Download all sample data without host setup
   ./install.sh sample-data
@@ -82,7 +82,7 @@ log_error() { if [ "$USE_COLOR" = true ]; then echo -e "${CLR_RED}[ERROR]${CLR_R
 PIPX_BIN_DIR="${USER_HOME}/.local/bin"
 
 ensure_pipx_on_path() {
-    sudo -u "$TARGET_USER" python3 -m pipx ensurepath
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" python3 -m pipx ensurepath
     case ":${PATH}:" in
         *":${PIPX_BIN_DIR}:") ;;
         *) PATH="${PIPX_BIN_DIR}:${PATH}" ;;
@@ -100,7 +100,7 @@ require_sudo() {
     elif ! sudo -n true 2>/dev/null; then
         log_error "This script requires sudo privileges."
         echo "Please run with a user that has sudo access, e.g.:"
-        echo "  curl -fsSL .../install.sh | sudo bash"
+        echo "  sudo ./install.sh"
         exit 1
     fi
 }
@@ -158,46 +158,151 @@ install_nvidia_container_toolkit() {
     log_info "NVIDIA Container Toolkit installed successfully."
 }
 
-install_docker() {
-    if command -v docker &>/dev/null; then
-        log_info "Docker is already installed ($(docker --version)). Skipping."
-        return
+docker_compose_supports_repo_graph() {
+    local probe_dir
+    local result=1
+    probe_dir="$(mktemp -d)"
+
+    cat > "${probe_dir}/base.yaml" <<'EOF'
+services:
+  capability-probe:
+    image: busybox:latest
+    environment:
+      OPENADKIT_BASE: "true"
+EOF
+    cat > "${probe_dir}/overlay.yaml" <<'EOF'
+include:
+  - path: base.yaml
+services:
+  capability-probe:
+    environment:
+      OPENADKIT_OVERRIDE: "true"
+EOF
+
+    if (
+        cd "$probe_dir"
+        docker compose -f overlay.yaml config -q
+    ) &>/dev/null; then
+        result=0
     fi
 
-    log_info "Installing Docker..."
+    rm -rf "$probe_dir"
+    return "$result"
+}
 
-    # Remove conflicting packages (Docker official install guide step)
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-        sudo apt-get remove -y "$pkg" 2>/dev/null || true
-    done
-
-    sudo apt-get update
-    sudo apt-get install -y ca-certificates curl
-
-    # Add Docker's official GPG key
-    sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        -o /etc/apt/keyrings/docker.asc
-    sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-    # Add repository
-    echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
-    | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin
-
-    # Add target user to docker group
+ensure_docker_group() {
     sudo groupadd docker 2>/dev/null || true
     sudo usermod -aG docker "$TARGET_USER"
+}
 
-    # Ensure Docker starts on boot
-    sudo systemctl enable --now docker
+install_docker() {
+    local docker_cli=false
+    local compose_capable=false
+    local buildx_available=false
+    local install_required=false
+    local docker_version
+    local buildx_version
+    local ci_force_install=false
+    local -a docker_install_args
 
-    log_info "Docker installed successfully."
+    if command -v docker &>/dev/null && docker_version="$(docker --version 2>/dev/null)"; then
+        docker_cli=true
+        log_info "Docker CLI is available (${docker_version})."
+    else
+        log_warn "Docker CLI is not available."
+    fi
+
+    if [ "$docker_cli" = true ] && docker_compose_supports_repo_graph; then
+        compose_capable=true
+        log_info "Docker Compose supports include with service overrides."
+    else
+        log_warn "Docker Compose is missing or cannot parse include with service overrides."
+    fi
+
+    if [ "$docker_cli" = true ] && buildx_version="$(docker buildx version 2>/dev/null)"; then
+        buildx_available=true
+        log_info "Docker Buildx is available (${buildx_version})."
+    else
+        log_warn "Docker Buildx is missing."
+    fi
+
+    if [ "$docker_cli" != true ] || [ "$compose_capable" != true ] || [ "$buildx_available" != true ]; then
+        install_required=true
+    fi
+
+    if [ "${OPENADKIT_CI_FORCE_DOCKER_INSTALL:-false}" = true ]; then
+        if [ "${CI:-false}" != true ]; then
+            log_error "OPENADKIT_CI_FORCE_DOCKER_INSTALL is restricted to disposable CI environments."
+            return 1
+        fi
+        log_info "Forcing official Docker package installation for CI validation."
+        ci_force_install=true
+        install_required=true
+    fi
+
+    if [ "$install_required" = true ]; then
+        log_info "Installing official Docker packages and plugins..."
+
+        # Remove conflicting packages (Docker official install guide step)
+        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+            sudo apt-get remove -y "$pkg" 2>/dev/null || true
+        done
+
+        sudo apt-get update
+        sudo apt-get install -y ca-certificates curl
+
+        # Add Docker's official GPG key
+        sudo install -m 0755 -d /etc/apt/keyrings
+        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            -o /etc/apt/keyrings/docker.asc
+        sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+        # Reuse an existing official repository instead of creating duplicate
+        # apt source entries on pre-provisioned hosts.
+        if grep -Rqs 'download\.docker\.com/linux/ubuntu' \
+            /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+            log_info "Docker's official apt repository is already configured."
+        else
+            echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        fi
+
+        sudo apt-get update
+        docker_install_args=(-y)
+        if [ "$ci_force_install" = true ]; then
+            # Disposable CI images sometimes hold their preinstalled Docker
+            # packages. The force switch is already rejected outside CI.
+            docker_install_args+=(--allow-change-held-packages)
+        fi
+        sudo apt-get install "${docker_install_args[@]}" docker-ce docker-ce-cli containerd.io \
+            docker-buildx-plugin docker-compose-plugin
+
+        # Ensure Docker starts on boot
+        sudo systemctl enable --now docker
+
+        log_info "Official Docker packages installed successfully."
+    else
+        log_info "Required Docker CLI, Compose, and Buildx capabilities are already available."
+    fi
+
+    # Group reconciliation is required even when all Docker capabilities were
+    # already present (for example on a pre-provisioned workstation).
+    ensure_docker_group
+
+    if ! command -v docker &>/dev/null || ! docker --version &>/dev/null; then
+        log_error "Docker CLI is unavailable after installation."
+        return 1
+    fi
+    if ! docker_compose_supports_repo_graph; then
+        log_error "Docker Compose cannot parse include with service overrides after installation."
+        return 1
+    fi
+    if ! docker buildx version &>/dev/null; then
+        log_error "Docker Buildx is unavailable after installation."
+        return 1
+    fi
 }
 
 install_build_dependencies() {
@@ -225,37 +330,50 @@ install_build_dependencies() {
 download_autoware_artifacts() {
     log_info "Downloading Autoware artifacts..."
 
-    # Remove system ansible (Ubuntu 22.04 ships an old version)
-    sudo apt-get purge -y ansible 2>/dev/null || true
-
     sudo apt-get update
-    sudo apt-get install -y pipx
+    sudo apt-get install -y git pipx
 
     # Ensure pipx binaries are on PATH in this shell invocation
     ensure_pipx_on_path
 
-    sudo -u "$TARGET_USER" pipx install --include-deps --force "ansible==6.*"
+    # Match Autoware's installer. Ansible 6 bundles ansible-core 2.13, which
+    # fails on Ubuntu 24.04's Python 3.12 during HTTPS artifact downloads.
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" \
+        pipx install --include-deps --force "ansible==10.*"
 
     # Clone to a temp path so we don't pollute the user's home
     local autoware_tmp
+    local command_status=0
+    local target_path="${PIPX_BIN_DIR}:${PATH}"
     autoware_tmp="${USER_HOME}/.cache/openadkit/autoware-clone"
-    rm -rf "$autoware_tmp"
-    git clone --depth 1 https://github.com/autowarefoundation/autoware.git "$autoware_tmp"
+    sudo install -d -m 0755 -o "$TARGET_USER" -g "$(id -gn "$TARGET_USER")" \
+        "$(dirname "$autoware_tmp")"
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" rm -rf "$autoware_tmp"
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" \
+        git clone --depth 1 https://github.com/autowarefoundation/autoware.git "$autoware_tmp"
 
     # Download artifacts into the user's home
     local data_dir="${USER_HOME}/autoware_data"
-    mkdir -p "$data_dir"
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" mkdir -p "$data_dir"
 
-    cd "$autoware_tmp"
-    ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml"
-    ansible-playbook autoware.dev_env.download_artifacts \
-        -e "data_dir=${data_dir}"
-
-    sudo chown -R "${TARGET_USER}:" "$data_dir"
+    if ! (
+        cd "$autoware_tmp"
+        sudo -u "$TARGET_USER" env HOME="$USER_HOME" PATH="$target_path" \
+            ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml"
+        sudo -u "$TARGET_USER" env HOME="$USER_HOME" PATH="$target_path" \
+            ansible-playbook autoware.dev_env.download_artifacts \
+            -e "data_dir=${data_dir}"
+    ); then
+        command_status=1
+    fi
 
     # Clean up clone
-    cd - >/dev/null
-    rm -rf "$autoware_tmp"
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" rm -rf "$autoware_tmp"
+
+    if [ "$command_status" -ne 0 ]; then
+        log_error "Autoware artifact download failed."
+        return "$command_status"
+    fi
 
     log_info "Autoware artifacts downloaded to ${data_dir}."
 }
@@ -397,11 +515,26 @@ download_sample_data() {
             ;;
     esac
 
+    if [[ $EUID -eq 0 && "$TARGET_USER" != "root" ]]; then
+        chown -R "${TARGET_USER}:" "$MAP_ROOT"
+    fi
     log_info "Sample data downloaded to ${MAP_ROOT}."
 }
 
 verify_installation() {
     log_info "Running post-install verification..."
+
+    if ! docker_compose_supports_repo_graph; then
+        log_error "Docker Compose capability verification failed."
+        return 1
+    fi
+    log_info "Docker Compose capability test passed."
+
+    if ! docker buildx version &>/dev/null; then
+        log_error "Docker Buildx verification failed."
+        return 1
+    fi
+    log_info "Docker Buildx capability test passed."
 
     # Verify Docker is usable. The script has sudo access (via require_sudo), so
     # use sudo for docker commands — the target user may not be in the docker

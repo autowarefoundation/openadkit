@@ -413,6 +413,8 @@ jobs:
           set: |
             *.platform=${{ matrix.platform }}
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
+            *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             carla-interface.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}

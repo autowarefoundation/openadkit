@@ -378,15 +378,17 @@ jobs:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - name: Set up build environment
+        uses: ./.github/actions/setup-build-env
         with:
+          autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          free-disk: false
+          setup-autoware: true
+          with-middleware: false
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta

@@ -197,6 +197,10 @@ jobs:
                   targets="${targets} carla-interface"
                   build_input_matched=true
                   ;;
+                components/runtime-cleanup.sh)
+                  targets="${targets} ${all_targets}"
+                  build_input_matched=true
+                  ;;
                 .github/image-inventory.json|\
                 .github/scripts/export_autoware_lock.py|\
                 .github/scripts/resolve_build_inputs.sh|\

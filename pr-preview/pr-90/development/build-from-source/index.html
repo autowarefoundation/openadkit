@@ -2554,7 +2554,7 @@ their scoped package sets. Prepare that tree before running Bake.</p>
 <p>Images are built with <a href="https://docs.docker.com/build/bake/">Docker Bake</a>. All targets are defined in <a href="https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl"><code>components/docker-bake.hcl</code></a>, which is also the file CI uses (<code>build-all-images.yaml</code>).</p>
 <p>The build is staged: the <code>universe-common</code> intermediate builds on top of the upstream Autoware images, and the component images build <em>from</em> <code>universe-common</code>.</p>
 <pre class="mermaid"><code>flowchart LR
-    CORE["autoware:core-devel / core"] --&gt; UC["universe-common"]
+    CORE["autoware:core-devel (build)&lt;br/&gt;autoware:base (runtime)"] --&gt; UC["universe-common"]
     CUDA["autoware:base-cuda-{devel,runtime}"] --&gt; SPC["sensing-perception-cuda"]
     UC --&gt; SP["sensing-perception"]
     UC --&gt; LM["localization-mapping"]
@@ -2566,8 +2566,9 @@ their scoped package sets. Prepare that tree before running Bake.</p>
     UC --&gt; SPC
     SIM --&gt; CARLA["carla-interface"]</code></pre>
 <p><code>universe-common</code> is an Open AD Kit-owned thin intermediate that compiles only the
-universe-common slice of Autoware on top of the upstream <code>core-devel</code>/<code>core</code>
-images; everything below it (base OS, ROS, core) is owned and built by upstream.
+universe-common slice of Autoware on upstream <code>core-devel</code>. Its runtime stage uses
+the lean upstream <code>base</code> image and copies in the compiled core/common install tree,
+so development files from <code>core-devel</code> do not enter published runtime layers.
 <code>sensing-perception-cuda</code> is a parallel CUDA branch that inherits from the
 upstream <code>base-cuda-{devel,runtime}</code> images and grafts in the <code>universe-common</code>
 install tree.</p>

@@ -2678,7 +2678,7 @@
 </ul>
 <h3 id="zenoh-bridge-configuration">Zenoh Bridge Configuration<a class="headerlink" href="#zenoh-bridge-configuration" title="Permanent link">#</a></h3>
 <ul>
-<li><strong><code>cloud_zenoh_bridge</code></strong> — Acts as a <strong>Router</strong>, listening for client connections on <strong>TCP 7448</strong> (configured via <code>-l tcp/0.0.0.0:7448</code> in <code>docker-compose.yaml</code>).</li>
+<li><strong><code>cloud_zenoh_bridge</code></strong> — Acts as a <strong>Router</strong>, listening on TCP 7448 inside its container. The host publishes that port on <code>${ZENOH_ROUTER_BIND_IP}:7448</code>, which defaults to loopback.</li>
 <li><strong><code>edge_zenoh_bridge</code></strong> — Acts as a <strong>Client</strong>, connecting to the cloud router on port <code>7448</code> via <code>zenoh_net</code> (or <code>${CLOUD_IP}:7448</code> in multi-machine setups). It scans ROS 2 topics in <code>edge_net</code>, converts them to Zenoh, and forwards to the router. Its own local listener uses TCP 7447.</li>
 <li><strong><code>config/zenoh-bridge-ros2dds.json5</code></strong> — Defines bridge mode, endpoints, and topic filtering rules. Filtering allows precise bandwidth control by excluding high-frequency or irrelevant topics.</li>
 </ul>
@@ -2708,11 +2708,20 @@
 </ul>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
 <h3 id="1-set-up-the-environment-one-time">1. Set up the environment (one-time)<a class="headerlink" href="#1-set-up-the-environment-one-time" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+<div class="highlight"><pre><span></span><code>install_openadkit<span class="o">()</span><span class="w"> </span><span class="o">(</span>
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span>-eu
+<span class="w">  </span><span class="nv">install_tmp</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>mktemp<span class="k">)</span><span class="s2">&quot;</span>
+<span class="w">  </span><span class="nb">trap</span><span class="w"> </span><span class="s1">&#39;rm -f &quot;$install_tmp&quot;&#39;</span><span class="w"> </span>EXIT
+<span class="w">  </span>curl<span class="w"> </span>-fsSL<span class="w"> </span>--output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$install_tmp</span><span class="s2">&quot;</span><span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/39c665b46a36348518dbece38049f0892d61be54/install.sh
+<span class="w">  </span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s  %s\n&#39;</span><span class="w"> </span><span class="s1">&#39;9a62abea051759c6115d17cf0e223733ad83553233f2b263e21edffb0fc2548a&#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$install_tmp</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sha256sum<span class="w"> </span>--check<span class="w"> </span>-
+<span class="w">  </span>sudo<span class="w"> </span>bash<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$install_tmp</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span>
+<span class="o">)</span>
+install_openadkit
 </code></pre></div>
 <h3 id="2-clone-the-repository-and-download-the-demo-map">2. Clone the repository and download the demo map<a class="headerlink" href="#2-clone-the-repository-and-download-the-demo-map" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
 <span class="nb">cd</span><span class="w"> </span>openadkit/deployments/zenoh-bridge
+cp<span class="w"> </span>.env.example<span class="w"> </span>.env
 ../../install.sh<span class="w"> </span>sample-data<span class="w"> </span>zenoh-bridge
 </code></pre></div>
 <div class="admonition tip">
@@ -2723,7 +2732,8 @@
 <div class="highlight"><pre><span></span><code>.
 ├── README.md
 ├── docker-compose.yaml
-├── .env
+├── .env.example
+├── .env                       # local configuration, not tracked
 ├── cloud.sh
 ├── edge.sh
 ├── common.sh
@@ -2736,7 +2746,7 @@
 </code></pre></div>
 <p>Modify <code>config/zenoh-bridge-ros2dds.json5</code> to filter topics as needed.</p>
 <h3 id="4-configure-environment-variables">4. Configure environment variables<a class="headerlink" href="#4-configure-environment-variables" title="Permanent link">#</a></h3>
-<p>Edit the <code>.env</code> file to customize your deployment. Key variables:</p>
+<p>Copy <code>.env.example</code> to <code>.env</code>, then edit <code>.env</code> to customize your deployment. Docker Compose parses <code>.env</code> as data; the helper scripts do not source or execute it. Variables exported in the calling shell take precedence over values in <code>.env</code>.</p>
 <table>
 <thead>
 <tr>
@@ -2758,12 +2768,12 @@
 </tr>
 <tr>
 <td><code>REMOTE_PASSWORD</code></td>
-<td>Password for noVNC visualizer (port 6080/6081). <strong>Required — must be set before starting.</strong></td>
+<td>Password for the noVNC visualizer only (port 6080/6081). <strong>Required — must be set before starting.</strong> It does not protect Zenoh.</td>
 <td>(none)</td>
 </tr>
 <tr>
 <td><code>ZENOH_ROUTER_BIND_IP</code></td>
-<td>Host interface for the cloud Zenoh router. Use <code>0.0.0.0</code> only when remote edge hosts must connect.</td>
+<td>Host interface for the cloud Zenoh router. For remote use, set the exact VPN/private-interface address; wildcard binds are rejected by <code>cloud.sh</code>.</td>
 <td><code>127.0.0.1</code></td>
 </tr>
 <tr>
@@ -2773,7 +2783,11 @@
 </tr>
 </tbody>
 </table>
-<p>For <strong>split topology</strong> (multi-machine), set <code>ZENOH_ROUTER_BIND_IP=0.0.0.0</code> on the cloud machine and set <code>CLOUD_IP</code> on the edge machine to the actual IP of the cloud machine. Restrict TCP 7448 with a firewall, VPN, or trusted network. See <a href="#option-a-split-topology-recommended">Option A: Split Topology</a> below.</p>
+<p>The scenario simulator, Autoware, and visualizer all use wall time in this deployment. <code>/clock</code> is intentionally not routed over Zenoh, and the visualizer sets <code>USE_SIM_TIME=false</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Zenoh transport is not secured</p>
+<p>TCP 7448 has no transport authentication or encryption in this demo. Keep the loopback default for single-host use. For a multi-machine deployment, first establish a VPN or private network, bind <code>ZENOH_ROUTER_BIND_IP</code> to the cloud machine's exact VPN/private-interface address (never <code>0.0.0.0</code>), and allow the port only from trusted VPN peers. <code>REMOTE_PASSWORD</code> protects only the noVNC session and does not protect Zenoh traffic.</p>
+</div>
 <h2 id="starting-the-system">Starting the System<a class="headerlink" href="#starting-the-system" title="Permanent link">#</a></h2>
 <h3 id="option-a-split-topology-recommended">Option A: Split Topology (Recommended)<a class="headerlink" href="#option-a-split-topology-recommended" title="Permanent link">#</a></h3>
 <p>Separate Edge and Cloud components to simulate a real-world distributed environment.</p>
@@ -2790,19 +2804,18 @@
 </code></pre></div>
 <p>The initial launch may take several minutes to download images.</p>
 <h3 id="option-c-distributed-deployment-multi-machine">Option C: Distributed Deployment (Multi-Machine)<a class="headerlink" href="#option-c-distributed-deployment-multi-machine" title="Permanent link">#</a></h3>
-<p>Deploy on separate machines (e.g., one Cloud, one Edge):</p>
+<p>Deploy on separate machines over a VPN or private network. In the examples below, <code>10.8.0.1</code> is the cloud machine's VPN-interface address.</p>
 <h4 id="1-cloud-machine">1. Cloud machine<a class="headerlink" href="#1-cloud-machine" title="Permanent link">#</a></h4>
-<div class="highlight"><pre><span></span><code>./cloud.sh
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">ZENOH_ROUTER_BIND_IP</span><span class="o">=</span><span class="m">10</span>.8.0.1
+./cloud.sh
 <span class="c1"># [Info] Cloud services started.</span>
-<span class="c1">#        To connect from Edge, set CLOUD_IP to one of the following:</span>
-<span class="c1">#        [Public/Routable IPs]</span>
-<span class="c1">#        - 192.168.1.100</span>
+<span class="c1">#        Zenoh is bound to 10.8.0.1.</span>
 </code></pre></div>
 <h4 id="2-edge-machine">2. Edge machine<a class="headerlink" href="#2-edge-machine" title="Permanent link">#</a></h4>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">CLOUD_IP</span><span class="o">=</span><span class="m">192</span>.168.1.100
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">CLOUD_IP</span><span class="o">=</span><span class="m">10</span>.8.0.1
 ./edge.sh
 </code></pre></div>
-<p>Before starting the cloud side for a multi-machine deployment, set <code>ZENOH_ROUTER_BIND_IP=0.0.0.0</code> in <code>.env</code>. This exposes TCP 7448 on the cloud host; keep it limited to trusted networks. (The value must be set in <code>.env</code> — <code>cloud.sh</code> sources <code>.env</code> on startup, which overwrites any shell export.)</p>
+<p>Configure the cloud firewall to allow TCP 7448 only through the VPN/private interface and only from the intended edge peers. The exported values above override <code>.env</code>; alternatively, put the same exact addresses in each machine's <code>.env</code>.</p>
 <h3 id="monitor-startup-logs">Monitor Startup Logs<a class="headerlink" href="#monitor-startup-logs" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f
 </code></pre></div>

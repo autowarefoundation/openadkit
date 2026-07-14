@@ -2353,7 +2353,7 @@
 </ul>
 <ul>
 <li>Release bundles vendor <code>base/</code> and merge both env files into a single <code>&lt;name&gt;.env</code>, so bundles run with one <code>--env-file</code>.</li>
-<li><strong>Zenoh bridge</strong> is self-contained — it does not include the base and uses its own <code>.env</code>.</li>
+<li><strong>Zenoh bridge</strong> is self-contained — it does not include the base. Copy its <code>.env.example</code> to the local, untracked <code>.env</code> before use.</li>
 </ul>
 <pre class="mermaid"><code>flowchart LR
     BASE["deployments/base/&lt;br/&gt;shared services + base.env"]

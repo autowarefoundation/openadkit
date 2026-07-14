@@ -2235,7 +2235,7 @@
 <p>Autoware uses a <strong>Core / Universe</strong> architecture. <strong>Core</strong> contains rigorously reviewed base functionality required for safe autonomous driving. <strong>Universe</strong> contains community extensions and research features that build on the Core foundation. Open AD Kit packages Universe components into focused container images that can be composed into complete AD systems.</p>
 <h2 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">#</a></h2>
 <pre class="mermaid"><code>flowchart LR
-    CORE["autoware:core-devel / core"] --&gt; UC["universe-common"]
+    CORE["autoware:core-devel (build)&lt;br/&gt;autoware:base (runtime)"] --&gt; UC["universe-common"]
     CUDA["autoware:base-cuda-{devel,runtime}"] --&gt; SPC["sensing-perception-cuda"]
     UC --&gt; SP["sensing-perception"]
     UC --&gt; LM["localization-mapping"]
@@ -2247,7 +2247,7 @@
     UC --&gt; SPC
     SIM --&gt; CARLA["carla-interface"]</code></pre>
 <p><code>universe-common</code> is an Open AD Kit-owned thin intermediate built on top of the
-upstream <code>autoware:core-devel</code>/<code>core</code> images. The bake groups and build commands
+upstream <code>autoware:core-devel</code>/<code>base</code> images. The bake groups and build commands
 are documented in <a href="../development/build-from-source/">Build from Source</a>.</p>
 <h2 id="interface-layers">Interface Layers<a class="headerlink" href="#interface-layers" title="Permanent link">#</a></h2>
 <p>Autoware defines three formal interface categories that govern how components communicate:</p>

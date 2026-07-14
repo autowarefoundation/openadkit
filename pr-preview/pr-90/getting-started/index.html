@@ -2252,11 +2252,19 @@
 <p>A GPU is <strong>not</strong> needed for this quickstart. For GPU-accelerated deployments and tested machines, see the full <a href="../platforms/hardware/">hardware requirements</a>.</p>
 <h2 id="1-install-dependencies">1. Install Dependencies<a class="headerlink" href="#1-install-dependencies" title="Permanent link">#</a></h2>
 <p>The included <code>install.sh</code> sets up Docker Engine and the NVIDIA Container Toolkit in one step:</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/main/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+<div class="highlight"><pre><span></span><code>install_openadkit<span class="o">()</span><span class="w"> </span><span class="o">(</span>
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span>-eu
+<span class="w">  </span><span class="nv">install_tmp</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>mktemp<span class="k">)</span><span class="s2">&quot;</span>
+<span class="w">  </span><span class="nb">trap</span><span class="w"> </span><span class="s1">&#39;rm -f &quot;$install_tmp&quot;&#39;</span><span class="w"> </span>EXIT
+<span class="w">  </span>curl<span class="w"> </span>-fsSL<span class="w"> </span>--output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$install_tmp</span><span class="s2">&quot;</span><span class="w"> </span>https://raw.githubusercontent.com/autowarefoundation/openadkit/39c665b46a36348518dbece38049f0892d61be54/install.sh
+<span class="w">  </span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s  %s\n&#39;</span><span class="w"> </span><span class="s1">&#39;9a62abea051759c6115d17cf0e223733ad83553233f2b263e21edffb0fc2548a&#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$install_tmp</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sha256sum<span class="w"> </span>--check<span class="w"> </span>-
+<span class="w">  </span>sudo<span class="w"> </span>bash<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$install_tmp</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span>
+<span class="o">)</span>
+install_openadkit
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Skip NVIDIA Toolkit</p>
-<p>Append <code>-s -- --no-nvidia</code> (i.e. <code>… | sudo bash -s -- --no-nvidia</code>) if you do not have an NVIDIA GPU. The toolkit is only needed for GPU-accelerated deployments.</p>
+<p>Append <code>--no-nvidia</code> to the final command (<code>install_openadkit --no-nvidia</code>) if you do not have an NVIDIA GPU. The toolkit is only needed for GPU-accelerated deployments.</p>
 </div>
 <p>Confirm the environment is ready:</p>
 <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>version

@@ -1,0 +1,5 @@
+# Upstream base image CVEs — setuptools 59.6.0 via apt (Ubuntu 22.04)
+# Cannot upgrade via apt; pip install shadows but METADATA remains on disk.
+CVE-2022-40897
+CVE-2024-6345
+CVE-2025-47273

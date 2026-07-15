@@ -18,11 +18,11 @@ ARG ROS_DISTRO
 COPY --parents --chown=${USERNAME}:${USERNAME} \
     autoware/src/**/package.xml \
     /tmp/
-# hadolint ignore=DL3005
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends && \
+    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs)" && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages} && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     . /opt/autoware/setup.sh && \
     rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
@@ -108,13 +108,13 @@ ENV CMAKE_PREFIX_PATH="/opt/acados${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 ENV ACADOS_SOURCE_DIR="/opt/acados"
 ENV LD_LIBRARY_PATH="/opt/acados/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-# hadolint ignore=DL3005
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends && \
+    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs)" && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages} && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
     rosdep install -y --from-paths /opt/autoware/*/share \

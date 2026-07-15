@@ -103,6 +103,12 @@ jobs:
       max-parallel: 6
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .trivyignore
+
       - name: Log in to Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:

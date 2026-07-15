@@ -144,6 +144,7 @@ def test_invalid_pr_base_sha_is_not_suppressed(tmp_path):
 
 def test_local_context_and_pr_scan_contracts():
     workflow = WORKFLOW_PATH.read_text()
+    workflow_config = yaml.safe_load(workflow)
     bake = BAKE_PATH.read_text()
     install_workflow = INSTALL_WORKFLOW_PATH.read_text()
 
@@ -153,5 +154,6 @@ def test_local_context_and_pr_scan_contracts():
     assert "origin/main...HEAD" not in workflow
     assert "load: ${{ github.event_name == 'pull_request'" in workflow
     assert "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25" in workflow
+    assert workflow_config["jobs"]["build"]["timeout-minutes"] == 120
     assert "OPENADKIT_CI_FORCE_DOCKER_INSTALL=true" in install_workflow
     assert "./install.sh --no-nvidia --verify" in install_workflow

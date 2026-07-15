@@ -265,7 +265,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.targets_json != '[]'
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       actions: write
       contents: read

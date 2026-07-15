@@ -13,6 +13,42 @@ OPENADKIT_REF = re.compile(
 )
 
 
+def test_validate_git_tag_treats_api_404_as_missing_tag(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' '{\"message\":\"Not Found\",\"status\":\"404\"}'\n"
+        "exit 1\n"
+    )
+    gh.chmod(0o755)
+    env = os.environ | {
+        "BUILD_TAG": "1-1",
+        "VERSION": "v9.8.7-test",
+        "GH_TOKEN": "test",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "IMAGE_PREFIX_COMMON": "example/common",
+        "IMAGE_PREFIX_COMPONENT": "example/component",
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+    }
+
+    subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; release_sha=abc123; validate_git_tag',
+            "bash",
+            str(VALIDATE_RELEASE),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+    )
+
+
 def test_validate_inventory_coverage_handles_global_and_image_distros(tmp_path):
     build_dir = tmp_path / "release-input/build"
     build_dir.mkdir(parents=True)

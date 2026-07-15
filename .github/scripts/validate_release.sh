@@ -345,7 +345,9 @@ validate_release_rules() {
 validate_git_tag() {
   local tag_sha
 
-  tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null || true)
+  if ! tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null); then
+    tag_sha=""
+  fi
   if [ -n "${tag_sha}" ] && [ "${tag_sha}" != "${release_sha}" ]; then
     fail "Tag ${VERSION} already exists at ${tag_sha}, expected ${release_sha}"
   fi

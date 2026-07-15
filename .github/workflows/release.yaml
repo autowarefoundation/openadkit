@@ -208,7 +208,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null || true)
+          if ! tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null); then
+            tag_sha=""
+          fi
           if [ -z "${tag_sha}" ]; then
             gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f ref="refs/tags/${VERSION}" \

@@ -19,9 +19,9 @@ on:
   workflow_dispatch:
     inputs:
       autoware_ref:
-        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to main.'
+        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to UPSTREAM_TAG, then main.'
         required: false
-        default: main
+        default: ''
       run_scan:
         description: 'Run a full image scan after this build completes.'
         required: false
@@ -63,7 +63,7 @@ jobs:
       - name: Resolve shared build inputs
         id: prepare
         env:
-          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || 'main' }}
+          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || vars.UPSTREAM_TAG || 'main' }}
           RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash

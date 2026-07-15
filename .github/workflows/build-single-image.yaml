@@ -76,7 +76,7 @@ jobs:
       - name: Resolve shared build inputs
         id: prepare
         env:
-          AUTOWARE_REF_INPUT: main
+          AUTOWARE_REF_INPUT: ${{ vars.UPSTREAM_TAG || 'main' }}
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
 

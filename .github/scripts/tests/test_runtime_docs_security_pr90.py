@@ -125,6 +125,14 @@ def test_runtime_images_use_lean_base_and_installed_package_manifests():
         assert '--skip-keys "${internal_packages}"' in content
 
 
+def test_build_source_defaults_to_the_pinned_upstream_tag():
+    build_all = (ROOT / ".github/workflows/build-all-images.yaml").read_text()
+    build_single = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
+
+    assert "inputs.autoware_ref || vars.UPSTREAM_TAG || 'main'" in build_all
+    assert "vars.UPSTREAM_TAG || 'main'" in build_single
+
+
 def test_carla_bundle_build_fails_with_clear_message(tmp_path):
     launcher = (ROOT / "deployments/carla-simulation/start-carla-e2e-demo.sh").read_text()
     assert 'REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)' in launcher

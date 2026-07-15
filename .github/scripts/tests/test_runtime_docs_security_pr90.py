@@ -101,7 +101,10 @@ def test_runtime_images_use_lean_base_and_installed_package_manifests():
     assert 'autoware-base       = upstream("base")' in bake
     assert 'autoware-core       = upstream("core")' not in bake
     assert "FROM ${BASE_IMAGE} AS universe-common" in common
-    runtime = common.split("FROM ${BASE_IMAGE} AS universe-common", 1)[1]
+    devel, runtime = common.split("FROM ${BASE_IMAGE} AS universe-common", 1)
+    upgrade = "apt-get upgrade -y --no-install-recommends"
+    assert upgrade in devel
+    assert upgrade in runtime
     assert "autoware/src/**/package.xml" not in runtime
     assert '--skip-keys "${internal_packages}"' in runtime
 

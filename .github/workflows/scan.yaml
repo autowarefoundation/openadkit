@@ -107,6 +107,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: .trivyignore
+          sparse-checkout-cone-mode: false
           fetch-depth: 1
 
       - name: Log in to Container Registry
@@ -127,6 +128,7 @@ jobs:
           exit-code: '1'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore
           limit-severities-for-sarif: true
 
       - name: Upload scan results to GitHub Security

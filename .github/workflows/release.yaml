@@ -247,13 +247,13 @@ jobs:
 
           if gh release view "${VERSION}" >/dev/null 2>&1; then
             gh release edit "${VERSION}" \
-              --title "OpenADKit ${VERSION}" \
+              --title "${VERSION}" \
               --notes-file release-notes.md \
               "${release_flags[@]}"
           else
             gh release create "${VERSION}" \
               --target "${RELEASE_SHA}" \
-              --title "OpenADKit ${VERSION}" \
+              --title "${VERSION}" \
               --notes-file release-notes.md \
               "${release_flags[@]}"
           fi

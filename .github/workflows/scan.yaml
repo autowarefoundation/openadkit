@@ -106,8 +106,8 @@ jobs:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
         with:
-          sparse-checkout: |
-            .trivyignore
+          sparse-checkout: .trivyignore
+          fetch-depth: 1
 
       - name: Log in to Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3

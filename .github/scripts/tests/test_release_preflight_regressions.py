@@ -9,7 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 VALIDATE_RELEASE = ROOT / ".github/scripts/validate_release.sh"
 PACKAGE_BUNDLES = ROOT / ".github/scripts/package_release_bundles.sh"
 OPENADKIT_REF = re.compile(
-    r"ghcr\.io/autowarefoundation/openadkit:([a-z-]+)-(humble|jazzy)-v9\.8\.7"
+    r"ghcr\.io/example/openadkit:([a-z-]+)-(humble|jazzy)-v9\.8\.7"
 )
 
 
@@ -89,6 +89,7 @@ def test_jazzy_release_bundles_keep_carla_humble_and_bind_mounts(tmp_path):
         "SOURCE_DIR": str(ROOT),
         "VERSION": "v9.8.7",
         "DEFAULT_ROS_DISTRO": "jazzy",
+        "IMAGE_PREFIX_COMPONENT": "ghcr.io/example/openadkit",
     }
     result = subprocess.run(
         ["bash", str(PACKAGE_BUNDLES)],
@@ -114,7 +115,9 @@ def test_jazzy_release_bundles_keep_carla_humble_and_bind_mounts(tmp_path):
         refs = []
         for path in bundle_dir.rglob("*"):
             if path.suffix in {".yaml", ".env"} or path.name == ".env":
-                refs.extend(OPENADKIT_REF.findall(path.read_text()))
+                content = path.read_text()
+                assert "ghcr.io/autowarefoundation/openadkit:" not in content
+                refs.extend(OPENADKIT_REF.findall(content))
         assert refs, f"no pinned Open AD Kit refs found in {name}"
         expected_distro = "humble" if name == "carla-simulation" else "jazzy"
         assert {distro for _, distro in refs} == {expected_distro}

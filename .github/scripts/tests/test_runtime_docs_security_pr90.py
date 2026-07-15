@@ -124,6 +124,10 @@ def test_runtime_images_use_lean_base_and_installed_package_manifests():
         assert "rosdep install -y --from-paths /opt/autoware/*/share" in content
         assert '--skip-keys "${internal_packages}"' in content
 
+    cuda = (ROOT / "components/sensing-perception/Dockerfile.cuda").read_text()
+    cuda_runtime = cuda.split("FROM ${BASE_CUDA_RUNTIME_IMAGE}", 1)[1]
+    assert upgrade in cuda_runtime
+
 
 def test_build_source_defaults_to_the_pinned_upstream_tag():
     build_all = (ROOT / ".github/workflows/build-all-images.yaml").read_text()

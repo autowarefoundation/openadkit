@@ -102,6 +102,8 @@ jobs:
             deployments
 
       - name: Install Docker Compose v5.2+
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/install-compose.sh
 
       - name: Package and validate deployment bundles

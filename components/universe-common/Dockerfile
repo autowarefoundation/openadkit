@@ -21,8 +21,8 @@ COPY --parents --chown=${USERNAME}:${USERNAME} \
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
-    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs)" && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages} && \
+    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs || true)" && \
+    if [ -n "${security_packages}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages}; fi && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     . /opt/autoware/setup.sh && \
     rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
@@ -113,8 +113,8 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
-    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs)" && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages} && \
+    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs || true)" && \
+    if [ -n "${security_packages}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages}; fi && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
     rosdep install -y --from-paths /opt/autoware/*/share \

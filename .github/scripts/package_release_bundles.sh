@@ -5,6 +5,7 @@ set -euo pipefail
 source_dir="${SOURCE_DIR:-src}"
 install="${source_dir}/install.sh"
 base_dir="${source_dir}/deployments/base"
+image_prefix_component="${IMAGE_PREFIX_COMPONENT:-ghcr.io/autowarefoundation/openadkit}"
 
 mkdir -p dist staging
 for entry in \
@@ -67,7 +68,7 @@ for entry in \
       "staging/${name}/${name}."*.env \
       "staging/${name}/.env"; do
       [ -f "${f}" ] || continue
-      sed -i -E "s#(ghcr\.io/autowarefoundation/openadkit:)([a-z-]+)#\1\2-${bundle_ros_distro}-${VERSION}#g" "${f}"
+      sed -i -E "s#ghcr\.io/autowarefoundation/openadkit:([a-z-]+)#${image_prefix_component}:\1-${bundle_ros_distro}-${VERSION}#g" "${f}"
     done
   else
     echo "VERSION/DEFAULT_ROS_DISTRO not set; skipping image pinning"

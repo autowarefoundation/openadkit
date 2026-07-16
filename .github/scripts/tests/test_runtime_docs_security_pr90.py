@@ -134,6 +134,10 @@ def test_build_source_defaults_to_the_pinned_upstream_tag():
     build_single = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
 
     assert "inputs.autoware_ref || vars.UPSTREAM_TAG || 'main'" in build_all
+    assert build_all.count(
+        "UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}"
+    ) == 3
+    assert "UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}" not in build_all
     assert "vars.UPSTREAM_TAG || 'main'" in build_single
 
 

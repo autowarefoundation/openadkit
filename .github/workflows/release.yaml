@@ -48,6 +48,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
+            .github/scripts/release_tag.sh
             .github/scripts/validate_release.sh
 
       - name: Set up Docker Buildx
@@ -122,10 +123,31 @@ jobs:
           retention-days: 7
           overwrite: true
 
+  release-tag:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    needs: [validate, package-bundles]
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release tag helper
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/scripts/release_tag.sh
+
+      - name: Create or verify git tag
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+        run: bash .github/scripts/release_tag.sh
+        shell: bash
+
   release-images:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    needs: [validate, package-bundles]
+    needs: [validate, package-bundles, release-tag]
     environment: release
     permissions:
       actions: read
@@ -166,7 +188,7 @@ jobs:
   release-github:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    needs: [validate, package-bundles, release-images]
+    needs: [validate, package-bundles, release-tag, release-images]
     environment: release
     permissions:
       actions: read
@@ -198,30 +220,6 @@ jobs:
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
         run: bash .github/scripts/write_release_notes.sh
-        shell: bash
-
-      - name: Create or verify git tag
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-        run: |
-          set -euo pipefail
-
-          if ! tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null); then
-            tag_sha=""
-          fi
-          if [ -z "${tag_sha}" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-              -f ref="refs/tags/${VERSION}" \
-              -f sha="${RELEASE_SHA}" >/dev/null
-            echo "Created tag ${VERSION} at ${RELEASE_SHA}"
-          elif [ "${tag_sha}" = "${RELEASE_SHA}" ]; then
-            echo "Tag ${VERSION} already exists at ${RELEASE_SHA}; continuing"
-          else
-            echo "Tag ${VERSION} exists at ${tag_sha}, expected ${RELEASE_SHA}" >&2
-            exit 1
-          fi
         shell: bash
 
       - name: Create or update GitHub Release

@@ -2,6 +2,10 @@
 # Validate that a build-all-images run can be promoted to an OpenADKit release.
 set -euo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=.github/scripts/release_tag.sh
+source "${script_dir}/release_tag.sh"
+
 : "${BUILD_TAG:?BUILD_TAG is required}"
 : "${VERSION:?VERSION is required}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
@@ -343,13 +347,15 @@ validate_release_rules() {
 }
 
 validate_git_tag() {
-  local tag_sha
+  local lookup_status tag_sha
 
-  if ! tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${VERSION}" --jq '.object.sha' 2>/dev/null); then
-    tag_sha=""
-  fi
-  if [ -n "${tag_sha}" ] && [ "${tag_sha}" != "${release_sha}" ]; then
-    fail "Tag ${VERSION} already exists at ${tag_sha}, expected ${release_sha}"
+  if tag_sha=$(release_tag_sha); then
+    if [ "${tag_sha}" != "${release_sha}" ]; then
+      fail "Tag ${VERSION} already exists at ${tag_sha}, expected ${release_sha}"
+    fi
+  else
+    lookup_status=$?
+    [ "${lookup_status}" -eq 1 ] || return "${lookup_status}"
   fi
 }
 

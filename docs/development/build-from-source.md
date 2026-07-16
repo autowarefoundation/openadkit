@@ -157,18 +157,21 @@ Open AD Kit releases are promoted from existing CI builds rather than rebuilt at
 
 Before running the release pipeline, verify:
 
-- **`vars.UPSTREAM_TAG`** is set in the repository or organization Variables on GitHub. This pins upstream Autoware base images to a specific release (e.g. `1.8.0`). Without it, images compile against unpinned upstream tags.
+- **`vars.UPSTREAM_TAG`** is set in the repository or organization Variables on GitHub. This selects the default Autoware source release (e.g. `1.8.0`). Manual `autoware_ref` inputs override it; the workflow derives and pins the matching base-image release from the resolved source ref.
 - **GHCR packages** are accessible: `ghcr.io/autowarefoundation/openadkit`, `ghcr.io/autowarefoundation/openadkit-common`, and the build cache repo `ghcr.io/autowarefoundation/openadkit-buildcache` must accept pushes from CI.
+- **`secrets.RELEASE_TOKEN`** is available when promoting a build commit older than subsequent workflow changes. Use a token with repository Contents and Workflows write access; otherwise the workflow uses `GITHUB_TOKEN`.
 - **A successful build** exists: `build-all-images` completed on `main` with the desired `autoware_ref`. The build summary shows a `build_tag` and confirms release eligibility.
 - **A successful scan** exists: `scan-images` completed and **passed** for that `build_tag`.
 
 ### Workflow Steps
 
-The release workflow (`.github/workflows/release.yaml`) has three jobs that run sequentially:
+The release workflow (`.github/workflows/release.yaml`) has five jobs that run sequentially:
 
 1. **validate** — Downloads build metadata and scan results, then runs 12 validation gates before any images are tagged.
-2. **release-images** — Promotes image digests to release tags.
-3. **release-github** — Creates the git tag, packages deployment bundles, and creates the GitHub Release.
+2. **package-bundles** — Packages all deployment bundles before any release state is published.
+3. **release-tag** — Creates or verifies the Git tag, failing closed on API errors or a conflicting commit.
+4. **release-images** — Promotes image digests to release tags after the Git tag is confirmed.
+5. **release-github** — Creates the GitHub Release and uploads bundles and provenance metadata.
 
 #### Validation Gates
 
@@ -208,16 +211,15 @@ Each alias is created independently from the digest — there is no sequential r
 The `release-github` job:
 
 1. Creates release notes with a provenance table and image digest list
-2. Creates or verifies the git tag (fails if tag exists at a different commit)
-3. Packages all 5 deployment bundles (`.tar.gz` with `install.sh`, vendored `base/`, merged env file)
-4. Creates or updates the GitHub Release with bundles and metadata as release assets
+2. Creates or updates the GitHub Release with all 5 deployment bundles and metadata as release assets
 
 ```mermaid
 flowchart LR
     A[Build All Images] --> R[Record Build Tag]
     R --> B[Scan Images]
-    B --> C[Promote & Tag]
-    C --> D[Update Aliases]
+    B --> C[Create Git Tag]
+    C --> D[Promote Images]
+    D --> E[Create GitHub Release]
 ```
 
 The resulting tag aliases are documented in [How Releases Are Tagged](../getting-started/container-images.md#how-releases-are-tagged).

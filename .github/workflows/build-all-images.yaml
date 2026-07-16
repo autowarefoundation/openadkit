@@ -68,15 +68,6 @@ jobs:
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
 
-      - name: Validate upstream tag pinning
-        if: ${{ vars.UPSTREAM_TAG == '' }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "::error::UPSTREAM_TAG is not set. Manual builds must pin an upstream Autoware release tag (e.g. 1.8.0) so images are reproducible."
-            exit 1
-          fi
-          echo "::warning::UPSTREAM_TAG is not set. Build will use unpinned upstream images (latest <name>-<distro> tags). Set vars.UPSTREAM_TAG in the repository or organization variables for reproducible builds."
-
       - name: Resolve image inventory
         id: inventory
         run: |
@@ -178,7 +169,7 @@ jobs:
       - name: Ensure upstream Autoware base images exist
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
         run: |
           set -euo pipefail
           # universe-common surfaces core-devel/base; sensing-perception-cuda
@@ -229,7 +220,7 @@ jobs:
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -333,7 +324,7 @@ jobs:
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
         with:
           files: |
             ${{ env.BAKE_FILE }}

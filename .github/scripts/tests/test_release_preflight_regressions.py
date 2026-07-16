@@ -4,10 +4,15 @@ import pathlib
 import re
 import subprocess
 
+import pytest
+import yaml
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 VALIDATE_RELEASE = ROOT / ".github/scripts/validate_release.sh"
+RELEASE_TAG = ROOT / ".github/scripts/release_tag.sh"
 PACKAGE_BUNDLES = ROOT / ".github/scripts/package_release_bundles.sh"
+RELEASE_WORKFLOW = ROOT / ".github/workflows/release.yaml"
 OPENADKIT_REF = re.compile(
     r"ghcr\.io/example/openadkit:([a-z-]+)-(humble|jazzy)-v9\.8\.7"
 )
@@ -47,6 +52,181 @@ def test_validate_git_tag_treats_api_404_as_missing_tag(tmp_path):
         env=env,
         check=True,
     )
+
+
+@pytest.mark.parametrize("status", ["403", "500"])
+def test_validate_git_tag_fails_closed_on_api_errors(tmp_path, status):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' '{{\"message\":\"API error\",\"status\":\"{status}\"}}'\n"
+        "exit 1\n"
+    )
+    gh.chmod(0o755)
+    env = os.environ | {
+        "BUILD_TAG": "1-1",
+        "VERSION": "v9.8.7-test",
+        "GH_TOKEN": "test",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "IMAGE_PREFIX_COMMON": "example/common",
+        "IMAGE_PREFIX_COMPONENT": "example/component",
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+    }
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; release_sha=abc123; validate_git_tag',
+            "bash",
+            str(VALIDATE_RELEASE),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert f"HTTP {status}" in result.stderr
+
+
+def test_validate_git_tag_fails_closed_on_network_error(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text("#!/usr/bin/env bash\nexit 1\n")
+    gh.chmod(0o755)
+    env = os.environ | {
+        "BUILD_TAG": "1-1",
+        "VERSION": "v9.8.7-test",
+        "GH_TOKEN": "test",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "IMAGE_PREFIX_COMMON": "example/common",
+        "IMAGE_PREFIX_COMPONENT": "example/component",
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+    }
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; release_sha=abc123; validate_git_tag',
+            "bash",
+            str(VALIDATE_RELEASE),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "GitHub API request failed" in result.stderr
+
+
+def test_validate_git_tag_resolves_annotated_tag(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    tag_sha = "b" * 40
+    release_sha = "a" * 40
+    gh.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"${2:-}\" == */git/refs/tags/* ]]; then\n"
+        f"  printf '%s\\n' '{{\"object\":{{\"type\":\"tag\",\"sha\":\"{tag_sha}\"}}}}'\n"
+        "elif [[ \"${2:-}\" == */git/tags/* ]]; then\n"
+        f"  printf '%s\\n' '{{\"object\":{{\"type\":\"commit\",\"sha\":\"{release_sha}\"}}}}'\n"
+        "else\n"
+        "  exit 2\n"
+        "fi\n"
+    )
+    gh.chmod(0o755)
+    env = os.environ | {
+        "BUILD_TAG": "1-1",
+        "VERSION": "v9.8.7-test",
+        "GH_TOKEN": "test",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "IMAGE_PREFIX_COMMON": "example/common",
+        "IMAGE_PREFIX_COMPONENT": "example/component",
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+    }
+
+    subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "$1"; release_sha={release_sha}; validate_git_tag',
+            "bash",
+            str(VALIDATE_RELEASE),
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+    )
+
+
+def test_release_tag_program_creates_only_after_confirmed_404(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    call_log = tmp_path / "gh-calls"
+    gh = bin_dir / "gh"
+    release_sha = "a" * 40
+    gh.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$*\" >> \"${GH_CALL_LOG}\"\n"
+        "if [[ \"${2:-}\" == */git/refs/tags/* ]]; then\n"
+        "  printf '%s\\n' '{\"message\":\"Not Found\",\"status\":\"404\"}'\n"
+        "  exit 1\n"
+        "fi\n"
+        "[[ \"${2:-}\" == */git/refs ]]\n"
+    )
+    gh.chmod(0o755)
+    env = os.environ | {
+        "VERSION": "v9.8.7-test",
+        "RELEASE_SHA": release_sha,
+        "GH_TOKEN": "test",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GH_CALL_LOG": str(call_log),
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+    }
+
+    result = subprocess.run(
+        ["bash", str(RELEASE_TAG)],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert f"Created tag v9.8.7-test at {release_sha}" in result.stdout
+    create_call = call_log.read_text().splitlines()[-1]
+    assert "api repos/example/repo/git/refs" in create_call
+    assert "-f ref=refs/tags/v9.8.7-test" in create_call
+    assert f"-f sha={release_sha}" in create_call
+
+
+def test_release_verifies_git_tag_before_promoting_images():
+    jobs = yaml.safe_load(RELEASE_WORKFLOW.read_text())["jobs"]
+
+    assert jobs["release-tag"]["needs"] == ["validate", "package-bundles"]
+    assert jobs["release-images"]["needs"] == [
+        "validate",
+        "package-bundles",
+        "release-tag",
+    ]
+    assert "Create or verify git tag" not in [
+        step.get("name") for step in jobs["release-github"]["steps"]
+    ]
 
 
 def test_validate_inventory_coverage_handles_global_and_image_distros(tmp_path):

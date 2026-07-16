@@ -2712,17 +2712,20 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 <h3 id="before-you-release">Before You Release<a class="headerlink" href="#before-you-release" title="Permanent link">#</a></h3>
 <p>Before running the release pipeline, verify:</p>
 <ul>
-<li><strong><code>vars.UPSTREAM_TAG</code></strong> is set in the repository or organization Variables on GitHub. This pins upstream Autoware base images to a specific release (e.g. <code>1.8.0</code>). Without it, images compile against unpinned upstream tags.</li>
+<li><strong><code>vars.UPSTREAM_TAG</code></strong> is set in the repository or organization Variables on GitHub. This selects the default Autoware source release (e.g. <code>1.8.0</code>). Manual <code>autoware_ref</code> inputs override it; the workflow derives and pins the matching base-image release from the resolved source ref.</li>
 <li><strong>GHCR packages</strong> are accessible: <code>ghcr.io/autowarefoundation/openadkit</code>, <code>ghcr.io/autowarefoundation/openadkit-common</code>, and the build cache repo <code>ghcr.io/autowarefoundation/openadkit-buildcache</code> must accept pushes from CI.</li>
+<li><strong><code>secrets.RELEASE_TOKEN</code></strong> is available when promoting a build commit older than subsequent workflow changes. Use a token with repository Contents and Workflows write access; otherwise the workflow uses <code>GITHUB_TOKEN</code>.</li>
 <li><strong>A successful build</strong> exists: <code>build-all-images</code> completed on <code>main</code> with the desired <code>autoware_ref</code>. The build summary shows a <code>build_tag</code> and confirms release eligibility.</li>
 <li><strong>A successful scan</strong> exists: <code>scan-images</code> completed and <strong>passed</strong> for that <code>build_tag</code>.</li>
 </ul>
 <h3 id="workflow-steps">Workflow Steps<a class="headerlink" href="#workflow-steps" title="Permanent link">#</a></h3>
-<p>The release workflow (<code>.github/workflows/release.yaml</code>) has three jobs that run sequentially:</p>
+<p>The release workflow (<code>.github/workflows/release.yaml</code>) has five jobs that run sequentially:</p>
 <ol>
 <li><strong>validate</strong> — Downloads build metadata and scan results, then runs 12 validation gates before any images are tagged.</li>
-<li><strong>release-images</strong> — Promotes image digests to release tags.</li>
-<li><strong>release-github</strong> — Creates the git tag, packages deployment bundles, and creates the GitHub Release.</li>
+<li><strong>package-bundles</strong> — Packages all deployment bundles before any release state is published.</li>
+<li><strong>release-tag</strong> — Creates or verifies the Git tag, failing closed on API errors or a conflicting commit.</li>
+<li><strong>release-images</strong> — Promotes image digests to release tags after the Git tag is confirmed.</li>
+<li><strong>release-github</strong> — Creates the GitHub Release and uploads bundles and provenance metadata.</li>
 </ol>
 <h4 id="validation-gates">Validation Gates<a class="headerlink" href="#validation-gates" title="Permanent link">#</a></h4>
 <p>Before any image is tagged, the <code>validate</code> job (<code>.github/scripts/validate_release.sh</code>) checks:</p>
@@ -2812,15 +2815,14 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 <p>The <code>release-github</code> job:</p>
 <ol>
 <li>Creates release notes with a provenance table and image digest list</li>
-<li>Creates or verifies the git tag (fails if tag exists at a different commit)</li>
-<li>Packages all 5 deployment bundles (<code>.tar.gz</code> with <code>install.sh</code>, vendored <code>base/</code>, merged env file)</li>
-<li>Creates or updates the GitHub Release with bundles and metadata as release assets</li>
+<li>Creates or updates the GitHub Release with all 5 deployment bundles and metadata as release assets</li>
 </ol>
 <pre class="mermaid"><code>flowchart LR
     A[Build All Images] --&gt; R[Record Build Tag]
     R --&gt; B[Scan Images]
-    B --&gt; C[Promote &amp; Tag]
-    C --&gt; D[Update Aliases]</code></pre>
+    B --&gt; C[Create Git Tag]
+    C --&gt; D[Promote Images]
+    D --&gt; E[Create GitHub Release]</code></pre>
 <p>The resulting tag aliases are documented in <a href="../../getting-started/container-images/#how-releases-are-tagged">How Releases Are Tagged</a>.</p>
 <h3 id="source-of-truth">Source of Truth<a class="headerlink" href="#source-of-truth" title="Permanent link">#</a></h3>
 <p>The following artifacts are the canonical reference for release validation:</p>

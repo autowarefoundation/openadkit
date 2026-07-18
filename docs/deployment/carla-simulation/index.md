@@ -17,7 +17,7 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 - An **amd64 (x86_64)** host with Docker — the `carla-interface` image is published for **amd64 and ROS 2 Humble only**; there is no arm64 image
 - Docker Engine with the NVIDIA Container Toolkit (set up via `install.sh`)
 - An NVIDIA GPU — the CARLA server requires GPU rendering
-- A working host X display (usually `DISPLAY=:0`) with X access for local containers (e.g. `xhost +SI:localuser:root`)
+- A working host X display with container access (e.g. `xhost +SI:localuser:root`) only for optional windowed rendering; the default `-RenderOffScreen` mode does not require X
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
 - **Ubuntu 22.04** — CARLA 0.9.16 is built on Unreal Engine 4.26, which has not been tested on Ubuntu 24.04 (see the [CARLA build docs](https://carla.readthedocs.io/en/0.9.16/build_linux)). Users on 24.04 have reported segfaults (Signal 11) at startup.
 
@@ -31,6 +31,8 @@ After starting the deployment, the CARLA server renders the `Town01` world and t
 ```bash
 {{ install_command }}
 ```
+
+--8<-- "includes/docker-group-activation.md"
 
 ### 2. Clone the repository
 
@@ -52,11 +54,13 @@ cd openadkit/deployments/carla-simulation
 
 The helper script:
 
-- Downloads the official CARLA Autoware `Town01` map assets if missing
+- Downloads the commit-pinned CARLA Autoware `Town01` map assets, verifies their SHA-256 checksums, and publishes them atomically
+- Validates Ubuntu, Docker, NVIDIA, Vulkan, and kernel prerequisites before starting containers
 - Starts the `carlasim/carla:0.9.16` server and preloads `Town01`
 - Starts the modular Open AD Kit containers (map, system, CARLA interface, sensing, perception, localization, planning, vehicle, control, API)
 - Starts the browser RViz2/noVNC visualizer
 - Verifies localization, CARLA LiDAR data, and the CARLA ego actor
+- Removes only the services started by the invocation if startup or verification fails
 
 The default behavior is **no-drive**: set a route and engage manually in RViz2.
 
@@ -66,7 +70,8 @@ The `sensor_mapping.yaml` file controls which CARLA sensors are bridged into Aut
 
 ### Kernel UDP Buffers
 
-The helper script automatically raises kernel UDP buffer limits. If you prefer to set them manually:
+The helper validates the required kernel UDP buffer limits but does not modify
+host-global sysctls. Set them explicitly before starting CARLA:
 
 ```bash
 sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
@@ -82,13 +87,12 @@ In RViz2:
 3. Click **Auto** to engage autonomous driving
 
 !!! note "Auto button not available?"
-    If the **Auto** button does not enable, the `/system/command_mode/availability` topic may not be published. This is an upstream Autoware issue, not an Open AD Kit defect. As a workaround, publish the availability manually inside the system container:
-
-    ```bash
-    ros2 topic pub --once /system/command_mode/availability \
-      tier4_system_msgs/msg/CommandModeAvailability \
-      '{items: [{mode: 1001, available: true}, {mode: 1002, available: true}, {mode: 1003, available: true}, {mode: 1004, available: true}]}'
-    ```
+    The diagnostic graph publishes `/system/command_mode/availability`, but
+    autonomous mode remains unavailable while any required subsystem reports a
+    warning or error. Inspect that topic and `/diagnostics_graph/status` in the
+    system container instead of overriding availability manually. The optional
+    `--drive` check also waits for autonomous availability and fails with a
+    bounded timeout.
 
 ## Optional Drive Check
 
@@ -100,8 +104,16 @@ To automatically set a short forward route, engage autonomous mode, and verify m
 
 ## Stop the Deployment
 
+From a source checkout:
+
 ```bash
 docker compose --env-file ../base/base.env --env-file carla-simulation.env down
+```
+
+From a release bundle:
+
+```bash
+docker compose --env-file carla-simulation.env down
 ```
 
 ## Troubleshooting

@@ -27,19 +27,24 @@ After starting the deployment, the scenario simulator generates a virtual traffi
 {{ install_command }}
 ```
 
-### 2. Clone the repository
+--8<-- "includes/docker-group-activation.md"
+
+### 2. Choose a deployment layout
+
+#### Source checkout setup
 
 ```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit/deployments/scenario-simulation
+../../install.sh sample-data scenario-simulation
 ```
 
---8<-- "includes/first-release-note.md"
-
-### 3. Download the Kashiwanoha map
+#### Release bundle setup
 
 ```bash
-../../install.sh sample-data scenario-simulation
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz | tar xz
+cd scenario-simulation
+./install.sh sample-data scenario-simulation
 ```
 
 ## Configuration
@@ -71,26 +76,54 @@ To run your own scenario:
 3. Simulation results are saved to `OUTPUT_HOST_PATH` (default: `./output/`)
 
 !!! tip "Custom Maps"
-    Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, update `MAP_PATH` (in `scenario-simulation.env`) and `LANELET2_MAP_FILE` / `POINTCLOUD_MAP_FILE` (in `base.env` for cloned-repo users), and ensure the files exist under `MAP_PATH` before starting.
+    Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, set `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE` in `scenario-simulation.env`, and ensure the files exist under `MAP_PATH` before starting. This env file overrides base defaults in a source checkout and already contains the merged defaults in a release bundle.
 
 ## Start the Deployment
 
-From the `scenario-simulation` directory, start the containers:
+From the `scenario-simulation` directory, use the command for your layout.
+
+### Start from a source checkout
 
 ```bash
 docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d
 ```
 
---8<-- "includes/cloned-repo-env-note.md"
+### Start from a release bundle
+
+```bash
+docker compose --env-file scenario-simulation.env up -d
+```
 
 Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an `INITIALIZE_DURATION` of 90 seconds before launching.
 
 --8<-- "includes/visualizer-remote-access.md"
 
+## View Scenario Runner Logs
+
+### View source checkout runner logs
+
+```bash
+docker compose --env-file ../base/base.env --env-file scenario-simulation.env logs -f scenario_simulator
+```
+
+### View release bundle runner logs
+
+```bash
+docker compose --env-file scenario-simulation.env logs -f scenario_simulator
+```
+
 ## Stop the Deployment
+
+### Stop a source checkout
 
 ```bash
 docker compose --env-file ../base/base.env --env-file scenario-simulation.env down
+```
+
+### Stop a release bundle
+
+```bash
+docker compose --env-file scenario-simulation.env down
 ```
 
 ## Expected Behavior
@@ -104,7 +137,7 @@ docker compose --env-file ../base/base.env --env-file scenario-simulation.env do
 
 | Issue | Solution |
 |-------|----------|
-| Scenario does not start | Ensure the map was fetched: re-run `./install.sh sample-data scenario-simulation --force` |
+| Scenario does not start | Ensure the map was fetched: from a source checkout, re-run `../../install.sh sample-data scenario-simulation --force`; from a release bundle, use `./install.sh sample-data scenario-simulation --force` |
 | `setMap() for invalid version map` | You are using the wrong map. Ensure Kashiwanoha is extracted, not `sample-map-planning` |
 | Visualizer blank | Wait up to 90 seconds for full initialization; containers depend on each other sequentially |
 | Missing results | Verify `OUTPUT_HOST_PATH` exists and is writable |

@@ -101,13 +101,20 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 # Port 5999 (TigerVNC) is intentionally loopback-only and not published.
 EXPOSE 6080
 
-# Add source commands to bash startup.
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
-    echo "source /opt/autoware/setup.bash" >> /root/.bashrc
+# Prepare the unprivileged runtime home and shell setup.
+RUN install -d -o aw -g aw \
+      /home/aw/.config/openbox \
+      /home/aw/.local/bin \
+      /home/aw/.vnc && \
+    touch /home/aw/.bashrc /home/aw/.config/openbox/autostart && \
+    echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/aw/.bashrc && \
+    echo "source /opt/autoware/setup.bash" >> /home/aw/.bashrc && \
+    chown -R aw:aw /home/aw
 
 # Copy startup scripts.
-COPY components/visualizer/etc/xstartup /root/.vnc/xstartup
+COPY --chown=aw:aw components/visualizer/etc/xstartup /home/aw/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
-RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /root/.vnc/xstartup
+RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
 
+USER aw
 ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]

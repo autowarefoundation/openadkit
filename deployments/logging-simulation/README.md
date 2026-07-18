@@ -8,11 +8,27 @@ For complete operational instructions, see the canonical documentation:
 
 **[Open AD Kit Docs — Logging Simulation](https://autowarefoundation.github.io/openadkit/deployment/logging-simulation/)**
 
-## Quick Start
+Before starting this deployment, install the host dependencies and Autoware perception artifacts as described in the canonical documentation.
+
+## Source Checkout
 
 ```bash
 ../../install.sh sample-data logging-simulation
 docker compose --env-file ../base/base.env --env-file logging-simulation.env up -d
+docker compose --env-file ../base/base.env --env-file logging-simulation.env \
+  --profile rosbag up -d rosbag
 ```
 
-*Release bundle: from the extracted directory, run `./install.sh sample-data logging-simulation` and `docker compose --env-file logging-simulation.env up -d` (the bundle ships a merged env file).*
+## Release Bundle
+
+From the extracted directory:
+
+```bash
+./install.sh sample-data logging-simulation
+docker compose --env-file logging-simulation.env up -d
+docker compose --env-file logging-simulation.env --profile rosbag up -d rosbag
+```
+
+The rosbag service waits for a subscriber on `ROSBAG_READY_TOPIC` before
+starting playback and fails after `ROSBAG_READY_TIMEOUT` instead of silently
+dropping the beginning of the recording.

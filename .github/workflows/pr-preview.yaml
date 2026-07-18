@@ -6,7 +6,6 @@ on:
       - opened
       - reopened
       - synchronize
-      - closed
     paths:
       - mkdocs.yaml
       - install.sh
@@ -22,17 +21,17 @@ on:
       - "docs/overrides/**"
       - "**/*.pages"
       - ".github/actions/build-docs/**"
+      - ".github/workflows/pr-preview.yaml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: preview-${{ github.ref }}
-  cancel-in-progress: false
+  group: preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   build-preview:
-    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -46,6 +45,7 @@ jobs:
       - name: Build docs
         uses: ./.github/actions/build-docs
         with:
+          allow-stale-release-notes: 'true'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload site artifact
@@ -54,35 +54,3 @@ jobs:
           name: pr-preview-site
           path: site
           retention-days: 1
-
-  deploy-preview:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: build-preview
-    if: >-
-      always() &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.action == 'closed' || needs.build-preview.result == 'success')
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download site artifact
-        if: github.event.action != 'closed'
-        uses: actions/download-artifact@v4
-        with:
-          name: pr-preview-site
-          path: site
-
-      - name: Deploy preview
-        uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1
-        with:
-          source-dir: ./site
-          preview-branch: gh-pages
-          umbrella-dir: pr-preview
-          action: auto
-          comment: true
-          qr-code: false

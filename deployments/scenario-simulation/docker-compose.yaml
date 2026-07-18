@@ -25,6 +25,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${OUTPUT_HOST_PATH}:${OUTPUT_DIRECTORY}

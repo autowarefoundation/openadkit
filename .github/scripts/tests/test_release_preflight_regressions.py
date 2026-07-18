@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import pathlib
@@ -12,6 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 VALIDATE_RELEASE = ROOT / ".github/scripts/validate_release.sh"
 RELEASE_TAG = ROOT / ".github/scripts/release_tag.sh"
 PACKAGE_BUNDLES = ROOT / ".github/scripts/package_release_bundles.sh"
+MANAGE_RELEASE = ROOT / ".github/scripts/manage_github_release.sh"
 RELEASE_WORKFLOW = ROOT / ".github/workflows/release.yaml"
 OPENADKIT_REF = re.compile(
     r"ghcr\.io/example/openadkit:([a-z-]+)-(humble|jazzy)-v9\.8\.7"
@@ -219,14 +221,68 @@ def test_release_verifies_git_tag_before_promoting_images():
     jobs = yaml.safe_load(RELEASE_WORKFLOW.read_text())["jobs"]
 
     assert jobs["release-tag"]["needs"] == ["validate", "package-bundles"]
-    assert jobs["release-images"]["needs"] == [
+    assert jobs["prepare-github-release"]["needs"] == [
         "validate",
         "package-bundles",
         "release-tag",
     ]
+    assert jobs["release-images"]["needs"] == [
+        "validate",
+        "prepare-github-release",
+    ]
+    assert jobs["release-github"]["needs"] == [
+        "validate",
+        "prepare-github-release",
+        "release-images",
+    ]
     assert "Create or verify git tag" not in [
         step.get("name") for step in jobs["release-github"]["steps"]
     ]
+    assert jobs["package-bundles"]["outputs"]["packager_sha"] == (
+        "${{ steps.packager.outputs.packager_sha }}"
+    )
+    notes_step = next(
+        step
+        for step in jobs["prepare-github-release"]["steps"]
+        if step.get("name") == "Create release metadata and notes"
+    )
+    assert notes_step["env"]["PACKAGER_SHA"] == (
+        "${{ needs.package-bundles.outputs.packager_sha }}"
+    )
+    assert jobs["prepare-github-release"]["outputs"]["release_id"] == (
+        "${{ steps.prepare-release.outputs.release_id }}"
+    )
+
+
+def test_existing_github_release_is_verified_without_mutation():
+    jobs = yaml.safe_load(RELEASE_WORKFLOW.read_text())["jobs"]
+    prepare_step = next(
+        step
+        for step in jobs["prepare-github-release"]["steps"]
+        if step.get("name") == "Verify existing release or create draft"
+    )
+    manager = MANAGE_RELEASE.read_text()
+
+    assert prepare_step["run"] == "bash .github/scripts/manage_github_release.sh prepare"
+    assert "gh release download" in manager
+    assert "--rawfile expected_body release-notes.md" in manager
+    assert 'cmp <(jq -S . "${existing_dir}/release-metadata.json")' in manager
+    assert 'gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"' in manager
+    assert "verify_owned_draft" in manager
+    assert "targetCommitish == $release_sha" in manager
+    assert "RELEASE_WORKFLOW_MARKER" in manager
+    assert "--draft" in manager
+
+    publish_step = next(
+        step
+        for step in jobs["release-github"]["steps"]
+        if step.get("name") == "Publish prepared GitHub Release"
+    )
+    assert publish_step["if"] == (
+        "needs.prepare-github-release.outputs.created == 'true'"
+    )
+    assert publish_step["run"] == "bash .github/scripts/manage_github_release.sh publish"
+    assert 'gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}"' in manager
 
 
 def test_validate_inventory_coverage_handles_global_and_image_distros(tmp_path):
@@ -301,11 +357,23 @@ def test_validate_inventory_coverage_handles_global_and_image_distros(tmp_path):
 
 
 def test_jazzy_release_bundles_keep_carla_humble_and_bind_mounts(tmp_path):
+    third_party_refs = [
+        "ghcr.io/autowarefoundation/autoware:universe",
+        "eclipse/zenoh-bridge-ros2dds:latest",
+        "ghcr.io/evshary/autoware_manual_control:latest",
+        "ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime",
+        "carlasim/carla:0.9.16",
+        "busybox:1.36.1",
+    ]
+    digest = "sha256:" + "a" * 64
     env = os.environ | {
         "SOURCE_DIR": str(ROOT),
         "VERSION": "v9.8.7",
         "DEFAULT_ROS_DISTRO": "jazzy",
         "IMAGE_PREFIX_COMPONENT": "ghcr.io/example/openadkit",
+        "THIRD_PARTY_IMAGE_DIGESTS_JSON": json.dumps(
+            {ref: digest for ref in third_party_refs}
+        ),
     }
     result = subprocess.run(
         ["bash", str(PACKAGE_BUNDLES)],
@@ -337,6 +405,14 @@ def test_jazzy_release_bundles_keep_carla_humble_and_bind_mounts(tmp_path):
         assert refs, f"no pinned Open AD Kit refs found in {name}"
         expected_distro = "humble" if name == "carla-simulation" else "jazzy"
         assert {distro for _, distro in refs} == {expected_distro}
+        combined = "\n".join(
+            path.read_text()
+            for path in bundle_dir.rglob("*")
+            if path.is_file() and (path.suffix in {".yaml", ".env"} or path.name == ".env")
+        )
+        for ref in third_party_refs:
+            if ref in combined:
+                assert f"{ref}@{digest}" in combined
 
     assert (tmp_path / "staging/zenoh-bridge/.env").is_file()
 
@@ -368,6 +444,32 @@ def test_jazzy_release_bundles_keep_carla_humble_and_bind_mounts(tmp_path):
     assert cyclonedds_mount["type"] == "bind"
     assert pathlib.Path(cyclonedds_mount["source"]) == carla_dir / "base/cyclonedds.xml"
 
+    sibling_base = tmp_path / "staging/base"
+    sibling_base.mkdir()
+    marker = tmp_path / "sibling-base-executed"
+    (sibling_base / "base.env").write_text(f"MALICIOUS=$(touch {marker})\n")
+    carla_dry_run = subprocess.run(
+        [
+            str(carla_dir / "start-carla-e2e-demo.sh"),
+            "--dry-run",
+            "--skip-verify",
+            "--no-visualizer",
+        ],
+        cwd=carla_dir,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    compose_commands = [
+        line
+        for line in carla_dry_run.stdout.splitlines()
+        if line.startswith("+ docker compose")
+    ]
+    assert compose_commands
+    assert all(command.count("--env-file") == 1 for command in compose_commands)
+    assert all("../base/base.env" not in command for command in compose_commands)
+    assert not marker.exists()
+
     helper = tmp_path / "staging/planning-simulation/start-planning-e2e-demo.sh"
     dry_run = subprocess.run(
         [str(helper), "--dry-run"],
@@ -381,3 +483,21 @@ def test_jazzy_release_bundles_keep_carla_humble_and_bind_mounts(tmp_path):
     assert compose_command.count("--env-file") == 1
     assert "planning-simulation.env" in compose_command
     assert "base.env" not in compose_command
+
+    first_hashes = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (tmp_path / "dist").glob("*.tar.gz")
+    }
+    subprocess.run(
+        ["bash", str(PACKAGE_BUNDLES)],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    second_hashes = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (tmp_path / "dist").glob("*.tar.gz")
+    }
+    assert second_hashes == first_hashes

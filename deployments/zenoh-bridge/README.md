@@ -12,8 +12,10 @@ For complete operational instructions, see the canonical documentation:
 
 ```bash
 cp .env.example .env
-./install.sh sample-data zenoh-bridge
+../../install.sh sample-data zenoh-bridge
 ```
+
+From a release bundle, use `./install.sh sample-data zenoh-bridge` instead.
 
 Set `REMOTE_PASSWORD` in `.env` before starting. Docker Compose reads this file
 without sourcing it; exported shell variables take precedence.

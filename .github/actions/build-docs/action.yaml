@@ -5,6 +5,10 @@ inputs:
   github-token:
     description: GitHub token used by the release-notes generator
     required: true
+  allow-stale-release-notes:
+    description: Keep the existing release page when a transient GitHub API fetch fails
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -21,14 +25,15 @@ runs:
       shell: bash
 
     - name: Generate release notes
-      # Tolerate failure here (offline or GitHub rate-limit); the doc page
-      # falls back to a placeholder section and the rest of the build still
-      # ships. Mirrors the `|| echo "WARNING..."` tolerance in the Makefile.
-      # The run value is quoted because `||` at the start of a YAML scalar
-      # would otherwise be parsed as a block-scalar indicator.
-      run: "python docs/scripts/generate_release_notes.py || echo \"WARNING: could not refresh release notes (offline or rate-limited); continuing without them\""
+      run: |
+        args=()
+        if [ "${ALLOW_STALE_RELEASE_NOTES}" = "true" ]; then
+          args+=(--allow-stale-on-fetch-error)
+        fi
+        python docs/scripts/generate_release_notes.py "${args[@]}"
       shell: bash
       env:
+        ALLOW_STALE_RELEASE_NOTES: ${{ inputs.allow-stale-release-notes }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
 
     - name: Pin installer source ref

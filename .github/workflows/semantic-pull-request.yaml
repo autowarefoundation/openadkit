@@ -1,7 +1,3 @@
-# This file is automatically synced from:
-# https://github.com/autowarefoundation/sync-file-templates
-# To make changes, update the source repository and follow the guidelines in its README.
-
 name: semantic-pull-request
 
 on:
@@ -15,13 +11,36 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   semantic-pull-request:
-    # timeout-minutes cannot be set on jobs that call a reusable workflow
-    # (actionlint enforces this); the upstream workflow controls its own
-    # timeout, so the 6-hour GHA default is fine for this sync'd template.
-    # WARNING: This file is synced from autowarefoundation/sync-file-templates.
-    # The SHA below pins the reusable workflow. When updating, re-pin to the
-    # commit SHA of the desired v1 tag from:
-    #   https://github.com/autowarefoundation/autoware-github-actions
-    uses: autowarefoundation/autoware-github-actions/.github/workflows/semantic-pull-request.yaml@c10bb685cf5ca5e8213a92b35a87d5534c47f1fa # v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          subjectPattern: ^(?![A-Z]).+$
+          ignoreLabels: |
+            bot
+            ignore-semantic-pull-request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

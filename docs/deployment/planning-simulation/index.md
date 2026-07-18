@@ -28,19 +28,24 @@ After starting the deployment, you will access a noVNC-based RViz2 visualizer in
 {{ install_command }}
 ```
 
-### 2. Clone the repository
+--8<-- "includes/docker-group-activation.md"
+
+### 2. Choose a deployment layout
+
+#### Source checkout setup
 
 ```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit/deployments/planning-simulation
+../../install.sh sample-data planning-simulation
 ```
 
---8<-- "includes/first-release-note.md"
-
-### 3. Download the demo map
+#### Release bundle setup
 
 ```bash
-../../install.sh sample-data planning-simulation
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
+cd planning-simulation
+./install.sh sample-data planning-simulation
 ```
 
 !!! info "About this map"
@@ -48,19 +53,39 @@ cd openadkit/deployments/planning-simulation
 
 ## Start the Deployment
 
-From the `planning-simulation` directory, start the containers:
+From the `planning-simulation` directory, use the command for your layout.
+
+### Start from a source checkout
 
 ```bash
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
---8<-- "includes/cloned-repo-env-note.md"
+### Start from a release bundle
+
+```bash
+docker compose --env-file planning-simulation.env up -d
+```
 
 Wait approximately 10 seconds for the containers to initialize.
 
 --8<-- "includes/visualizer-remote-access.md"
 
 The RViz2 interface may take a few additional seconds to fully load.
+
+## View Logs
+
+### View source checkout logs
+
+```bash
+docker compose --env-file ../base/base.env --env-file planning-simulation.env logs -f
+```
+
+### View release bundle logs
+
+```bash
+docker compose --env-file planning-simulation.env logs -f
+```
 
 ## Run the Simulation
 
@@ -72,8 +97,16 @@ Once the visualizer is open, follow the [Autoware planning simulation instructio
 
 ## Stop the Deployment
 
+### Stop a source checkout
+
 ```bash
 docker compose --env-file ../base/base.env --env-file planning-simulation.env down
+```
+
+### Stop a release bundle
+
+```bash
+docker compose --env-file planning-simulation.env down
 ```
 
 ## Troubleshooting
@@ -82,6 +115,16 @@ docker compose --env-file ../base/base.env --env-file planning-simulation.env do
 |-------|----------|
 | Vehicle does not move after setting goal | Check that the initial pose is set correctly and the map is loaded in RViz2 |
 
+To re-download the map:
+
+```bash
+# Source checkout
+../../install.sh sample-data planning-simulation --force
+
+# Release bundle
+./install.sh sample-data planning-simulation --force
+```
+
 For Docker, GPU, and visualizer issues common to all deployments, see [Troubleshooting](../../getting-started/troubleshooting.md).
 
 ## Architecture
@@ -89,13 +132,22 @@ For Docker, GPU, and visualizer issues common to all deployments, see [Troublesh
 ```mermaid
 flowchart LR
     subgraph Host["Single Host"]
+        M[map]
         P[planning]
         C[control]
+        V[vehicle]
+        S[system]
+        SIM[simulator]
+        API[API]
         VIZ[visualizer]
     end
 
-    Map[~/autoware_map] --> P
+    Map[~/autoware_map] --> M
+    M --> P
     P --> C
+    C --> V
+    SIM <-->|ROS 2 DDS| V
+    S <-->|ROS 2 DDS| API
     P <-->|ROS 2 DDS| VIZ
 ```
 

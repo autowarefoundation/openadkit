@@ -125,6 +125,8 @@ flowchart TD
 {{ install_command }}
 ```
 
+--8<-- "includes/docker-group-activation.md"
+
 ### 2. Clone the repository and download the demo map
 
 ```bash
@@ -271,7 +273,7 @@ Log in with the password you set as `REMOTE_PASSWORD` in `.env`.
 docker compose down
 ```
 
-The map is mounted read-only from `~/autoware_map/kashiwanoha_map` on the host, so stopping the stack leaves it untouched. Re-fetch it any time with `./install.sh sample-data zenoh-bridge --force`.
+The map is mounted read-only from `~/autoware_map/kashiwanoha_map` on the host, so stopping the stack leaves it untouched. From a source checkout, re-fetch it with `../../install.sh sample-data zenoh-bridge --force`; from a release bundle, use `./install.sh sample-data zenoh-bridge --force`.
 
 ## Teleoperation (Optional)
 
@@ -318,21 +320,23 @@ For the edge side, the default simulation mode works, but pure control testing w
 
 ### Visualizer Shows "Global Status: Warning" or Blank Screen
 
-**Cause:** Race condition where ROS 2 nodes start before the Zenoh bridge connection is fully established. `depends_on` helps but does not guarantee readiness.
+**Cause:** The bounded `cloud_zenoh_ready` or `edge_zenoh_ready` check could not
+reach its required Zenoh listener before `ZENOH_READY_TIMEOUT` expired.
 
 **Solutions:**
 
-1. **Restart:**
+1. **Inspect readiness logs:**
 
    ```bash
-   docker compose restart
+   docker compose logs cloud_zenoh_ready edge_zenoh_ready
    ```
 
-2. **Staged Startup:** Start the cloud side first, wait, then start the edge side.
+2. **Verify ordering and connectivity:** Start the cloud side first, then start
+   the edge side. The edge readiness check verifies both bridge listeners before
+   Autoware starts.
 
    ```bash
    ./cloud.sh up -d
-   sleep 15
    ./edge.sh up -d
    ```
 
@@ -340,7 +344,7 @@ For the edge side, the default simulation mode works, but pure control testing w
 
 **Cause:** Ports `6081` (noVNC), `7448` (cloud Zenoh router), or `7447` (edge Zenoh bridge) are in use.
 
-**Solution:** Stop the conflicting program, or modify `docker-compose.yaml`. For example, change `6081:6080` to `8080:6080` and access via `https://localhost:8080/vnc.html`.
+**Solution:** Stop the conflicting program, or modify `docker-compose.yaml`. For example, change `127.0.0.1:6081:6080` to `127.0.0.1:8080:6080` and access via `https://localhost:8080/vnc.html`.
 
 ### Container Fails to Start with `file not found`
 
@@ -352,7 +356,9 @@ For the edge side, the default simulation mode works, but pure control testing w
 
 The `autoware` service in this deployment uses the upstream `ghcr.io/autowarefoundation/autoware:universe` image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture; a component-based replacement will ship in a future release.
 
-This demo also depends on third-party images that are **not** pinned to immutable tags: `eclipse/zenoh-bridge-ros2dds:latest` and the community `ghcr.io/evshary/autoware_manual_control` teleop image. They may change upstream without notice — pin them to a specific digest if you need a fully reproducible demo.
+Source checkouts use readable third-party tags for the Zenoh bridge and teleop
+images. Release packaging resolves and writes their manifest digests into the
+bundle so released deployments remain reproducible.
 
 ## Related
 

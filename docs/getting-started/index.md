@@ -25,6 +25,8 @@ The included `install.sh` sets up Docker Engine and the NVIDIA Container Toolkit
 !!! tip "Skip NVIDIA Toolkit"
     Append `--no-nvidia` to the final command (`install_openadkit --no-nvidia`) if you do not have an NVIDIA GPU. The toolkit is only needed for GPU-accelerated deployments.
 
+--8<-- "includes/docker-group-activation.md"
+
 Confirm the environment is ready:
 
 ```bash
@@ -33,23 +35,34 @@ docker compose version
 
 ## 2. Get the Deployment Files
 
+### Source checkout files
+
 ```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit/deployments/planning-simulation
+../../install.sh sample-data planning-simulation
 ```
 
---8<-- "includes/zip-release-note.md"
-
-Then fetch the demo map (~500 MB download):
+### Release bundle files
 
 ```bash
-../../install.sh sample-data planning-simulation
+curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
+cd planning-simulation
+./install.sh sample-data planning-simulation
 ```
 
 ## 3. Start It
 
+### Start the source checkout
+
 ```bash
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
+```
+
+### Start the release bundle
+
+```bash
+docker compose --env-file planning-simulation.env up -d
 ```
 
 Wait about 10 seconds for the containers to initialize.
@@ -67,14 +80,6 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 That's it — you are running Autoware. The full guide with configuration, architecture, and cloned-repo usage is at [Planning Simulation](../deployment/planning-simulation/index.md).
 
 If something goes wrong, see [Troubleshooting](troubleshooting.md).
-
-!!! tip "Release Bundles"
-    Once a release is published, you can download a self-contained bundle and skip the `git clone`:
-    ```bash
-    curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/planning-simulation.tar.gz | tar xz
-    cd planning-simulation
-    ```
-    The bundle includes `install.sh` and a merged env file, so every command runs from the extracted directory.
 
 ## Next Steps
 

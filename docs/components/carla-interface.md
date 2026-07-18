@@ -5,7 +5,7 @@
 The `carla-interface` image packages the `autoware_carla_interface` bridge, enabling **closed-loop end-to-end simulation** with the [CARLA](https://carla.org/) simulator. It is built on top of the `simulator` image and published as `ghcr.io/autowarefoundation/openadkit:carla-interface`. It acts as a bidirectional gateway between Autoware and CARLA: translating Autoware control outputs into CARLA ego vehicle commands, and converting CARLA sensor data into Autoware-compatible ROS 2 messages. This allows the full Autoware stack to drive and perceive within a photorealistic CARLA world.
 
 !!! note "Platform support"
-    `carla-interface` is published for **amd64 + Humble only** and requires an **NVIDIA GPU** (the CARLA server renders the world). There is no arm64 image.
+    `carla-interface` is published for **amd64 + Humble only**. The bridge image itself does not require a GPU, but the complete CARLA deployment requires an NVIDIA GPU for the colocated CARLA server. There is no arm64 image.
 
 ## What This Image Contains
 
@@ -27,7 +27,7 @@ The `carla-interface` image bundles the following capabilities:
 Typical resource usage:
 
 - **CPU**: Moderate (bridge logic + Python-based CARLA client)
-- **GPU**: Recommended (CARLA server itself requires GPU; the bridge container does not, but CARLA rendering is GPU-intensive)
+- **GPU**: Not required by this bridge image; required by the complete deployment's CARLA server
 - **Memory**: ~2–4 GB
 
 ## Used In

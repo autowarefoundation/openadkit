@@ -58,16 +58,18 @@ cd openadkit
 ./install.sh --build-deps --download-samples --verify
 ```
 
-Log out and back in (or run `newgrp docker`) for the docker group change to take
-effect, then continue:
+--8<-- "includes/docker-group-activation.md"
 
 ```bash
 # 3. Install vcs2l (imports Autoware source for component Dockerfiles)
 pipx install vcs2l
 export PATH="$HOME/.local/bin:$PATH"
 
-# 4. Import Autoware sources
-git clone --depth 1 https://github.com/autowarefoundation/autoware.git
+# 4. Import Autoware sources at the release used by upstream base images
+AUTOWARE_REF=1.8.0
+export UPSTREAM_TAG="$AUTOWARE_REF"
+git clone --branch "$AUTOWARE_REF" --depth 1 \
+  https://github.com/autowarefoundation/autoware.git
 mkdir -p autoware/src
 vcs import --shallow autoware/src < autoware/repositories/autoware.repos
 mkdir -p autoware/src/middleware/external
@@ -133,8 +135,8 @@ The Bake file exposes a few variables, overridable via environment variables:
 | `UPSTREAM_REPO` | Upstream Autoware image repository | `ghcr.io/autowarefoundation/autoware` |
 
 ```bash
-# Build the component group for ROS 2 Humble against a pinned upstream release
-ROS_DISTRO=humble UPSTREAM_TAG=1.8.0 \
+# Reuse the ref selected for the Autoware checkout above
+ROS_DISTRO=humble UPSTREAM_TAG="$AUTOWARE_REF" \
   docker buildx bake -f components/docker-bake.hcl component
 ```
 
@@ -160,18 +162,19 @@ Before running the release pipeline, verify:
 - **`vars.UPSTREAM_TAG`** is set in the repository or organization Variables on GitHub. This selects the default Autoware source release (e.g. `1.8.0`). Manual `autoware_ref` inputs override it; the workflow derives and pins the matching base-image release from the resolved source ref.
 - **GHCR packages** are accessible: `ghcr.io/autowarefoundation/openadkit`, `ghcr.io/autowarefoundation/openadkit-common`, and the build cache repo `ghcr.io/autowarefoundation/openadkit-buildcache` must accept pushes from CI.
 - **`secrets.RELEASE_TOKEN`** is available when promoting a build commit older than subsequent workflow changes. Use a token with repository Contents and Workflows write access; otherwise the workflow uses `GITHUB_TOKEN`.
-- **A successful build** exists: `build-all-images` completed on `main` with the desired `autoware_ref`. The build summary shows a `build_tag` and confirms release eligibility.
+- **A successful build** exists: `build-all-images` completed on `main` from an exact Autoware release tag. Branch and SHA builds remain useful for validation but cannot be promoted. The build summary shows the resulting `build_tag`.
 - **A successful scan** exists: `scan-images` completed and **passed** for that `build_tag`.
 
 ### Workflow Steps
 
-The release workflow (`.github/workflows/release.yaml`) has five jobs that run sequentially:
+The release workflow (`.github/workflows/release.yaml`) has six jobs that run sequentially:
 
 1. **validate** — Downloads build metadata and scan results, then runs 12 validation gates before any images are tagged.
-2. **package-bundles** — Packages all deployment bundles before any release state is published.
+2. **package-bundles** — Packages all deployment bundles and records the packager SHA before any release state is published.
 3. **release-tag** — Creates or verifies the Git tag, failing closed on API errors or a conflicting commit.
-4. **release-images** — Promotes image digests to release tags after the Git tag is confirmed.
-5. **release-github** — Creates the GitHub Release and uploads bundles and provenance metadata.
+4. **prepare-github-release** — Creates a workflow-owned draft, or verifies an existing published release against the complete metadata, notes, target SHA, and assets.
+5. **release-images** — Promotes immutable image tags, rechecks the latest-stable policy, then updates mutable aliases only if the policy is unchanged.
+6. **release-github** — Revalidates the exact draft release ID and publishes it after image promotion succeeds.
 
 #### Validation Gates
 
@@ -187,12 +190,14 @@ Before any image is tagged, the `validate` job (`.github/scripts/validate_releas
 | 6 | **Build age** | Build must be less than 90 days old |
 | 7 | **Scan results** | A passing `scan-images` run must exist for the build; scan metadata is validated against the build metadata |
 | 8 | **Metadata schema** | 15+ fields in `build-metadata.json` are validated (types, formats, SHA256 lengths) |
-| 9 | **File integrity** | SHA256 of `autoware-lock.repos` and `image-inventory.json` must match the metadata |
-| 10 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build — no missing, no extras |
-| 11 | **Scan coverage** | Every image digest and platform must have a scan result |
-| 12 | **Registry integrity** | Build images must still exist in GHCR with matching digests; release tags must not conflict with existing tags at different digests |
+| 9 | **File integrity** | SHA256 of `autoware-lock.repos`, `image-inventory.json`, and `upstream-images.json` must match the metadata |
+| 10 | **Autoware revision** | Every release, including pre-releases, must use an exact Autoware release tag matching the base version |
+| 11 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build; no missing or extra images |
+| 12 | **Upstream coverage** | Every required Autoware base is recorded and consumed as an immutable manifest digest |
+| 13 | **Scan coverage** | Every image digest and platform must have a scan result |
+| 14 | **Registry integrity** | Build images must still exist in GHCR with matching digests; confirmed missing tags are distinguished from retried transient and fail-closed registry errors |
 
-If all 12 gates pass, the workflow proceeds to tag promotion.
+If all 14 gates pass, the workflow proceeds to tag promotion.
 
 #### Tag Promotion
 
@@ -229,6 +234,7 @@ The resulting tag aliases are documented in [How Releases Are Tagged](../getting
 The following artifacts are the canonical reference for release validation:
 
 - **Build metadata** — CI run logs and artifact manifests
+- **`upstream-images.json`** — Exact Autoware base manifests consumed by the build
 - **Scan metadata** — CVE scan results
 - **`.github/image-inventory.json`** — Canonical inventory of all published images and their tags
 

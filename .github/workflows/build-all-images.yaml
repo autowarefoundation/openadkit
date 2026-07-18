@@ -49,6 +49,7 @@ jobs:
       autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
       autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      upstream_images: ${{ steps.upstream.outputs.upstream_images }}
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       scan_requested: ${{ steps.prepare.outputs.scan_requested }}
@@ -76,6 +77,26 @@ jobs:
           cp .github/image-inventory.json image-inventory/image-inventory.json
           python3 .github/scripts/resolve_image_matrices.py >> "$GITHUB_OUTPUT"
         shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Resolve immutable upstream Autoware images
+        id: upstream
+        env:
+          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/resolve_upstream_images.sh
+          echo "upstream_images=$(jq -c 'reduce .[] as $item ({}; .[$item.ros_distro][$item.name] = $item)' upstream-images/upstream-images.json)" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Upload immutable upstream image metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-images-${{ steps.prepare.outputs.build_tag }}
+          path: upstream-images/upstream-images.json
+          retention-days: 90
 
       - name: Upload image inventory
         uses: actions/upload-artifact@v4
@@ -166,33 +187,6 @@ jobs:
           flavor: |
             latest=false
 
-      - name: Ensure upstream Autoware base images exist
-        env:
-          ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
-        run: |
-          set -euo pipefail
-          # universe-common surfaces core-devel/base; sensing-perception-cuda
-          # surfaces base-cuda-{devel,runtime}. Together they cover every
-          # upstream base this build depends on, so a missing CUDA base fails
-          # here instead of late in build-components.
-          refs=$(docker buildx bake -f "${BAKE_FILE}" --print universe-common sensing-perception-cuda 2>/dev/null \
-            | jq -r '[.target[].contexts // {} | to_entries[].value]
-                     | map(select(startswith("docker-image://ghcr.io/autowarefoundation/autoware:")))
-                     | unique[]' | sed 's#^docker-image://##')
-          if [ -z "${refs}" ]; then echo "No upstream refs to verify."; exit 0; fi
-          fail=0
-          while IFS= read -r ref; do
-            [ -z "${ref}" ] && continue
-            if docker buildx imagetools inspect "${ref}" >/dev/null 2>&1; then
-              echo "OK: ${ref}"
-            else
-              echo "::error::Missing upstream image: ${ref}"; fail=1
-            fi
-          done <<< "${refs}"
-          [ "${fail}" -eq 0 ]
-        shell: bash
-
       - name: Restore BuildKit cache mounts
         id: cache-restore
         uses: actions/cache/restore@v5
@@ -232,6 +226,8 @@ jobs:
           push: true
           set: |
             *.platform=${{ matrix.platform }}
+            *.contexts.autoware-core-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['core-devel'].uri }}
+            *.contexts.autoware-base=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro].base.uri }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
@@ -334,6 +330,8 @@ jobs:
           set: |
             *.platform=${{ matrix.platform }}
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
+            sensing-perception-cuda.contexts.autoware-base-cuda-runtime=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['base-cuda-runtime'].uri }}
+            sensing-perception-cuda.contexts.autoware-base-cuda-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['base-cuda-devel'].uri }}
             *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
@@ -504,6 +502,12 @@ jobs:
           name: image-inventory-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
+      - name: Download immutable upstream image metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: upstream-images-${{ needs.prepare.outputs.build_tag }}
+          path: build-metadata
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -537,6 +541,7 @@ jobs:
             build-metadata/build-metadata.json
             build-metadata/autoware-lock.repos
             build-metadata/image-inventory.json
+            build-metadata/upstream-images.json
           retention-days: 90
 
   summarize:

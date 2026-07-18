@@ -2,6 +2,12 @@
 # Promote validated build image digests to release tags and stable aliases.
 set -euo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=.github/scripts/registry_lookup.sh
+source "${script_dir}/registry_lookup.sh"
+# shellcheck source=.github/scripts/stable_alias_policy.sh
+source "${script_dir}/stable_alias_policy.sh"
+
 : "${VERSION:?VERSION is required}"
 : "${DEFAULT_ROS_DISTRO:?DEFAULT_ROS_DISTRO is required}"
 : "${PUBLISH_LATEST_ALIASES:?PUBLISH_LATEST_ALIASES is required}"
@@ -24,10 +30,10 @@ promote_tag() {
   local repo="$2"
   local digest="$3"
   local mode="$4"
-  local existing_json existing_digest
+  local existing_digest lookup_status=0
 
-  if existing_json=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}' 2>/dev/null); then
-    existing_digest=$(printf '%s' "${existing_json}" | jq -r '.manifest.digest')
+  existing_digest=$(registry_manifest_digest "${ref}") || lookup_status=$?
+  if [ "${lookup_status}" -eq 0 ]; then
     if [ "${existing_digest}" = "${digest}" ]; then
       echo "${ref} already points to ${digest}; skipping"
       return
@@ -37,8 +43,10 @@ promote_tag() {
       exit 1
     fi
     echo "Updating ${ref}: ${existing_digest} -> ${digest}"
-  else
+  elif [ "${lookup_status}" -eq 1 ]; then
     echo "Promoting ${repo}@${digest} -> ${ref}"
+  else
+    return "${lookup_status}"
   fi
 
   docker buildx imagetools create -t "${ref}" "${repo}@${digest}"
@@ -47,8 +55,18 @@ promote_tag() {
 while IFS=$'\t' read -r repo target distro digest; do
   release_ref="${repo}:${target}-${distro}-${VERSION}"
   promote_tag "${release_ref}" "${repo}" "${digest}" immutable
+done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
 
-  if [ "${stable_release}" = "true" ] && [ "${PUBLISH_LATEST_ALIASES}" = "true" ]; then
+if [ "${stable_release}" = true ]; then
+  current_policy=$(current_latest_alias_policy)
+  if [ "${current_policy}" != "${PUBLISH_LATEST_ALIASES}" ]; then
+    echo "Latest alias policy changed during release: expected ${PUBLISH_LATEST_ALIASES}, now ${current_policy}; rerun the release workflow" >&2
+    exit 1
+  fi
+fi
+
+if [ "${stable_release}" = true ] && [ "${PUBLISH_LATEST_ALIASES}" = true ]; then
+  while IFS=$'\t' read -r repo target distro digest; do
     promote_tag "${repo}:${target}-${distro}" "${repo}" "${digest}" alias
     promote_tag "${repo}:${target}-${distro}-latest" "${repo}" "${digest}" alias
 
@@ -56,5 +74,5 @@ while IFS=$'\t' read -r repo target distro digest; do
       promote_tag "${repo}:${target}" "${repo}" "${digest}" alias
       promote_tag "${repo}:${target}-latest" "${repo}" "${digest}" alias
     fi
-  fi
-done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
+  done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
+fi

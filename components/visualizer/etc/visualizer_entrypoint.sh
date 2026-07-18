@@ -3,12 +3,32 @@
 # shellcheck disable=SC1090,SC1091
 set -euo pipefail
 
-cleanup() {
-    echo "Shutting down VNC and websockify..."
-    pkill websockify 2>/dev/null || true
-    vncserver -kill :99 2>/dev/null || true
+VNC_PID=""
+WEBSOCKIFY_PID=""
+COMMAND_PID=""
+
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Visualizer must run as a non-root user" >&2
+    exit 1
+fi
+
+terminate_child() {
+    local pid="${1:-}"
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
 }
-trap cleanup EXIT SIGTERM SIGINT
+
+cleanup() {
+    trap - EXIT INT TERM
+    echo "Shutting down VNC and websockify..."
+    terminate_child "$COMMAND_PID"
+    terminate_child "$WEBSOCKIFY_PID"
+    terminate_child "$VNC_PID"
+}
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 # Check if RVIZ_CONFIG is provided
 if [ -z "${RVIZ_CONFIG:-}" ]; then
@@ -25,8 +45,8 @@ fi
 
 configure_vnc() {
     # Create Openbox application configuration
-    mkdir -p /etc/xdg/openbox
-    cat >/etc/xdg/openbox/rc.xml <<'EOF'
+    mkdir -p "$HOME/.config/openbox" "$HOME/.local/bin"
+    cat >"$HOME/.config/openbox/rc.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <openbox_config xmlns="http://openbox.org/3.4/rc"
                 xmlns:xi="http://www.w3.org/2001/XInclude">
@@ -44,7 +64,7 @@ configure_vnc() {
 </openbox_config>
 EOF
     # Create rviz2 start script
-    cat >/usr/local/bin/start-rviz2.sh <<'EOF'
+    cat >"$HOME/.local/bin/start-rviz2.sh" <<'EOF'
 #!/bin/bash
 source /opt/ros/"$ROS_DISTRO"/setup.bash
 source /opt/autoware/setup.bash
@@ -66,8 +86,9 @@ fi
 
 exec $rviz_launcher rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
 EOF
-    chmod +x /usr/local/bin/start-rviz2.sh
-    echo "/usr/local/bin/start-rviz2.sh" >>/etc/xdg/openbox/autostart
+    chmod +x "$HOME/.local/bin/start-rviz2.sh"
+    grep -qxF "$HOME/.local/bin/start-rviz2.sh" "$HOME/.config/openbox/autostart" \
+        || echo "$HOME/.local/bin/start-rviz2.sh" >>"$HOME/.config/openbox/autostart"
 
     # Configure VNC password
     if [ -z "${REMOTE_PASSWORD:-}" ]; then
@@ -82,24 +103,27 @@ EOF
     # inside the container) can reach it. This is important under
     # network_mode: host where the container's loopback == the host's.
     echo "Starting VNC server with Openbox..."
-    if ! vncserver :99 -localhost -geometry 1024x768 -depth 16 -pixelformat rgb565; then
+    vncserver :99 -fg -localhost -geometry 1024x768 -depth 16 -pixelformat rgb565 &
+    VNC_PID=$!
+    sleep 2
+    if ! kill -0 "$VNC_PID" 2>/dev/null; then
+        wait "$VNC_PID" 2>/dev/null || true
+        VNC_PID=""
         echo "Failed to start VNC server"
-        exit 1
+        return 1
     fi
 
     # Set the DISPLAY variable to match VNC server
     echo "Setting DISPLAY to :99"
-    echo "export DISPLAY=:99" >>~/.bashrc
-    sleep 2
-
+    grep -qxF "export DISPLAY=:99" ~/.bashrc || echo "export DISPLAY=:99" >>~/.bashrc
     # Generate a unique self-signed TLS certificate at runtime so each
     # container instance has its own key pair (instead of a shared build-time
     # certificate baked into the image).
     echo "Generating TLS certificate for NoVNC..."
-    mkdir -p /etc/ssl/private /etc/ssl/certs
+    mkdir -p "$HOME/.vnc"
     if ! openssl req -x509 -nodes -newkey rsa:2048 \
-      -keyout /etc/ssl/private/novnc.key \
-      -out /etc/ssl/certs/novnc.crt \
+      -keyout "$HOME/.vnc/novnc.key" \
+      -out "$HOME/.vnc/novnc.crt" \
       -days 365 \
       -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1; then
         echo "Failed to generate TLS certificate for NoVNC"
@@ -114,11 +138,16 @@ EOF
     # loopback. The VNC server is always loopback-only (see -localhost above).
     echo "Starting NoVNC..."
     local websck_bind="${WEBSOCKIFY_BIND:-127.0.0.1}"
-    if ! websockify --daemon --web=/usr/share/novnc/ \
-      --cert=/etc/ssl/certs/novnc.crt --key=/etc/ssl/private/novnc.key \
-      "${websck_bind}:6080" localhost:5999; then
+    websockify --web=/usr/share/novnc/ \
+      --cert="$HOME/.vnc/novnc.crt" --key="$HOME/.vnc/novnc.key" \
+      "${websck_bind}:6080" localhost:5999 &
+    WEBSOCKIFY_PID=$!
+    sleep 1
+    if ! kill -0 "$WEBSOCKIFY_PID" 2>/dev/null; then
+        wait "$WEBSOCKIFY_PID" 2>/dev/null || true
+        WEBSOCKIFY_PID=""
         echo "Failed to start websockify (NoVNC server)"
-        exit 1
+        return 1
     fi
 
     # Print info
@@ -144,6 +173,14 @@ if [ "${REMOTE_DISPLAY:-true}" == "false" ]; then
 else
     echo "Launching remote rviz2 display"
     configure_vnc
-    [ $# -eq 0 ] && sleep infinity
-    exec "$@"
+    if [ $# -eq 0 ]; then
+        sleep infinity
+    else
+        "$@" &
+        COMMAND_PID=$!
+        command_status=0
+        wait "$COMMAND_PID" || command_status=$?
+        COMMAND_PID=""
+        exit "$command_status"
+    fi
 fi

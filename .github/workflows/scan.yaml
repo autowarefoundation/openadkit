@@ -34,6 +34,7 @@ jobs:
       contents: read
     outputs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
+      policy_sha: ${{ steps.prepare.outputs.policy_sha }}
       matrix: ${{ steps.prepare.outputs.matrix }}
       should_scan: ${{ steps.prepare.outputs.should_scan }}
     steps:
@@ -69,6 +70,11 @@ jobs:
           else
             should_scan=true
           fi
+          policy_sha=$(jq -r '.openadkit_sha' build-metadata/build-metadata.json)
+          if ! printf '%s\n' "${policy_sha}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Invalid OpenADKit SHA in build metadata: ${policy_sha}" >&2
+            exit 1
+          fi
 
           matrix=$(
             jq -c '{include: [.images[] as $image | $image.platforms[] | {
@@ -84,6 +90,7 @@ jobs:
 
           {
             echo "build_tag=${build_tag}"
+            echo "policy_sha=${policy_sha}"
             echo "should_scan=${should_scan}"
             echo "matrix=${matrix}"
           } >> "$GITHUB_OUTPUT"
@@ -106,6 +113,7 @@ jobs:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ needs.prepare.outputs.policy_sha }}
           sparse-checkout: .trivyignore
           sparse-checkout-cone-mode: false
           fetch-depth: 1
@@ -150,6 +158,7 @@ jobs:
       - name: Write scan metadata
         env:
           BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          POLICY_SHA: ${{ needs.prepare.outputs.policy_sha }}
           SCAN_RESULT: ${{ needs.scan.result }}
           SCAN_MATRIX: ${{ needs.prepare.outputs.matrix }}
         run: |
@@ -163,6 +172,7 @@ jobs:
 
           jq -n \
             --arg build_tag "${BUILD_TAG}" \
+            --arg policy_sha "${POLICY_SHA}" \
             --arg scan_status "${status}" \
             --arg scan_result "${SCAN_RESULT}" \
             --arg run_id "${GITHUB_RUN_ID}" \
@@ -170,6 +180,7 @@ jobs:
             --argjson scan_matrix "${SCAN_MATRIX}" \
             '{
               build_tag: $build_tag,
+              policy_sha: $policy_sha,
               scan_scope: "all",
               scan_status: $scan_status,
               scan_result: $scan_result,

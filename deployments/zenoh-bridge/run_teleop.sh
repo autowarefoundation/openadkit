@@ -14,4 +14,4 @@ echo "Connecting to container..."
 docker compose exec -it teleop bash -c "
     source /autoware_manual_control_ws/install/setup.bash && \
     echo -e '\n\033[1;32mStarting Keyboard Control...\033[0m' && \
-    ros2 run autoware_manual_control keyboard_control --ros-args --params-file /autoware_manual_control_ws/src/autoware_manual_control/teleop_config.yaml"
+    ros2 run autoware_manual_control keyboard_control --ros-args --params-file /autoware_manual_control_ws/teleop_config.yaml"

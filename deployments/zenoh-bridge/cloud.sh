@@ -10,7 +10,7 @@ show_help() {
     echo "  down            Stop and remove Cloud services"
     echo "  ps              List status of Cloud services"
     echo "  logs            View logs of Cloud services"
-    echo "  config          Validate and view the Compose file"
+    echo "  config          Validate the Compose file"
     echo "  dry-run         Show what would be executed without doing it"
     echo ""
     echo "Options:"
@@ -60,13 +60,30 @@ if [ -z "$CMD" ]; then
     CMD="up"
 fi
 
-# Compose reads .env itself. Read only the effective bind value for this
-# preflight, without sourcing the file or overriding exported variables.
-if ! ZENOH_BIND_IP=$(read_dotenv_value ZENOH_ROUTER_BIND_IP); then
-    ZENOH_BIND_IP=127.0.0.1
+# Ask Compose for the effective value so this guard follows its dotenv comment,
+# quoting, interpolation, and environment-precedence semantics exactly.
+if ZENOH_BIND_IP=$(read_compose_environment_value ZENOH_ROUTER_BIND_IP); then
+    :
+else
+    compose_environment_status=$?
+    if [[ "$compose_environment_status" -eq 3 ]]; then
+        ZENOH_BIND_IP=127.0.0.1
+    else
+        echo -e "${RED}[Error]${NC} Could not resolve the effective Zenoh binding from Docker Compose."
+        exit 1
+    fi
+fi
+normalized_bind_ip="${ZENOH_BIND_IP#[}"
+normalized_bind_ip="${normalized_bind_ip%]}"
+if ! resolved_bind_ip=$(getent ahosts "$normalized_bind_ip" | awk 'NR == 1 { print $1 }') \
+    || [[ -z "$resolved_bind_ip" ]]; then
+    echo -e "${RED}[Error]${NC} Could not resolve Zenoh binding ${ZENOH_BIND_IP} to an IP address."
+    exit 1
 fi
 if [[ "$CMD" == "up" || "$CMD" == "dry-run" ]] \
-    && [[ "$ZENOH_BIND_IP" == "0.0.0.0" || "$ZENOH_BIND_IP" == "::" ]]; then
+    && [[ "$resolved_bind_ip" == "0.0.0.0" \
+        || "$resolved_bind_ip" == "::" \
+        || "$resolved_bind_ip" == "::ffff:0.0.0.0" ]]; then
     echo -e "${RED}[Error]${NC} Refusing wildcard Zenoh binding ${ZENOH_BIND_IP}."
     echo "        Bind ZENOH_ROUTER_BIND_IP to an exact VPN/private-interface address."
     echo "        Zenoh TCP port 7448 has no transport authentication or encryption."

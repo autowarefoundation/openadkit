@@ -2,10 +2,25 @@
 # Assemble and validate self-contained deployment bundles for a release.
 set -euo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=.github/scripts/registry_lookup.sh
+# shellcheck disable=SC1091
+source "${script_dir}/registry_lookup.sh"
+
 source_dir="${SOURCE_DIR:-src}"
 install="${source_dir}/install.sh"
 base_dir="${source_dir}/deployments/base"
 image_prefix_component="${IMAGE_PREFIX_COMPONENT:-ghcr.io/autowarefoundation/openadkit}"
+
+third_party_digest() {
+  local ref="$1"
+  if [ -n "${THIRD_PARTY_IMAGE_DIGESTS_JSON:-}" ]; then
+    jq -er --arg ref "${ref}" '.[$ref] | select(test("^sha256:[0-9a-f]{64}$"))' \
+      <<<"${THIRD_PARTY_IMAGE_DIGESTS_JSON}"
+  else
+    registry_manifest_digest "${ref}"
+  fi
+}
 
 mkdir -p dist staging
 for entry in \
@@ -52,8 +67,6 @@ for entry in \
 
   # Pin Open AD Kit image refs to immutable release tags so a downloaded
   # bundle stays reproducible after future releases repoint the bare aliases.
-  # Third-party images (autoware:universe, zenoh-bridge:latest, etc.) are left
-  # untouched — pinning those is tracked separately.
   if [ -n "${VERSION:-}" ] && [ -n "${DEFAULT_ROS_DISTRO:-}" ]; then
     bundle_ros_distro="${DEFAULT_ROS_DISTRO}"
     if [ "${name}" = "carla-simulation" ]; then
@@ -73,6 +86,28 @@ for entry in \
   else
     echo "VERSION/DEFAULT_ROS_DISTRO not set; skipping image pinning"
   fi
+
+  # Resolve every literal third-party image used by the deployment. Keeping
+  # the human-readable tag before @sha256 documents the selected upstream
+  # version while making pulls immutable.
+  for ref in \
+    ghcr.io/autowarefoundation/autoware:universe \
+    eclipse/zenoh-bridge-ros2dds:latest \
+    ghcr.io/evshary/autoware_manual_control:latest \
+    ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime \
+    carlasim/carla:0.9.16 \
+    busybox:1.36.1; do
+    matching_files=()
+    while IFS= read -r -d '' candidate; do
+      if grep -Fq "${ref}" "${candidate}"; then
+        matching_files+=("${candidate}")
+      fi
+    done < <(find "staging/${name}" -type f \( -name '*.yaml' -o -name '*.env' -o -name '.env' \) -print0)
+    [ "${#matching_files[@]}" -gt 0 ] || continue
+    digest=$(third_party_digest "${ref}")
+    echo "Pinning ${ref}@${digest}"
+    sed -i "s#${ref}#${ref}@${digest}#g" "${matching_files[@]}"
+  done
 
   env_file="staging/${name}/${name}.env"
   if [ -f "${env_file}" ]; then
@@ -109,6 +144,16 @@ for entry in \
     echo "::endgroup::"
   fi
 
-  tar -C staging -czf "dist/${name}.tar.gz" "${name}"
+  # Normalize archive metadata so an idempotent release rerun produces the
+  # exact same bytes instead of silently replacing historical assets.
+  tar \
+    --sort=name \
+    --mtime='@0' \
+    --owner=0 \
+    --group=0 \
+    --numeric-owner \
+    -C staging \
+    -czf "dist/${name}.tar.gz" \
+    "${name}"
   echo "packaged dist/${name}.tar.gz"
 done

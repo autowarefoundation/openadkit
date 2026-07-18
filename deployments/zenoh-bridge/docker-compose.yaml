@@ -34,8 +34,8 @@ services:
       scenario_simulation:=${SCENARIO_SIMULATION:-true}
       rviz:=false"
     depends_on:
-      edge_zenoh_bridge:
-        condition: service_started
+      edge_zenoh_ready:
+        condition: service_completed_successfully
 
   scenario_simulator:
     image: *scenario-simulator-image
@@ -67,8 +67,8 @@ services:
     depends_on:
       autoware:
         condition: service_started
-      edge_zenoh_bridge:
-        condition: service_started
+      edge_zenoh_ready:
+        condition: service_completed_successfully
 
   edge_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
@@ -91,6 +91,27 @@ services:
       -e tcp/${CLOUD_IP:-cloud_zenoh_bridge}:7448
       -c /config/zenoh-bridge-ros2dds.json5
 
+  edge_zenoh_ready:
+    image: busybox:1.36.1
+    networks:
+      - zenoh_net
+    environment:
+      - CLOUD_IP=${CLOUD_IP:-cloud_zenoh_bridge}
+      - ZENOH_READY_TIMEOUT=${ZENOH_READY_TIMEOUT:-120}
+    depends_on:
+      edge_zenoh_bridge:
+        condition: service_started
+    command:
+      - sh
+      - -ec
+      - |
+        deadline=$$(($$(date +%s) + ZENOH_READY_TIMEOUT))
+        until nc -z -w 1 edge_zenoh_bridge 7447 && nc -z -w 1 "$$CLOUD_IP" 7448; do
+          [ "$$(date +%s)" -lt "$$deadline" ] || { echo "Zenoh edge tunnel readiness timed out" >&2; exit 1; }
+          sleep 2
+        done
+    restart: "no"
+
   visualizer:
     image: ghcr.io/autowarefoundation/openadkit:visualizer
     networks:
@@ -110,8 +131,8 @@ services:
     ports:
       - "127.0.0.1:6081:6080"
     depends_on:
-      cloud_zenoh_bridge:
-        condition: service_started
+      cloud_zenoh_ready:
+        condition: service_completed_successfully
 
   cloud_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
@@ -137,15 +158,36 @@ services:
       -l tcp/0.0.0.0:7448
       -c /config/zenoh-bridge-ros2dds.json5
 
+  cloud_zenoh_ready:
+    image: busybox:1.36.1
+    networks:
+      - zenoh_net
+    environment:
+      - ZENOH_READY_TIMEOUT=${ZENOH_READY_TIMEOUT:-120}
+    depends_on:
+      cloud_zenoh_bridge:
+        condition: service_started
+    command:
+      - sh
+      - -ec
+      - |
+        deadline=$$(($$(date +%s) + ZENOH_READY_TIMEOUT))
+        until nc -z -w 1 cloud_zenoh_bridge 7448; do
+          [ "$$(date +%s)" -lt "$$deadline" ] || { echo "Zenoh cloud listener readiness timed out" >&2; exit 1; }
+          sleep 2
+        done
+    restart: "no"
+
   teleop:
-    image: ghcr.io/evshary/autoware_manual_control:feat-ci-image-release
+    image: ghcr.io/evshary/autoware_manual_control:latest
     networks:
       - cloud_net
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
     volumes:
-      - ./teleop/teleop_config.yaml:/autoware_manual_control_ws/src/autoware_manual_control/teleop_config.yaml
+      - ./teleop/teleop_config.yaml:/autoware_manual_control_ws/teleop_config.yaml:ro
     command: sleep infinity
     depends_on:
-      - cloud_zenoh_bridge
+      cloud_zenoh_ready:
+        condition: service_completed_successfully

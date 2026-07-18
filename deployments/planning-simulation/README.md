@@ -8,11 +8,18 @@ For complete operational instructions, see the canonical documentation:
 
 **[Open AD Kit Docs — Planning Simulation](https://autowarefoundation.github.io/openadkit/deployment/planning-simulation/)**
 
-## Quick Start
+## Source Checkout
 
 ```bash
 ../../install.sh sample-data planning-simulation
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d
 ```
 
-*Release bundle: from the extracted directory, run `./install.sh sample-data planning-simulation` and `docker compose --env-file planning-simulation.env up -d` (the bundle ships a merged env file).*
+## Release Bundle
+
+From the extracted directory:
+
+```bash
+./install.sh sample-data planning-simulation
+docker compose --env-file planning-simulation.env up -d
+```

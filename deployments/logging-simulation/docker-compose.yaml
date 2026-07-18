@@ -16,6 +16,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
       - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
@@ -43,6 +44,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
       - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
@@ -74,6 +76,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -99,12 +102,33 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${ROSBAG_PATH}:/autoware_map/rosbag:ro
-    command: >
-      bash -c "ros2 bag info /autoware_map/rosbag -s ${ROSBAG_FORMAT} &&
-      ros2 bag play /autoware_map/rosbag -r ${ROSBAG_RATE} -s ${ROSBAG_FORMAT}"
+    depends_on:
+      sensing:
+        condition: service_started
+      perception:
+        condition: service_started
+      localization:
+        condition: service_started
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+        ros2 bag info /autoware_map/rosbag -s ${ROSBAG_FORMAT}
+        topic=${ROSBAG_READY_TOPIC}
+        deadline=$$((SECONDS + ${ROSBAG_READY_TIMEOUT}))
+        until ros2 topic info "$$topic" 2>/dev/null | grep -Eq 'Subscription count: [1-9][0-9]*'; do
+          if (( SECONDS >= deadline )); then
+            echo "Timed out waiting for a subscriber on $$topic" >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        exec ros2 bag play /autoware_map/rosbag -r ${ROSBAG_RATE} -s ${ROSBAG_FORMAT}
     restart: "no"
     profiles:
       - rosbag

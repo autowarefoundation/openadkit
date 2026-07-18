@@ -41,6 +41,26 @@ read_dotenv_value() {
     return 1
 }
 
+# Read the value Docker Compose will actually use after applying shell
+# precedence, dotenv quoting/comments, and interpolation rules.
+read_compose_environment_value() {
+    local name="$1"
+    local compose_environment line
+
+    [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 2
+    if ! compose_environment=$(docker compose config --environment); then
+        return 1
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "${line%%=*}" == "$name" ]]; then
+            printf '%s\n' "${line#*=}"
+            return 0
+        fi
+    done <<< "$compose_environment"
+    return 3
+}
+
 validate_args() {
     local args="$1"
     local allowed_flags="-d --detach --build --no-build --no-deps --force-recreate --remove-orphans"
@@ -89,7 +109,12 @@ run_compose() {
         "dry-run")
             echo -e "${YELLOW}[${context_name}]${NC} [Dry Run] Would start services: ${GREEN}${target_services}${NC}"
             echo -e "${YELLOW}[${context_name}]${NC} Validating compose configuration..."
-            docker compose config
+            docker compose config -q
+            ;;
+
+        "config")
+            echo -e "${YELLOW}[${context_name}]${NC} Validating compose configuration..."
+            docker compose config -q
             ;;
 
         *)

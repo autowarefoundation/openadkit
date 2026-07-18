@@ -12,8 +12,7 @@ For complete operational instructions, see the canonical documentation:
 
 - Docker with NVIDIA Container Toolkit (`nvidia` runtime configured)
 - Access to `carlasim/carla:0.9.16`
-- Host X display (`DISPLAY=:0`)
-- Host X access for containers: `xhost +SI:localuser:root`
+- Host X display and container access (`xhost +SI:localuser:root`) only when disabling the default offscreen rendering mode
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
 - Large kernel UDP buffers:
 
@@ -28,13 +27,13 @@ sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
 ./start-carla-e2e-demo.sh
 ```
 
-The helper downloads map assets, starts CARLA, Autoware modules, and the RViz visualizer. Use `--drive` to auto-engage and verify movement. Use `--build` to rebuild the CARLA interface image locally.
+The helper validates host prerequisites, downloads checksum-pinned map assets atomically, and then starts CARLA, Autoware modules, and the RViz visualizer. Failed startup or verification removes only services started by that invocation. Use `--drive` to auto-engage and verify movement. In a source checkout, use `--build` to rebuild the CARLA interface image locally; release bundles use the published image and reject this option.
 
 | Flag | Behavior |
 |------|----------|
 | *(none)* | Start stack, no drive |
 | `--drive` | Start + auto-engage + verify movement |
-| `--build` | Rebuild CARLA interface image before starting |
+| `--build` | Rebuild CARLA interface image before starting (source checkout only) |
 | `--no-drive` | Explicit no-drive (default) |
 | `--skip-build` | Skip CARLA interface image rebuild (default) |
 | `--skip-verify` | Skip the post-start verification checks |
@@ -43,6 +42,14 @@ The helper downloads map assets, starts CARLA, Autoware modules, and the RViz vi
 
 ## Stop
 
+From a source checkout:
+
 ```bash
 docker compose --env-file ../base/base.env --env-file carla-simulation.env down
+```
+
+From a release bundle:
+
+```bash
+docker compose --env-file carla-simulation.env down
 ```

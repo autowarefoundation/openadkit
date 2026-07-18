@@ -8,11 +8,18 @@ For complete operational instructions, see the canonical documentation:
 
 **[Open AD Kit Docs — Scenario Simulation](https://autowarefoundation.github.io/openadkit/deployment/scenario-simulation/)**
 
-## Quick Start
+## Source Checkout
 
 ```bash
 ../../install.sh sample-data scenario-simulation
 docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d
 ```
 
-*Release bundle: from the extracted directory, run `./install.sh sample-data scenario-simulation` and `docker compose --env-file scenario-simulation.env up -d` (the bundle ships a merged env file).*
+## Release Bundle
+
+From the extracted directory:
+
+```bash
+./install.sh sample-data scenario-simulation
+docker compose --env-file scenario-simulation.env up -d
+```

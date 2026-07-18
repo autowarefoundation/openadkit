@@ -18,7 +18,7 @@ For running deployments, simulations, and development workloads on a workstation
 | Storage | 50 GB | 100 GB+ SSD |
 
 !!! tip "GPU Recommendation"
-    An NVIDIA GPU is highly recommended for sensing and perception tasks. Without a GPU, CUDA-accelerated components will fall back to CPU execution, which significantly impacts performance.
+    An NVIDIA GPU is highly recommended for sensing and perception tasks. CUDA images require a working NVIDIA runtime; they do not automatically fall back to CPU. Use the standard CPU image or deployment configuration on hosts without a GPU.
 
 ### Verified Edge Deployment
 
@@ -28,8 +28,14 @@ For running a full Autoware stack on a verified edge platform, the requirements 
 |----------|---------------|
 | CPU | 40-core Arm Neoverse N1 equivalent (or better) |
 | RAM | 32 GB |
-| GPU | NVIDIA with CUDA support (for sensing/perception) |
+| GPU | NVIDIA with CUDA support (hardware capability; see the ARM64 image note below) |
 | Architecture | arm64 |
+
+!!! warning "ARM64 sensing and perception"
+    ARM64 edge hardware may include a CUDA-capable NVIDIA GPU, but the published
+    `sensing-perception-cuda` image currently supports `linux/amd64` only. On
+    ARM64, use the standard `sensing-perception` image; sensing and perception
+    run on CPU and do not use the available GPU.
 
 !!! info "Why the difference?"
     The 40-core Neoverse N1 requirement reflects the verified ADLINK AADP-AVA platform, which runs the full Autoware stack with real-time constraints. Local development with demo simulations has lower requirements.

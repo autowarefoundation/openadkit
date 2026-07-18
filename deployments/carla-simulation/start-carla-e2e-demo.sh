@@ -3,21 +3,27 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
-ENV_FILE=carla-simulation.env
-BASE_ENV_FILE=../base/base.env
+ENV_FILE="$SCRIPT_DIR/carla-simulation.env"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yaml"
+SOURCE_BASE_DIR="$SCRIPT_DIR/../base"
+BUNDLE_BASE_DIR="$SCRIPT_DIR/base"
+COMPOSE_ENV_ARGS=()
 PYTHON_HELPER=$SCRIPT_DIR/carla_e2e_helper.py
 DRY_RUN=false
 BUILD_IMAGE=false
 SKIP_VERIFY=false
 START_VISUALIZER_OVERRIDE=
 AUTO_DRIVE_OVERRIDE=
+STARTED_SERVICES=()
+TEMP_FILES=()
+SUCCESS=false
 
 usage() {
   cat <<'EOF'
 Usage: ./start-carla-e2e-demo.sh [options]
 
-Starts the closed-loop CARLA e2e demo using CARLA on the host display and
-Autoware's in-tree autoware_carla_interface.
+Starts the closed-loop CARLA e2e demo using offscreen CARLA rendering by
+default and Autoware's in-tree autoware_carla_interface.
 
 Options:
   --build               Build the local CARLA interface image from components
@@ -75,32 +81,155 @@ run() {
 }
 
 run_compose() {
-  local env_args=(--env-file "$ENV_FILE")
-  if [[ -f "$BASE_ENV_FILE" ]]; then
-    env_args=(--env-file "$BASE_ENV_FILE" "${env_args[@]}")
-  fi
-  printf '+ docker compose %s -f docker-compose.yaml %s\n' "${env_args[*]}" "$*"
+  printf '+ docker compose'
+  printf ' %q' "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" "$@"
+  printf '\n'
   if [[ "$DRY_RUN" == false ]]; then
-    docker compose "${env_args[@]}" -f docker-compose.yaml "$@"
+    docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" "$@"
+  fi
+}
+
+rollback() {
+  local status=$?
+  trap - EXIT INT TERM
+  if [[ "${#TEMP_FILES[@]}" -gt 0 ]]; then
+    rm -f "${TEMP_FILES[@]}"
+  fi
+  if [[ "$SUCCESS" == false && "$DRY_RUN" == false && "${#STARTED_SERVICES[@]}" -gt 0 ]]; then
+    printf 'Startup failed; removing services started by this invocation: %s\n' "${STARTED_SERVICES[*]}" >&2
+    docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" \
+      rm --stop --force "${STARTED_SERVICES[@]}" >/dev/null 2>&1 || true
+  fi
+  exit "$status"
+}
+trap rollback EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
+select_layout() {
+  if [[ -f "$BUNDLE_BASE_DIR/docker-compose.yaml" ]]; then
+    if [[ ! -f "$BUNDLE_BASE_DIR/cyclonedds.xml" ]]; then
+      printf 'Incomplete release bundle: missing %s\n' "$BUNDLE_BASE_DIR/cyclonedds.xml" >&2
+      return 1
+    fi
+    COMPOSE_ENV_ARGS=(--env-file "$ENV_FILE")
+  elif [[ -f "$SOURCE_BASE_DIR/docker-compose.yaml" && -f "$SOURCE_BASE_DIR/base.env" ]]; then
+    COMPOSE_ENV_ARGS=(
+      --env-file "$SOURCE_BASE_DIR/base.env"
+      --env-file "$ENV_FILE"
+    )
+  else
+    printf 'Cannot identify source or release-bundle layout under %s\n' "$SCRIPT_DIR" >&2
+    return 1
   fi
 }
 
 load_env() {
-  set -a
-  if [[ -f "$BASE_ENV_FILE" ]]; then
-    # shellcheck source=/dev/null
-    source "$BASE_ENV_FILE"
+  local output line name
+  local -A values=()
+  local required=(
+    AUTOWARE_E2E_AUTO_DRIVE
+    AUTOWARE_E2E_DRIVE_VERIFY_DISTANCE
+    AUTOWARE_E2E_DRIVE_VERIFY_TIMEOUT
+    AUTOWARE_E2E_ROUTE_FORWARD_DISTANCE
+    AUTOWARE_E2E_ROUTE_SETTLE_TIMEOUT
+    AUTOWARE_E2E_START_VISUALIZER
+    AUTOWARE_E2E_VERIFY_INTERVAL
+    AUTOWARE_E2E_VERIFY_TIMEOUT
+    CARLA_CONTAINER_NAME
+    CARLA_DISPLAY
+    CARLA_E2E_LANELET2_URL
+    CARLA_E2E_LANELET2_SHA256
+    CARLA_E2E_MAP_PATH
+    CARLA_E2E_POINTCLOUD_URL
+    CARLA_E2E_POINTCLOUD_SHA256
+    CARLA_INTERFACE_CONTAINER
+    CARLA_INTERFACE_IMAGE
+    CARLA_LOAD_TIMEOUT
+    CARLA_PYTHON_VERSION
+    CARLA_RENDER_ARGS
+    CARLA_RPC_HOST
+    CARLA_RPC_PORT
+    CARLA_START_TIMEOUT
+    CARLA_VK_ICD_HOST_PATH
+    CARLA_WORLD
+    MAP_PATH
+    POINTCLOUD_MAP_FILE
+    ROS_DISTRO
+  )
+
+  if ! output=$(docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" config --environment); then
+    printf 'Failed to parse Compose environment\n' >&2
+    return 1
   fi
-  # shellcheck source=/dev/null
-  source "$ENV_FILE"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" == *=* ]] || continue
+    name="${line%%=*}"
+    [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    values["$name"]="${line#*=}"
+  done <<< "$output"
+
+  for name in "${required[@]}"; do
+    if [[ ! -v "values[$name]" ]]; then
+      printf 'Required environment variable %s is missing\n' "$name" >&2
+      return 1
+    fi
+    printf -v "$name" '%s' "${values[$name]}"
+    export "${name?}"
+  done
 
   if [[ -n "$START_VISUALIZER_OVERRIDE" ]]; then
     AUTOWARE_E2E_START_VISUALIZER=$START_VISUALIZER_OVERRIDE
+    export AUTOWARE_E2E_START_VISUALIZER
   fi
 
   if [[ -n "$AUTO_DRIVE_OVERRIDE" ]]; then
     AUTOWARE_E2E_AUTO_DRIVE=$AUTO_DRIVE_OVERRIDE
+    export AUTOWARE_E2E_AUTO_DRIVE
+  fi
+}
+
+require_amd64_host() {
+  case "$(uname -m)" in
+    x86_64|amd64) ;;
+    *)
+      printf 'CARLA simulation requires an amd64 host (detected %s).\n' "$(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+require_host_prerequisites() {
+  printf '+ validate Ubuntu, Docker, NVIDIA runtime, GPU, and Vulkan prerequisites\n'
+  if [[ "$DRY_RUN" == true ]]; then
+    return 0
+  fi
+
+  if [[ ! -r /etc/os-release ]]; then
+    printf 'CARLA simulation requires Ubuntu 22.04; /etc/os-release is unavailable.\n' >&2
+    return 1
+  fi
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  if [[ "${ID:-}" != ubuntu || "${VERSION_ID:-}" != 22.04 ]]; then
+    printf 'CARLA simulation requires Ubuntu 22.04 (detected %s %s).\n' "${ID:-unknown}" "${VERSION_ID:-unknown}" >&2
+    return 1
+  fi
+  command -v docker >/dev/null || {
+    printf 'Docker is required for CARLA simulation.\n' >&2
+    return 1
+  }
+  if ! command -v nvidia-smi >/dev/null || ! nvidia-smi >/dev/null; then
+    printf 'A working NVIDIA GPU and driver are required for CARLA simulation.\n' >&2
+    return 1
+  fi
+  docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"' || {
+    printf 'The Docker NVIDIA runtime is not available.\n' >&2
+    return 1
+  }
+  if [[ ! -r "$CARLA_VK_ICD_HOST_PATH" ]]; then
+    printf 'NVIDIA Vulkan ICD not found at %s.\n' "$CARLA_VK_ICD_HOST_PATH" >&2
+    return 1
   fi
 }
 
@@ -111,8 +240,8 @@ load_env() {
 UDP_MEM_MAX_REQUIRED=2147483647
 UDP_MEM_DEFAULT_REQUIRED=134217728
 
-ensure_udp_buffers() {
-  printf '+ ensure kernel UDP buffer sizes for DDS\n'
+require_udp_buffers() {
+  printf '+ validate kernel UDP buffer sizes for DDS\n'
   if [[ "$DRY_RUN" == true ]]; then
     return 0
   fi
@@ -127,30 +256,40 @@ ensure_udp_buffers() {
     return 0
   fi
 
-  local sysctl_args=(
-    "net.core.rmem_max=$UDP_MEM_MAX_REQUIRED"
-    "net.core.wmem_max=$UDP_MEM_MAX_REQUIRED"
-    "net.core.rmem_default=$UDP_MEM_DEFAULT_REQUIRED"
-    "net.core.wmem_default=$UDP_MEM_DEFAULT_REQUIRED"
-  )
-  local sudo_cmd=()
-  if [[ $EUID -ne 0 ]]; then
-    if [[ -t 0 ]]; then
-      sudo_cmd=(sudo)
-    else
-      sudo_cmd=(sudo -n)
-    fi
-  fi
-  if run "${sudo_cmd[@]}" sysctl -qw "${sysctl_args[@]}"; then
-    return 0
-  fi
-
-  printf 'Failed to raise kernel UDP buffer limits. Run this and retry:\n' >&2
-  printf '  sudo sysctl -w %s %s %s %s\n' "${sysctl_args[@]}" >&2
+  printf 'Kernel UDP buffers are too small. Explicitly raise them and retry:\n' >&2
+  printf '  sudo sysctl -w net.core.rmem_max=%s net.core.wmem_max=%s net.core.rmem_default=%s net.core.wmem_default=%s\n' \
+    "$UDP_MEM_MAX_REQUIRED" "$UDP_MEM_MAX_REQUIRED" \
+    "$UDP_MEM_DEFAULT_REQUIRED" "$UDP_MEM_DEFAULT_REQUIRED" >&2
   return 1
 }
 
+download_verified() {
+  local url="$1"
+  local expected="$2"
+  local destination="$3"
+  local tmp
+
+  if [[ -f "$destination" ]] \
+    && printf '%s  %s\n' "$expected" "$destination" | sha256sum --check --status; then
+    return 0
+  fi
+
+  tmp=$(mktemp "${destination}.tmp.XXXXXX")
+  TEMP_FILES+=("$tmp")
+  if ! run curl -L --fail -A Mozilla/5.0 -o "$tmp" "$url"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if ! printf '%s  %s\n' "$expected" "$tmp" | sha256sum --check --status; then
+    rm -f "$tmp"
+    printf 'Checksum verification failed for %s\n' "$url" >&2
+    return 1
+  fi
+  mv -f "$tmp" "$destination"
+}
+
 prepare_map() {
+  local projector_tmp
   if [[ "$DRY_RUN" == true ]]; then
     printf '+ prepare CARLA Town01 map at %s\n' "$CARLA_E2E_MAP_PATH"
     return 0
@@ -158,15 +297,15 @@ prepare_map() {
 
   mkdir -p "$CARLA_E2E_MAP_PATH"
 
-  if [[ ! -s "$CARLA_E2E_MAP_PATH/pointcloud_map.pcd" ]]; then
-    run curl -L --fail -A Mozilla/5.0 -o "$CARLA_E2E_MAP_PATH/pointcloud_map.pcd" "$CARLA_E2E_POINTCLOUD_URL"
-  fi
+  download_verified "$CARLA_E2E_POINTCLOUD_URL" "$CARLA_E2E_POINTCLOUD_SHA256" \
+    "$CARLA_E2E_MAP_PATH/pointcloud_map.pcd"
+  download_verified "$CARLA_E2E_LANELET2_URL" "$CARLA_E2E_LANELET2_SHA256" \
+    "$CARLA_E2E_MAP_PATH/lanelet2_map.osm"
 
-  if [[ ! -s "$CARLA_E2E_MAP_PATH/lanelet2_map.osm" ]]; then
-    run curl -L --fail -A Mozilla/5.0 -o "$CARLA_E2E_MAP_PATH/lanelet2_map.osm" "$CARLA_E2E_LANELET2_URL"
-  fi
-
-  printf 'projector_type: Local\n' > "$CARLA_E2E_MAP_PATH/map_projector_info.yaml"
+  projector_tmp=$(mktemp "$CARLA_E2E_MAP_PATH/map_projector_info.yaml.tmp.XXXXXX")
+  TEMP_FILES+=("$projector_tmp")
+  printf 'projector_type: Local\n' >"$projector_tmp"
+  mv -f "$projector_tmp" "$CARLA_E2E_MAP_PATH/map_projector_info.yaml"
 }
 
 build_image() {
@@ -233,8 +372,8 @@ wait_for_carla_api() {
   return 1
 }
 
-stop_container_carla() {
-  run docker rm -f "$CARLA_CONTAINER_NAME" || true
+remove_compose_service() {
+  run_compose rm --stop --force "$1" || true
 }
 
 start_container_carla() {
@@ -245,7 +384,8 @@ start_container_carla() {
     return 1
   fi
 
-  stop_container_carla
+  remove_compose_service carla
+  STARTED_SERVICES+=(carla)
   run_compose up -d --force-recreate carla
 
   wait_for_carla_rpc
@@ -276,7 +416,8 @@ preload_carla_world() {
 }
 
 start_autoware() {
-  run docker rm -f "$CARLA_INTERFACE_CONTAINER" || true
+  remove_compose_service carla-interface
+  STARTED_SERVICES+=(map system carla-map-loader carla-interface sensing perception localization planning vehicle control api)
   run_compose up -d --force-recreate \
     map \
     system \
@@ -306,7 +447,8 @@ start_visualizer() {
     return 0
   fi
 
-  run docker rm -f autoware-e2e-visualizer || true
+  remove_compose_service visualizer
+  STARTED_SERVICES+=(visualizer)
   run_compose up -d --force-recreate visualizer
 }
 
@@ -335,7 +477,7 @@ verify_runtime() {
     sleep "$AUTOWARE_E2E_VERIFY_INTERVAL"
   done
 
-  docker compose --env-file ../base/base.env --env-file "$ENV_FILE" -f docker-compose.yaml logs --tail 160 >&2 || true
+  run_compose logs --tail 160 >&2 || true
   printf 'Timed out waiting for CARLA e2e verification\n' >&2
   return 1
 }
@@ -380,8 +522,11 @@ verify_autonomous_drive() {
 
 main() {
   cd "$SCRIPT_DIR"
+  select_layout
   load_env
-  ensure_udp_buffers
+  require_amd64_host
+  require_host_prerequisites
+  require_udp_buffers
   prepare_map
   build_image
   start_container_carla
@@ -391,6 +536,7 @@ main() {
   verify_runtime
   start_autonomous_drive
   verify_autonomous_drive
+  SUCCESS=true
 }
 
 main

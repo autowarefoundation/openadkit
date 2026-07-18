@@ -22,10 +22,8 @@ cd openadkit
 # Install Docker (and NVIDIA Container Toolkit on supported hosts)
 ./install.sh
 
-# Add your user to the docker group (log out and back in, or use sudo)
-sudo usermod -aG docker $USER
-echo "Log out and back in for group changes to take effect, or prefix docker commands with 'sudo'."
-echo ""
+# Activate the Docker group added by install.sh (or log out and back in)
+newgrp docker
 
 # Start the planning-simulation deployment from the source tree
 cd deployments/planning-simulation
@@ -35,7 +33,7 @@ docker compose --env-file ../base/base.env --env-file planning-simulation.env up
 
 Open the noVNC visualizer at `https://localhost:6080/vnc.html` (password: `openadkit`; accept the self-signed certificate warning).
 
-For artifact downloads (logging-simulation's perception models), run `./install.sh --download-artifacts`. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
+For artifact downloads (logging-simulation's perception models), run `../../install.sh --download-artifacts` from the deployment directory. For other deployments and the release-bundle workflow, see the [documentation site](https://autowarefoundation.github.io/openadkit/deployment/).
 
 ## Deployments
 

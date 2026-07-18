@@ -16,6 +16,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ${MAP_PATH}:/autoware_map:ro
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
@@ -39,6 +40,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -65,6 +67,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -90,6 +93,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -116,6 +120,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -152,6 +157,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -193,6 +199,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
     volumes:
       - ./cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
@@ -223,6 +230,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
+      - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
       - REMOTE_DISPLAY=${REMOTE_DISPLAY}

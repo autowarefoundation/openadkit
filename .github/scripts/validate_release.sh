@@ -5,6 +5,10 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=.github/scripts/release_tag.sh
 source "${script_dir}/release_tag.sh"
+# shellcheck source=.github/scripts/registry_lookup.sh
+source "${script_dir}/registry_lookup.sh"
+# shellcheck source=.github/scripts/stable_alias_policy.sh
+source "${script_dir}/stable_alias_policy.sh"
 
 : "${BUILD_TAG:?BUILD_TAG is required}"
 : "${VERSION:?VERSION is required}"
@@ -45,25 +49,15 @@ validate_inputs() {
 }
 
 resolve_latest_alias_policy() {
-  local existing_tag_refs existing_stable_tags highest_stable
+  local current_policy
 
   if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
     is_stable_release=true
-    existing_tag_refs=$(
-      gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
-        --jq '.[].ref | sub("^refs/tags/"; "")'
-    )
-    existing_stable_tags=$(printf '%s\n' "${existing_tag_refs}" | grep -E "${openadkit_stable_re}" || true)
-    highest_stable=$(
-      {
-        printf '%s\n' "${VERSION}"
-        printf '%s\n' "${existing_stable_tags}"
-      } | grep -E "${openadkit_stable_re}" | sort -V | tail -n 1
-    )
-    if [ "${highest_stable}" = "${VERSION}" ]; then
+    current_policy=$(current_latest_alias_policy)
+    if [ "${current_policy}" = true ]; then
       publish_latest_aliases=true
     else
-      echo "Stable aliases will not be updated: ${highest_stable} is newer than ${VERSION}"
+      echo "Stable aliases will not be updated because a newer stable release exists"
     fi
   fi
 }
@@ -138,6 +132,7 @@ select_scan_metadata() {
 
     if ! jq -e --arg build_tag "${BUILD_TAG}" '
       .build_tag == $build_tag and
+      (.policy_sha | test("^[0-9a-f]{40}$")) and
       .scan_scope == "all" and
       (.scan_status == "passed" or .scan_status == "failed") and
       (.run_id | test("^[0-9]+$")) and
@@ -211,6 +206,7 @@ validate_build_metadata_schema() {
     (.autoware_base_version | test("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")) and
     (.autoware_lock_sha256 | test("^[0-9a-f]{64}$")) and
     (.image_inventory_sha256 | test("^[0-9a-f]{64}$")) and
+    (.upstream_images_sha256 | test("^[0-9a-f]{64}$")) and
     (.scan_requested | type == "boolean") and
     (.images | type == "array" and length > 0) and
     all(.images[];
@@ -221,6 +217,14 @@ validate_build_metadata_schema() {
       (.ref == (.repo + ":" + .target + "-" + .ros_distro + "-" + $build_tag)) and
       (.platforms | type == "array" and length > 0) and
       all(.platforms[]; test("^linux/(amd64|arm64)$"))
+    ) and
+    (.upstream_images | type == "array" and length > 0) and
+    all(.upstream_images[];
+      (.name | IN("core-devel", "base", "base-cuda-runtime", "base-cuda-devel")) and
+      (.ros_distro | type == "string" and length > 0) and
+      (.ref | type == "string" and length > 0) and
+      (.digest | test("^sha256:[0-9a-f]{64}$")) and
+      .uri == ("docker-image://" + .ref + "@" + .digest)
     )
   ' release-input/build/build-metadata.json >/dev/null; then
     fail "Build metadata failed schema validation"
@@ -229,6 +233,7 @@ validate_build_metadata_schema() {
 
 validate_metadata_files() {
   local metadata_lock_sha actual_lock_sha metadata_inventory_sha actual_inventory_sha
+  local metadata_upstream_sha actual_upstream_sha
 
   [ -f release-input/build/autoware-lock.repos ] || fail "Build metadata is missing autoware-lock.repos"
   metadata_lock_sha=$(jq -r '.autoware_lock_sha256' release-input/build/build-metadata.json)
@@ -241,6 +246,15 @@ validate_metadata_files() {
   actual_inventory_sha=$(sha256sum release-input/build/image-inventory.json | cut -d ' ' -f1)
   [ "${actual_inventory_sha}" = "${metadata_inventory_sha}" ] \
     || fail "Image inventory SHA ${actual_inventory_sha} does not match metadata SHA ${metadata_inventory_sha}"
+
+  [ -f release-input/build/upstream-images.json ] || fail "Build metadata is missing upstream-images.json"
+  metadata_upstream_sha=$(jq -r '.upstream_images_sha256' release-input/build/build-metadata.json)
+  actual_upstream_sha=$(sha256sum release-input/build/upstream-images.json | cut -d ' ' -f1)
+  [ "${actual_upstream_sha}" = "${metadata_upstream_sha}" ] \
+    || fail "Upstream image metadata SHA ${actual_upstream_sha} does not match metadata SHA ${metadata_upstream_sha}"
+  cmp <(jq -S . release-input/build/upstream-images.json) \
+    <(jq -S '.upstream_images' release-input/build/build-metadata.json) \
+    || fail "Embedded upstream image metadata does not match upstream-images.json"
 }
 
 validate_inventory_coverage() {
@@ -288,8 +302,38 @@ validate_inventory_coverage() {
   fi
 }
 
+validate_upstream_coverage() {
+  local expected actual base_version expected_count actual_count
+  expected=$(mktemp)
+  actual=$(mktemp)
+  base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
+
+  jq -r --arg version "${base_version}" '
+    .ros_distros[] as $distro |
+    ["core-devel", "base", "base-cuda-runtime", "base-cuda-devel"][] as $name |
+    [$name, $distro, ("ghcr.io/autowarefoundation/autoware:" + $name + "-" + $distro + "-" + $version)] |
+    @tsv
+  ' release-input/build/image-inventory.json | sort -u >"${expected}"
+  jq -r '.upstream_images[] | [.name, .ros_distro, .ref] | @tsv' \
+    release-input/build/build-metadata.json | sort -u >"${actual}"
+
+  expected_count=$(wc -l <"${expected}" | tr -d ' ')
+  actual_count=$(jq '.upstream_images | length' release-input/build/build-metadata.json)
+  if [ "${actual_count}" != "${expected_count}" ] || ! cmp "${expected}" "${actual}"; then
+    diff -u "${expected}" "${actual}" >&2 || true
+    rm -f "${expected}" "${actual}"
+    fail "Upstream image metadata does not cover every required Autoware base"
+  fi
+  rm -f "${expected}" "${actual}"
+}
+
 validate_scan_coverage() {
-  local build_coverage scan_coverage missing_coverage extra_coverage
+  local build_coverage scan_coverage missing_coverage extra_coverage build_sha policy_sha
+
+  build_sha=$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)
+  policy_sha=$(jq -r '.policy_sha' release-input/scan/scan-metadata.json)
+  [ "${policy_sha}" = "${build_sha}" ] \
+    || fail "Scan policy SHA ${policy_sha} does not match build SHA ${build_sha}"
 
   build_coverage=$(mktemp)
   scan_coverage=$(mktemp)
@@ -330,19 +374,11 @@ validate_release_rules() {
   autoware_input_ref=$(jq -r '.autoware_input_ref' release-input/build/build-metadata.json)
   autoware_ref_type=$(jq -r '.autoware_ref_type' release-input/build/build-metadata.json)
   autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
-  if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
-    if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
-      fail "Stable releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})"
-    fi
-    if [ "${autoware_base_version}" != "${autoware_input_ref}" ]; then
-      fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
-    fi
-  else
-    if [ "${autoware_ref_type}" = "tag" ] && ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
-      fail "Pre-release Autoware tags must use X.Y.Z format (got ${autoware_input_ref})"
-    elif [ "${autoware_ref_type}" != "tag" ] && [ "${autoware_ref_type}" != "sha" ]; then
-      fail "Pre-releases must be built from an Autoware release tag or full SHA (got ${autoware_ref_type}:${autoware_input_ref})"
-    fi
+  if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
+    fail "Releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})"
+  fi
+  if [ "${autoware_base_version}" != "${autoware_input_ref}" ]; then
+    fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
   fi
 }
 
@@ -360,23 +396,33 @@ validate_git_tag() {
 }
 
 validate_registry_conflicts() {
-  local conflicts repo target distro ref digest source_digest release_ref existing_json existing_digest
+  local conflicts repo target distro ref digest source_digest release_ref existing_digest lookup_status
 
   conflicts=0
   while IFS=$'\t' read -r repo target distro ref digest; do
-    source_digest=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}' | jq -r '.manifest.digest')
+    lookup_status=0
+    source_digest=$(registry_manifest_digest "${ref}") || lookup_status=$?
+    if [ "${lookup_status}" -eq 1 ]; then
+      echo "Source image not found: ${ref}" >&2
+      return 1
+    elif [ "${lookup_status}" -ne 0 ]; then
+      return "${lookup_status}"
+    fi
     if [ "${source_digest}" != "${digest}" ]; then
       echo "Source digest mismatch for ${ref}: ${source_digest} != ${digest}" >&2
       conflicts=1
     fi
 
     release_ref="${repo}:${target}-${distro}-${VERSION}"
-    if existing_json=$(docker buildx imagetools inspect "${release_ref}" --format '{{json .}}' 2>/dev/null); then
-      existing_digest=$(printf '%s' "${existing_json}" | jq -r '.manifest.digest')
+    lookup_status=0
+    existing_digest=$(registry_manifest_digest "${release_ref}") || lookup_status=$?
+    if [ "${lookup_status}" -eq 0 ]; then
       if [ "${existing_digest}" != "${digest}" ]; then
         echo "Release tag conflict: ${release_ref} points to ${existing_digest}, expected ${digest}" >&2
         conflicts=1
       fi
+    elif [ "${lookup_status}" -ne 1 ]; then
+      return "${lookup_status}"
     fi
   done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .ref, .digest] | @tsv' release-input/build/build-metadata.json)
 
@@ -400,6 +446,7 @@ main() {
   validate_build_metadata_schema
   validate_metadata_files
   validate_inventory_coverage
+  validate_upstream_coverage
   validate_scan_coverage
   validate_release_rules
   validate_git_tag

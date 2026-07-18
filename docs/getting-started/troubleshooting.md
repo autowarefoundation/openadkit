@@ -23,16 +23,16 @@ This page covers common issues and solutions when working with Open AD Kit.
 - Restart Docker: `sudo systemctl restart docker`
 - Check GPU availability: `nvidia-smi`
 
-### Perception is very slow
+### Perception is very slow or the GPU overlay does not start
 
-- The sensing and perception pipeline is falling back to CPU. Install the NVIDIA Container Toolkit (`install.sh` does this by default) and, for Logging Simulation, start with the GPU overlay described on that page.
+- The default sensing and perception image runs on CPU. For GPU acceleration, install the NVIDIA Container Toolkit (`install.sh` does this by default) and start Logging Simulation with its GPU overlay. The CUDA image requires a working NVIDIA runtime and does not automatically fall back to CPU.
 
 ## Deployment Issues
 
 ### Visualizer shows blank screen
 
 - Wait 10–30 seconds for containers to fully initialize
-- Check container logs: `docker compose --env-file <deployment>.env logs -f` (replace `<deployment>` with the actual env file name, e.g. `planning-simulation.env`)
+- From a source checkout, check container logs with both env files: `docker compose --env-file ../base/base.env --env-file <deployment>.env logs -f`. From a release bundle, use only its merged env file: `docker compose --env-file <deployment>.env logs -f`.
 - Verify all required map files are present
 
 ### Port 6080 or 6081 already in use
@@ -41,7 +41,7 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 ### Sample data `file not found`
 
-- Re-run the fetch with `--force` from the deployment directory: `./install.sh sample-data <deployment> --force` (e.g. `planning-simulation`). Data lands in `~/autoware_map`.
+- From a source checkout, re-run the fetch from the deployment directory with `../../install.sh sample-data <deployment> --force`. From a release bundle, use `./install.sh sample-data <deployment> --force`. Data lands in `~/autoware_map`.
 
 ## Getting Help
 

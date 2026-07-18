@@ -22,6 +22,7 @@ autoware_lock_sha256=$(sha256sum build-metadata/autoware-lock.repos | cut -d ' '
   exit 1
 }
 image_inventory_sha256=$(sha256sum build-metadata/image-inventory.json | cut -d ' ' -f1)
+upstream_images_sha256=$(sha256sum build-metadata/upstream-images.json | cut -d ' ' -f1)
 images_file="build-metadata/images.json"
 jq -n '[]' > "${images_file}"
 
@@ -81,8 +82,10 @@ jq -n \
   --arg autoware_base_version "${AUTOWARE_BASE_VERSION}" \
   --arg autoware_lock_sha256 "${autoware_lock_sha256}" \
   --arg image_inventory_sha256 "${image_inventory_sha256}" \
+  --arg upstream_images_sha256 "${upstream_images_sha256}" \
   --argjson scan_requested "${SCAN_REQUESTED}" \
   --slurpfile images "${images_file}" \
+  --slurpfile upstream_images build-metadata/upstream-images.json \
   '{
     build_tag: $build_tag,
     run_id: $run_id,
@@ -94,6 +97,8 @@ jq -n \
     autoware_base_version: $autoware_base_version,
     autoware_lock_sha256: $autoware_lock_sha256,
     image_inventory_sha256: $image_inventory_sha256,
+    upstream_images_sha256: $upstream_images_sha256,
     scan_requested: $scan_requested,
-    images: $images[0]
+    images: $images[0],
+    upstream_images: $upstream_images[0]
   }' > build-metadata/build-metadata.json

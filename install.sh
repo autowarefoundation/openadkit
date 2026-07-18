@@ -16,6 +16,9 @@ DOWNLOAD_ARTIFACTS=false
 INSTALL_BUILD_DEPS=false
 DOWNLOAD_SAMPLES=false
 RUN_VERIFY=false
+HOST_ARCH=""
+SAMPLE_TMP=""
+declare -a SAMPLE_STAGE_PATHS=()
 
 # Resolve the real invoking user whether the script is run via sudo or directly.
 TARGET_USER="${SUDO_USER:-$(id -un)}"
@@ -124,6 +127,25 @@ check_os() {
     fi
 }
 
+detect_host_architecture() {
+    case "$(uname -m)" in
+        x86_64|amd64) HOST_ARCH=amd64 ;;
+        aarch64|arm64) HOST_ARCH=arm64 ;;
+        *)
+            log_error "Unsupported architecture: $(uname -m). Open AD Kit supports amd64 and arm64 hosts."
+            return 1
+            ;;
+    esac
+}
+
+require_amd64() {
+    local feature="$1"
+    if [ "$HOST_ARCH" != amd64 ]; then
+        log_error "${feature} requires an amd64 host (detected ${HOST_ARCH})."
+        return 1
+    fi
+}
+
 install_nvidia_container_toolkit() {
     if command -v nvidia-ctk &>/dev/null; then
         log_info "NVIDIA Container Toolkit is already installed ($(nvidia-ctk --version))."
@@ -210,6 +232,9 @@ install_docker() {
     local install_required=false
     local docker_version
     local buildx_version
+    local docker_policy
+    local docker_candidate
+    local docker_versions
     local ci_force_install=false
     local -a docker_install_args
 
@@ -251,11 +276,6 @@ install_docker() {
     if [ "$install_required" = true ]; then
         log_info "Installing official Docker packages and plugins..."
 
-        # Remove conflicting packages (Docker official install guide step)
-        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-            sudo apt-get remove -y "$pkg" 2>/dev/null || true
-        done
-
         sudo apt-get update
         sudo apt-get install -y ca-certificates curl
 
@@ -265,25 +285,43 @@ install_docker() {
             -o /etc/apt/keyrings/docker.asc
         sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-        # Reuse an existing official repository instead of creating duplicate
-        # apt source entries on pre-provisioned hosts.
-        if grep -Rqs 'download\.docker\.com/linux/ubuntu' \
-            /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
-            log_info "Docker's official apt repository is already configured."
-        else
-            echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-            $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
-            | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-        fi
+        # Write one canonical active source instead of trusting any textual URL
+        # match, which could be commented out, stale, or missing signed-by.
+        echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
+        | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        printf '%s\n' \
+            'Package: docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin' \
+            'Pin: origin "download.docker.com"' \
+            'Pin-Priority: 1001' \
+            | sudo tee /etc/apt/preferences.d/openadkit-docker > /dev/null
 
         sudo apt-get update
+        docker_policy=$(sudo env LC_ALL=C apt-cache policy docker-ce)
+        docker_candidate=$(awk '$1 == "Candidate:" { print $2; exit }' <<< "$docker_policy")
+        docker_versions=$(sudo env LC_ALL=C apt-cache madison docker-ce)
+        if [ -z "$docker_candidate" ] || [ "$docker_candidate" = "(none)" ] \
+            || ! awk -F '|' -v candidate="$docker_candidate" '
+                {
+                    version=$2
+                    gsub(/^[[:space:]]+|[[:space:]]+$/, "", version)
+                    if (version == candidate && $3 ~ /^[[:space:]]*https:\/\/download\.docker\.com\/linux\/ubuntu([[:space:]]|$)/) found=1
+                }
+                END { exit(found ? 0 : 1) }
+            ' <<< "$docker_versions"; then
+            log_error "Docker CE has no candidate from the configured official repository; existing Docker packages were left unchanged."
+            return 1
+        fi
         docker_install_args=(-y)
         if [ "$ci_force_install" = true ]; then
             # Disposable CI images sometimes hold their preinstalled Docker
             # packages. The force switch is already rejected outside CI.
             docker_install_args+=(--allow-change-held-packages)
         fi
+        # APT replaces conflicting distro packages in the same transaction, so
+        # a repository or download failure cannot strand the host after a
+        # separate pre-emptive removal step.
         sudo apt-get install "${docker_install_args[@]}" docker-ce docker-ce-cli containerd.io \
             docker-buildx-plugin docker-compose-plugin
 
@@ -386,9 +424,55 @@ download_autoware_artifacts() {
     log_info "Autoware artifacts downloaded to ${data_dir}."
 }
 
+install_sample_data_dependencies() {
+    log_info "Installing sample download dependencies..."
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends \
+        ca-certificates curl unzip coreutils python3
+}
+
+preflight_sample_data_dependencies() {
+    local deployment="$1"
+    local needs_unzip=false
+    local missing=()
+
+    case "$deployment" in
+        all|""|planning-simulation|logging-simulation) needs_unzip=true ;;
+        scenario-simulation|zenoh-bridge) ;;
+        carla-simulation) return 0 ;;
+        *)
+            log_error "Unknown deployment for sample-data: $deployment"
+            return 1
+            ;;
+    esac
+
+    command -v curl >/dev/null 2>&1 || missing+=(curl)
+    command -v realpath >/dev/null 2>&1 || missing+=(realpath)
+    if ! command -v sha256sum >/dev/null 2>&1 \
+        && ! command -v shasum >/dev/null 2>&1; then
+        missing+=("sha256sum or shasum")
+    fi
+    if [ "$needs_unzip" = true ] && ! command -v unzip >/dev/null 2>&1; then
+        missing+=(unzip)
+    fi
+    if [ "$needs_unzip" = true ] && ! command -v python3 >/dev/null 2>&1; then
+        missing+=(python3)
+    fi
+    if [ "${#missing[@]}" -gt 0 ]; then
+        log_error "Missing sample download dependencies: ${missing[*]}"
+        return 1
+    fi
+}
+
 download_sample_data() {
     local deployment="${1:-all}"
     local force="${2:-false}"
+
+    preflight_sample_data_dependencies "$deployment"
+    if [ "$deployment" = carla-simulation ]; then
+        log_info "carla-simulation downloads its assets via deployments/carla-simulation/start-carla-e2e-demo.sh."
+        return 0
+    fi
 
     log_info "Downloading sample map/rosbag data for deployments..."
 
@@ -399,17 +483,182 @@ download_sample_data() {
     local TIER4_SHA="63ccb1da6944a7be4427440bf200ad62281dc899"
     local TIER4_RAW="https://raw.githubusercontent.com/tier4/scenario_simulator_v2/${TIER4_SHA}/map/kashiwanoha_map/map"
     local MAP_ROOT="${AUTOWARE_MAP_DIR:-${USER_HOME}/autoware_map}"
-    local TMP
-    TMP="$(mktemp -d)"
-    # shellcheck disable=SC2064
-    trap "rm -rf '${TMP}'" EXIT
+    local stage_path
+    SAMPLE_TMP="$(mktemp -d)"
+    SAMPLE_STAGE_PATHS=()
 
-    if ! command -v curl >/dev/null 2>&1; then
-        log_error "'curl' is required"
-        return 1
-    fi
+    remove_sample_temporary_paths() {
+        [ -n "$SAMPLE_TMP" ] && rm -rf -- "$SAMPLE_TMP"
+        for stage_path in "${SAMPLE_STAGE_PATHS[@]}"; do
+            [ -n "$stage_path" ] && rm -rf -- "$stage_path"
+        done
+    }
+
+    cleanup_sample_temporary_paths() {
+        local status=$?
+        trap - EXIT HUP INT TERM
+        remove_sample_temporary_paths
+        exit "$status"
+    }
+    trap cleanup_sample_temporary_paths EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
 
     # ---- helpers ----
+    reject_symlink_path_components() {
+        local path="$1" current="/" component
+        local -a components
+        IFS='/' read -r -a components <<< "${path#/}"
+        for component in "${components[@]}"; do
+            [ -n "$component" ] || continue
+            current="${current%/}/${component}"
+            if [ -L "$current" ]; then
+                log_error "Refusing symlink path component: $current"
+                return 1
+            fi
+            if [ -e "$current" ] && [ ! -d "$current" ]; then
+                log_error "Sample map path component is not a directory: $current"
+                return 1
+            fi
+        done
+    }
+
+    prepare_sample_map_root() {
+        MAP_ROOT="$(realpath -ms -- "$MAP_ROOT")"
+        reject_symlink_path_components "$MAP_ROOT" || return 1
+        if [ ! -d "$MAP_ROOT" ]; then
+            mkdir -p -- "$MAP_ROOT"
+        fi
+        reject_symlink_path_components "$MAP_ROOT" || return 1
+    }
+
+    validate_sample_target_path() {
+        local target="$1"
+        if [ -L "$target" ]; then
+            log_error "Refusing sample target symlink: $target"
+            return 1
+        fi
+        if [ -e "$target" ] && [ ! -d "$target" ]; then
+            log_error "Sample target is not a directory: $target"
+            return 1
+        fi
+    }
+
+    require_sample_file() {
+        local path="$1"
+        if [ -L "$path" ] || [ ! -f "$path" ] || [ ! -s "$path" ]; then
+            log_error "Sample dataset is missing required file: $path"
+            return 1
+        fi
+    }
+
+    validate_sample_dataset() {
+        local name="$1" candidate="$2" db3 found_db3=false
+        case "$name" in
+            sample-map-planning|sample-map-rosbag)
+                require_sample_file "$candidate/lanelet2_map.osm"
+                require_sample_file "$candidate/pointcloud_map.pcd"
+                ;;
+            sample-rosbag)
+                require_sample_file "$candidate/metadata.yaml"
+                for db3 in "$candidate"/*.db3; do
+                    [ -e "$db3" ] || continue
+                    require_sample_file "$db3"
+                    found_db3=true
+                done
+                if [ "$found_db3" != true ]; then
+                    log_error "Sample rosbag has no nonempty DB3 file: $candidate"
+                    return 1
+                fi
+                ;;
+            kashiwanoha_map)
+                require_sample_file "$candidate/lanelet2_map.osm"
+                require_sample_file "$candidate/pointcloud_map.pcd"
+                require_sample_file "$candidate/global_map_center.pcd.yaml"
+                require_sample_file "$candidate/lanelet2_map_provider.osm.yaml"
+                require_sample_file "$candidate/map.map_publisher.yaml"
+                ;;
+            *)
+                log_error "Unknown sample dataset contract: $name"
+                return 1
+                ;;
+        esac
+    }
+
+    validate_zip_archive() {
+        local archive="$1" expected_root="$2"
+        python3 - "$archive" "$expected_root" <<'PY'
+import pathlib
+import stat
+import sys
+import zipfile
+
+archive, expected_root = sys.argv[1:]
+seen = set()
+with zipfile.ZipFile(archive) as source:
+    for member in source.infolist():
+        name = member.filename
+        if not name or "\\" in name or name.startswith("/"):
+            raise SystemExit(f"unsafe ZIP member: {name!r}")
+        normalized = name[:-1] if name.endswith("/") else name
+        parts = normalized.split("/")
+        if any(part in ("", ".", "..") for part in parts):
+            raise SystemExit(f"unsafe ZIP member: {name!r}")
+        if parts[0] != expected_root:
+            raise SystemExit(f"ZIP member outside {expected_root}: {name!r}")
+        key = pathlib.PurePosixPath(*parts).as_posix()
+        if key in seen:
+            raise SystemExit(f"duplicate ZIP member: {name!r}")
+        seen.add(key)
+        if member.flag_bits & 0x1:
+            raise SystemExit(f"encrypted ZIP member: {name!r}")
+        file_type = (member.external_attr >> 16) & 0o170000
+        if file_type not in (0, stat.S_IFREG, stat.S_IFDIR):
+            raise SystemExit(f"special ZIP member: {name!r}")
+PY
+    }
+
+    atomic_rename_directories() {
+        local candidate="$1" target="$2" flags="$3"
+        python3 - "$candidate" "$target" "$flags" <<'PY'
+import ctypes
+import os
+import sys
+
+candidate, target = (os.fsencode(path) for path in sys.argv[1:3])
+flags = int(sys.argv[3])
+libc = ctypes.CDLL(None, use_errno=True)
+renameat2 = libc.renameat2
+renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+renameat2.restype = ctypes.c_int
+if renameat2(-100, candidate, -100, target, flags) != 0:
+    error = ctypes.get_errno()
+    raise OSError(error, os.strerror(error))
+PY
+    }
+
+    publish_sample_dataset() {
+        local candidate="$1" target="$2" stage="$3"
+        validate_sample_target_path "$target"
+        if [ -d "$target" ]; then
+            if [ "$force" != true ]; then
+                log_error "Sample target appeared during installation; rerun with --force: $target"
+                return 1
+            fi
+            if ! atomic_rename_directories "$candidate" "$target" 2; then
+                log_error "Atomic replacement failed; existing dataset was left unchanged: $target"
+                return 1
+            fi
+        else
+            if ! atomic_rename_directories "$candidate" "$target" 1; then
+                log_error "Atomic installation failed; no dataset was published: $target"
+                return 1
+            fi
+        fi
+        rm -rf -- "$stage"
+    }
+
     sha256_verify() {
         local got
         if command -v sha256sum >/dev/null 2>&1; then
@@ -427,8 +676,13 @@ download_sample_data() {
     }
 
     fetch_zip() {
-        local url="$1" sum="$2" name="$3" target="${MAP_ROOT}/$3"
+        local url="$1" sum="$2" name="$3" target="${MAP_ROOT}/$3" stage candidate
+        validate_sample_target_path "$target" || return 1
         if [ "$force" != true ] && [ -d "$target" ]; then
+            if ! validate_sample_dataset "$name" "$target"; then
+                log_error "$name is incomplete at $target; rerun with --force"
+                return 1
+            fi
             log_info "$name already present at $target (use --force to re-download)"
             return 0
         fi
@@ -437,22 +691,38 @@ download_sample_data() {
             return 1
         fi
         log_info "Downloading $name ..."
-        curl -fL --retry 3 -o "${TMP}/${name}.zip" "$url"
-        sha256_verify "${TMP}/${name}.zip" "$sum"
-        mkdir -p "$MAP_ROOT"
-        unzip -oq "${TMP}/${name}.zip" -d "$MAP_ROOT"
+        curl -fL --retry 3 -o "${SAMPLE_TMP}/${name}.zip" "$url" || return 1
+        sha256_verify "${SAMPLE_TMP}/${name}.zip" "$sum" || return 1
+        validate_zip_archive "${SAMPLE_TMP}/${name}.zip" "$name" || return 1
+        stage="$(mktemp -d "${MAP_ROOT}/.${name}.stage.XXXXXX")"
+        SAMPLE_STAGE_PATHS+=("$stage")
+        unzip -q "${SAMPLE_TMP}/${name}.zip" -d "$stage" || return 1
+        candidate="$stage/$name"
+        if [ -L "$candidate" ] || [ ! -d "$candidate" ]; then
+            log_error "Archive did not create expected directory: $candidate"
+            return 1
+        fi
+        validate_sample_dataset "$name" "$candidate" || return 1
+        publish_sample_dataset "$candidate" "$target" "$stage" || return 1
         log_info "$name -> $target"
     }
 
     fetch_kashiwanoha() {
-        local target="${MAP_ROOT}/kashiwanoha_map"
+        local target="${MAP_ROOT}/kashiwanoha_map" stage candidate
+        validate_sample_target_path "$target" || return 1
         if [ "$force" != true ] && [ -d "$target" ]; then
+            if ! validate_sample_dataset kashiwanoha_map "$target"; then
+                log_error "kashiwanoha_map is incomplete at $target; rerun with --force"
+                return 1
+            fi
             log_info "kashiwanoha_map already present at $target (use --force to re-download)"
             return 0
         fi
         log_info "Downloading kashiwanoha_map (tier4 scenario_simulator_v2 @ ${TIER4_SHA}) ..."
-        local stage="${TMP}/kashiwanoha_map"
-        mkdir -p "$stage"
+        stage="$(mktemp -d "${MAP_ROOT}/.kashiwanoha_map.stage.XXXXXX")"
+        SAMPLE_STAGE_PATHS+=("$stage")
+        candidate="$stage/kashiwanoha_map"
+        mkdir -p "$candidate"
         local files=(
             "lanelet2_map.osm:91a9126e561783c1dc833e4de84f4d667888cc0466eb5983660cff6c70dd316f"
             "pointcloud_map.pcd:6ac84b21103b32ae43ac387d4905285442d250657f5ea100b12dfb59a1c758da"
@@ -464,15 +734,11 @@ download_sample_data() {
         for entry in "${files[@]}"; do
             name="${entry%%:*}"
             sum="${entry##*:}"
-            curl -fL --retry 3 -o "${stage}/${name}" "${TIER4_RAW}/${name}"
-            sha256_verify "${stage}/${name}" "$sum"
+            curl -fL --retry 3 -o "${candidate}/${name}" "${TIER4_RAW}/${name}" || return 1
+            sha256_verify "${candidate}/${name}" "$sum" || return 1
         done
-        mkdir -p "$MAP_ROOT"
-        rm -rf "$target"
-        if ! mv "$stage" "$target"; then
-            log_error "Failed to move $stage to $target"
-            return 1
-        fi
+        validate_sample_dataset kashiwanoha_map "$candidate" || return 1
+        publish_sample_dataset "$candidate" "$target" "$stage" || return 1
         log_info "kashiwanoha_map -> $target"
     }
 
@@ -493,10 +759,11 @@ download_sample_data() {
             "5f9d36353393b3d249212153c19049822b1298db56512aa045b4f7f6fc37cf88" \
             "sample-rosbag"
         mkdir -p "${USER_HOME}/autoware_data"
-        chown "${TARGET_USER}:" "${USER_HOME}/autoware_data" 2>/dev/null || true
         log_info "NOTE: logging-simulation also needs Autoware perception artifacts in ~/autoware_data"
         log_info "      (download them with: install.sh --download-artifacts)."
     }
+
+    prepare_sample_map_root
 
     case "$deployment" in
         all|"")
@@ -513,20 +780,15 @@ download_sample_data() {
         scenario-simulation|zenoh-bridge)
             fetch_kashiwanoha
             ;;
-        carla-simulation)
-            log_info "carla-simulation downloads its assets via deployments/carla-simulation/start-carla-e2e-demo.sh."
-            return 0
-            ;;
-        *)
-            log_error "Unknown deployment for sample-data: $deployment"
-            return 1
-            ;;
+        carla-simulation) return 0 ;;
+        *) return 1 ;;
     esac
 
-    if [[ $EUID -eq 0 && "$TARGET_USER" != "root" ]]; then
-        chown -R "${TARGET_USER}:" "$MAP_ROOT"
-    fi
     log_info "Sample data downloaded to ${MAP_ROOT}."
+    trap - EXIT HUP INT TERM
+    remove_sample_temporary_paths
+    SAMPLE_TMP=""
+    SAMPLE_STAGE_PATHS=()
 }
 
 verify_installation() {
@@ -560,10 +822,12 @@ verify_installation() {
             if sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
                 log_info "NVIDIA GPU runtime verification passed."
             else
-                log_warn "NVIDIA GPU runtime verification failed. GPU containers may not work."
+                log_error "NVIDIA GPU runtime verification failed."
+                return 1
             fi
         else
-            log_warn "Could not pull NVIDIA CUDA test image; skipping GPU runtime verification."
+            log_error "Could not pull NVIDIA CUDA test image."
+            return 1
         fi
     elif [ "$INSTALL_NVIDIA" = true ]; then
         log_warn "nvidia-smi not found on host; skipping GPU runtime verification."
@@ -647,10 +911,32 @@ run_sample_data_command() {
         esac
     done
 
-    if ! download_sample_data "$deployment" "$force"; then
-        exit 1
+    detect_host_architecture
+    if [ "$deployment" = carla-simulation ]; then
+        require_amd64 "carla-simulation"
     fi
+    run_sample_data_as_target "$deployment" "$force"
     log_info "Sample data installation completed."
+}
+
+run_sample_data_as_target() {
+    local deployment="$1" force="$2" script_path
+    local -a command
+    if [[ $EUID -eq 0 && "$TARGET_USER" != root ]]; then
+        if ! script_path=$(realpath -e -- "$0") || [ ! -f "$script_path" ]; then
+            log_error "Sample installation under sudo requires install.sh to run from a file."
+            return 1
+        fi
+        command=(sudo -u "$TARGET_USER" env -u SUDO_USER HOME="$USER_HOME" PATH="$PATH")
+        if [[ -v AUTOWARE_MAP_DIR ]]; then
+            command+=(AUTOWARE_MAP_DIR="$AUTOWARE_MAP_DIR")
+        fi
+        command+=(bash "$script_path" sample-data "$deployment")
+        [ "$force" = true ] && command+=(--force)
+        "${command[@]}"
+    else
+        download_sample_data "$deployment" "$force"
+    fi
 }
 
 #### Main ####
@@ -660,6 +946,7 @@ if [[ "${1:-}" == "sample-data" ]]; then
 fi
 
 parse_args "$@"
+detect_host_architecture
 require_sudo
 check_os
 
@@ -678,9 +965,8 @@ if [ "$DOWNLOAD_ARTIFACTS" = true ]; then
 fi
 
 if [ "$DOWNLOAD_SAMPLES" = true ]; then
-    if ! download_sample_data all false; then
-        exit 1
-    fi
+    install_sample_data_dependencies
+    run_sample_data_as_target all false
 fi
 
 if [ "$RUN_VERIFY" = true ]; then

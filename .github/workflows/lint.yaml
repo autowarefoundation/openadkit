@@ -6,7 +6,9 @@ permissions:
 on:
   pull_request:
     paths:
+      - '.gitignore'
       - '**/*.sh'
+      - '**/*.json5'
       - '.github/image-inventory.json'
       - '.github/scripts/**'
       - '.github/workflows/**'
@@ -19,7 +21,11 @@ on:
       - '**/*.env'
       - '**/*.env.example'
       - 'components/**/*.hcl'
+      - '.hadolint.yaml'
+      - '.markdownlint.yaml'
+      - '.yamllint.yaml'
       - 'mkdocs.yaml'
+      - 'docs/Makefile'
       - 'docs/**/*.yaml'
       - 'docs/**/*.yml'
 
@@ -145,6 +151,11 @@ jobs:
           docker buildx bake -f components/docker-bake.hcl --print universe-common-devel \
             > /dev/null
           exit "${fail}"
+
+      - name: Smoke-test Dockerized docs build
+        run: |
+          make -C docs build
+          test -f site/index.html
 
       - name: Run Python tests
         run: pytest .github/scripts/

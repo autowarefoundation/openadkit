@@ -30,7 +30,15 @@ def git(repo, *arguments):
     ).stdout.strip()
 
 
-def run_detection(tmp_path, changed_path, base_sha=None):
+def run_detection(
+    tmp_path,
+    changed_path,
+    base_sha=None,
+    *,
+    event_name="pull_request",
+    target_input="",
+    ros_distro="humble",
+):
     inventory = INVENTORY_PATH.read_text()
     inventory_path = tmp_path / ".github/image-inventory.json"
     inventory_path.parent.mkdir(parents=True)
@@ -57,9 +65,10 @@ def run_detection(tmp_path, changed_path, base_sha=None):
     env.update(
         {
             "BASE_SHA": base_sha or actual_base_sha,
-            "EVENT_NAME": "pull_request",
+            "EVENT_NAME": event_name,
             "GITHUB_OUTPUT": str(output_path),
-            "TARGET_INPUT": "",
+            "ROS_DISTRO": ros_distro,
+            "TARGET_INPUT": target_input,
         }
     )
     result = subprocess.run(
@@ -142,6 +151,39 @@ def test_invalid_pr_base_sha_is_not_suppressed(tmp_path):
     assert result.returncode != 0
 
 
+@pytest.mark.parametrize(
+    ("target", "distro"),
+    [("api", "jazzy"), ("carla-interface", "humble")],
+)
+def test_manual_targets_accept_supported_ros_distros(tmp_path, target, distro):
+    result, outputs = run_detection(
+        tmp_path,
+        "manual-input",
+        event_name="workflow_dispatch",
+        target_input=target,
+        ros_distro=distro,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(outputs["targets_json"]) == [target]
+
+
+def test_manual_target_rejects_unsupported_ros_distro(tmp_path):
+    result, outputs = run_detection(
+        tmp_path,
+        "manual-input",
+        event_name="workflow_dispatch",
+        target_input="api carla-interface",
+        ros_distro="jazzy",
+    )
+
+    assert result.returncode != 0
+    assert "carla-interface" in result.stderr
+    assert "jazzy" in result.stderr
+    assert "humble" in result.stderr
+    assert outputs == {}
+
+
 def test_local_context_and_pr_scan_contracts():
     workflow = WORKFLOW_PATH.read_text()
     workflow_config = yaml.safe_load(workflow)
@@ -152,7 +194,14 @@ def test_local_context_and_pr_scan_contracts():
     assert 'SIMULATOR_IMAGE = "simulator"' in bake
     assert "github.event.pull_request.base.sha" in workflow
     assert "origin/main...HEAD" not in workflow
-    assert "load: ${{ github.event_name == 'pull_request'" in workflow
+    assert "inputs.push" not in workflow
+    assert "push: false" in workflow
+    assert "load: true" in workflow
+    assert workflow_config["jobs"]["build"]["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "packages": "read",
+    }
     assert "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25" in workflow
     assert workflow_config["jobs"]["build"]["timeout-minutes"] == 120
     assert "OPENADKIT_CI_FORCE_DOCKER_INSTALL=true" in install_workflow

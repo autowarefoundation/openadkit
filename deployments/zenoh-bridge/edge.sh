@@ -10,7 +10,7 @@ show_help() {
     echo "  down            Stop and remove Edge services"
     echo "  ps              List status of Edge services"
     echo "  logs            View logs of Edge services"
-    echo "  config          Validate and view the Compose file"
+    echo "  config          Validate the Compose file"
     echo "  dry-run         Show what would be executed without doing it"
     echo ""
     echo "Options:"

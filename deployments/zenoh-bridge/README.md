@@ -1,59 +1,41 @@
-# Open AD Kit Zenoh Bridge
+# Zenoh Bridge
 
-This deployment bridges Autoware data from Edge to Cloud using Zenoh for remote visualization and control.
+Bridges Autoware data from edge to cloud for remote visualization and control.
+See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)
+for topology, configuration, and teleoperation.
 
-## Documentation
-
-For complete operational instructions, see the canonical documentation:
-
-**[Open AD Kit Docs — Zenoh Bridge](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)**
-
-## Quick Start
+## Setup
 
 ```bash
 cp .env.example .env
 ../../install.sh sample-data zenoh-bridge
 ```
 
-From a release bundle, use `./install.sh sample-data zenoh-bridge` instead.
-
-Set `REMOTE_PASSWORD` in `.env` before starting. Docker Compose reads this file
-without sourcing it; exported shell variables take precedence.
-
-### Split Topology (Recommended)
-
-Start each side in its own terminal:
+From a release bundle, replace the install command with:
 
 ```bash
-./edge.sh up -d
+./install.sh sample-data zenoh-bridge
+```
+
+Set `REMOTE_PASSWORD` in `.env` before starting.
+
+## Start
+
+```bash
 ./cloud.sh up -d
+./edge.sh up -d
 ```
 
-Access the visualizer at `https://localhost:6081/vnc.html` (accept the self-signed certificate warning).
+Open `https://localhost:6081/vnc.html` and accept the self-signed certificate.
 
-For separate machines, expose TCP 7448 only on an exact VPN/private-interface
-address and restrict it to trusted peers. Zenoh transport is not authenticated
-or encrypted; `REMOTE_PASSWORD` protects only the noVNC visualizer.
+**Warning:** TCP 7448 has no transport authentication or encryption. For
+separate machines, bind it to an exact VPN/private-interface address and
+restrict it to trusted peers. `REMOTE_PASSWORD` protects only the noVNC
+visualizer.
 
-### Monolithic
+## Stop
 
 ```bash
-docker compose up -d
+./edge.sh down
+./cloud.sh down
 ```
-
-*Cloned repo: run `../../install.sh` instead.*
-
-## Teleoperation
-
-```bash
-./cloud.sh up --with-teleop -d
-./run_teleop.sh
-```
-
-| Key | Function |
-|-----|----------|
-| **W/S** | Throttle / Brake |
-| **A/D** | Turn Left / Right |
-| **Z** | Toggle Auto/Local Control |
-| **Space** | Emergency Stop / Resume |
-| **Q** | Quit |

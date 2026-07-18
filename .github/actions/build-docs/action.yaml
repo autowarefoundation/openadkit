@@ -1,14 +1,5 @@
 name: build-docs
-description: Build the MkDocs site (install deps, generate release notes, build)
-
-inputs:
-  github-token:
-    description: GitHub token used by the release-notes generator
-    required: true
-  allow-stale-release-notes:
-    description: Keep the existing release page when a transient GitHub API fetch fails
-    required: false
-    default: 'false'
+description: Build the MkDocs site
 
 runs:
   using: composite
@@ -23,18 +14,6 @@ runs:
     - name: Install dependencies
       run: pip install -r docs/requirements.txt
       shell: bash
-
-    - name: Generate release notes
-      run: |
-        args=()
-        if [ "${ALLOW_STALE_RELEASE_NOTES}" = "true" ]; then
-          args+=(--allow-stale-on-fetch-error)
-        fi
-        python docs/scripts/generate_release_notes.py "${args[@]}"
-      shell: bash
-      env:
-        ALLOW_STALE_RELEASE_NOTES: ${{ inputs.allow-stale-release-notes }}
-        GITHUB_TOKEN: ${{ inputs.github-token }}
 
     - name: Pin installer source ref
       run: printf 'OPENADKIT_INSTALL_REF=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"

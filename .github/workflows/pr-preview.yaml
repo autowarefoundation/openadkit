@@ -44,9 +44,6 @@ jobs:
 
       - name: Build docs
         uses: ./.github/actions/build-docs
-        with:
-          allow-stale-release-notes: 'true'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload site artifact
         uses: actions/upload-artifact@v4

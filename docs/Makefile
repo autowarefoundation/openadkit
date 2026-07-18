@@ -6,7 +6,7 @@ REPO_ROOT := $(shell cd .. && pwd)
 OPENADKIT_INSTALL_REF := $(shell git -C "$(REPO_ROOT)" rev-parse HEAD)
 DOCS_CONTAINER_ENV := -e OPENADKIT_INSTALL_REF=$(OPENADKIT_INSTALL_REF)
 
-.PHONY: help prepare prepare-if-missing serve build clean generate-release-notes
+.PHONY: help prepare prepare-if-missing serve build clean
 
 # Default target
 help:
@@ -15,23 +15,14 @@ help:
 	@echo "  make prepare-if-missing  Reuse local image if present, otherwise build it"
 	@echo "  make serve        Start development server on the built container"
 	@echo "  make build        Build static documentation"
-	@echo "  make generate-release-notes  Refresh release notes from GitHub Releases"
 	@echo "  make clean        Clean build artifacts"
 
 # Serve documentation locally
-serve: prepare-if-missing generate-release-notes
+serve: prepare-if-missing
 	docker run --rm -p 8000:8000 -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) $(DOCS_CONTAINER_ENV) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev
 
-# Refresh release notes from GitHub Releases (runs inside the docs container).
-# Non-fatal: when offline or rate-limited, the site still builds — the
-# Releases page is simply skipped until the next successful refresh.
-# Set GITHUB_TOKEN in your shell to authenticate (avoids API rate limiting).
-generate-release-notes:
-	@docker run --rm -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) $(DOCS_CONTAINER_ENV) -e GITHUB_TOKEN mkdocs-dev \
-		python docs/scripts/generate_release_notes.py --allow-stale-on-fetch-error
-
 # Build static documentation
-build: prepare-if-missing generate-release-notes
+build: prepare-if-missing
 	docker run --rm -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) $(DOCS_CONTAINER_ENV) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev mkdocs build
 
 # Clean build artifacts

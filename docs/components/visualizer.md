@@ -34,7 +34,10 @@ The following environment variables can be configured when launching the visuali
 |----------|---------------|-----------------|-------------|
 | `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | Any valid path | The full path to the RViz2 configuration file inside the container |
 | `REMOTE_DISPLAY` | `true` | `true`, `false` | **(Recommended)** Browser-based RViz2 display bound to host loopback by default. Use SSH forwarding or an authenticated reverse proxy for remote access. Set to `false` to launch a local RViz2 display |
-| `REMOTE_PASSWORD` | — (required) | Any string without special characters | Password for the remote display. Required when `REMOTE_DISPLAY=true` (the default); the container exits if unset |
+| `REMOTE_PASSWORD` | — | Any string | Password for the remote display. Required when `REMOTE_DISPLAY=true`; the container exits if unset |
+| `WEBSOCKIFY_BIND` | `127.0.0.1` | IP address | noVNC bind address. For bridge networking, use `0.0.0.0` inside the container and publish the host port on `127.0.0.1` |
+| `USE_SIM_TIME` | `false` | `true`, `false` | Use the ROS simulation clock |
+| `RVIZ_GPU` | `auto` | `auto`, `on`, `off` | Select automatic, forced, or disabled VirtualGL acceleration |
 
 ## Used In
 

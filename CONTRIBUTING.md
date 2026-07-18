@@ -4,7 +4,6 @@ Thank you for your interest in contributing to Open AD Kit. This project is part
 
 ## Quick Links
 
-- [:material-file-document: Full Contributing Guide](https://autowarefoundation.github.io/openadkit/development/contributing/) — detailed workflow, conventions, and setup instructions
 - [:material-github: Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and request features
 - [:material-chat: Discord](https://discord.gg/Q94UsPvReQ) — real-time discussion
 
@@ -18,8 +17,6 @@ Open AD Kit is licensed under **Apache License 2.0**. All contributions are acce
 2. **Sign off** your commits (`git commit -s`) to certify DCO compliance
 3. **Preview docs** locally with `make -C docs serve`
 4. **Open a PR** against `main` with a clear description
-
-See the [full guide](https://autowarefoundation.github.io/openadkit/development/contributing/) for detailed instructions.
 
 ## For Internal (Foundation) Contributors
 
@@ -65,7 +62,6 @@ export REMOTE_PASSWORD="ci-validate"
 
 # Documentation (local build, from the repository root)
 pip install -r docs/requirements.txt
-python3 docs/scripts/generate_release_notes.py  # optional: populates the Releases page (needs network)
 mkdocs build
 ```
 

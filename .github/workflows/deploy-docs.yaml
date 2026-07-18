@@ -50,9 +50,6 @@ jobs:
 
       - name: Build docs
         uses: ./.github/actions/build-docs
-        with:
-          allow-stale-release-notes: ${{ github.event_name != 'release' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload production site
         uses: actions/upload-artifact@v4

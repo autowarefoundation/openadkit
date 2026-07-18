@@ -1,158 +1,24 @@
 # Contributing
 
-Thank you for your interest in contributing to Open AD Kit. This project is part of the [Autoware Foundation](https://www.autoware.org/) ecosystem, and we welcome contributions from individuals and organizations worldwide.
+Open AD Kit welcomes contributions from individuals and organizations. The
+repository's [CONTRIBUTING.md](https://github.com/autowarefoundation/openadkit/blob/main/CONTRIBUTING.md)
+is the canonical guide for:
 
-## License
+- Developer Certificate of Origin (DCO) sign-off
+- Branch and commit conventions
+- Local lint and test commands
+- Deployment validation
+- Release workflow
 
-Open AD Kit is licensed under the **Apache License 2.0**. By contributing, you agree that your contributions will be licensed under the same terms.
-
-!!! note "No CLA Required"
-    The Autoware Foundation does **not** require a Contributor License Agreement (CLA). Contributions are accepted under the Apache 2.0 license terms.
-
-## Developer Certificate of Origin (DCO)
-
-All commits must include a **Signed-off-by** line to certify that you have the right to submit the code under the Apache 2.0 license:
-
-```bash
-# Sign off automatically when committing
-git commit -s -m "feat: add new deployment"
-```
-
-The sign-off is a simple line at the end of the commit message:
-
-```text
-Signed-off-by: Your Name <your.email@example.com>
-```
-
-!!! warning "DCO Enforcement"
-    Pull requests without proper DCO sign-off will not be merged. The CI checks enforce this requirement automatically.
-
-## How to Contribute
-
-### 1. Fork the Repository
-
-Create your own fork of the [Open AD Kit repository](https://github.com/autowarefoundation/openadkit) on GitHub.
-
-### 2. Set Up Your Environment
-
-```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/openadkit.git
-cd openadkit
-
-# Add the upstream remote
-git remote add upstream https://github.com/autowarefoundation/openadkit.git
-```
-
-### 3. Create a Branch
-
-```bash
-# Make sure you are on the latest main branch first
-git checkout main
-git pull upstream main
-
-# Create your feature branch
-git checkout -b feat/your-feature-name
-```
-
-Use descriptive branch names that reflect the change:
-
-- `feat/` — New features or enhancements
-- `fix/` — Bug fixes
-- `docs/` — Documentation improvements
-- `refactor/` — Code refactoring
-
-### 4. Make Your Changes
-
-Follow the existing code style and documentation conventions. For documentation changes, preview them locally:
-
-```bash
-# Build the MkDocs container image (run once)
-make -C docs prepare
-
-# Serve the docs site
-make -C docs serve
-```
-
-### 5. Commit with Conventional Commits
-
-Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages and PR titles:
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `feat` | New feature | `feat: add carla-interface container` |
-| `fix` | Bug fix | `fix: resolve zenoh bridge port conflict` |
-| `docs` | Documentation only | `docs: update hardware requirements` |
-| `style` | Formatting, no code change | `style: format docker-compose files` |
-| `refactor` | Code restructuring | `refactor: simplify build pipeline` |
-| `test` | Adding or updating tests | `test: add scenario simulation test` |
-| `chore` | Maintenance tasks | `chore: update CI workflow` |
-
-```bash
-git commit -s -m "feat: add new deployment for logging simulation"
-```
-
-### 6. Push and Open a Pull Request
-
-```bash
-git push origin feat/your-feature-name
-```
-
-Open a pull request against the `main` branch of the upstream repository. The PR description should include:
-
-- **What** changed and **why**
-- **How** it was tested
-- Any **breaking changes** or migration notes
-
-!!! info "Large Changes"
-    For significant changes (new features, architectural modifications), please open a GitHub Discussion first to align with maintainers before submitting a PR.
-
-## Contribution Workflow Summary
-
-<div class="oak-steps" markdown="1">
-
-- **Fork** the repository on GitHub
-- **Clone** your fork and set up the development environment
-- **Branch** from `main` with a descriptive name
-- **Develop** your changes following project conventions
-- **Commit** with DCO sign-off and Conventional Commit format
-- **Push** your branch to your fork
-- **Validate** before opening a PR (see below)
-- **Open a Pull Request** against `main` with a clear description
-
-</div>
-
-## Validate Before Pushing
-
-Run the same checks CI runs to catch issues early:
-
-```bash
-# Documentation build
-make -C docs build
-
-# Docker Compose validation (per-deployment, with both env files — base first, last wins)
-export REMOTE_PASSWORD="ci-validate"
-( cd deployments/planning-simulation && \
-  docker compose --env-file ../base/base.env --env-file planning-simulation.env config -q )
-
-# Python tests
-pytest .github/scripts/
-```
-
-For the complete lint suite (shellcheck, actionlint, hadolint, yamllint, markdownlint) and all deployment validations, see the top-level [CONTRIBUTING.md](https://github.com/autowarefoundation/openadkit/blob/main/CONTRIBUTING.md) file.
-
-```mermaid
-flowchart LR
-    Fork --> Clone --> Branch --> Develop --> Commit --> Push --> PR
-```
+Before opening a pull request, run the checks relevant to your change and sign
+every commit with `git commit -s`. Significant architectural changes should be
+discussed in [GitHub Discussions](https://github.com/autowarefoundation/openadkit/discussions)
+before implementation.
 
 ## Community
 
-- [Autoware Foundation Discord](https://discord.gg/Q94UsPvReQ) — Real-time discussion and support
-- [Autoware Documentation — Contributing](https://autowarefoundation.github.io/autoware-documentation/main/contributing/) — Foundation-wide contribution guidelines
-- [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues) — Bug reports and feature requests
-- [GitHub Discussions](https://github.com/autowarefoundation/openadkit/discussions) — Design proposals and community questions
-
-## Code of Conduct
-
-All contributors are expected to adhere to the [Autoware Foundation Code of Conduct](https://github.com/autowarefoundation/openadkit/blob/main/CODE_OF_CONDUCT.md), which fosters an open, welcoming, and harassment-free environment.
+- [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues)
+- [GitHub Discussions](https://github.com/autowarefoundation/openadkit/discussions)
+- [Autoware Foundation Discord](https://discord.gg/Q94UsPvReQ)
+- [Autoware contribution guide](https://autowarefoundation.github.io/autoware-documentation/main/contributing/)
+- [Code of Conduct](https://github.com/autowarefoundation/openadkit/blob/main/CODE_OF_CONDUCT.md)

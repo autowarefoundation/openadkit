@@ -126,6 +126,25 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Scan ${{ matrix.target }}-${{ matrix.ros_distro }} (${{ matrix.platform }})
+        id: trivy-scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          image-ref: ${{ matrix.image_ref }}
+          format: sarif
+          output: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          scanners: vuln
+          timeout: 15m
+          trivyignores: .trivyignore
+          limit-severities-for-sarif: true
+
+      - name: Retry scan after transient failure
+        if: steps.trivy-scan.outcome == 'failure'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_PLATFORM: ${{ matrix.platform }}
@@ -142,7 +161,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload scan results to GitHub Security
-        if: always()
+        if: ${{ always() && hashFiles(format('trivy-{0}-{1}-{2}.sarif', matrix.target, matrix.ros_distro, matrix.platform_label)) != '' }}
         uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif

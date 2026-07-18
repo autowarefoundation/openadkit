@@ -107,14 +107,26 @@ def test_production_docs_build_and_deploy_have_separate_permissions():
 
 def test_full_image_scan_is_limited_to_vulnerabilities_with_explicit_timeout():
     workflow = yaml.safe_load((ROOT / ".github/workflows/scan.yaml").read_text())
-    scan_step = next(
+    scan_steps = [
         step
         for step in workflow["jobs"]["scan"]["steps"]
         if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
-    )
+    ]
 
-    assert scan_step["with"]["scanners"] == "vuln"
-    assert scan_step["with"]["timeout"] == "15m"
+    assert len(scan_steps) == 2
+    assert scan_steps[0]["id"] == "trivy-scan"
+    assert scan_steps[0]["continue-on-error"] is True
+    assert scan_steps[1]["if"] == "steps.trivy-scan.outcome == 'failure'"
+    for scan_step in scan_steps:
+        assert scan_step["with"]["scanners"] == "vuln"
+        assert scan_step["with"]["timeout"] == "15m"
+
+    upload_step = next(
+        step
+        for step in workflow["jobs"]["scan"]["steps"]
+        if str(step.get("uses", "")).startswith("github/codeql-action/upload-sarif@")
+    )
+    assert "hashFiles(" in upload_step["if"]
 
 
 def test_semantic_pr_uses_pinned_action_with_read_only_permissions():

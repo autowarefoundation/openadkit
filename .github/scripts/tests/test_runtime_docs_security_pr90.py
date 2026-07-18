@@ -97,9 +97,12 @@ def test_production_docs_build_and_deploy_have_separate_permissions():
     deploy_steps = jobs["deploy"]["steps"]
     assert any(step.get("uses") == "./.github/actions/build-docs" for step in build_steps)
     assert any(step.get("uses") == "actions/upload-artifact@v4" for step in build_steps)
+    checkout = next(
+        step for step in deploy_steps if step.get("uses") == "actions/checkout@v6"
+    )
+    assert checkout["with"]["persist-credentials"] is False
     assert any(step.get("uses") == "actions/download-artifact@v4" for step in deploy_steps)
     assert all(step.get("uses") != "./.github/actions/build-docs" for step in deploy_steps)
-    assert all(step.get("uses") != "actions/checkout@v6" for step in deploy_steps)
 
 
 def test_semantic_pr_uses_pinned_action_with_read_only_permissions():

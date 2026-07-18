@@ -70,6 +70,11 @@ jobs:
       actions: read
       contents: write
     steps:
+      - name: Checkout deployment repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
       - name: Download production site
         uses: actions/download-artifact@v4
         with:

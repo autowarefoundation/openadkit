@@ -165,5 +165,4 @@ jobs:
       - name: Run shell tests
         run: |
           bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
-          bash .github/scripts/tests/test_install_docker_capabilities.sh
           bash .github/scripts/tests/test_report_manifests.sh

@@ -1,368 +1,129 @@
 # Zenoh Bridge
 
-!!! abstract ""
-    This demo demonstrates a distributed deployment pattern for Open AD Kit: separating compute-intensive components (perception, planning, simulation) on an edge server from lightweight visualization and control on a remote machine. Zenoh bridges the two isolated ROS 2 environments with high-performance, low-latency communication.
-
-!!! abstract "When to Use This Demo"
-    Use the Zenoh Bridge demo when you need to:
-
-    - **Remotely visualize** an Autoware stack running on a vehicle or powerful simulation server
-    - **Separate compute and display** to optimize resource usage on each machine
-    - **Validate cloud-edge architecture** before production deployment
-    - **Manage multiple vehicles** from a central monitoring station (via Zenoh namespaces)
-
-## Demo Video
-
-[![[openadkit x zenoh-bridge] remote control (cloud/edge) demo](https://img.youtube.com/vi/6yhhxlVQTKI/0.jpg)](https://www.youtube.com/watch?v=6yhhxlVQTKI)
-
-| Time | Description |
-|------|-------------|
-| 00:00 | Start cloud services |
-| 00:16 | Start edge services |
-| 00:52 | Demo: Stop, planning, resume |
-| 01:53 | Stop edge and cloud services |
+Bridge an edge Autoware domain to a separate visualization and control domain.
+The edge runs Autoware and simulation; the cloud side runs browser-based RViz2.
+Zenoh carries selected ROS 2 topics between the isolated domains.
 
 ## Architecture
 
-### Edge-Cloud Model
-
-The system decouples the monolithic stack into two domains:
-
-- **Edge Side** — High computational demand (CPU/GPU)
-  - `autoware`: Core perception, decision-making, and planning modules
-  - `scenario_simulator`: Generates virtual traffic environments and sensor data
-  - **Deployment**: Vehicle compute unit or powerful simulation server
-
-- **Cloud Side** — Lightweight interaction and visualization
-  - `visualizer`: Browser-accessible RViz2 via noVNC; no local ROS 2 installation required
-  - **Deployment**: Laptop, workstation, or cloud management system
-
-### Architecture Diagram
-
 ```mermaid
-flowchart TD
-    subgraph CloudSide["Cloud Side (User Machine)"]
-        direction LR
-
-        subgraph CloudNet[cloud_net Network]
-            direction TB
-
-            visualizer["Visualizer<br/>RViz2 via noVNC"]
-            cloud_bridge["Cloud Zenoh Bridge<br/>Router, listens on TCP"]
-
-            visualizer -->|"ROS 2 DDS"| cloud_bridge
-        end
+flowchart LR
+    subgraph Edge[Edge ROS_DOMAIN_ID 0]
+        A[Autoware] --> EB[Zenoh Client]
+        S[Scenario Simulator] --> EB
     end
-
-    subgraph EdgeSide["Edge Side (Vehicle/Server)"]
-        direction LR
-
-        subgraph EdgeNet[edge_net Network]
-            direction TB
-
-            autoware["Autoware<br/>Perception, Planning, Control"]
-            scenario_simulator["Scenario Simulator<br/>Virtual Environment, Sensor Data"]
-            edge_bridge["Edge Zenoh Bridge<br/>Client, converts DDS ↔ Zenoh"]
-
-            autoware <-->|"ROS 2 DDS"| scenario_simulator
-            autoware -->|"ROS 2 DDS"| edge_bridge
-            scenario_simulator -->|"ROS 2 DDS"| edge_bridge
-        end
+    subgraph Cloud[Cloud ROS_DOMAIN_ID 1]
+        CB[Zenoh Router] --> V[RViz2 / noVNC]
     end
-
-    user[User] -->|"HTTPS (Port 6081)"| visualizer
-    edge_bridge -->|"Zenoh Protocol<br/>over zenoh_net"| cloud_bridge
+    EB -->|TCP 7448| CB
 ```
 
-### Network Isolation and Communication Bridge
-
-- **`edge_net`** — Isolated virtual network for `autoware` and `scenario_simulator`. Uses ROS 2 DDS multicast for low-latency local communication.
-- **`cloud_net`** — Isolated network for `visualizer`, simulating physical or logical separation.
-- **`zenoh_net`** — Bridges `edge_zenoh_bridge` and `cloud_zenoh_bridge` across domains. Zenoh replaces raw DDS multicast with a tunneled TCP connection, enabling cross-network operation.
-
-### Zenoh Bridge Configuration
-
-- **`cloud_zenoh_bridge`** — Acts as a **Router**, listening on TCP 7448 inside its container. The host publishes that port on `${ZENOH_ROUTER_BIND_IP}:7448`, which defaults to loopback.
-- **`edge_zenoh_bridge`** — Acts as a **Client**, connecting to the cloud router on port `7448` via `zenoh_net` (or `${CLOUD_IP}:7448` in multi-machine setups). It scans ROS 2 topics in `edge_net`, converts them to Zenoh, and forwards to the router. Its own local listener uses TCP 7447.
-- **`config/zenoh-bridge-ros2dds.json5`** — Defines bridge mode, endpoints, and topic filtering rules. Filtering allows precise bandwidth control by excluding high-frequency or irrelevant topics.
-
-!!! warning "Prevent DDS Cross-Traffic"
-    When bridging two ROS 2 domains, ensure they cannot discover each other via native DDS multicast. The compose file enforces domain separation via `ROS_DOMAIN_ID`: edge services use `0`, cloud services use `1`. The Zenoh bridges carry messages across this boundary over `zenoh_net`. Alternatively, configure `CYCLONEDDS_URI` to restrict interfaces. Otherwise, topics may be duplicated across both networks.
-
-### Multi-Vehicle Namespace Support
-
-Zenoh supports **namespace-based multi-vehicle management** by assigning a unique namespace to each bridge:
-
-```json5
-{
-  namespace: "/bot1"
-}
-```
-
-This allows a single cloud visualizer or fleet management station to connect to multiple vehicles without reconfiguring ROS nodes on each vehicle. The `zenoh_autoware_fms` prototype demonstrates this pattern on ADLINK ADM-AL30 hardware.
-
-```mermaid
-flowchart TD
-    Cloud[Cloud Visualizer / FMS] --> Bridge1[Zenoh Bridge /bot1]
-    Cloud --> Bridge2[Zenoh Bridge /bot2]
-    Cloud --> Bridge3[Zenoh Bridge /bot3]
-
-    Bridge1 --> V1[Vehicle 1]
-    Bridge2 --> V2[Vehicle 2]
-    Bridge3 --> V3[Vehicle 3]
-```
-
-## Prerequisites
-
-- Docker Engine + Docker Compose (set up via `install.sh`, below)
-- Stable internet connection for pulling images
+The separate ROS domain IDs prevent native DDS cross-traffic. Configure topic
+filters and namespaces in `config/zenoh-bridge-ros2dds.json5`.
 
 ## Setup
 
-### 1. Set up the environment (one-time)
-
 ```bash
 {{ install_command }}
-```
-
---8<-- "includes/docker-group-activation.md"
-
-### 2. Clone the repository and download the demo map
-
-```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit/deployments/zenoh-bridge
 cp .env.example .env
 ../../install.sh sample-data zenoh-bridge
 ```
 
+--8<-- "includes/docker-group-activation.md"
+
 --8<-- "includes/first-release-note.md"
 
-### 3. Verify directory structure
+From an extracted release bundle, run `./install.sh sample-data zenoh-bridge`.
 
-```text
-.
-├── README.md
-├── docker-compose.yaml
-├── .env.example
-├── .env                       # local configuration, not tracked
-├── cloud.sh
-├── edge.sh
-├── common.sh
-├── run_teleop.sh
-├── install.sh                # included in the release bundle
-├── teleop/
-│   └── teleop_config.yaml
-└── config/
-    └── zenoh-bridge-ros2dds.json5
-```
+Edit `.env` before starting:
 
-Modify `config/zenoh-bridge-ros2dds.json5` to filter topics as needed.
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `CLOUD_IP` | Cloud router address used by the edge | Docker DNS on one host |
+| `MAP_PATH` | Kashiwanoha map directory | `$HOME/autoware_map/kashiwanoha_map` |
+| `REMOTE_PASSWORD` | Required noVNC password | None |
+| `ZENOH_ROUTER_BIND_IP` | Cloud router host interface | `127.0.0.1` |
 
-### 4. Configure environment variables
-
-Copy `.env.example` to `.env`, then edit `.env` to customize your deployment. Docker Compose parses `.env` as data; the helper scripts do not source or execute it. Variables exported in the calling shell take precedence over values in `.env`.
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CLOUD_IP` | IP address or hostname of the cloud machine (used by edge bridge to connect) | `cloud_zenoh_bridge` (Docker DNS, single-host only) |
-| `MAP_PATH` | Host path to the map directory | `$HOME/autoware_map/kashiwanoha_map` |
-| `REMOTE_PASSWORD` | Password for the noVNC visualizer only (port 6080/6081). **Required — must be set before starting.** It does not protect Zenoh. | (none) |
-| `ZENOH_ROUTER_BIND_IP` | Host interface for the cloud Zenoh router. For remote use, set the exact VPN/private-interface address; wildcard binds are rejected by `cloud.sh`. | `127.0.0.1` |
-| `SCENARIO_SIMULATION` | Enable scenario simulator (`true`/`false`) | `true` |
-
-The scenario simulator, Autoware, and visualizer all use wall time in this deployment. `/clock` is intentionally not routed over Zenoh, and the visualizer sets `USE_SIM_TIME=false`.
+Docker Compose reads `.env` as data; helper scripts do not execute it. Exported
+shell variables override file values. The deployment uses wall time and does
+not bridge `/clock`.
 
 !!! warning "Zenoh transport is not secured"
-    TCP 7448 has no transport authentication or encryption in this demo. Keep the loopback default for single-host use. For a multi-machine deployment, first establish a VPN or private network, bind `ZENOH_ROUTER_BIND_IP` to the cloud machine's exact VPN/private-interface address (never `0.0.0.0`), and allow the port only from trusted VPN peers. `REMOTE_PASSWORD` protects only the noVNC session and does not protect Zenoh traffic.
+    TCP 7448 has no authentication or encryption. For separate machines, use a
+    VPN/private network, bind `ZENOH_ROUTER_BIND_IP` to that exact interface,
+    and restrict the port to trusted peers. `REMOTE_PASSWORD` protects only
+    noVNC. Wildcard router binds are rejected.
 
-## Starting the System
+## Run
 
-### Option A: Split Topology (Recommended)
+### Split Topology
 
-Separate Edge and Cloud components to simulate a real-world distributed environment.
+Start cloud first, then edge:
 
 ```bash
-# Terminal 1: Start Cloud components (Visualizer, Cloud Bridge)
 ./cloud.sh up -d
-
-# Terminal 2: Start Edge components (Autoware, Simulator, Edge Bridge)
 ./edge.sh up -d
 ```
 
-Start the cloud side first so the edge Zenoh bridge can connect to the cloud router immediately. If edge starts before cloud, the bridge retries until the router is available.
-
-### Option B: Monolithic Deployment
-
-Run everything on a single machine using standard Docker Compose.
+### Single Host
 
 ```bash
 docker compose up -d
 ```
 
-The initial launch may take several minutes to download images.
-
-### Option C: Distributed Deployment (Multi-Machine)
-
-Deploy on separate machines over a VPN or private network. In the examples below, `10.8.0.1` is the cloud machine's VPN-interface address.
-
-#### 1. Cloud machine
+### Separate Machines
 
 ```bash
+# Cloud machine
 export ZENOH_ROUTER_BIND_IP=10.8.0.1
-./cloud.sh
-# [Info] Cloud services started.
-#        Zenoh is bound to 10.8.0.1.
-```
+./cloud.sh up -d
 
-#### 2. Edge machine
-
-```bash
+# Edge machine
 export CLOUD_IP=10.8.0.1
-./edge.sh
+./edge.sh up -d
 ```
 
-Configure the cloud firewall to allow TCP 7448 only through the VPN/private interface and only from the intended edge peers. The exported values above override `.env`; alternatively, put the same exact addresses in each machine's `.env`.
+Allow TCP 7448 only through the VPN/private interface. Open the visualizer at
+`https://localhost:6081/vnc.html` and use `REMOTE_PASSWORD`.
 
-### Monitor Startup Logs
-
-```bash
-docker compose logs -f
-```
-
-## Verification and Usage
-
-### 1. Check container status
-
-Run `docker ps` or `docker compose ps` to verify all containers are running:
-
-- `autoware`
-- `scenario_simulator`
-- `visualizer`
-- `edge_zenoh_bridge`
-- `cloud_zenoh_bridge`
-
-### 2. Access the visualizer
-
-Open a web browser and navigate to:
-
-```text
-https://localhost:6081/vnc.html
-```
-
-The connection uses a self-signed certificate; dismiss the browser privacy warning to continue.
-
-Log in with the password you set as `REMOTE_PASSWORD` in `.env`.
-
-### 3. Verify operation
-
-- The noVNC interface should display RViz2.
-- If **Global Status** in the RViz2 Displays panel shows `OK` (green), the system is running correctly. You should see maps, the vehicle model, and simulated objects.
-- If it shows **Warning**, see the troubleshooting section below.
-
-### 4. Stop the system
-
-```bash
-# Stop Cloud
-./cloud.sh down
-
-# Stop Edge
-./edge.sh down
-
-# Stop everything
-docker compose down
-```
-
-The map is mounted read-only from `~/autoware_map/kashiwanoha_map` on the host, so stopping the stack leaves it untouched. From a source checkout, re-fetch it with `../../install.sh sample-data zenoh-bridge --force`; from a release bundle, use `./install.sh sample-data zenoh-bridge --force`.
-
-## Teleoperation (Optional)
-
-A containerized terminal-based teleoperation interface lets you drive the vehicle manually from the cloud side.
-
-### 1. Start the Teleop Backend
-
-The teleop service only starts when the cloud side is launched with `--with-teleop`:
+## Teleoperation
 
 ```bash
 ./cloud.sh up --with-teleop -d
-```
-
-For the edge side, the default simulation mode works, but pure control testing without scenario interference is cleaner with `--no-sim`:
-
-```bash
 ./edge.sh --no-sim up -d
-```
-
-### 2. Launch the Interface
-
-```bash
 ./run_teleop.sh
 ```
 
-### 3. Controls
+| Key | Action |
+|-----|--------|
+| `W` / `S` | Throttle / brake |
+| `A` / `D` | Steer |
+| `Z` | Toggle auto/local control |
+| `X` / `C` / `V` | Drive / reverse / park |
+| `M` | Cycle drive mode |
+| `R` | Reset to the configured initial pose |
+| `Space` | Emergency stop or resume |
+| `Q` | Quit |
 
-| Key | Function | Description |
-|-----|----------|-------------|
-| **W** | Throttle | Accelerate |
-| **S** | Brake | Decelerate |
-| **A** | Turn Left | Steer left |
-| **D** | Turn Right | Steer right |
-| **Z** | Auto/Local | **Toggle control mode** (must be in Local/External to drive) |
-| **M** | Switch Mode | Cycle modes: `STOP` → `PHYSICS` → `CRUISE` |
-| **X** | Gear: Drive | Shift to Drive (D) |
-| **C** | Gear: Reverse | Shift to Reverse (R) |
-| **V** | Gear: Park | Shift to Park (P) |
-| **Space** | Emergency Stop | Immediate max braking / resume |
-| **R** | Reset Pose | Reset to initial position |
-| **Q** | Quit | Exit the interface |
+For a fresh `--no-sim` session, press `R` to initialize the pose, `Z` to enter
+local control, choose a gear with `X` or `C`, select the drive mode with `M`,
+then use the movement keys.
 
-## Troubleshooting
+## Stop and Troubleshoot
 
-### Visualizer Shows "Global Status: Warning" or Blank Screen
+```bash
+./edge.sh down
+./cloud.sh down
+docker compose down
+```
 
-**Cause:** The bounded `cloud_zenoh_ready` or `edge_zenoh_ready` check could not
-reach its required Zenoh listener before `ZENOH_READY_TIMEOUT` expired.
+If a bridge is not ready, inspect
+`docker compose logs cloud_zenoh_ready edge_zenoh_ready` and start cloud before
+edge. Ports 6081, 7448, and 7447 must be free. Re-fetch the map with
+`../../install.sh sample-data zenoh-bridge --force` from a source checkout or
+`./install.sh sample-data zenoh-bridge --force` from a release bundle.
 
-**Solutions:**
-
-1. **Inspect readiness logs:**
-
-   ```bash
-   docker compose logs cloud_zenoh_ready edge_zenoh_ready
-   ```
-
-2. **Verify ordering and connectivity:** Start the cloud side first, then start
-   the edge side. The edge readiness check verifies both bridge listeners before
-   Autoware starts.
-
-   ```bash
-   ./cloud.sh up -d
-   ./edge.sh up -d
-   ```
-
-### Port Conflict (Port is already allocated)
-
-**Cause:** Ports `6081` (noVNC), `7448` (cloud Zenoh router), or `7447` (edge Zenoh bridge) are in use.
-
-**Solution:** Stop the conflicting program, or modify `docker-compose.yaml`. For example, change `127.0.0.1:6081:6080` to `127.0.0.1:8080:6080` and access via `https://localhost:8080/vnc.html`.
-
-### Container Fails to Start with `file not found`
-
-**Cause:** `config/zenoh-bridge-ros2dds.json5` is missing or inaccessible.
-
-**Solution:** Verify the `config` directory and file exist. On Linux/macOS, check file permissions to ensure Docker can read them.
-
-## Known Limitations
-
-The `autoware` service in this deployment uses the upstream `ghcr.io/autowarefoundation/autoware:universe` image rather than an Open AD Kit component image. This is a temporary measure while Open AD Kit migrates from monolithic to component-based architecture; a component-based replacement will ship in a future release.
-
-Source checkouts use readable third-party tags for the Zenoh bridge and teleop
-images. Release packaging resolves and writes their manifest digests into the
-bundle so released deployments remain reproducible.
-
-## Related
-
-- [Zenoh Plugin ROS2 DDS](https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds)
-- [Managing Multiple Autoware Vehicles with Zenoh](https://autoware.org/managing-multiple-autoware-vehicles-with-zenoh/)
-- [Driving Autoware with Zenoh](https://autoware.org/driving-autoware-with-zenoh/)
-- [Deployments](../index.md) — Single-machine simulations
+The `autoware` service currently uses the upstream `autoware:universe` image;
+release bundles pin its manifest digest.

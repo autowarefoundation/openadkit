@@ -1,27 +1,14 @@
 # Scenario Simulation
 
-!!! abstract ""
-    The Scenario Simulation deployment runs the Autoware stack alongside the official [TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2) container. It enables you to execute predefined traffic scenarios to validate planning and behavior under specific conditions — ideal for CI pipelines and regression testing.
+Run predefined traffic scenarios with
+[TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2).
+The deployment executes scenarios automatically and writes their results to the
+host.
 
-## What You Will See
+!!! warning "Use the Kashiwanoha map"
+    `sample-map-planning` is incompatible and causes invalid-map and MRM errors.
 
-After starting the deployment, the scenario simulator generates a virtual traffic environment around the ego vehicle. You can:
-
-- Watch the ego vehicle navigate predefined scenarios in the noVNC visualizer
-- Observe behavior planning decisions (lane changes, intersection handling, obstacle avoidance)
-- Review simulation results and metrics after scenario completion
-- Define and run your own custom scenarios
-
-## Prerequisites
-
-- Docker Engine (set up via `install.sh`, below)
-
-!!! warning "Use the Correct Map"
-    Do **not** use the `sample-map-planning` map with this deployment. The Kashiwanoha map is required. Using a different map will cause `setMap() for invalid version map`, missing route/localization, and repeated MRM transitions.
-
-## Before You Start
-
-### 1. Set up the environment (one-time)
+## Setup
 
 ```bash
 {{ install_command }}
@@ -29,157 +16,77 @@ After starting the deployment, the scenario simulator generates a virtual traffi
 
 --8<-- "includes/docker-group-activation.md"
 
-### 2. Choose a deployment layout
+=== "Source checkout"
 
-#### Source checkout setup
+    ```bash
+    git clone https://github.com/autowarefoundation/openadkit.git
+    cd openadkit/deployments/scenario-simulation
+    ../../install.sh sample-data scenario-simulation
+    ```
 
-```bash
-git clone https://github.com/autowarefoundation/openadkit.git
-cd openadkit/deployments/scenario-simulation
-../../install.sh sample-data scenario-simulation
-```
+=== "Release bundle"
 
-#### Release bundle setup
-
-```bash
-curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz | tar xz
-cd scenario-simulation
-./install.sh sample-data scenario-simulation
-```
+    ```bash
+    curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/scenario-simulation.tar.gz | tar xz
+    cd scenario-simulation
+    ./install.sh sample-data scenario-simulation
+    ```
 
 ## Configuration
 
-Edit `scenario-simulation.env` to customize the deployment:
+Edit `scenario-simulation.env` as needed:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SCENARIO_SIMULATION` | Enable scenario simulator mode | `true` |
-| `SCENARIO` | Scenario file path inside the container | (bundled example) |
-| `SCENARIO_HOST_DIR` | Host directory mounted at `/scenarios` | `./scenarios` |
-| `OUTPUT_HOST_PATH` | Host directory for simulation results | `./output` |
-| `OUTPUT_DIRECTORY` | Container path for simulation results | `/autoware/scenario-sim/output` |
-| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image tag | `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime` (pinned in `scenario-simulation.env`) |
-| `SCENARIO_READY_TIMEOUT` | Max seconds to wait for Autoware readiness | 300 |
-| `MAP_PATH` | Host map directory mounted into containers | `~/autoware_map/kashiwanoha_map` |
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `SCENARIO` | Scenario path inside the container | Bundled example |
+| `SCENARIO_HOST_DIR` | Host scenario directory | `./scenarios` |
+| `OUTPUT_HOST_PATH` | Host results directory | `./output` |
+| `SCENARIO_READY_TIMEOUT` | Autoware readiness timeout in seconds | `300` |
+| `MAP_PATH` | Host map directory | `~/autoware_map/kashiwanoha_map` |
 
-### Custom Scenarios
+For a custom scenario, place its YAML under `SCENARIO_HOST_DIR` and set, for
+example, `SCENARIO=/scenarios/my-scenario.yaml`. A custom map must provide
+matching `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE` values.
 
-To run your own scenario:
+## Run
 
-1. Place your scenario YAML files under the `SCENARIO_HOST_DIR` (default: `./scenarios/`)
-2. Set the scenario path in the environment file:
+=== "Source checkout"
 
-   ```bash
-   SCENARIO=/scenarios/my-scenario.yaml
-   ```
+    ```bash
+    docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d
+    docker compose --env-file ../base/base.env --env-file scenario-simulation.env logs -f scenario_simulator
+    ```
 
-3. Simulation results are saved to `OUTPUT_HOST_PATH` (default: `./output/`)
+=== "Release bundle"
 
-!!! tip "Custom Maps"
-    Custom scenarios must use the Kashiwanoha map unless you also provide a matching host map. For a different map, set `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE` in `scenario-simulation.env`, and ensure the files exist under `MAP_PATH` before starting. This env file overrides base defaults in a source checkout and already contains the merged defaults in a release bundle.
+    ```bash
+    docker compose --env-file scenario-simulation.env up -d
+    docker compose --env-file scenario-simulation.env logs -f scenario_simulator
+    ```
 
-## Start the Deployment
-
-From the `scenario-simulation` directory, use the command for your layout.
-
-### Start from a source checkout
-
-```bash
-docker compose --env-file ../base/base.env --env-file scenario-simulation.env up -d
-```
-
-### Start from a release bundle
-
-```bash
-docker compose --env-file scenario-simulation.env up -d
-```
-
-Wait approximately **90 seconds** for Autoware and the scenario simulator to initialize. The scenario runner waits up to `SCENARIO_READY_TIMEOUT` seconds (default 300) for required Autoware map and API endpoints, then runs the scenario with an `INITIALIZE_DURATION` of 90 seconds before launching.
+Initialization takes about 90 seconds. The runner waits up to
+`SCENARIO_READY_TIMEOUT`, executes the scenario, and writes results to
+`OUTPUT_HOST_PATH`.
 
 --8<-- "includes/visualizer-remote-access.md"
 
-## View Scenario Runner Logs
+## Stop and Recover
 
-### View source checkout runner logs
+=== "Source checkout"
 
-```bash
-docker compose --env-file ../base/base.env --env-file scenario-simulation.env logs -f scenario_simulator
-```
+    ```bash
+    docker compose --env-file ../base/base.env --env-file scenario-simulation.env down
+    ```
 
-### View release bundle runner logs
+=== "Release bundle"
 
-```bash
-docker compose --env-file scenario-simulation.env logs -f scenario_simulator
-```
+    ```bash
+    docker compose --env-file scenario-simulation.env down
+    ```
 
-## Stop the Deployment
-
-### Stop a source checkout
-
-```bash
-docker compose --env-file ../base/base.env --env-file scenario-simulation.env down
-```
-
-### Stop a release bundle
-
-```bash
-docker compose --env-file scenario-simulation.env down
-```
-
-## Expected Behavior
-
-- Autoware containers initialize and load the mounted Kashiwanoha map
-- The scenario simulator container starts and waits for Autoware readiness
-- Once ready, the scenario executes automatically
-- Results are written to the configured output directory
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Scenario does not start | Ensure the map was fetched: from a source checkout, re-run `../../install.sh sample-data scenario-simulation --force`; from a release bundle, use `./install.sh sample-data scenario-simulation --force` |
-| `setMap() for invalid version map` | You are using the wrong map. Ensure Kashiwanoha is extracted, not `sample-map-planning` |
-| Visualizer blank | Wait up to 90 seconds for full initialization; containers depend on each other sequentially |
-| Missing results | Verify `OUTPUT_HOST_PATH` exists and is writable |
-
-For Docker, GPU, and visualizer issues common to all deployments, see [Troubleshooting](../../getting-started/troubleshooting.md).
-
-## Architecture
-
-```mermaid
-flowchart LR
-    subgraph Host["Single Host"]
-        M[localization-mapping]
-        PC[planning-control]
-        V[vehicle]
-        S[system]
-        SIM[simulator]
-        API[api]
-        VIZ[visualizer]
-        SS[scenario_simulator]
-    end
-
-    Map[~/autoware_map] --> M
-    M --> API
-    M --> PC
-    SS <-->|ROS 2 DDS| SIM
-    SIM --> PC
-    S --> PC
-    V --> PC
-    PC --> VIZ
-```
-
-### Advanced Configuration
-
-The `config/` directory contains parameter files mounted into the containers:
-
-- `config/mrm_handler.param.yaml` — MRM (Minimum Risk Maneuver) timeouts and behavior, mounted into the `system` service
-- `config/default_adapi.param.yaml` — ADAPI parameter overrides, mounted into the `api` service
-
-Edit these files to tune MRM and API behavior without rebuilding images.
-
-## Related
-
-- [Scenario test simulation](https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/) — Official Autoware scenario simulation guide
-- [Planning Simulation](../planning-simulation/index.md) — Simpler single-map simulation
-- [Logging Simulation](../logging-simulation/index.md) — Replay recorded sensor data
+Parameter overrides live in `config/mrm_handler.param.yaml` and
+`config/default_adapi.param.yaml`. To replace missing map data, run
+`../../install.sh sample-data scenario-simulation --force` from a source
+checkout or `./install.sh sample-data scenario-simulation --force` from a
+bundle. For common issues, see
+[Troubleshooting](../../getting-started/troubleshooting.md).

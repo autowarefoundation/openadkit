@@ -1,54 +1,21 @@
 # Visualizer
 
-## Overview
+The `visualizer` image provides browser-accessible RViz2 through noVNC. It
+combines RViz2 and Autoware plugins with Openbox, TigerVNC, and a TLS-enabled
+noVNC server. The VNC backend remains loopback-only, and each container creates
+its own self-signed certificate at startup.
 
-The `visualizer` image provides a **browser-accessible RViz2 environment** via noVNC, allowing remote inspection of Autoware topics and state without requiring a local ROS 2 installation or display server. It is designed as a lightweight component that can be deployed alongside the core stack or on a separate machine for remote monitoring. Accessing the visualizer requires only a web browser, making it ideal for distributed deployments, headless servers, and cloud-edge setups.
+## Settings
 
-## What This Image Contains
-
-The `visualizer` image bundles the following tools and capabilities:
-
-- **noVNC web server** — Browser-based VNC client served over HTTPS (port 6080) with a self-signed SSL certificate for encrypted access
-- **TigerVNC standalone server** — Native VNC backend (port 5999, loopback-only) that renders the desktop session
-- **Openbox window manager** — Minimal X11 window manager to host RViz2 and other GUI tools
-- **RViz2** — Official ROS 2 visualization tool pre-configured with Autoware display plugins for:
-  - Detected objects and predicted trajectories
-  - Planned paths, behavior states, and motion trajectories
-  - Occupancy grid maps and point cloud data
-  - Lane boundaries, traffic lights, and map markers
-  - Vehicle state and diagnostic displays
-- **SSL certificate for noVNC** — Runtime-generated self-signed certificate created on each container start for secure browser connections
-- **Autoware visualization plugins** — Custom RViz2 plugins for Autoware-specific message types (e.g., `autoware_perception_msgs`, `autoware_planning_msgs`)
-
-Typical resource usage:
-
-- **CPU**: Low (rendering is handled by the VNC/RViz2 processes)
-- **GPU**: Not required (CPU rendering via software OpenGL; GPU can improve RViz2 performance if available)
-- **Memory**: ~500 MB–1 GB
-
-## Visualizer Settings
-
-The following environment variables can be configured when launching the visualizer container:
-
-| Variable | Default Value | Possible Values | Description |
-|----------|---------------|-----------------|-------------|
-| `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | Any valid path | The full path to the RViz2 configuration file inside the container |
-| `REMOTE_DISPLAY` | `true` | `true`, `false` | **(Recommended)** Browser-based RViz2 display bound to host loopback by default. Use SSH forwarding or an authenticated reverse proxy for remote access. Set to `false` to launch a local RViz2 display |
-| `REMOTE_PASSWORD` | — | Any string | Password for the remote display. Required when `REMOTE_DISPLAY=true`; the container exits if unset |
-| `WEBSOCKIFY_BIND` | `127.0.0.1` | IP address | noVNC bind address. For bridge networking, use `0.0.0.0` inside the container and publish the host port on `127.0.0.1` |
+| Variable | Default | Values | Description |
+|----------|---------|--------|-------------|
+| `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | Path | RViz2 configuration inside the container |
+| `REMOTE_DISPLAY` | `true` | `true`, `false` | Use browser-based RViz2; `false` launches a local display |
+| `REMOTE_PASSWORD` | — | String | Required when `REMOTE_DISPLAY=true` |
+| `WEBSOCKIFY_BIND` | `127.0.0.1` | IP address | noVNC bind address; bridge networking uses `0.0.0.0` with a host loopback port mapping |
 | `USE_SIM_TIME` | `false` | `true`, `false` | Use the ROS simulation clock |
 | `RVIZ_GPU` | `auto` | `auto`, `on`, `off` | Select automatic, forced, or disabled VirtualGL acceleration |
 
-## Used In
-
-- [Planning Simulation](../deployment/planning-simulation/index.md) — Visualizes planning trajectories, goal poses, and vehicle motion
-- [Scenario Simulation](../deployment/scenario-simulation/index.md) — Displays scenario-driven traffic, ego vehicle behavior, and obstacle interactions
-- [Logging Simulation](../deployment/logging-simulation/index.md) — Replays rosbag data with full perception, localization, and planning visualization
-- [CARLA Simulation](../deployment/carla-simulation/index.md) — Visualizes the CARLA closed-loop simulation
-- [Zenoh Bridge](../deployment/zenoh-bridge/index.md) — Remote visualization across isolated ROS 2 domains via Zenoh bridging
-
-## Related
-
-- [Autoware interface design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/) — How visualization tools access component interfaces and AD API
-- [Autoware node diagram](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/node-diagram/) — Overall architecture diagram showing topic flows
-- [Deployments](../deployment/index.md) — How the visualizer container is composed with other components
+Under host networking, open `https://localhost:6080/vnc.html`. For remote
+access, use SSH forwarding or an authenticated reverse proxy rather than
+exposing noVNC directly.

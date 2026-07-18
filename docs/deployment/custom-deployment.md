@@ -1,55 +1,12 @@
 # Custom Deployment
 
-This guide shows how to compose your own Open AD Kit deployment from OAK component images using Docker Compose.
+Use the published component images to compose a deployment for your own task.
+Start from the [Planning Simulation Compose file](https://github.com/autowarefoundation/openadkit/blob/main/deployments/planning-simulation/docker-compose.yaml)
+rather than assembling a complete stack from scratch. The
+[component catalog](../components/index.md#image-reference) lists image targets
+and supported platforms.
 
-## Prerequisites
-
-- Docker Engine (set up via `install.sh`)
-- Optional: NVIDIA Container Toolkit (for GPU-accelerated components)
-- Optional: a deployment bundle as a starting reference — download from the [latest release](https://github.com/autowarefoundation/openadkit/releases/latest)
-
-## Component Selection
-
-Choose which OAK images to use based on your use case:
-
-### Minimal Stack
-
-The simplest useful deployment runs just planning and visualization:
-
-| Component | Image | Purpose |
-|-----------|-------|---------|
-| `visualizer` | `{{ registry }}:visualizer` | Browser-accessible RViz2 |
-| `planning-control` | `{{ registry }}:planning-control` | Planning and control logic |
-
-### Full Simulation Stack
-
-Add a simulator to test planning without real sensors:
-
-| Component | Image | Purpose |
-|-----------|-------|---------|
-| `visualizer` | `{{ registry }}:visualizer` | Browser-accessible RViz2 |
-| `planning-control` | `{{ registry }}:planning-control` | Planning and control logic |
-| `simulator` | `{{ registry }}:simulator` | Virtual vehicle and environment |
-
-### Full Perception Stack
-
-Run the complete Autoware pipeline with sensing and perception:
-
-| Component | Image | Purpose |
-|-----------|-------|---------|
-| `visualizer` | `{{ registry }}:visualizer` | Browser-accessible RViz2 |
-| `sensing-perception` | `{{ registry }}:sensing-perception` | Sensor preprocessing and perception |
-| `localization-mapping` | `{{ registry }}:localization-mapping` | Localization and map serving |
-| `planning-control` | `{{ registry }}:planning-control` | Planning and control logic |
-| `vehicle-system` | `{{ registry }}:vehicle-system` | Vehicle interface and system services |
-| `api` | `{{ registry }}:api` | External API services |
-
-!!! tip "GPU-Accelerated Perception"
-    Use the `sensing-perception-cuda` image instead of `sensing-perception` for GPU-accelerated inference. This is **amd64-only** and requires NVIDIA Container Toolkit.
-
-## Example Compose File
-
-Here is a minimal `docker-compose.yaml` showing the two essential patterns — an Autoware component launched via its `autoware_launch` per-component launch file, and the visualizer running its built-in noVNC entrypoint:
+## Core Patterns
 
 ```yaml
 services:
@@ -73,61 +30,31 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
-      - REMOTE_PASSWORD=openadkit # required — the container exits if unset
+      - REMOTE_PASSWORD=openadkit
       - USE_SIM_TIME=true
 ```
 
-With host networking, the visualizer is reachable directly at `https://localhost:6080/vnc.html` (accept the self-signed certificate warning).
+Keep these invariants:
 
-!!! warning "Patterns to keep"
-    - Components are launched with `ros2 launch autoware_launch tier4_<component>_component.launch.xml component_wise_launch:=true ...` — there are no per-component ROS packages named after the images.
-    - Do **not** override the visualizer's `command`: its entrypoint starts the VNC/noVNC stack and RViz2.
-    - All services need the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID` for DDS discovery; deployments use `network_mode: host` with CycloneDDS.
+- All services use the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID`.
+- Launch component images with their `tier4_<component>_component.launch.xml`
+  launch file; image names are not ROS package names.
+- Do not override the visualizer command; its entrypoint starts noVNC and RViz2.
+- Add map, vehicle, system, simulator, and API services as required by the task.
+- Use `sensing-perception-cuda` only on amd64 hosts with NVIDIA Container
+  Toolkit.
 
-!!! note "A runnable stack needs more services"
-    A planning stack that actually does something also needs map serving, a simulator or vehicle interface, system services, and the API container. Use the [planning-simulation `docker-compose.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/deployments/planning-simulation/docker-compose.yaml) as the reference and prune from there.
+With host networking, open the visualizer at
+`https://localhost:6080/vnc.html` and accept the self-signed certificate.
 
-## Environment Configuration
-
-Create a `.env` file alongside your `docker-compose.yaml`:
-
-```bash
-# Required
-ROS_DOMAIN_ID=1
-
-# Optional: NVIDIA runtime (for GPU-accelerated images)
-# NVIDIA_VISIBLE_DEVICES=all
-# NVIDIA_DRIVER_CAPABILITIES=all
-```
-
-## Starting the Deployment
+## Operate
 
 ```bash
-# Start the stack
 docker compose up -d
-
-# Verify all containers are running
 docker compose ps
-
-# View logs
 docker compose logs -f
-
-# Stop the stack
 docker compose down
 ```
 
-## Next Steps
-
-- For a complete, ready-to-run example, see the [Planning Simulation](planning-simulation/index.md)
-- For GPU-accelerated deployments, see the [Logging Simulation](logging-simulation/index.md)
-- For distributed deployments, see the [Zenoh Bridge](zenoh-bridge/index.md)
-
-!!! note "Future Work"
-    A unified master deployment configuration is planned to serve as both documentation and a golden-path setup for all OAK components.
-
-## Related
-
-- [Component Overview](../components/index.md) — Understand the full OAK architecture
-- [Troubleshooting](../getting-started/troubleshooting.md) — Docker, GPU, and visualizer issues
-- [Container Images & Versioning](../getting-started/container-images.md) — Choose the right tag
-- [Getting Started](../getting-started/index.md) — Environment setup
+See [Logging Simulation](logging-simulation/index.md) for a GPU overlay and
+[Zenoh Bridge](zenoh-bridge/index.md) for distributed ROS 2 domains.

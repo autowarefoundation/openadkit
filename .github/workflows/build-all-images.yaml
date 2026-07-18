@@ -1,21 +1,6 @@
 name: build-all-images
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/actions/combine-multi-arch-images/**'
-      - '.github/actions/free-disk-space/**'
-      - '.github/actions/inject-ccache/**'
-      - '.github/actions/setup-build-env/**'
-      - '.github/image-inventory.json'
-      - '.github/scripts/**'
-      - '.github/workflows/build-all-images.yaml'
-      - 'components/**'
-
-  schedule:
-    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       autoware_ref:
@@ -40,7 +25,7 @@ env:
 
 jobs:
   prepare:
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 10
     permissions:
       contents: read
@@ -134,7 +119,7 @@ jobs:
   # =============================================================================
   build-common:
     needs: prepare
-    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubicloud-standard-8-ubuntu-2204' || 'ubuntu-22.04-arm' }}
     timeout-minutes: 120
     permissions:
       actions: write
@@ -159,7 +144,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          free-disk: true
+          free-disk: false
           setup-autoware: true
           with-middleware: true
 
@@ -251,7 +236,7 @@ jobs:
   # Stage 2: Build component images (parallel)
   # =============================================================================
   build-components:
-    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubicloud-standard-8-ubuntu-2204' || 'ubuntu-22.04-arm' }}
     timeout-minutes: 120
     needs: [prepare, build-common]
     permissions:
@@ -277,7 +262,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          free-disk: true
+          free-disk: false
           setup-autoware: true
           with-middleware: false
 
@@ -354,7 +339,7 @@ jobs:
         run: bash .github/scripts/prune-buildkit-cache.sh
 
   build-carla-interface:
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-8-ubuntu-2204
     timeout-minutes: 60
     needs: [prepare, build-common, build-components]
     permissions:
@@ -419,7 +404,7 @@ jobs:
   # Stage 3: Create multi-arch manifests
   # =============================================================================
   create-manifests:
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 15
     needs: [prepare, build-common, build-components, build-carla-interface]
     if: success()
@@ -448,7 +433,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   manifest-report:
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 10
     needs: [prepare, create-manifests]
     if: ${{ !cancelled() }}
@@ -479,7 +464,7 @@ jobs:
         shell: bash
 
   capture-metadata:
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 15
     needs: [prepare, create-manifests]
     permissions:
@@ -545,7 +530,7 @@ jobs:
           retention-days: 90
 
   summarize:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 5
     needs: [prepare, capture-metadata]
     if: success()
@@ -565,7 +550,7 @@ jobs:
         run: bash .github/scripts/write_build_summary.sh >> "$GITHUB_STEP_SUMMARY"
 
   notify-failure:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 5
     needs: [prepare, build-common, build-components, build-carla-interface, create-manifests, capture-metadata]
     if: failure() && github.event_name == 'schedule'

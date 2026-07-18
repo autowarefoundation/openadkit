@@ -167,7 +167,9 @@ def install_fake_gh(tmp_path, *, listed, refreshed=None, created=None, existing_
         'printf "%s\\n" "$*" >> "$GH_CALL_LOG"\n'
         'if [[ "$*" == *"/git/refs/tags/"* ]]; then cat "$GH_RESPONSES/tag.json"; exit 0; fi\n'
         'if [[ "$*" == *"--paginate --slurp"*"releases?per_page=100"* ]]; then '
-        'printf "["; cat "$GH_RESPONSES/list.json"; printf "]\\n"; exit 0; fi\n'
+        'if [[ -f "$GH_CREATED" ]]; then printf "[["; cat "$GH_RESPONSES/created.json"; '
+        'printf "]]\\n"; else printf "["; cat "$GH_RESPONSES/list.json"; printf "]\\n"; fi; '
+        'exit 0; fi\n'
         'if [[ "$*" == *"--method DELETE"* ]]; then touch "$GH_DELETED"; exit 0; fi\n'
         'if [[ "$*" == *"--method PATCH"* ]]; then touch "$GH_PATCHED"; exit 0; fi\n'
         'if [[ "$*" == *"/releases/tags/"* ]]; then cat "$GH_RESPONSES/created.json"; exit 0; fi\n'
@@ -219,6 +221,7 @@ def test_prepare_replaces_only_owned_draft_by_release_id(tmp_path):
     create_index = next(i for i, call in enumerate(calls) if "release create" in call)
     assert "releases/42" in calls[delete_index]
     assert delete_index < create_index
+    assert not any("/releases/tags/" in call for call in calls)
     assert (tmp_path / "deleted").exists()
     assert (tmp_path / "created").exists()
     assert (tmp_path / "github-output").read_text().splitlines() == [

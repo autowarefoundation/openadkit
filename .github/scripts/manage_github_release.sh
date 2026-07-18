@@ -58,8 +58,30 @@ verify_owned_draft() {
 }
 
 fetch_release_by_id() {
-  local release_id="$1"
-  gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}" | project_release
+  local release_id="$1" response
+  response=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}") || return
+  project_release <<<"${response}"
+}
+
+fetch_release_by_tag() {
+  local response
+  response=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100") || return
+  jq -c --arg version "${VERSION}" '
+    [.[][] | select(.tag_name == $version)] |
+    if length > 1 then error("duplicate releases for tag")
+    elif length == 1 then
+      .[0] | {
+        id,
+        assets,
+        body: (.body // ""),
+        isDraft: .draft,
+        isPrerelease: .prerelease,
+        name,
+        tagName: .tag_name,
+        targetCommitish: .target_commitish
+      }
+    else empty end
+  ' <<<"${response}"
 }
 
 verify_published_release() {
@@ -120,9 +142,12 @@ create_draft() {
     release-input/build/autoware-lock.repos \
     release-input/build/upstream-images.json \
     dist/*.tar.gz >/dev/null
-  state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${VERSION}" | project_release)
-  verify_owned_draft "${state}"
-  printf '%s\n' "$(jq -r '.id' <<<"${state}")"
+  state=$(fetch_release_by_tag) || return
+  if [ -z "${state}" ] || ! verify_owned_draft "${state}"; then
+    echo "Created draft release ${VERSION} could not be verified" >&2
+    return 1
+  fi
+  jq -er '.id' <<<"${state}"
 }
 
 prepare_release() {
@@ -130,33 +155,15 @@ prepare_release() {
 
   : "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
   verify_release_tag_target
-  release_state=$(
-    gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
-      | jq -c --arg version "${VERSION}" '
-          [.[][] | select(.tag_name == $version)] |
-          if length > 1 then error("duplicate releases for tag")
-          elif length == 1 then
-            .[0] | {
-              id,
-              assets,
-              body: (.body // ""),
-              isDraft: .draft,
-              isPrerelease: .prerelease,
-              name,
-              tagName: .tag_name,
-              targetCommitish: .target_commitish
-            }
-          else empty end
-        '
-  )
+  release_state=$(fetch_release_by_tag) || return
 
   if [ -n "${release_state}" ]; then
     existing_is_draft=$(jq -r '.isDraft' <<<"${release_state}")
     release_id=$(jq -r '.id' <<<"${release_state}")
     if [ "${existing_is_draft}" = true ]; then
-      verify_owned_draft "${release_state}"
-      refreshed=$(fetch_release_by_id "${release_id}")
-      verify_owned_draft "${refreshed}"
+      verify_owned_draft "${release_state}" || return
+      refreshed=$(fetch_release_by_id "${release_id}") || return
+      verify_owned_draft "${refreshed}" || return
       cmp <(jq -S . <<<"${release_state}") <(jq -S . <<<"${refreshed}")
       echo "Removing workflow-owned incomplete draft release ${VERSION}."
       gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" >/dev/null
@@ -170,7 +177,7 @@ prepare_release() {
   fi
 
   if [ "${create_release}" = true ]; then
-    release_id=$(create_draft)
+    release_id=$(create_draft) || return
   fi
   body_sha256=$(sha256sum release-notes.md | cut -d ' ' -f1)
   {

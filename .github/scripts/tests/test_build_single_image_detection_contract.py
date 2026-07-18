@@ -203,6 +203,13 @@ def test_local_context_and_pr_scan_contracts():
         "packages": "read",
     }
     assert "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25" in workflow
+    scan_step = next(
+        step
+        for step in workflow_config["jobs"]["build"]["steps"]
+        if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
+    )
+    assert scan_step["with"]["scanners"] == "vuln"
+    assert scan_step["with"]["timeout"] == "15m"
     assert workflow_config["jobs"]["build"]["timeout-minutes"] == 120
     assert "OPENADKIT_CI_FORCE_DOCKER_INSTALL=true" in install_workflow
     assert "./install.sh --no-nvidia --verify" in install_workflow

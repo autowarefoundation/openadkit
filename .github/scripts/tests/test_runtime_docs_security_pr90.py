@@ -105,6 +105,18 @@ def test_production_docs_build_and_deploy_have_separate_permissions():
     assert all(step.get("uses") != "./.github/actions/build-docs" for step in deploy_steps)
 
 
+def test_full_image_scan_is_limited_to_vulnerabilities_with_explicit_timeout():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/scan.yaml").read_text())
+    scan_step = next(
+        step
+        for step in workflow["jobs"]["scan"]["steps"]
+        if str(step.get("uses", "")).startswith("aquasecurity/trivy-action@")
+    )
+
+    assert scan_step["with"]["scanners"] == "vuln"
+    assert scan_step["with"]["timeout"] == "15m"
+
+
 def test_semantic_pr_uses_pinned_action_with_read_only_permissions():
     workflow_text = (ROOT / ".github/workflows/semantic-pull-request.yaml").read_text()
     workflow = yaml.safe_load(workflow_text)

@@ -34,13 +34,9 @@ jobs:
           sudo env CI=true OPENADKIT_CI_FORCE_DOCKER_INSTALL=true \
             ./install.sh --no-nvidia --verify
 
-      - name: Verify installed Docker capabilities
+      - name: Validate repository Compose config
         run: |
           set -euo pipefail
-          docker --version
-          docker compose version
-          docker buildx version
-          sudo docker info > /dev/null
           (
             cd deployments/scenario-simulation
             docker compose \

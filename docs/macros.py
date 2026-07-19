@@ -6,7 +6,7 @@ generated from the catalog (.github/image-inventory.json) so the docs cannot
 drift from what CI actually builds.
 
 Used by the `macros` plugin configured in mkdocs.yaml. Reference in any page
-under docs/ as `{{ install_command }}`, `{{ registry }}`, `{{ default_distro }}`,
+under docs/ as `{{ install_command }}`, `{{ registry }}`,
 `{{ default_distro_title }}`, or `{{ component_table() }}`.
 
 Parameterless shared blocks live as plain markdown under docs/includes/ and are
@@ -76,15 +76,8 @@ def _load_inventory():
         ) from exc
 
 
-def _components():
-    """Component images from the catalog, in catalog order."""
-    data = _load_inventory()
-    return [img for img in data["images"] if img.get("stage") == "component"]
-
-
 def define_env(env):
     env.variables["registry"] = REGISTRY
-    env.variables["default_distro"] = DEFAULT_DISTRO
     env.variables["default_distro_title"] = DEFAULT_DISTRO.capitalize()
     env.variables["install_command"] = INSTALL_COMMAND
 
@@ -101,7 +94,9 @@ def define_env(env):
             "| Component | Image | ROS Distros | Platforms |",
             "|-----------|-------|-------------|-----------|",
         ]
-        for img in _components():
+        for img in data["images"]:
+            if img.get("stage") != "component":
+                continue
             target = img["target"]
             distros = ", ".join(img.get("ros_distros", global_distros))
             arches = ", ".join(p.rsplit("/", 1)[-1] for p in img["platforms"])

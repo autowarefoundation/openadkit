@@ -14,7 +14,6 @@ CLR_RESET="\033[0m"
 INSTALL_NVIDIA=true
 DOWNLOAD_ARTIFACTS=false
 INSTALL_BUILD_DEPS=false
-DOWNLOAD_SAMPLES=false
 RUN_VERIFY=false
 HOST_ARCH=""
 SAMPLE_TMP=""
@@ -43,7 +42,6 @@ Deployments for sample-data:
   logging-simulation     Download the logging simulation map and rosbag
   scenario-simulation    Download the Kashiwanoha scenario map
   zenoh-bridge           Download the Kashiwanoha scenario map
-  carla-simulation       No-op; CARLA assets are handled by its launcher
   all                    Download all non-CARLA sample data (default)
 
 Options:
@@ -53,7 +51,6 @@ Options:
   --download-artifacts    Download Autoware artifacts (does not skip Docker)
   --build-deps            Install tools needed to build images from source
                            (jq, vcs2l, python3-yaml, unzip, pipx, git)
-  --download-samples      Download sample map/rosbag data for deployments
   --verify                Run post-install smoke tests (Docker + GPU if available)
   --force                 Re-download sample data in sample-data mode
 
@@ -67,8 +64,9 @@ Examples:
   # Download artifacts + install Docker
   sudo ./install.sh --download-artifacts
 
-  # Full developer environment: Docker + NVIDIA + build deps + samples + verify
-  sudo ./install.sh --build-deps --download-samples --verify
+  # Full developer environment: host setup, then sample data
+  sudo ./install.sh --build-deps --verify
+  ./install.sh sample-data
 
   # Download all sample data without host setup
   ./install.sh sample-data
@@ -136,14 +134,6 @@ detect_host_architecture() {
             return 1
             ;;
     esac
-}
-
-require_amd64() {
-    local feature="$1"
-    if [ "$HOST_ARCH" != amd64 ]; then
-        log_error "${feature} requires an amd64 host (detected ${HOST_ARCH})."
-        return 1
-    fi
 }
 
 install_nvidia_container_toolkit() {
@@ -424,13 +414,6 @@ download_autoware_artifacts() {
     log_info "Autoware artifacts downloaded to ${data_dir}."
 }
 
-install_sample_data_dependencies() {
-    log_info "Installing sample download dependencies..."
-    sudo apt-get update
-    sudo apt-get install -y --no-install-recommends \
-        ca-certificates curl unzip coreutils python3
-}
-
 preflight_sample_data_dependencies() {
     local deployment="$1"
     local needs_unzip=false
@@ -439,7 +422,11 @@ preflight_sample_data_dependencies() {
     case "$deployment" in
         all|""|planning-simulation|logging-simulation) needs_unzip=true ;;
         scenario-simulation|zenoh-bridge) ;;
-        carla-simulation) return 0 ;;
+        carla-simulation)
+            log_error "sample-data does not support carla-simulation."
+            log_info "Use deployments/carla-simulation/start-carla-e2e-demo.sh instead."
+            return 1
+            ;;
         *)
             log_error "Unknown deployment for sample-data: $deployment"
             return 1
@@ -469,14 +456,10 @@ download_sample_data() {
     local force="${2:-false}"
 
     preflight_sample_data_dependencies "$deployment"
-    if [ "$deployment" = carla-simulation ]; then
-        log_info "carla-simulation downloads its assets via deployments/carla-simulation/start-carla-e2e-demo.sh."
-        return 0
-    fi
 
     log_info "Downloading sample map/rosbag data for deployments..."
 
-    # Self-contained sample data fetcher used by host setup and release bundles.
+    # Self-contained sample data fetcher used by the CLI and release bundles.
     local S3_BASE="https://autoware-files.s3.us-west-2.amazonaws.com"
     # Pin to the commit SHA that the 25.0.20 tag resolves to, not the mutable
     # tag itself, so downloads are reproducible and checksums are stable.
@@ -780,7 +763,6 @@ PY
         scenario-simulation|zenoh-bridge)
             fetch_kashiwanoha
             ;;
-        carla-simulation) return 0 ;;
         *) return 1 ;;
     esac
 
@@ -793,18 +775,6 @@ PY
 
 verify_installation() {
     log_info "Running post-install verification..."
-
-    if ! docker_compose_supports_repo_graph; then
-        log_error "Docker Compose capability verification failed."
-        return 1
-    fi
-    log_info "Docker Compose capability test passed."
-
-    if ! docker buildx version &>/dev/null; then
-        log_error "Docker Buildx verification failed."
-        return 1
-    fi
-    log_info "Docker Buildx capability test passed."
 
     # Verify Docker is usable. The script has sudo access (via require_sudo), so
     # use sudo for docker commands — the target user may not be in the docker
@@ -853,10 +823,6 @@ parse_args() {
                 ;;
             --build-deps)
                 INSTALL_BUILD_DEPS=true
-                shift
-                ;;
-            --download-samples)
-                DOWNLOAD_SAMPLES=true
                 shift
                 ;;
             --verify)
@@ -911,10 +877,6 @@ run_sample_data_command() {
         esac
     done
 
-    detect_host_architecture
-    if [ "$deployment" = carla-simulation ]; then
-        require_amd64 "carla-simulation"
-    fi
     run_sample_data_as_target "$deployment" "$force"
     log_info "Sample data installation completed."
 }
@@ -922,21 +884,19 @@ run_sample_data_command() {
 run_sample_data_as_target() {
     local deployment="$1" force="$2" script_path
     local -a command
-    if [[ $EUID -eq 0 && "$TARGET_USER" != root ]]; then
-        if ! script_path=$(realpath -e -- "$0") || [ ! -f "$script_path" ]; then
-            log_error "Sample installation under sudo requires install.sh to run from a file."
-            return 1
-        fi
-        command=(sudo -u "$TARGET_USER" env -u SUDO_USER HOME="$USER_HOME" PATH="$PATH")
-        if [[ -v AUTOWARE_MAP_DIR ]]; then
-            command+=(AUTOWARE_MAP_DIR="$AUTOWARE_MAP_DIR")
-        fi
-        command+=(bash "$script_path" sample-data "$deployment")
-        [ "$force" = true ] && command+=(--force)
-        "${command[@]}"
-    else
+    if [[ $EUID -ne 0 || "$TARGET_USER" == root ]]; then
         download_sample_data "$deployment" "$force"
+        return
     fi
+    if ! script_path=$(realpath -e -- "$0") || [[ ! -f "$script_path" ]]; then
+        log_error "Sample installation under sudo requires install.sh to run from a file."
+        return 1
+    fi
+    command=(sudo -u "$TARGET_USER" env -u SUDO_USER HOME="$USER_HOME" PATH="$PATH")
+    [[ -v AUTOWARE_MAP_DIR ]] && command+=(AUTOWARE_MAP_DIR="$AUTOWARE_MAP_DIR")
+    command+=(bash "$script_path" sample-data "$deployment")
+    [[ "$force" == true ]] && command+=(--force)
+    "${command[@]}"
 }
 
 #### Main ####
@@ -962,11 +922,6 @@ fi
 
 if [ "$DOWNLOAD_ARTIFACTS" = true ]; then
     download_autoware_artifacts
-fi
-
-if [ "$DOWNLOAD_SAMPLES" = true ]; then
-    install_sample_data_dependencies
-    run_sample_data_as_target all false
 fi
 
 if [ "$RUN_VERIFY" = true ]; then

@@ -88,3 +88,16 @@ def test_parent_symlink_is_rejected_before_download(tmp_path):
     assert result.returncode != 0
     assert not log.exists()
     assert not (referent / "maps").exists()
+
+
+def test_carla_sample_data_is_unsupported(tmp_path):
+    result = subprocess.run(
+        ["bash", str(INSTALLER), "sample-data", "carla-simulation"],
+        env=os.environ | {"AUTOWARE_MAP_DIR": str(tmp_path / "maps")},
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "deployments/carla-simulation/start-carla-e2e-demo.sh" in result.stdout
+    assert not (tmp_path / "maps").exists()

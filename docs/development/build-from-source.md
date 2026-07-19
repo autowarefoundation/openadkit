@@ -54,15 +54,14 @@ locally built images.
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
-# 2. Install host dependencies and sample data
-./install.sh --build-deps --download-samples --verify
+# 2. Install host dependencies
+./install.sh --build-deps --verify
 ```
 
 --8<-- "includes/docker-group-activation.md"
 
 ```bash
-# 3. Install vcs2l (imports Autoware source for component Dockerfiles)
-pipx install vcs2l
+# 3. Make the pipx-installed vcs command available in this shell
 export PATH="$HOME/.local/bin:$PATH"
 
 # 4. Import Autoware sources at the release used by upstream base images
@@ -92,7 +91,7 @@ docker buildx bake -f components/docker-bake.hcl \
   --load \
   component
 
-# 7. Start a deployment
+# 7. Download its sample data and start a deployment
 ./install.sh sample-data planning-simulation
 cd deployments/planning-simulation
 docker compose --env-file ../base/base.env --env-file planning-simulation.env up -d

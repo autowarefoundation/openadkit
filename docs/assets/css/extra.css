@@ -364,78 +364,10 @@
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
-.oak-badge--supported {
-  background-color: rgba(79, 142, 247, 0.1);
-  color: #1d4ed8;
-  border: 1px solid rgba(79, 142, 247, 0.25);
-}
-
 .oak-badge--neutral {
   background-color: rgba(139, 139, 139, 0.08);
   color: #555;
   border: 1px solid #ddd;
-}
-
-.oak-badge--recommended {
-  background-color: rgba(168, 85, 247, 0.1);
-  color: #7e22ce;
-  border: 1px solid rgba(168, 85, 247, 0.25);
-}
-
-.oak-badge--required {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
-  border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-/* --------------------------------------------------------------------------
-   Step Flow
-   -------------------------------------------------------------------------- */
-.oak-steps {
-  counter-reset: oak-step;
-  list-style: none;
-  padding-left: 0;
-}
-
-.oak-steps ul {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.oak-steps li {
-  position: relative;
-  padding-left: 2.8rem;
-  margin-bottom: 1.2rem;
-  min-height: 2rem;
-}
-
-.oak-steps li::before {
-  counter-increment: oak-step;
-  content: counter(oak-step);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 50%;
-  background: var(--md-accent-fg-color);
-  color: white;
-  font-weight: 500;
-  font-size: 0.8em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.oak-steps li strong {
-  display: block;
-  margin-bottom: 0.2rem;
-}
-
-.oak-steps li p {
-  margin: 0;
-  font-size: 0.95em;
 }
 
 /* --------------------------------------------------------------------------
@@ -496,21 +428,9 @@
   color: #fbbf24;
 }
 
-[data-md-color-scheme="slate"] .oak-badge--supported {
-  color: #60a5fa;
-}
-
 [data-md-color-scheme="slate"] .oak-badge--neutral {
   color: rgba(255, 255, 255, 0.65);
   border-color: rgba(255, 255, 255, 0.15);
-}
-
-[data-md-color-scheme="slate"] .oak-badge--recommended {
-  color: #c084fc;
-}
-
-[data-md-color-scheme="slate"] .oak-badge--required {
-  color: #f87171;
 }
 
 [data-md-color-scheme="slate"] .oak-card {

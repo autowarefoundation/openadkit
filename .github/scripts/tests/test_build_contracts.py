@@ -1,12 +1,10 @@
+import io
 import json
-import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 
 import pytest
-import yaml
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -17,7 +15,6 @@ import resolve_image_matrices as matrices
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
-WORKFLOW = ROOT / ".github/workflows/build-single-image.yaml"
 
 
 def manifest_index():
@@ -58,65 +55,101 @@ def test_carla_builds_after_simulator():
     assert carla == {"carla-interface"}
 
 
-def git(repo, *args):
-    return subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True, text=True
-    ).stdout.strip()
-
-
-def run_detection(tmp_path, changed_path):
-    inventory = ROOT / ".github/image-inventory.json"
-    target_inventory = tmp_path / ".github/image-inventory.json"
-    target_inventory.parent.mkdir(parents=True)
-    target_inventory.write_bytes(inventory.read_bytes())
-    git(tmp_path, "init", "-b", "main")
-    git(tmp_path, "config", "user.email", "ci@example.com")
-    git(tmp_path, "config", "user.name", "CI")
-    git(tmp_path, "add", ".")
-    git(tmp_path, "commit", "-m", "base")
-    base = git(tmp_path, "rev-parse", "HEAD")
-    changed = tmp_path / changed_path
-    changed.parent.mkdir(parents=True, exist_ok=True)
-    changed.write_text("changed\n")
-    git(tmp_path, "add", ".")
-    git(tmp_path, "commit", "-m", "change")
-    steps = yaml.safe_load(WORKFLOW.read_text())["jobs"]["prepare"]["steps"]
-    script = next(step["run"] for step in steps if step.get("id") == "detect")
-    output = tmp_path / "output"
-    result = subprocess.run(
-        ["bash", "-c", script],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "BASE_SHA": base,
-            "EVENT_NAME": "pull_request",
-            "GITHUB_OUTPUT": str(output),
-            "ROS_DISTRO": "humble",
-            "TARGET_INPUT": "",
-        },
-        text=True,
-        capture_output=True,
-    )
-    values = {}
-    if output.exists():
-        values = dict(line.split("=", 1) for line in output.read_text().splitlines())
-    return result, values
-
-
 @pytest.mark.parametrize(
-    ("changed", "expected"),
+    ("changed", "expected", "flags"),
     [
-        ("components/api/Dockerfile", {"api"}),
-        ("components/simulator/Dockerfile", {"simulator", "carla-interface"}),
+        (
+            "components/universe-common/Dockerfile",
+            {"universe-common-devel", "universe-common"},
+            {"with_middleware": True, "use_local_common": True},
+        ),
+        ("components/sensing-perception/Dockerfile", {"sensing-perception"}, {}),
+        (
+            "components/sensing-perception/Dockerfile.cuda",
+            {"sensing-perception-cuda"},
+            {},
+        ),
+        (
+            "components/sensing-perception/scripts/build.sh",
+            {"sensing-perception", "sensing-perception-cuda"},
+            {},
+        ),
+        ("components/api/Dockerfile", {"api"}, {}),
+        (
+            "components/simulator/Dockerfile",
+            {"simulator", "carla-interface"},
+            {"use_local_simulator": True},
+        ),
+        (
+            "components/carla-interface/Dockerfile",
+            {"carla-interface"},
+            {"setup_autoware": False},
+        ),
     ],
 )
-def test_component_changes_select_required_targets(tmp_path, changed, expected):
-    result, outputs = run_detection(tmp_path, changed)
-    assert result.returncode == 0, result.stderr
-    assert set(json.loads(outputs["targets_json"])) == expected
+def test_component_changes_select_required_targets(changed, expected, flags):
+    plan = matrices.build_single_image_plan(INVENTORY, [changed])
+    assert set(plan["targets_json"]) == expected
+    assert all(plan[name] is value for name, value in flags.items())
 
 
-def test_unknown_component_input_fails_closed(tmp_path):
-    result, _ = run_detection(tmp_path, "components/new-component/Dockerfile")
-    assert result.returncode != 0
-    assert "Unmapped component build input" in result.stderr
+def test_shared_build_inputs_select_all_targets():
+    expected = {image["target"] for image in INVENTORY["images"]}
+    for changed in (
+        ".github/scripts/registry_lookup.sh",
+        ".github/actions/inject-ccache/action.yaml",
+    ):
+        plan = matrices.build_single_image_plan(INVENTORY, [changed])
+        assert set(plan["targets_json"]) == expected
+
+
+def test_docker_bake_change_uses_all_local_images():
+    plan = matrices.build_single_image_plan(
+        INVENTORY, ["components/docker-bake.hcl"]
+    )
+    assert plan["use_local_common"] is True
+    assert plan["use_local_simulator"] is True
+
+
+def test_manual_targets_are_validated_sorted_and_deduplicated():
+    plan = matrices.build_single_image_plan(
+        INVENTORY, target_input="visualizer api visualizer"
+    )
+    assert plan["targets_json"] == ["api", "visualizer"]
+
+    with pytest.raises(ValueError, match="Unknown Bake target: missing"):
+        matrices.build_single_image_plan(INVENTORY, target_input="missing")
+
+
+def test_distro_validation_applies_to_global_and_target_constraints():
+    with pytest.raises(ValueError, match="Unsupported ROS distro: rolling"):
+        matrices.build_single_image_plan(INVENTORY, distro="rolling")
+    with pytest.raises(
+        ValueError,
+        match="Target 'carla-interface' does not support ROS distro 'jazzy'",
+    ):
+        matrices.build_single_image_plan(
+            INVENTORY, target_input="carla-interface", distro="jazzy"
+        )
+
+
+def test_irrelevant_and_readme_changes_produce_empty_plan():
+    plan = matrices.build_single_image_plan(
+        INVENTORY,
+        ["docs/index.md", "components/README.md", "components/api/README.md"],
+    )
+    assert plan["targets_json"] == []
+
+
+def test_unknown_component_input_fails_closed():
+    with pytest.raises(ValueError, match="Unmapped component build input"):
+        matrices.build_single_image_plan(
+            INVENTORY, ["components/new-component/Dockerfile"]
+        )
+
+
+def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):
+    monkeypatch.chdir(ROOT)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("components/api/Dockerfile\n"))
+    assert matrices.main(["resolver", "single-image", "humble", ""]) == 0
+    assert 'targets_json=["api"]' in capsys.readouterr().out

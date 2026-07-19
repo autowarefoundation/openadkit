@@ -21,6 +21,7 @@ on:
       - "components/**"
       - ".github/image-inventory.json"
       - ".github/scripts/export_autoware_lock.py"
+      - ".github/scripts/resolve_image_matrices.py"
       - ".github/scripts/resolve_build_inputs.sh"
       - ".github/scripts/registry_lookup.sh"
       - ".github/actions/free-disk-space/**"
@@ -121,24 +122,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          all_targets=$(jq -r '.images[].target' .github/image-inventory.json | xargs)
-          distro="${ROS_DISTRO:-humble}"
-          targets=""
-          build_input_matched=false
-          use_local_common=false
-          use_local_simulator=false
-
-          if [ -n "${TARGET_INPUT}" ]; then
-            for requested_target in ${TARGET_INPUT}; do
-              if ! jq -e --arg target "${requested_target}" \
-                '.images[] | select(.target == $target)' \
-                .github/image-inventory.json > /dev/null; then
-                echo "Unknown Bake target: ${requested_target}" >&2
-                exit 1
-              fi
-            done
-            targets="${TARGET_INPUT}"
-          else
+          changed_files=""
+          if [ -z "${TARGET_INPUT}" ]; then
             if [ "${EVENT_NAME}" = "pull_request" ]; then
               if [ -z "${BASE_SHA}" ]; then
                 echo "Pull request base SHA is unavailable" >&2
@@ -151,152 +136,12 @@ jobs:
 
             changed_files=$(git diff --name-only "${diff_base}...HEAD")
             echo "Changed files:" >&2
-            echo "${changed_files}" >&2
-
-            while IFS= read -r changed_file; do
-              [ -n "${changed_file}" ] || continue
-              case "${changed_file}" in
-                components/docker-bake.hcl)
-                  targets="${targets} ${all_targets}"
-                  build_input_matched=true
-                  use_local_common=true
-                  use_local_simulator=true
-                  ;;
-                components/README.md|components/*/README.md)
-                  ;;
-                components/universe-common/*)
-                  targets="${targets} universe-common-devel universe-common"
-                  build_input_matched=true
-                  use_local_common=true
-                  ;;
-                components/sensing-perception/Dockerfile)
-                  targets="${targets} sensing-perception"
-                  build_input_matched=true
-                  ;;
-                components/sensing-perception/Dockerfile.cuda)
-                  targets="${targets} sensing-perception-cuda"
-                  build_input_matched=true
-                  ;;
-                components/sensing-perception/*)
-                  targets="${targets} sensing-perception sensing-perception-cuda"
-                  build_input_matched=true
-                  ;;
-                components/localization-mapping/*)
-                  targets="${targets} localization-mapping"
-                  build_input_matched=true
-                  ;;
-                components/planning-control/*)
-                  targets="${targets} planning-control"
-                  build_input_matched=true
-                  ;;
-                components/vehicle-system/*)
-                  targets="${targets} vehicle-system"
-                  build_input_matched=true
-                  ;;
-                components/api/*)
-                  targets="${targets} api"
-                  build_input_matched=true
-                  ;;
-                components/visualizer/*)
-                  targets="${targets} visualizer"
-                  build_input_matched=true
-                  ;;
-                components/simulator/*)
-                  targets="${targets} simulator carla-interface"
-                  build_input_matched=true
-                  use_local_simulator=true
-                  ;;
-                components/carla-interface/*)
-                  targets="${targets} carla-interface"
-                  build_input_matched=true
-                  ;;
-                components/runtime-cleanup.sh)
-                  targets="${targets} ${all_targets}"
-                  build_input_matched=true
-                  ;;
-                .github/image-inventory.json|\
-                .github/scripts/export_autoware_lock.py|\
-                .github/scripts/resolve_build_inputs.sh|\
-                .github/actions/free-disk-space/*|\
-                .github/actions/inject-ccache/*|\
-                .github/actions/setup-build-env/*|\
-                .github/workflows/build-single-image.yaml)
-                  targets="${targets} ${all_targets}"
-                  build_input_matched=true
-                  ;;
-                components/*)
-                  echo "Unmapped component build input: ${changed_file}" >&2
-                  exit 1
-                  ;;
-                *)
-                  ;;
-              esac
-            done <<< "${changed_files}"
+            printf '%s\n' "${changed_files}" >&2
           fi
 
-          targets=$(tr ' ' '\n' <<< "${targets}" | sort -u | xargs)
-
-          if ! jq -e --arg distro "${distro}" '.ros_distros | index($distro) != null' \
-            .github/image-inventory.json >/dev/null; then
-            echo "Unsupported ROS distro: ${distro}" >&2
-            exit 1
-          fi
-          for target in ${targets}; do
-            if ! jq -e --arg target "${target}" --arg distro "${distro}" '
-              .ros_distros as $global |
-              .images[] |
-              select(.target == $target) |
-              (.ros_distros // $global) |
-              index($distro) != null
-            ' .github/image-inventory.json >/dev/null; then
-              supported_distros=$(jq -r --arg target "${target}" '
-                .ros_distros as $global |
-                .images[] |
-                select(.target == $target) |
-                (.ros_distros // $global) |
-                join(", ")
-              ' .github/image-inventory.json)
-              echo "Target '${target}' does not support ROS distro '${distro}' (supported: ${supported_distros})" >&2
-              exit 1
-            fi
-          done
-
-          if [ "${build_input_matched}" = true ] && [ -z "${targets}" ]; then
-            echo "A build-affecting path matched but produced no Bake targets" >&2
-            exit 1
-          fi
-
-          setup_autoware=false
-          with_middleware=false
-          for target in ${targets}; do
-            if [ "${target}" != "carla-interface" ]; then
-              setup_autoware=true
-            fi
-            case "${target}" in
-              universe-common-devel|universe-common)
-                with_middleware=true
-                ;;
-            esac
-          done
-
-          if [ -z "${targets}" ]; then
-            targets_json="[]"
-          else
-            targets_json=$(tr ' ' '\n' <<< "${targets}" | jq -R . | jq -s -c .)
-          fi
-
-          {
-            echo "targets_json=${targets_json}"
-            echo "setup_autoware=${setup_autoware}"
-            echo "with_middleware=${with_middleware}"
-            echo "use_local_common=${use_local_common}"
-            echo "use_local_simulator=${use_local_simulator}"
-          } >> "${GITHUB_OUTPUT}"
-          echo "Detected targets: '${targets}'" >&2
-          echo "setup_autoware: ${setup_autoware}" >&2
-          echo "with_middleware: ${with_middleware}" >&2
-          echo "use_local_common: ${use_local_common}" >&2
-          echo "use_local_simulator: ${use_local_simulator}" >&2
+          python3 .github/scripts/resolve_image_matrices.py \
+            single-image "${ROS_DISTRO:-humble}" "${TARGET_INPUT}" \
+            <<< "${changed_files}" >> "${GITHUB_OUTPUT}"
         shell: bash
 
   build:

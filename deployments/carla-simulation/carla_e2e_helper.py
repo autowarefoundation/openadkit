@@ -10,23 +10,6 @@ def _env(name, cast=str):
     return cast(os.environ[name])
 
 
-def wait_api():
-    import carla
-
-    client = carla.Client(_env("CARLA_RPC_HOST"), _env("CARLA_RPC_PORT", int))
-    client.set_timeout(_env("CARLA_API_TIMEOUT", float))
-    print(client.get_world().get_map().name)
-
-
-def preload_world():
-    import carla
-
-    client = carla.Client(_env("CARLA_RPC_HOST"), _env("CARLA_RPC_PORT", int))
-    client.set_timeout(_env("CARLA_LOAD_TIMEOUT", float))
-    world = client.load_world(_env("CARLA_WORLD"))
-    print(world.get_map().name)
-
-
 def verify_runtime():
     import carla
     import rclpy
@@ -252,13 +235,11 @@ def main():
     parser = argparse.ArgumentParser(description="CARLA e2e helper commands")
     parser.add_argument(
         "command",
-        choices=["wait-api", "preload-world", "verify-runtime", "set-route-and-engage", "verify-motion"],
+        choices=["verify-runtime", "set-route-and-engage", "verify-motion"],
     )
     args = parser.parse_args()
 
     commands = {
-        "wait-api": wait_api,
-        "preload-world": preload_world,
         "verify-runtime": verify_runtime,
         "set-route-and-engage": set_route_and_engage,
         "verify-motion": verify_motion,

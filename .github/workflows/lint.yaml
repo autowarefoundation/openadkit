@@ -4,7 +4,6 @@ permissions:
   contents: read
 
 on:
-  workflow_dispatch:
   pull_request:
     paths:
       - '.gitignore'
@@ -14,7 +13,6 @@ on:
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/actions/**'
-      - '.github/actionlint.yaml'
       - '**/*.md'
       - '**/Dockerfile*'
       - '**/*.dockerfile'

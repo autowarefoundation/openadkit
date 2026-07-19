@@ -27,7 +27,7 @@ env:
 jobs:
   prepare:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubicloud-standard-2-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
       actions: read
@@ -99,7 +99,7 @@ jobs:
   scan:
     needs: prepare
     if: needs.prepare.outputs.should_scan == 'true'
-    runs-on: ubicloud-standard-4-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -170,7 +170,7 @@ jobs:
   publish-metadata:
     needs: [prepare, scan]
     if: always() && needs.prepare.outputs.should_scan == 'true'
-    runs-on: ubicloud-standard-2-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
       actions: write

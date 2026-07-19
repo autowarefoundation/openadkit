@@ -7,7 +7,7 @@ ENV_FILE="$SCRIPT_DIR/carla-simulation.env"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yaml"
 SOURCE_BASE_DIR="$SCRIPT_DIR/../base"
 BUNDLE_BASE_DIR="$SCRIPT_DIR/base"
-COMPOSE_ENV_ARGS=()
+COMPOSE_CMD=()
 PYTHON_HELPER=$SCRIPT_DIR/carla_e2e_helper.py
 DRY_RUN=false
 BUILD_IMAGE=false
@@ -81,24 +81,21 @@ run() {
 }
 
 run_compose() {
-  printf '+ docker compose'
-  printf ' %q' "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" "$@"
+  printf '+'
+  printf ' %q' "${COMPOSE_CMD[@]}" "$@"
   printf '\n'
   if [[ "$DRY_RUN" == false ]]; then
-    docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" "$@"
+    "${COMPOSE_CMD[@]}" "$@"
   fi
 }
 
 rollback() {
   local status=$?
   trap - EXIT INT TERM
-  if [[ "${#TEMP_FILES[@]}" -gt 0 ]]; then
-    rm -f "${TEMP_FILES[@]}"
-  fi
+  rm -f "${TEMP_FILES[@]}"
   if [[ "$SUCCESS" == false && "$DRY_RUN" == false && "${#STARTED_SERVICES[@]}" -gt 0 ]]; then
     printf 'Startup failed; removing services started by this invocation: %s\n' "${STARTED_SERVICES[*]}" >&2
-    docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" \
-      rm --stop --force "${STARTED_SERVICES[@]}" >/dev/null 2>&1 || true
+    "${COMPOSE_CMD[@]}" rm --stop --force "${STARTED_SERVICES[@]}" >/dev/null 2>&1 || true
   fi
   exit "$status"
 }
@@ -107,14 +104,15 @@ trap 'exit 143' TERM
 trap 'exit 130' INT
 
 select_layout() {
+  local -a env_args
   if [[ -f "$BUNDLE_BASE_DIR/docker-compose.yaml" ]]; then
     if [[ ! -f "$BUNDLE_BASE_DIR/cyclonedds.xml" ]]; then
       printf 'Incomplete release bundle: missing %s\n' "$BUNDLE_BASE_DIR/cyclonedds.xml" >&2
       return 1
     fi
-    COMPOSE_ENV_ARGS=(--env-file "$ENV_FILE")
+    env_args=(--env-file "$ENV_FILE")
   elif [[ -f "$SOURCE_BASE_DIR/docker-compose.yaml" && -f "$SOURCE_BASE_DIR/base.env" ]]; then
-    COMPOSE_ENV_ARGS=(
+    env_args=(
       --env-file "$SOURCE_BASE_DIR/base.env"
       --env-file "$ENV_FILE"
     )
@@ -122,6 +120,7 @@ select_layout() {
     printf 'Cannot identify source or release-bundle layout under %s\n' "$SCRIPT_DIR" >&2
     return 1
   fi
+  COMPOSE_CMD=(docker compose "${env_args[@]}" -f "$COMPOSE_FILE")
 }
 
 load_env() {
@@ -136,7 +135,6 @@ load_env() {
     AUTOWARE_E2E_START_VISUALIZER
     AUTOWARE_E2E_VERIFY_INTERVAL
     AUTOWARE_E2E_VERIFY_TIMEOUT
-    CARLA_CONTAINER_NAME
     CARLA_DISPLAY
     CARLA_E2E_LANELET2_URL
     CARLA_E2E_LANELET2_SHA256
@@ -145,20 +143,17 @@ load_env() {
     CARLA_E2E_POINTCLOUD_SHA256
     CARLA_INTERFACE_CONTAINER
     CARLA_INTERFACE_IMAGE
-    CARLA_LOAD_TIMEOUT
     CARLA_PYTHON_VERSION
     CARLA_RENDER_ARGS
     CARLA_RPC_HOST
     CARLA_RPC_PORT
-    CARLA_START_TIMEOUT
     CARLA_VK_ICD_HOST_PATH
-    CARLA_WORLD
     MAP_PATH
     POINTCLOUD_MAP_FILE
     ROS_DISTRO
   )
 
-  if ! output=$(docker compose "${COMPOSE_ENV_ARGS[@]}" -f "$COMPOSE_FILE" config --environment); then
+  if ! output=$("${COMPOSE_CMD[@]}" config --environment); then
     printf 'Failed to parse Compose environment\n' >&2
     return 1
   fi
@@ -178,28 +173,21 @@ load_env() {
     export "${name?}"
   done
 
-  if [[ -n "$START_VISUALIZER_OVERRIDE" ]]; then
-    AUTOWARE_E2E_START_VISUALIZER=$START_VISUALIZER_OVERRIDE
-    export AUTOWARE_E2E_START_VISUALIZER
-  fi
-
-  if [[ -n "$AUTO_DRIVE_OVERRIDE" ]]; then
-    AUTOWARE_E2E_AUTO_DRIVE=$AUTO_DRIVE_OVERRIDE
-    export AUTOWARE_E2E_AUTO_DRIVE
-  fi
-}
-
-require_amd64_host() {
-  case "$(uname -m)" in
-    x86_64|amd64) ;;
-    *)
-      printf 'CARLA simulation requires an amd64 host (detected %s).\n' "$(uname -m)" >&2
-      return 1
-      ;;
-  esac
+  AUTOWARE_E2E_START_VISUALIZER=${START_VISUALIZER_OVERRIDE:-$AUTOWARE_E2E_START_VISUALIZER}
+  AUTOWARE_E2E_AUTO_DRIVE=${AUTO_DRIVE_OVERRIDE:-$AUTOWARE_E2E_AUTO_DRIVE}
+  export AUTOWARE_E2E_START_VISUALIZER AUTOWARE_E2E_AUTO_DRIVE
 }
 
 require_host_prerequisites() {
+  local arch
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64) ;;
+    *)
+      printf 'CARLA simulation requires an amd64 host (detected %s).\n' "$arch" >&2
+      return 1
+      ;;
+  esac
   printf '+ validate Ubuntu, Docker, NVIDIA runtime, GPU, and Vulkan prerequisites\n'
   if [[ "$DRY_RUN" == true ]]; then
     return 0
@@ -215,10 +203,6 @@ require_host_prerequisites() {
     printf 'CARLA simulation requires Ubuntu 22.04 (detected %s %s).\n' "${ID:-unknown}" "${VERSION_ID:-unknown}" >&2
     return 1
   fi
-  command -v docker >/dev/null || {
-    printf 'Docker is required for CARLA simulation.\n' >&2
-    return 1
-  }
   if ! command -v nvidia-smi >/dev/null || ! nvidia-smi >/dev/null; then
     printf 'A working NVIDIA GPU and driver are required for CARLA simulation.\n' >&2
     return 1
@@ -332,103 +316,30 @@ build_image() {
     carla-interface
 }
 
-wait_for_carla_rpc() {
-  printf '+ wait for CARLA RPC on %s:%s\n' "$CARLA_RPC_HOST" "$CARLA_RPC_PORT"
-  if [[ "$DRY_RUN" == true ]]; then
-    return 0
-  fi
-
-  local deadline=$((SECONDS + CARLA_START_TIMEOUT))
-  while ((SECONDS < deadline)); do
-    if timeout 1 bash -c "</dev/tcp/${CARLA_RPC_HOST}/${CARLA_RPC_PORT}" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-
-  printf 'Timed out waiting for CARLA RPC on %s:%s\n' "$CARLA_RPC_HOST" "$CARLA_RPC_PORT" >&2
-  return 1
-}
-
-wait_for_carla_api() {
-  printf '+ wait for CARLA Python API on %s:%s\n' "$CARLA_RPC_HOST" "$CARLA_RPC_PORT"
-  if [[ "$DRY_RUN" == true ]]; then
-    return 0
-  fi
-
-  local deadline=$((SECONDS + CARLA_START_TIMEOUT))
-  while ((SECONDS < deadline)); do
-    if docker run --rm --network host \
-      -e CARLA_RPC_HOST="$CARLA_RPC_HOST" \
-      -e CARLA_RPC_PORT="$CARLA_RPC_PORT" \
-      -e CARLA_API_TIMEOUT=5 \
-      "$CARLA_INTERFACE_IMAGE" python3 - wait-api < "$PYTHON_HELPER" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 5
-  done
-
-  printf 'Timed out waiting for CARLA Python API on %s:%s\n' "$CARLA_RPC_HOST" "$CARLA_RPC_PORT" >&2
-  return 1
-}
-
-remove_compose_service() {
-  run_compose rm --stop --force "$1" || true
-}
-
-start_container_carla() {
+start_stack() {
   local display_num="${CARLA_DISPLAY##*:}"
+  local running_output service
+  local -a services=(carla map system carla-interface sensing perception localization planning vehicle control api)
+  local -A running=()
   display_num="${display_num%%.*}"
   if [[ "$DRY_RUN" == false && "${CARLA_RENDER_ARGS:-}" != *RenderOffScreen* && ! -S "/tmp/.X11-unix/X${display_num}" ]]; then
     printf 'X display socket for %s was not found under /tmp/.X11-unix\n' "$CARLA_DISPLAY" >&2
     return 1
   fi
 
-  remove_compose_service carla
-  STARTED_SERVICES+=(carla)
-  run_compose up -d --force-recreate carla
-
-  wait_for_carla_rpc
-  wait_for_carla_api
-}
-
-preload_carla_world() {
-  if [[ "$DRY_RUN" == true ]]; then
-    printf '+ docker run --rm --network host ... %s python3 - preload-world < %s\n' "$CARLA_INTERFACE_IMAGE" "$PYTHON_HELPER"
-    return 0
+  if [[ "$AUTOWARE_E2E_START_VISUALIZER" == true ]]; then
+    services+=(visualizer)
   fi
-
-  local deadline=$((SECONDS + CARLA_LOAD_TIMEOUT))
-  while ((SECONDS < deadline)); do
-    if docker run --rm --network host \
-      -e CARLA_RPC_HOST="$CARLA_RPC_HOST" \
-      -e CARLA_RPC_PORT="$CARLA_RPC_PORT" \
-      -e CARLA_LOAD_TIMEOUT=30 \
-      -e CARLA_WORLD="$CARLA_WORLD" \
-      "$CARLA_INTERFACE_IMAGE" python3 - preload-world < "$PYTHON_HELPER"; then
-      return 0
-    fi
-    sleep 5
-  done
-
-  printf 'Timed out preloading CARLA world %s\n' "$CARLA_WORLD" >&2
-  return 1
-}
-
-start_autoware() {
-  remove_compose_service carla-interface
-  STARTED_SERVICES+=(map system carla-map-loader carla-interface sensing perception localization planning vehicle control api)
-  run_compose up -d --force-recreate \
-    map \
-    system \
-    carla-interface \
-    sensing \
-    perception \
-    localization \
-    planning \
-    vehicle \
-    control \
-    api
+  if [[ "$DRY_RUN" == false ]]; then
+    running_output=$("${COMPOSE_CMD[@]}" ps --services --filter status=running)
+    while IFS= read -r service; do
+      [[ -n "$service" ]] && running["$service"]=1
+    done <<< "$running_output"
+    for service in "${services[@]}" carla-map-loader; do
+      [[ -v "running[$service]" ]] || STARTED_SERVICES+=("$service")
+    done
+  fi
+  run_compose up -d --force-recreate "${services[@]}"
 
   # Fail fast if the pointcloud map is not visible inside the container. A
   # wrong or empty bind mount (for example MAP_PATH expanded with the wrong
@@ -442,14 +353,12 @@ start_autoware() {
   fi
 }
 
-start_visualizer() {
-  if [[ "$AUTOWARE_E2E_START_VISUALIZER" != true ]]; then
-    return 0
-  fi
-
-  remove_compose_service visualizer
-  STARTED_SERVICES+=(visualizer)
-  run_compose up -d --force-recreate visualizer
+run_helper() {
+  local command=$1
+  shift
+  docker exec -i "$@" "$CARLA_INTERFACE_CONTAINER" \
+    bash -lc "source /opt/ros/${ROS_DISTRO}/setup.bash; source /opt/autoware/setup.bash; python3 - $command" \
+    < "$PYTHON_HELPER"
 }
 
 verify_runtime() {
@@ -465,12 +374,10 @@ verify_runtime() {
   local deadline=$((SECONDS + AUTOWARE_E2E_VERIFY_TIMEOUT))
   local output
   while ((SECONDS < deadline)); do
-    if output=$(docker exec -i \
+    if output=$(run_helper verify-runtime \
       -e CARLA_RPC_HOST="$CARLA_RPC_HOST" \
       -e CARLA_RPC_PORT="$CARLA_RPC_PORT" \
-      "$CARLA_INTERFACE_CONTAINER" \
-      bash -lc "source /opt/ros/${ROS_DISTRO}/setup.bash; source /opt/autoware/setup.bash; python3 - verify-runtime" \
-      < "$PYTHON_HELPER" 2>&1); then
+      2>&1); then
       printf '%s\n' "$output"
       return 0
     fi
@@ -482,60 +389,41 @@ verify_runtime() {
   return 1
 }
 
-start_autonomous_drive() {
+autonomous_drive() {
   if [[ "$AUTOWARE_E2E_AUTO_DRIVE" != true ]]; then
     return 0
   fi
 
   printf '+ set forward route and engage autonomous mode\n'
-  if [[ "$DRY_RUN" == true ]]; then
-    return 0
+  if [[ "$DRY_RUN" == false ]]; then
+    run_helper set-route-and-engage \
+      -e AUTOWARE_E2E_ROUTE_FORWARD_DISTANCE="$AUTOWARE_E2E_ROUTE_FORWARD_DISTANCE" \
+      -e AUTOWARE_E2E_ROUTE_SETTLE_TIMEOUT="$AUTOWARE_E2E_ROUTE_SETTLE_TIMEOUT"
   fi
 
-  docker exec \
-    -i \
-    -e AUTOWARE_E2E_ROUTE_FORWARD_DISTANCE="$AUTOWARE_E2E_ROUTE_FORWARD_DISTANCE" \
-    -e AUTOWARE_E2E_ROUTE_SETTLE_TIMEOUT="$AUTOWARE_E2E_ROUTE_SETTLE_TIMEOUT" \
-    "$CARLA_INTERFACE_CONTAINER" \
-    bash -lc "source /opt/ros/${ROS_DISTRO}/setup.bash; source /opt/autoware/setup.bash; python3 - set-route-and-engage" \
-    < "$PYTHON_HELPER"
-}
-
-verify_autonomous_drive() {
-  if [[ "$AUTOWARE_E2E_AUTO_DRIVE" != true || "$SKIP_VERIFY" == true ]]; then
+  if [[ "$SKIP_VERIFY" == true ]]; then
     return 0
   fi
 
   printf '+ verify autonomous CARLA motion\n'
-  if [[ "$DRY_RUN" == true ]]; then
-    return 0
+  if [[ "$DRY_RUN" == false ]]; then
+    run_helper verify-motion \
+      -e AUTOWARE_E2E_DRIVE_VERIFY_TIMEOUT="$AUTOWARE_E2E_DRIVE_VERIFY_TIMEOUT" \
+      -e AUTOWARE_E2E_DRIVE_VERIFY_DISTANCE="$AUTOWARE_E2E_DRIVE_VERIFY_DISTANCE"
   fi
-
-  docker exec \
-    -i \
-    -e AUTOWARE_E2E_DRIVE_VERIFY_TIMEOUT="$AUTOWARE_E2E_DRIVE_VERIFY_TIMEOUT" \
-    -e AUTOWARE_E2E_DRIVE_VERIFY_DISTANCE="$AUTOWARE_E2E_DRIVE_VERIFY_DISTANCE" \
-    "$CARLA_INTERFACE_CONTAINER" \
-    bash -lc "source /opt/ros/${ROS_DISTRO}/setup.bash; source /opt/autoware/setup.bash; python3 - verify-motion" \
-    < "$PYTHON_HELPER"
 }
 
 main() {
   cd "$SCRIPT_DIR"
   select_layout
   load_env
-  require_amd64_host
   require_host_prerequisites
   require_udp_buffers
   prepare_map
   build_image
-  start_container_carla
-  preload_carla_world
-  start_autoware
-  start_visualizer
+  start_stack
   verify_runtime
-  start_autonomous_drive
-  verify_autonomous_drive
+  autonomous_drive
   SUCCESS=true
 }
 

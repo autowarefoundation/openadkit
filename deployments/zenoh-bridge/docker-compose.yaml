@@ -134,6 +134,22 @@ services:
       cloud_zenoh_ready:
         condition: service_completed_successfully
 
+  cloud_zenoh_bind_guard:
+    image: busybox:1.36.1
+    environment:
+      - ZENOH_ROUTER_BIND_IP=${ZENOH_ROUTER_BIND_IP:-127.0.0.1}
+    command:
+      - sh
+      - -ec
+      - |
+        case "$$ZENOH_ROUTER_BIND_IP" in
+          0.0.0.0|::|[[]::[]]|::ffff:0.0.0.0)
+            echo "Refusing wildcard Zenoh router bind: $$ZENOH_ROUTER_BIND_IP" >&2
+            exit 1
+            ;;
+        esac
+    restart: "no"
+
   cloud_zenoh_bridge:
     image: eclipse/zenoh-bridge-ros2dds:latest
     # Bridges cloud_net and zenoh_net. The 7448 listener is exposed to the
@@ -150,6 +166,9 @@ services:
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=1
+    depends_on:
+      cloud_zenoh_bind_guard:
+        condition: service_completed_successfully
     ports:
       - "${ZENOH_ROUTER_BIND_IP:-127.0.0.1}:7448:7448"
     volumes:

@@ -11,6 +11,7 @@ source_dir="${SOURCE_DIR:-src}"
 install="${source_dir}/install.sh"
 base_dir="${source_dir}/deployments/base"
 image_prefix_component="${IMAGE_PREFIX_COMPONENT:-ghcr.io/autowarefoundation/openadkit}"
+build_metadata_file="${BUILD_METADATA_FILE:-release-input/build/build-metadata.json}"
 
 third_party_digest() {
   local ref="$1"
@@ -65,24 +66,57 @@ for entry in \
     fi
   fi
 
-  # Pin Open AD Kit image refs to immutable release tags so a downloaded
-  # bundle stays reproducible after future releases repoint the bare aliases.
+  # Keep the readable release tag, but bind it to the exact validated digest so
+  # a downloaded bundle cannot change if a registry credential later moves it.
   if [ -n "${VERSION:-}" ] && [ -n "${DEFAULT_ROS_DISTRO:-}" ]; then
+    [ -f "${build_metadata_file}" ] || {
+      echo "Validated build metadata not found: ${build_metadata_file}" >&2
+      exit 1
+    }
     bundle_ros_distro="${DEFAULT_ROS_DISTRO}"
     if [ "${name}" = "carla-simulation" ]; then
       bundle_ros_distro=humble
     fi
-    echo "Pinning Open AD Kit image refs to ${bundle_ros_distro}-${VERSION}"
-    for f in \
+    bundle_files=(
       "staging/${name}/docker-compose.yaml" \
       "staging/${name}/docker-compose."*.yaml \
       "staging/${name}/base/docker-compose.yaml" \
       "staging/${name}/${name}.env" \
       "staging/${name}/${name}."*.env \
-      "staging/${name}/.env"; do
-      [ -f "${f}" ] || continue
-      sed -i -E "s#ghcr\.io/autowarefoundation/openadkit:([a-z-]+)#${image_prefix_component}:\1-${bundle_ros_distro}-${VERSION}#g" "${f}"
-    done
+      "staging/${name}/.env"
+    )
+    echo "Pinning Open AD Kit image refs to ${bundle_ros_distro}-${VERSION} and validated digests"
+    while IFS= read -r target; do
+      [ -n "${target}" ] || continue
+      matches=$(jq -c \
+        --arg repo "${image_prefix_component}" \
+        --arg target "${target}" \
+        --arg distro "${bundle_ros_distro}" \
+        '[.images[] | select(.repo == $repo and .target == $target and .ros_distro == $distro)]' \
+        "${build_metadata_file}")
+      [ "$(jq 'length' <<<"${matches}")" -eq 1 ] || {
+        echo "Expected one validated digest for ${image_prefix_component}:${target}-${bundle_ros_distro}, found $(jq 'length' <<<"${matches}")" >&2
+        exit 1
+      }
+      digest=$(jq -r '.[0].digest | select(test("^sha256:[0-9a-f]{64}$"))' <<<"${matches}")
+      [ -n "${digest}" ] || {
+        echo "Invalid validated digest for ${target}-${bundle_ros_distro}" >&2
+        exit 1
+      }
+      for f in "${bundle_files[@]}"; do
+        [ -f "${f}" ] || continue
+        sed -i -E "s#ghcr\.io/autowarefoundation/openadkit:${target}([^a-z-]|$)#${image_prefix_component}:${target}-${bundle_ros_distro}-${VERSION}@${digest}\1#g" "${f}"
+        if grep -Eq "ghcr\.io/autowarefoundation/openadkit:${target}([^a-z-]|$)" "${f}"; then
+          echo "Unpinned Open AD Kit image reference remains in ${f}" >&2
+          exit 1
+        fi
+      done
+    done < <(
+      for f in "${bundle_files[@]}"; do
+        [ -f "${f}" ] || continue
+        grep -hoE 'ghcr\.io/autowarefoundation/openadkit:[a-z-]+' "${f}" || true
+      done | cut -d: -f2 | sort -u
+    )
   else
     echo "VERSION/DEFAULT_ROS_DISTRO not set; skipping image pinning"
   fi

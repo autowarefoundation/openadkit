@@ -57,6 +57,66 @@ verify_owned_draft() {
     ' <<<"${state}" >/dev/null
 }
 
+write_expected_asset_manifest() {
+  {
+    for asset in \
+      release-metadata.json \
+      release-input/build/autoware-lock.repos \
+      release-input/build/upstream-images.json \
+      dist/*.tar.gz; do
+      [ -f "${asset}" ] || {
+        echo "Expected release asset is missing: ${asset}" >&2
+        return 1
+      }
+      printf '%s  %s\n' "$(sha256sum "${asset}" | cut -d ' ' -f1)" "$(basename "${asset}")"
+    done
+  } | sort -k2,2 > release-assets.sha256
+}
+
+verify_draft_assets() {
+  local state="$1"
+  local manifest="${RELEASE_ASSET_MANIFEST:-release-assets.sha256}"
+  local expected_assets existing_assets download_dir manifest_path
+
+  [ -f "${manifest}" ] || {
+    echo "Expected release asset manifest is missing: ${manifest}" >&2
+    return 1
+  }
+  if ! awk '
+    NF != 2 || $1 !~ /^[0-9a-f]{64}$/ || $2 !~ /^[A-Za-z0-9._-]+$/ { invalid=1 }
+    { count++ }
+    END { exit(!invalid && count > 0 ? 0 : 1) }
+  ' "${manifest}"; then
+    echo "Release asset manifest is invalid" >&2
+    return 1
+  fi
+
+  expected_assets=$(awk '{ print $2 }' "${manifest}" | sort)
+  existing_assets=$(jq -r '.assets[].name' <<<"${state}" | sort)
+  if ! diff -u <(printf '%s\n' "${expected_assets}") <(printf '%s\n' "${existing_assets}"); then
+    echo "Draft release asset names changed before publication" >&2
+    return 1
+  fi
+
+  download_dir=$(mktemp -d)
+  manifest_path=$(realpath "${manifest}")
+  if ! (
+    cd "${download_dir}"
+    while IFS=$'\t' read -r asset_id asset_name; do
+      [[ "${asset_id}" =~ ^[0-9]+$ && "${asset_name}" =~ ^[A-Za-z0-9._-]+$ ]] || exit 1
+      gh api \
+        -H 'Accept: application/octet-stream' \
+        "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" > "${asset_name}"
+    done < <(jq -r '.assets[] | [.id, .name] | @tsv' <<<"${state}")
+    sha256sum --check "${manifest_path}"
+  ); then
+    rm -rf "${download_dir}"
+    echo "Draft release asset contents changed before publication" >&2
+    return 1
+  fi
+  rm -rf "${download_dir}"
+}
+
 fetch_release_by_id() {
   local release_id="$1" response
   response=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}") || return
@@ -154,6 +214,7 @@ prepare_release() {
   local release_state existing_is_draft release_id refreshed body_sha256 create_release=false
 
   : "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
+  write_expected_asset_manifest
   verify_release_tag_target
   release_state=$(fetch_release_by_tag) || return
 
@@ -199,6 +260,7 @@ publish_release() {
     echo "Draft release body changed before publication" >&2
     return 1
   fi
+  verify_draft_assets "${state}"
   prerelease=$(expected_prerelease)
   make_latest=false
   if [ "${STABLE_RELEASE}" = true ] && [ "${PUBLISH_LATEST_ALIASES}" = true ]; then

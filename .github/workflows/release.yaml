@@ -87,6 +87,7 @@ jobs:
     timeout-minutes: 15
     needs: validate
     permissions:
+      actions: read
       contents: read
     outputs:
       packager_sha: ${{ steps.packager.outputs.packager_sha }}
@@ -122,6 +123,12 @@ jobs:
           sparse-checkout: |
             install.sh
             deployments
+
+      - name: Download validated release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-release-${{ inputs.build_tag }}
+          path: release-input
 
       - name: Install Docker Compose v5.2+
         env:
@@ -269,12 +276,22 @@ jobs:
         run: bash .github/scripts/manage_github_release.sh prepare
         shell: bash
 
+      - name: Upload expected release asset manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-manifest-${{ inputs.build_tag }}
+          path: release-assets.sha256
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
   release-github:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     needs: [validate, prepare-github-release, release-images]
     environment: release
     permissions:
+      actions: read
       contents: write
     steps:
       - name: Check out release manager
@@ -285,6 +302,12 @@ jobs:
             .github/scripts/manage_github_release.sh
             .github/scripts/release_tag.sh
 
+      - name: Download expected release asset manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-asset-manifest-${{ inputs.build_tag }}
+          path: release-asset-manifest
+
       - name: Publish prepared GitHub Release
         if: needs.prepare-github-release.outputs.created == 'true'
         env:
@@ -292,6 +315,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           RELEASE_ID: ${{ needs.prepare-github-release.outputs.release_id }}
           RELEASE_BODY_SHA256: ${{ needs.prepare-github-release.outputs.release_body_sha256 }}
+          RELEASE_ASSET_MANIFEST: release-asset-manifest/release-assets.sha256
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}

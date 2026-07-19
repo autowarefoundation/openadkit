@@ -59,7 +59,9 @@ def test_registry_lookup_retries_and_classifies_failures(tmp_path):
     assert subprocess.run(command, env=env).returncode == 2
 
 
-def release_record(*, release_id=42, body=MARKER + "\n", target=RELEASE_SHA):
+def release_record(
+    *, release_id=42, body=MARKER + "\n", target=RELEASE_SHA, assets=None
+):
     return {
         "id": release_id,
         "tag_name": VERSION,
@@ -68,8 +70,17 @@ def release_record(*, release_id=42, body=MARKER + "\n", target=RELEASE_SHA):
         "draft": True,
         "prerelease": False,
         "body": body,
-        "assets": [],
+        "assets": assets or [],
     }
+
+
+def release_assets():
+    return [
+        {"id": 101, "name": "release-metadata.json"},
+        {"id": 102, "name": "autoware-lock.repos"},
+        {"id": 103, "name": "upstream-images.json"},
+        {"id": 104, "name": "example.tar.gz"},
+    ]
 
 
 def release_workspace(tmp_path):
@@ -81,6 +92,17 @@ def release_workspace(tmp_path):
     (build / "upstream-images.json").write_text("[]\n")
     (tmp_path / "release-metadata.json").write_text("{}\n")
     (tmp_path / "release-notes.md").write_text(MARKER + "\n")
+    files = [
+        tmp_path / "release-metadata.json",
+        build / "autoware-lock.repos",
+        build / "upstream-images.json",
+        tmp_path / "dist/example.tar.gz",
+    ]
+    manifest = "".join(
+        f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+        for path in sorted(files, key=lambda path: path.name)
+    )
+    (tmp_path / "release-assets.sha256").write_text(manifest)
 
 
 def fake_gh_environment(tmp_path, listed, refreshed=None):
@@ -92,6 +114,17 @@ def fake_gh_environment(tmp_path, listed, refreshed=None):
     (responses / "listed").write_text(json.dumps([listed] if listed else []))
     (responses / "refreshed").write_text(json.dumps(refreshed or listed or {}))
     (responses / "created").write_text(json.dumps(created))
+    state = refreshed or listed or {}
+    asset_sources = {
+        "release-metadata.json": tmp_path / "release-metadata.json",
+        "autoware-lock.repos": tmp_path / "release-input/build/autoware-lock.repos",
+        "upstream-images.json": tmp_path / "release-input/build/upstream-images.json",
+        "example.tar.gz": tmp_path / "dist/example.tar.gz",
+    }
+    for asset in state.get("assets", []):
+        source = asset_sources.get(asset["name"])
+        if source is not None:
+            (responses / f"asset-{asset['id']}").write_bytes(source.read_bytes())
     log = tmp_path / "gh-calls"
     executable(
         bin_dir / "gh",
@@ -104,6 +137,7 @@ def fake_gh_environment(tmp_path, listed, refreshed=None):
         'else printf "["; cat "$GH_RESPONSES/listed"; printf "]\\n"; fi; exit; fi\n'
         'if [[ "$*" == *"--method DELETE"* ]]; then touch "$GH_DELETED"; exit; fi\n'
         'if [[ "$*" == *"--method PATCH"* ]]; then touch "$GH_PATCHED"; exit; fi\n'
+        'if [[ "$*" == *"/releases/assets/"* ]]; then uri="${!#}"; cat "$GH_RESPONSES/asset-${uri##*/}"; exit; fi\n'
         'if [[ "$1" == api && "$*" == *"/releases/"* ]]; then cat "$GH_RESPONSES/refreshed"; exit; fi\n'
         'if [[ "$1 $2" == "release create" ]]; then touch "$GH_CREATED"; exit; fi\n'
         'echo "unhandled gh call: $*" >&2; exit 2\n',
@@ -179,7 +213,7 @@ def test_publish_revalidates_body_before_mutation(tmp_path):
 
 def test_publish_patches_the_revalidated_release_id(tmp_path):
     release_workspace(tmp_path)
-    owned = release_record()
+    owned = release_record(assets=release_assets())
     env, log = fake_gh_environment(tmp_path, owned)
     env |= {
         "RELEASE_ID": "42",
@@ -191,6 +225,21 @@ def test_publish_patches_the_revalidated_release_id(tmp_path):
     patch = next(call for call in log.read_text().splitlines() if "PATCH" in call)
     assert "releases/42" in patch
     assert "draft=false" in patch
+
+
+def test_publish_rejects_changed_draft_asset(tmp_path):
+    release_workspace(tmp_path)
+    owned = release_record(assets=release_assets())
+    env, _ = fake_gh_environment(tmp_path, owned)
+    (tmp_path / "responses/asset-104").write_bytes(b"replaced bundle")
+    env |= {
+        "RELEASE_ID": "42",
+        "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
+        "PUBLISH_LATEST_ALIASES": "true",
+    }
+    result = run_manager(tmp_path, env, "publish")
+    assert result.returncode != 0
+    assert not (tmp_path / "patched").exists()
 
 
 def test_registry_auth_failure_never_mutates_image_tags(tmp_path):
@@ -246,6 +295,22 @@ def test_release_bundles_pin_images_and_are_reproducible(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     executable(bin_dir / "docker", "#!/usr/bin/env bash\nexit 0\n")
+    build = tmp_path / "release-input/build"
+    build.mkdir(parents=True)
+    images = []
+    for image in json.loads((ROOT / ".github/image-inventory.json").read_text())["images"]:
+        if image["repo"] != "component":
+            continue
+        for distro in image.get("ros_distros", ["humble", "jazzy"]):
+            images.append(
+                {
+                    "repo": "ghcr.io/example/openadkit",
+                    "target": image["target"],
+                    "ros_distro": distro,
+                    "digest": DIGEST,
+                }
+            )
+    (build / "build-metadata.json").write_text(json.dumps({"images": images}))
     env = os.environ | {
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "SOURCE_DIR": str(ROOT),
@@ -260,14 +325,22 @@ def test_release_bundles_pin_images_and_are_reproducible(tmp_path):
         for path in (tmp_path / "dist").glob("*.tar.gz")
     }
     assert len(first) == 5
-    for name in ("planning-simulation", "scenario-simulation", "logging-simulation"):
+    for name in (
+        "planning-simulation",
+        "scenario-simulation",
+        "logging-simulation",
+        "carla-simulation",
+        "zenoh-bridge",
+    ):
         text = "\n".join(
             path.read_text()
             for path in (tmp_path / "staging" / name).rglob("*")
             if path.is_file() and (path.suffix in {".yaml", ".env"} or path.name == ".env")
         )
         assert "ghcr.io/autowarefoundation/openadkit:" not in text
-        assert re.search(r"ghcr.io/example/openadkit:[a-z-]+-jazzy-v9\.8\.7", text)
+        refs = re.findall(r"ghcr.io/example/openadkit:[a-z-]+-(?:humble|jazzy)-v9\.8\.7[^\s\"}]*", text)
+        assert refs
+        assert all(ref.endswith(f"@{DIGEST}") for ref in refs)
     subprocess.run(["bash", str(PACKAGER)], cwd=tmp_path, env=env, check=True)
     second = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()

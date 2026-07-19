@@ -15,6 +15,9 @@ import resolve_image_matrices as matrices
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
+SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
+INSTALLER = (ROOT / "install.sh").read_text()
+ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
 def manifest_index():
@@ -146,6 +149,31 @@ def test_unknown_component_input_fails_closed():
         matrices.build_single_image_plan(
             INVENTORY, ["components/new-component/Dockerfile"]
         )
+
+
+def test_long_pr_build_leaves_time_for_vulnerability_scan():
+    assert re.search(
+        r"(?m)^\s+timeout-minutes:\s+(1[5-9][0-9]|[2-9][0-9]{2,})$",
+        SINGLE_IMAGE_WORKFLOW,
+    )
+
+
+def test_artifact_prerequisites_fail_before_playbook():
+    assert 'cd "$autoware_tmp" &&' in INSTALLER
+    assert (
+        'ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml" &&'
+        in INSTALLER
+    )
+
+
+def test_zenoh_cloud_bridge_requires_non_wildcard_bind_guard():
+    assert re.search(
+        r"cloud_zenoh_bind_guard:.*?0\.0\.0\.0\|::.*?cloud_zenoh_bridge:"
+        r".*?depends_on:\s+cloud_zenoh_bind_guard:\s+"
+        r"condition: service_completed_successfully",
+        ZENOH_COMPOSE,
+        flags=re.DOTALL,
+    )
 
 
 def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):

@@ -393,9 +393,9 @@ download_autoware_artifacts() {
     sudo -u "$TARGET_USER" env HOME="$USER_HOME" mkdir -p "$data_dir"
 
     if ! (
-        cd "$autoware_tmp"
+        cd "$autoware_tmp" &&
         sudo -u "$TARGET_USER" env HOME="$USER_HOME" PATH="$target_path" \
-            ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml"
+            ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml" &&
         sudo -u "$TARGET_USER" env HOME="$USER_HOME" PATH="$target_path" \
             ansible-playbook autoware.dev_env.download_artifacts \
             -e "data_dir=${data_dir}"

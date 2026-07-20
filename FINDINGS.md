@@ -1,19 +1,21 @@
 # Remaining Review Findings
 
 This document records findings independently validated for PR #90 at commit
-`0cf93629cbf7eb15902e84dcb625059722a30c7d`. Severity reflects demonstrated
+`c55be7760285c72fb19afa1ad3785bfa0c84d2e4`. Severity reflects demonstrated
 impact, not the amount of code involved.
 
 ## Current PR Status
 
-- DCO passes.
 - The PR is open, approved, and reported as mergeable by GitHub.
-- The existing remote `build (planning-control)` check is still red, but its
-  timeout fix is present in the worktree and requires a new CI run.
+- DCO is currently failing because six older commits still lack sign-off; the
+  latest commit is signed off.
+- Lint, preview, semantic PR, and host-install checks pass.
+- Image builds, including `planning-control` with its new timeout, are running.
 
 ## Resolved In The Current Worktree
 
-The first five highest-ROI findings have been addressed and are pending CI:
+The first five highest-ROI findings were committed and pushed; image CI is still
+running:
 
 - The PR image-build timeout now leaves enough time for the bounded Trivy scan.
 - A Compose-level dependency guard blocks wildcard Zenoh router binds for normal
@@ -23,6 +25,33 @@ The first five highest-ROI findings have been addressed and are pending CI:
 - Draft release asset names and SHA-256 contents are revalidated immediately
   before publication.
 - Release bundles bind Open AD Kit version tags to validated image digests.
+
+## Merge Decision
+
+There are 28 remaining verified findings: 1 high, 19 medium, and 8 low. The two
+defense-in-depth notes are not included in that count.
+
+Eight findings should be resolved before merge because they affect host safety,
+release integrity, supply-chain integrity, or a primary runtime service:
+
+| Priority | Finding | Reason to block merge |
+|----------|---------|-----------------------|
+| 1 | Failed NVIDIA runtime configuration can leave Docker unavailable | Can stop Docker and all host containers |
+| 2 | Stable alias promotion can leave a mixed release | Can expose a partially promoted public release |
+| 3 | Manual builds can overwrite stable architecture tags | Can publish alternate inputs under stable tags |
+| 4 | Release inputs and build tooling are not fully locked | Weakens release reproducibility and privileged CI integrity |
+| 5 | NVIDIA repository replacement is non-transactional | A failed install can break a working package source |
+| 6 | VirtualGL is installed without cryptographic verification | Installs an unverified package as root |
+| 7 | Visualizer does not supervise VNC and websockify | Container can appear healthy after its service dies |
+| 8 | Publishing an older or prerelease tag can replace current documentation | Can roll the canonical documentation site backward |
+
+The other 20 findings are valid but may be moved to tracked follow-up issues.
+They concern default-off or narrower deployment edge cases, lifecycle and
+recovery improvements, locally trusted configuration inputs, test coverage, and
+documentation or developer ergonomics.
+
+DCO remediation and successful completion of all required CI checks are process
+gates in addition to these eight code findings.
 
 ## High Severity
 

@@ -1,0 +1,42 @@
+name: visionpilot
+
+image:
+  hostname: autosd-visionpilot
+  image_size: 8 GiB
+
+content:
+  rpms:
+    - podman
+  container_images:
+    # Multi-arch image built by the visionpilot-image workflow; aib embeds the
+    # arch-matching variant into the image at build time (no pull at boot).
+    - source: ghcr.io/youtalk/visionpilot
+      tag: cpu
+      name: localhost/visionpilot:cpu
+  make_dirs:
+    - path: /etc/visionpilot/config
+      mode: 0755
+      exist_ok: true
+      parents: true
+    # aib add_files only permits /etc or /usr destinations; /etc is writable so
+    # the Quadlet's :Z SELinux relabel works (read-only /usr would not).
+    - path: /etc/visionpilot/data
+      mode: 0755
+      exist_ok: true
+      parents: true
+  add_files:
+    - source_path: ../smoke/config/vision_pilot.conf
+      path: /etc/visionpilot/config/vision_pilot.conf
+    - source_path: ../smoke/config/vision_pilot_test.conf
+      path: /etc/visionpilot/config/vision_pilot_test.conf
+    # 10-frame smoke data downloaded into aib/files/ before the build (CI does this).
+    - source_path: files/clip.mp4
+      path: /etc/visionpilot/data/clip.mp4
+    - source_path: files/speed.txt
+      path: /etc/visionpilot/data/speed.txt
+    - source_path: ../components/container-files/visionpilot.container
+      path: /etc/containers/systemd/visionpilot.container
+
+auth:
+  # root password "visionpilot" — dev/CI image only, never a board deliverable.
+  root_password: $6$autosdvp$rNm6zzERqtseklDeVIZ9MrqiTFxkfYGc3//6Gi9fdoAIEVOi9bw3AWsp6/jF2ypU8E7mbJly37D94f659KzWP0

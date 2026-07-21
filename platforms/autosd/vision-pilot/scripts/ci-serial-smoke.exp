@@ -1,0 +1,49 @@
+#!/usr/bin/expect -f
+# Drive the AutoSD serial console: log in, wait for the VisionPilot oneshot
+# service to reach a terminal state, dump its journal, and exit 0/1/2.
+# Usage: ci-serial-smoke.exp <run-qemu.sh> <disk.qcow2> <session-log-out>
+#
+# The whole serial session (boot + journal) is captured to <session-log-out>;
+# assert-smoke.py then parses the VisionPilot 'plan:' lines out of it. The exit
+# code is the primary verdict: 0 service active (clean run), 1 failed, 2 timeout.
+set timeout 3000
+match_max 1000000
+set runner [lindex $argv 0]
+set disk   [lindex $argv 1]
+set out    [lindex $argv 2]
+
+log_file -noappend $out
+spawn $runner $disk
+
+expect {
+  timeout { puts "\nFAIL: timeout waiting for login prompt"; exit 2 }
+  "login: "
+}
+send "root\r"
+expect {
+  timeout { puts "\nFAIL: timeout waiting for password prompt"; exit 2 }
+  "Password: "
+}
+send "visionpilot\r"
+expect {
+  timeout { puts "\nFAIL: timeout waiting for shell"; exit 2 }
+  "# "
+}
+
+# Wait (bounded) for the oneshot to finish: active = clean run, failed = error.
+send "s=; for i in \$(seq 1 360); do s=\$(systemctl is-active visionpilot.service); case \"\$s\" in active|failed) break;; esac; sleep 5; done; echo VP_STATE=\$s\r"
+set verdict 2
+expect {
+  timeout          { puts "\nFAIL: timeout waiting for service to settle"; exit 2 }
+  -re {VP_STATE=active}  { set verdict 0 }
+  -re {VP_STATE=failed}  { set verdict 1 }
+}
+
+# Dump the journal (container stdout, incl. the 'plan:' lines) into the session log.
+send "journalctl -u visionpilot.service --no-pager\r"
+expect "# "
+send "echo VP_JOURNAL_DONE\r"
+expect "VP_JOURNAL_DONE"
+
+send "poweroff\r"
+exit $verdict

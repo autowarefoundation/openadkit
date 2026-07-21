@@ -1,0 +1,23 @@
+[Unit]
+Description=VisionPilot CPU smoke (M=10 frames)
+Wants=network-online.target
+After=network-online.target
+
+[Install]
+WantedBy=default.target
+
+[Container]
+ContainerName=visionpilot
+Image=localhost/visionpilot:cpu
+Network=host
+# Override only the two .conf files, not the whole config dir — a directory
+# mount would hide the image's build-generated H.yaml / homography_C_matrix.yaml
+# and crash VisionPilot at startup.
+Volume=/etc/visionpilot/config/vision_pilot.conf:/usr/share/visionpilot/config/vision_pilot.conf:Z,ro
+Volume=/etc/visionpilot/config/vision_pilot_test.conf:/usr/share/visionpilot/config/vision_pilot_test.conf:Z,ro
+Volume=/etc/visionpilot/data:/data:Z,ro
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=1800

@@ -1,0 +1,46 @@
+diff --git a/VisionPilot/modules/visualization/include/visualization/local_display.hpp b/VisionPilot/modules/visualization/include/visualization/local_display.hpp
+index 842b8814..cbcec8da 100644
+--- a/VisionPilot/modules/visualization/include/visualization/local_display.hpp
++++ b/VisionPilot/modules/visualization/include/visualization/local_display.hpp
+@@ -13,6 +13,9 @@ namespace visualization
+ 
+         bool render_frame(const cv::Mat& display_frame) override;
+         bool stop() override;
++
++    private:
++        bool window_created_ = false;
+     };
+ }
+ 
+diff --git a/VisionPilot/modules/visualization/src/local_display.cpp b/VisionPilot/modules/visualization/src/local_display.cpp
+index 773a6191..a1405448 100644
+--- a/VisionPilot/modules/visualization/src/local_display.cpp
++++ b/VisionPilot/modules/visualization/src/local_display.cpp
+@@ -4,10 +4,7 @@
+ 
+ namespace visualization
+ {
+-    LocalDisplay::LocalDisplay()
+-    {
+-        cv::namedWindow("VisionPilot", cv::WINDOW_NORMAL);
+-    }
++    LocalDisplay::LocalDisplay() = default;
+ 
+     LocalDisplay::~LocalDisplay()
+     {
+@@ -16,6 +13,15 @@ namespace visualization
+ 
+     bool LocalDisplay::render_frame(const cv::Mat& display_frame)
+     {
++        // Create the GUI window lazily on the first frame we actually render.
++        // Opening it in the constructor makes VisionPilot abort on startup when
++        // no X display is available (e.g. headless containers), even when
++        // visualization is disabled and no frame is ever shown.
++        if (!window_created_)
++        {
++            cv::namedWindow("VisionPilot", cv::WINDOW_NORMAL);
++            window_created_ = true;
++        }
+         cv::resizeWindow("VisionPilot", display_frame.cols, display_frame.rows);
+         cv::imshow("VisionPilot", display_frame);
+         cv::waitKey(1);

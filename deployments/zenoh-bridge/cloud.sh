@@ -60,34 +60,47 @@ if [ -z "$CMD" ]; then
     CMD="up"
 fi
 
-# Ask Compose for the effective value so this guard follows its dotenv comment,
-# quoting, interpolation, and environment-precedence semantics exactly.
-if ZENOH_BIND_IP=$(read_compose_environment_value ZENOH_ROUTER_BIND_IP); then
-    :
-else
-    compose_environment_status=$?
-    if [[ "$compose_environment_status" -eq 3 ]]; then
-        ZENOH_BIND_IP=127.0.0.1
+# Teardown must remove everything the cloud side owns — including the one-shot
+# readiness/guard helpers and teleop — regardless of which optional services
+# `up` started, so `down` cannot leave orphaned containers behind.
+if [ "$CMD" == "down" ]; then
+    TARGET_SERVICES="visualizer cloud_zenoh_bridge cloud_zenoh_ready cloud_zenoh_bind_guard teleop"
+fi
+
+# Resolving and guarding the Zenoh bind address needs the fully interpolated
+# Compose environment (REMOTE_PASSWORD included) and working DNS. Restrict it to
+# commands that actually start services, so teardown and diagnostics (down, ps,
+# logs, config) stay usable when startup config is broken or a secret is absent
+# during incident recovery.
+if [[ "$CMD" == "up" || "$CMD" == "dry-run" ]]; then
+    # Ask Compose for the effective value so this guard follows its dotenv comment,
+    # quoting, interpolation, and environment-precedence semantics exactly.
+    if ZENOH_BIND_IP=$(read_compose_environment_value ZENOH_ROUTER_BIND_IP); then
+        :
     else
-        echo -e "${RED}[Error]${NC} Could not resolve the effective Zenoh binding from Docker Compose."
+        compose_environment_status=$?
+        if [[ "$compose_environment_status" -eq 3 ]]; then
+            ZENOH_BIND_IP=127.0.0.1
+        else
+            echo -e "${RED}[Error]${NC} Could not resolve the effective Zenoh binding from Docker Compose."
+            exit 1
+        fi
+    fi
+    normalized_bind_ip="${ZENOH_BIND_IP#[}"
+    normalized_bind_ip="${normalized_bind_ip%]}"
+    if ! resolved_bind_ip=$(getent ahosts "$normalized_bind_ip" | awk 'NR == 1 { print $1 }') \
+        || [[ -z "$resolved_bind_ip" ]]; then
+        echo -e "${RED}[Error]${NC} Could not resolve Zenoh binding ${ZENOH_BIND_IP} to an IP address."
         exit 1
     fi
-fi
-normalized_bind_ip="${ZENOH_BIND_IP#[}"
-normalized_bind_ip="${normalized_bind_ip%]}"
-if ! resolved_bind_ip=$(getent ahosts "$normalized_bind_ip" | awk 'NR == 1 { print $1 }') \
-    || [[ -z "$resolved_bind_ip" ]]; then
-    echo -e "${RED}[Error]${NC} Could not resolve Zenoh binding ${ZENOH_BIND_IP} to an IP address."
-    exit 1
-fi
-if [[ "$CMD" == "up" || "$CMD" == "dry-run" ]] \
-    && [[ "$resolved_bind_ip" == "0.0.0.0" \
+    if [[ "$resolved_bind_ip" == "0.0.0.0" \
         || "$resolved_bind_ip" == "::" \
         || "$resolved_bind_ip" == "::ffff:0.0.0.0" ]]; then
-    echo -e "${RED}[Error]${NC} Refusing wildcard Zenoh binding ${ZENOH_BIND_IP}."
-    echo "        Bind ZENOH_ROUTER_BIND_IP to an exact VPN/private-interface address."
-    echo "        Zenoh TCP port 7448 has no transport authentication or encryption."
-    exit 1
+        echo -e "${RED}[Error]${NC} Refusing wildcard Zenoh binding ${ZENOH_BIND_IP}."
+        echo "        Bind ZENOH_ROUTER_BIND_IP to an exact VPN/private-interface address."
+        echo "        Zenoh TCP port 7448 has no transport authentication or encryption."
+        exit 1
+    fi
 fi
 
 # Run Compose

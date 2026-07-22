@@ -16,7 +16,9 @@ networks:
 
 services:
   autoware:
-    image: ghcr.io/autowarefoundation/autoware:universe
+    # Pinned to a reviewed digest for reproducible source starts; the tag stays
+    # visible and can be re-resolved to bump this deliberately.
+    image: ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175
     networks:
       - edge_net
     volumes:
@@ -38,6 +40,9 @@ services:
         condition: service_completed_successfully
 
   scenario_simulator:
+    # Scenario output (output_directory below) is written to the container
+    # filesystem only and is disposable by design: record:=false, so no rosbag
+    # is retained. Bind a host volume here if you need per-run artifacts kept.
     image: *scenario-simulator-image
     networks:
       - edge_net
@@ -71,7 +76,7 @@ services:
         condition: service_completed_successfully
 
   edge_zenoh_bridge:
-    image: eclipse/zenoh-bridge-ros2dds:latest
+    image: eclipse/zenoh-bridge-ros2dds:latest@sha256:5aca6798ae112e390a97788450fd37360ddd72ac092032a25acf9fac17b2d9af
     # Bridges edge_net (ROS 2 DDS) and zenoh_net (tunneled TCP). DNS alias
     # `cloud_zenoh_bridge` resolves via zenoh_net regardless of CLOUD_IP.
     networks:
@@ -85,7 +90,10 @@ services:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=0
     volumes:
-      - ./config:/config
+      - ./config:/config:ro
+    # Long-running bridge process: restart if it dies so the tunnel recovers
+    # instead of leaving the container exited while the project looks healthy.
+    restart: unless-stopped
     command: >
       -l tcp/0.0.0.0:7447
       -e tcp/${CLOUD_IP:-cloud_zenoh_bridge}:7448
@@ -151,7 +159,7 @@ services:
     restart: "no"
 
   cloud_zenoh_bridge:
-    image: eclipse/zenoh-bridge-ros2dds:latest
+    image: eclipse/zenoh-bridge-ros2dds:latest@sha256:5aca6798ae112e390a97788450fd37360ddd72ac092032a25acf9fac17b2d9af
     # Bridges cloud_net and zenoh_net. The 7448 listener is exposed to the
     # host via the bridge port mapping. Remote use must bind an exact
     # VPN/private-interface address because this endpoint has no transport
@@ -172,7 +180,10 @@ services:
     ports:
       - "${ZENOH_ROUTER_BIND_IP:-127.0.0.1}:7448:7448"
     volumes:
-      - ./config:/config
+      - ./config:/config:ro
+    # Long-running bridge process: restart if it dies so the tunnel recovers
+    # instead of leaving the container exited while the project looks healthy.
+    restart: unless-stopped
     command: >
       -l tcp/0.0.0.0:7448
       -c /config/zenoh-bridge-ros2dds.json5
@@ -198,7 +209,7 @@ services:
     restart: "no"
 
   teleop:
-    image: ghcr.io/evshary/autoware_manual_control:latest
+    image: ghcr.io/evshary/autoware_manual_control:latest@sha256:3d2c2c4cfeb27386e1079ac8ab13f3b7517a449b8e5cd74d6ad187a829ddffb0
     networks:
       - cloud_net
     environment:

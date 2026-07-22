@@ -64,6 +64,14 @@ fi
 
 TARGET_SERVICES="$EDGE_SERVICES"
 
+# Teardown must remove everything the edge side owns — including scenario_simulator
+# (even when started with --no-sim omitted it) and the one-shot readiness helper —
+# regardless of which optional services `up` started, so `down` cannot leave
+# orphaned containers behind.
+if [ "$CMD" == "down" ]; then
+    TARGET_SERVICES="autoware scenario_simulator edge_zenoh_bridge edge_zenoh_ready"
+fi
+
 # The map is mounted from the host. Compose reads .env directly; this narrow
 # parser obtains the same preflight value without executing dotenv as shell.
 if ! MAP_DIR=$(read_dotenv_value MAP_PATH); then

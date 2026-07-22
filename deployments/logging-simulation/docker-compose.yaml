@@ -92,7 +92,9 @@ services:
     restart: on-failure
 
   rosbag:
-    image: ghcr.io/autowarefoundation/autoware:universe
+    # Pinned to a reviewed digest for reproducible source starts; the tag stays
+    # visible and can be re-resolved to bump this deliberately.
+    image: ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175
     container_name: autoware-rosbag
     network_mode: host
     init: true
@@ -103,6 +105,12 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml
       - CYCLONEDDS_NETWORK_INTERFACE=${CYCLONEDDS_NETWORK_INTERFACE:-lo}
+      # Passed as runtime environment data (not interpolated into the command
+      # program) so shell metacharacters in a value cannot alter the script.
+      - ROSBAG_FORMAT=${ROSBAG_FORMAT}
+      - ROSBAG_READY_TOPIC=${ROSBAG_READY_TOPIC}
+      - ROSBAG_READY_TIMEOUT=${ROSBAG_READY_TIMEOUT}
+      - ROSBAG_RATE=${ROSBAG_RATE}
     volumes:
       - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${ROSBAG_PATH}:/autoware_map/rosbag:ro
@@ -118,9 +126,20 @@ services:
       - -lc
       - |
         set -euo pipefail
-        ros2 bag info /autoware_map/rosbag -s ${ROSBAG_FORMAT}
-        topic=${ROSBAG_READY_TOPIC}
-        deadline=$$((SECONDS + ${ROSBAG_READY_TIMEOUT}))
+        # Validate the values that arrive as environment data before use.
+        case "$$ROSBAG_FORMAT" in
+          sqlite3|mcap) ;;
+          *) echo "Invalid ROSBAG_FORMAT '$$ROSBAG_FORMAT' (expected sqlite3 or mcap)" >&2; exit 1 ;;
+        esac
+        case "$$ROSBAG_READY_TIMEOUT" in
+          ''|*[!0-9]*) echo "ROSBAG_READY_TIMEOUT must be a positive integer, got '$$ROSBAG_READY_TIMEOUT'" >&2; exit 1 ;;
+        esac
+        case "$$ROSBAG_RATE" in
+          ''|*[!0-9.]*) echo "ROSBAG_RATE must be numeric, got '$$ROSBAG_RATE'" >&2; exit 1 ;;
+        esac
+        ros2 bag info /autoware_map/rosbag -s "$$ROSBAG_FORMAT"
+        topic="$$ROSBAG_READY_TOPIC"
+        deadline=$$((SECONDS + ROSBAG_READY_TIMEOUT))
         until ros2 topic info "$$topic" 2>/dev/null | grep -Eq 'Subscription count: [1-9][0-9]*'; do
           if (( SECONDS >= deadline )); then
             echo "Timed out waiting for a subscriber on $$topic" >&2
@@ -128,7 +147,7 @@ services:
           fi
           sleep 2
         done
-        exec ros2 bag play /autoware_map/rosbag -r ${ROSBAG_RATE} -s ${ROSBAG_FORMAT}
+        exec ros2 bag play /autoware_map/rosbag -r "$$ROSBAG_RATE" -s "$$ROSBAG_FORMAT"
     restart: "no"
     profiles:
       - rosbag

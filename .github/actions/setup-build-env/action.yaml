@@ -7,7 +7,7 @@ name: setup-build-env
 # needs the repo on disk to resolve the local composite action path).
 #
 # Usage:
-#   - uses: actions/checkout@v6
+#   - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 #   - uses: ./.github/actions/setup-build-env
 #     with:
 #       autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
@@ -61,12 +61,12 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y jq pipx
-        pipx install vcs2l
+        pipx install "vcs2l==1.1.7"
       shell: bash
 
     - name: Checkout Autoware repository
       if: inputs.setup-autoware == 'true'
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       with:
         repository: autowarefoundation/autoware
         ref: ${{ inputs.autoware-ref }}
@@ -75,7 +75,7 @@ runs:
 
     - name: Download Autoware dependency lockfile
       if: inputs.setup-autoware == 'true' && inputs.build-tag != ''
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: autoware-lock-${{ inputs.build-tag }}
         path: autoware-lock

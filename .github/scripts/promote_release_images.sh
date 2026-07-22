@@ -15,6 +15,11 @@ source "${script_dir}/stable_alias_policy.sh"
 
 stable_release="${STABLE_RELEASE:-false}"
 
+# Track alias convergence so a partial promotion is reported and fails the run
+# rather than silently leaving some public aliases on the previous release.
+PROMOTED_REFS=()
+PENDING_REFS=()
+
 available_distros=$(jq -r '.images | unique_by(.ros_distro) | map(.ros_distro) | join(" ")' release-input/build/build-metadata.json)
 echo "Available ROS distros in build: ${available_distros}"
 
@@ -36,6 +41,7 @@ promote_tag() {
   if [ "${lookup_status}" -eq 0 ]; then
     if [ "${existing_digest}" = "${digest}" ]; then
       echo "${ref} already points to ${digest}; skipping"
+      PROMOTED_REFS+=("${ref}")
       return
     fi
     if [ "${mode}" = "immutable" ]; then
@@ -49,7 +55,31 @@ promote_tag() {
     return "${lookup_status}"
   fi
 
-  docker buildx imagetools create -t "${ref}" "${repo}@${digest}"
+  # Retry the mutating create, then confirm the alias actually resolves to the
+  # intended digest before treating it as promoted. A timeout, rate limit, or
+  # transient network failure on a single alias no longer leaves the release
+  # split across old and new digests unnoticed.
+  local attempt result_digest result_status
+  for attempt in 1 2 3; do
+    if docker buildx imagetools create -t "${ref}" "${repo}@${digest}"; then
+      result_status=0
+      result_digest=$(registry_manifest_digest "${ref}") || result_status=$?
+      if [ "${result_status}" -eq 0 ] && [ "${result_digest}" = "${digest}" ]; then
+        PROMOTED_REFS+=("${ref}")
+        return 0
+      fi
+      echo "Post-promote verification for ${ref} did not match on attempt ${attempt}: got '${result_digest:-<none>}', want '${digest}'" >&2
+    else
+      echo "imagetools create for ${ref} failed on attempt ${attempt}" >&2
+    fi
+    if [ "${attempt}" -lt 3 ]; then
+      sleep "$(( attempt * 5 ))"
+    fi
+  done
+
+  echo "ERROR: ${ref} did not converge to ${digest} after retries" >&2
+  PENDING_REFS+=("${ref}")
+  return 0
 }
 
 while IFS=$'\t' read -r repo target distro digest; do
@@ -75,4 +105,13 @@ if [ "${stable_release}" = true ] && [ "${PUBLISH_LATEST_ALIASES}" = true ]; the
       promote_tag "${repo}:${target}-latest" "${repo}" "${digest}" alias
     fi
   done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
+fi
+
+# Final convergence check: every intended ref must resolve to the release digest.
+echo "Alias promotion summary: ${#PROMOTED_REFS[@]} converged, ${#PENDING_REFS[@]} pending."
+if [ "${#PENDING_REFS[@]}" -gt 0 ]; then
+  echo "The following refs did not converge to the release digests:" >&2
+  printf '  %s\n' "${PENDING_REFS[@]}" >&2
+  echo "ERROR: release promotion is incomplete; rerun the release workflow." >&2
+  exit 1
 fi

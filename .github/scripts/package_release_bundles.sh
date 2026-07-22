@@ -133,6 +133,12 @@ for entry in \
     busybox:1.36.1; do
     matching_files=()
     while IFS= read -r -d '' candidate; do
+      # Skip files where this ref is already digest-pinned (e.g. source compose
+      # defaults that ship "<tag>@sha256:..."), so pinning stays idempotent and
+      # never produces a malformed "<tag>@sha256:...@sha256:..." reference.
+      if grep -Fq "${ref}@sha256:" "${candidate}"; then
+        continue
+      fi
       if grep -Fq "${ref}" "${candidate}"; then
         matching_files+=("${candidate}")
       fi

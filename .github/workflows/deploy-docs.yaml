@@ -19,6 +19,7 @@ on:
       - "docs/overrides/**"
       - "**/*.pages"
       - ".github/actions/build-docs/**"
+      - ".github/workflows/deploy-docs.yaml"
   release:
     types:
       - published
@@ -40,7 +41,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           # Push to main: builds the latest docs.
           # Release published: builds docs from the release tag (github.ref is
@@ -52,7 +53,7 @@ jobs:
         uses: ./.github/actions/build-docs
 
       - name: Upload production site
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: production-docs-site
           path: site
@@ -68,17 +69,43 @@ jobs:
       contents: write
     steps:
       - name: Checkout deployment repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Download production site
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: production-docs-site
           path: site
 
+      # The root site is the canonical (main) documentation. A release build
+      # checks out its own tag, so publishing an older delayed release or a
+      # prerelease would roll the public docs backward. Only let a release
+      # replace the root site when it is the repository's latest stable release.
+      - name: Gate production deploy to the latest stable release
+        id: gate
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Prerelease $RELEASE_TAG will not replace the production docs."
+            exit 0
+          fi
+          latest="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
+          if [ "$latest" != "$RELEASE_TAG" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$RELEASE_TAG is not the latest stable release ($latest); leaving production docs unchanged."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to GitHub Pages
+        if: github.event_name != 'release' || steps.gate.outputs.skip == 'false'
         uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
         with:
           folder: site

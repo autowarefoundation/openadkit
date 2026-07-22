@@ -68,7 +68,7 @@ jobs:
       use_local_simulator: ${{ steps.detect.outputs.use_local_simulator }}
     steps:
       - name: Checkout OpenADKit repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
@@ -106,7 +106,7 @@ jobs:
         shell: bash
 
       - name: Upload Autoware dependency lockfile
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: autoware-lock-${{ steps.prepare.outputs.build_tag }}
           path: autoware-lock/autoware-lock.repos
@@ -161,7 +161,7 @@ jobs:
         target: ${{ fromJson(needs.prepare.outputs.targets_json) }}
     steps:
       - name: Checkout OpenADKit repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up build environment
         uses: ./.github/actions/setup-build-env
@@ -234,7 +234,7 @@ jobs:
 
       - name: Restore BuildKit cache mounts
         id: cache-restore
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
           key: buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-${{ github.sha }}

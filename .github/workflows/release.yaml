@@ -45,7 +45,7 @@ jobs:
       is_stable_release: ${{ steps.validate.outputs.is_stable_release }}
     steps:
       - name: Check out release scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
@@ -75,7 +75,7 @@ jobs:
         shell: bash
 
       - name: Upload validated release metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
@@ -93,7 +93,7 @@ jobs:
       packager_sha: ${{ steps.packager.outputs.packager_sha }}
     steps:
       - name: Check out release scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
@@ -116,7 +116,7 @@ jobs:
         shell: bash
 
       - name: Check out repository at release SHA
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
           path: src
@@ -125,7 +125,7 @@ jobs:
             deployments
 
       - name: Download validated release metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
@@ -146,7 +146,7 @@ jobs:
         shell: bash
 
       - name: Upload deployment bundles
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-bundles-${{ inputs.build_tag }}
           path: dist/*.tar.gz
@@ -163,7 +163,7 @@ jobs:
       contents: write
     steps:
       - name: Check out release tag helper
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: .github/scripts/release_tag.sh
@@ -187,7 +187,7 @@ jobs:
       packages: write
     steps:
       - name: Check out release scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
@@ -196,7 +196,7 @@ jobs:
             .github/scripts/stable_alias_policy.sh
 
       - name: Download validated release metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
@@ -235,7 +235,7 @@ jobs:
       release_id: ${{ steps.prepare-release.outputs.release_id }}
     steps:
       - name: Check out release scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
@@ -244,13 +244,13 @@ jobs:
             .github/scripts/write_release_notes.sh
 
       - name: Download validated release metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
 
       - name: Download deployment bundles
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-bundles-${{ inputs.build_tag }}
           path: dist
@@ -277,7 +277,7 @@ jobs:
         shell: bash
 
       - name: Upload expected release asset manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-asset-manifest-${{ inputs.build_tag }}
           path: release-assets.sha256
@@ -295,7 +295,7 @@ jobs:
       contents: write
     steps:
       - name: Check out release manager
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
@@ -303,7 +303,7 @@ jobs:
             .github/scripts/release_tag.sh
 
       - name: Download expected release asset manifest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-asset-manifest-${{ inputs.build_tag }}
           path: release-asset-manifest

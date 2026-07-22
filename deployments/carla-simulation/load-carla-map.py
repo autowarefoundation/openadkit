@@ -16,9 +16,18 @@ def main():
     client = carla.Client(host, port)
     last_error = None
 
-    while time.monotonic() < deadline:
+    def remaining():
+        return deadline - time.monotonic()
+
+    def rpc_timeout():
+        # Cap every blocking call to the time left so no single RPC can overrun
+        # the overall CARLA_LOAD_TIMEOUT budget.
+        return min(10.0, remaining())
+
+    # Phase 1: is the requested map already loaded?
+    while remaining() > 0:
         try:
-            client.set_timeout(10.0)
+            client.set_timeout(rpc_timeout())
             current = client.get_world().get_map().name
             if current == map_name or current.endswith(f"/{map_name}"):
                 print(f"CARLA map already loaded: {current}")
@@ -26,27 +35,34 @@ def main():
             break
         except RuntimeError as error:
             last_error = error
-            time.sleep(2.0)
+            if remaining() <= 0:
+                break
+            time.sleep(min(2.0, remaining()))
 
-    remaining = max(10.0, deadline - time.monotonic())
-    print(f"Loading CARLA map {map_name} via {host}:{port} (timeout {remaining:.0f}s)")
-
-    try:
-        client.set_timeout(remaining)
-        client.load_world_if_different(map_name)
-    except RuntimeError as error:
-        last_error = error
-
-    while time.monotonic() < deadline:
+    # Phase 2: request the load, bounded by the time actually left (never a
+    # forced minimum that could exceed the deadline).
+    if remaining() > 0:
+        budget = remaining()
+        print(f"Loading CARLA map {map_name} via {host}:{port} (timeout {budget:.0f}s)")
         try:
-            client.set_timeout(10.0)
+            client.set_timeout(budget)
+            client.load_world_if_different(map_name)
+        except RuntimeError as error:
+            last_error = error
+
+    # Phase 3: confirm the load completed within the remaining budget.
+    while remaining() > 0:
+        try:
+            client.set_timeout(rpc_timeout())
             current = client.get_world().get_map().name
             if current == map_name or current.endswith(f"/{map_name}"):
                 print(f"CARLA map loaded: {current}")
                 return 0
         except RuntimeError as error:
             last_error = error
-        time.sleep(2.0)
+        if remaining() <= 0:
+            break
+        time.sleep(min(2.0, remaining()))
 
     print(f"Timed out waiting for CARLA map {map_name}: {last_error}", file=sys.stderr)
     return 1

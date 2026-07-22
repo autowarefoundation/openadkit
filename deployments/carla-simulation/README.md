@@ -6,7 +6,10 @@ for configuration, launcher options, and troubleshooting.
 
 ## Requirements
 
+- amd64 / x86_64 host
+- Ubuntu 22.04
 - Docker with NVIDIA Container Toolkit
+- Docker Compose v2.20 or newer
 - Access to `carlasim/carla:0.9.16`
 - Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
 - Large UDP buffers:

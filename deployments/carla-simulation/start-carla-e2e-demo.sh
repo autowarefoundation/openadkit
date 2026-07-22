@@ -138,7 +138,6 @@ load_env() {
     CARLA_DISPLAY
     CARLA_E2E_LANELET2_URL
     CARLA_E2E_LANELET2_SHA256
-    CARLA_E2E_MAP_PATH
     CARLA_E2E_POINTCLOUD_URL
     CARLA_E2E_POINTCLOUD_SHA256
     CARLA_INTERFACE_CONTAINER
@@ -150,6 +149,7 @@ load_env() {
     CARLA_VK_ICD_HOST_PATH
     MAP_PATH
     POINTCLOUD_MAP_FILE
+    LANELET2_MAP_FILE
     ROS_DISTRO
   )
 
@@ -273,23 +273,36 @@ download_verified() {
 }
 
 prepare_map() {
-  local projector_tmp
+  local projector_tmp f
   if [[ "$DRY_RUN" == true ]]; then
-    printf '+ prepare CARLA Town01 map at %s\n' "$CARLA_E2E_MAP_PATH"
+    printf '+ prepare CARLA Town01 map at %s\n' "$MAP_PATH"
     return 0
   fi
 
-  mkdir -p "$CARLA_E2E_MAP_PATH"
+  mkdir -p "$MAP_PATH"
 
+  # Download into the directory Compose actually mounts (MAP_PATH), using the
+  # same configured filenames the runtime reads, so preparation and runtime can
+  # never point at different directories or filenames.
   download_verified "$CARLA_E2E_POINTCLOUD_URL" "$CARLA_E2E_POINTCLOUD_SHA256" \
-    "$CARLA_E2E_MAP_PATH/pointcloud_map.pcd"
+    "$MAP_PATH/$POINTCLOUD_MAP_FILE"
   download_verified "$CARLA_E2E_LANELET2_URL" "$CARLA_E2E_LANELET2_SHA256" \
-    "$CARLA_E2E_MAP_PATH/lanelet2_map.osm"
+    "$MAP_PATH/$LANELET2_MAP_FILE"
 
-  projector_tmp=$(mktemp "$CARLA_E2E_MAP_PATH/map_projector_info.yaml.tmp.XXXXXX")
+  projector_tmp=$(mktemp "$MAP_PATH/map_projector_info.yaml.tmp.XXXXXX")
   TEMP_FILES+=("$projector_tmp")
   printf 'projector_type: Local\n' >"$projector_tmp"
-  mv -f "$projector_tmp" "$CARLA_E2E_MAP_PATH/map_projector_info.yaml"
+  mv -f "$projector_tmp" "$MAP_PATH/map_projector_info.yaml"
+
+  # Verify all three inputs the stack needs are present in the mounted directory
+  # (not just the pointcloud) so a partial map surfaces here instead of as a
+  # later localization or routing failure.
+  for f in "$POINTCLOUD_MAP_FILE" "$LANELET2_MAP_FILE" map_projector_info.yaml; do
+    if [[ ! -s "$MAP_PATH/$f" ]]; then
+      printf 'Prepared map is missing %s in %s\n' "$f" "$MAP_PATH" >&2
+      return 1
+    fi
+  done
 }
 
 build_image() {
@@ -320,6 +333,7 @@ start_stack() {
   local display_num="${CARLA_DISPLAY##*:}"
   local running_output service
   local -a services=(carla map system carla-interface sensing perception localization planning vehicle control api)
+  local -a fresh_services=() existing_services=()
   local -A running=()
   display_num="${display_num%%.*}"
   if [[ "$DRY_RUN" == false && "${CARLA_RENDER_ARGS:-}" != *RenderOffScreen* && ! -S "/tmp/.X11-unix/X${display_num}" ]]; then
@@ -338,8 +352,26 @@ start_stack() {
     for service in "${services[@]}" carla-map-loader; do
       [[ -v "running[$service]" ]] || STARTED_SERVICES+=("$service")
     done
+    for service in "${services[@]}"; do
+      if [[ -v "running[$service]" ]]; then
+        existing_services+=("$service")
+      else
+        fresh_services+=("$service")
+      fi
+    done
+  else
+    fresh_services=("${services[@]}")
   fi
-  run_compose up -d --force-recreate "${services[@]}"
+
+  # Recreate only the services this invocation introduces; leave already-running
+  # services in place (--no-recreate) so a failure rollback, which removes only
+  # STARTED_SERVICES, cannot destroy and fail to restore a pre-existing container.
+  if [[ "${#existing_services[@]}" -gt 0 ]]; then
+    run_compose up -d --no-recreate "${existing_services[@]}"
+  fi
+  if [[ "${#fresh_services[@]}" -gt 0 ]]; then
+    run_compose up -d --force-recreate "${fresh_services[@]}"
+  fi
 
   # Fail fast if the pointcloud map is not visible inside the container. A
   # wrong or empty bind mount (for example MAP_PATH expanded with the wrong

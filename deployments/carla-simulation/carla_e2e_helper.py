@@ -142,8 +142,16 @@ def set_route_and_engage():
         request.header.frame_id = "map"
         request.option.allow_goal_modification = True
         request.goal = Pose()
-        request.goal.position.x = start_pose.position.x + forward_distance
-        request.goal.position.y = start_pose.position.y
+        # Project the goal forward along the vehicle's current heading (map-frame
+        # yaw from the odometry quaternion) rather than blindly along +X, so the
+        # goal stays ahead of the vehicle regardless of its orientation.
+        q = start_pose.orientation
+        yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z),
+        )
+        request.goal.position.x = start_pose.position.x + forward_distance * math.cos(yaw)
+        request.goal.position.y = start_pose.position.y + forward_distance * math.sin(yaw)
         request.goal.position.z = 0.0
         request.goal.orientation = start_pose.orientation
 

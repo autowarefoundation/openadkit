@@ -137,26 +137,41 @@ detect_host_architecture() {
 }
 
 install_nvidia_container_toolkit() {
+    # Clean up every temp file this function may create on return via a single
+    # RETURN trap declared once, so a later trap cannot clobber an earlier one.
+    local tmp_key="" tmp_list="" docker_backup=""
+    trap 'rm -f "$tmp_key" "$tmp_list" "$docker_backup"' RETURN
+
     if command -v nvidia-ctk &>/dev/null; then
         log_info "NVIDIA Container Toolkit is already installed ($(nvidia-ctk --version))."
     else
         log_info "Installing NVIDIA Container Toolkit..."
 
-        # Remove any pre-existing repo configuration to avoid duplicate entries
-        sudo rm -f /etc/apt/sources.list.d/nvidia-container-toolkit*.list
-        sudo rm -f /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg2
 
-        # Add NVIDIA GPG key and repository (dearmored per official NVIDIA docs)
-        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
-            | sudo gpg --dearmor \
-            -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        # Download and validate the replacement keyring and repo list into
+        # temporary files first. The existing NVIDIA source is only removed once
+        # both downloads succeed, so a transient network, TLS, or GPG failure
+        # under `set -e` cannot disable a previously working package repository.
+        tmp_key="$(mktemp)"
+        tmp_list="$(mktemp)"
 
+        # Dearmor the NVIDIA GPG key per official NVIDIA docs.
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+            | gpg --dearmor -o "$tmp_key"
         curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
             | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
-            | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+            > "$tmp_list"
+        if [ ! -s "$tmp_key" ] || [ ! -s "$tmp_list" ]; then
+            log_error "Failed to download a valid NVIDIA keyring or repository list; leaving existing configuration untouched."
+            return 1
+        fi
+
+        # Both replacements are ready; drop stale duplicates and install atomically.
+        sudo rm -f /etc/apt/sources.list.d/nvidia-container-toolkit*.list
+        sudo install -m 0644 "$tmp_key" /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        sudo install -m 0644 "$tmp_list" /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
         sudo apt-get update
         sudo apt-get install -y nvidia-container-toolkit
@@ -168,10 +183,50 @@ install_nvidia_container_toolkit() {
     fi
 
     log_info "Configuring NVIDIA runtime for Docker..."
-    sudo nvidia-ctk runtime configure --runtime=docker
-    sudo systemctl restart docker
+
+    # Docker's daemon config is host-wide: a bad rewrite or a failed restart can
+    # take down every container on the machine. Back it up, validate the rewrite
+    # before restarting, and roll back both the config and the daemon on any
+    # failure instead of exiting under `set -e` with Docker left stopped.
+    local docker_config=/etc/docker/daemon.json
+    if [ -f "$docker_config" ]; then
+        docker_backup="$(mktemp)"
+        sudo cp -a "$docker_config" "$docker_backup"
+    fi
+
+    restore_docker() {
+        log_warn "Rolling back Docker configuration and restarting the daemon..."
+        if [ -n "$docker_backup" ]; then
+            sudo cp -a "$docker_backup" "$docker_config"
+        else
+            sudo rm -f "$docker_config"
+        fi
+        sudo systemctl restart docker \
+            || log_error "Docker failed to restart after rollback; run 'sudo systemctl status docker'."
+    }
+
+    if ! sudo nvidia-ctk runtime configure --runtime=docker; then
+        log_error "nvidia-ctk could not update the Docker runtime configuration."
+        restore_docker
+        return 1
+    fi
+
+    if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$docker_config" 2>/dev/null; then
+        log_error "Generated Docker configuration is not valid JSON; not restarting the daemon."
+        restore_docker
+        return 1
+    fi
+
+    log_warn "Restarting the Docker daemon to apply the NVIDIA runtime; this briefly interrupts running containers."
+    if ! sudo systemctl restart docker; then
+        log_error "Docker failed to restart with the new NVIDIA configuration."
+        restore_docker
+        return 1
+    fi
+
     if ! sudo docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'; then
         log_error "NVIDIA runtime configuration did not become available in Docker."
+        restore_docker
         return 1
     fi
 

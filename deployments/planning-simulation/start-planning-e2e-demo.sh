@@ -18,8 +18,9 @@ usage() {
   cat <<'EOF'
 Usage: ./start-planning-e2e-demo.sh [options]
 
-Starts the planning-simulation deployment.  Runs Autoware planning/control
-stack against a pre-recorded map in the built-in simulator.
+Smoke-tests the planning-simulation deployment: validates the Compose
+configuration and required files, then prints the commands to start and
+stop the deployment. It does not start the deployment itself.
 
 Options:
   --dry-run   Print planned commands without running them

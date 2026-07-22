@@ -39,7 +39,7 @@ git ls-files '*.sh' | xargs shellcheck --severity=error
 ./actionlint
 
 # Dockerfiles
-hadolint --config .hadolint.yaml **/Dockerfile*
+git ls-files '**/Dockerfile*' | xargs hadolint --config .hadolint.yaml
 
 # YAML files
 yamllint -c .yamllint.yaml \

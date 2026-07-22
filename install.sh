@@ -15,7 +15,6 @@ INSTALL_NVIDIA=true
 DOWNLOAD_ARTIFACTS=false
 INSTALL_BUILD_DEPS=false
 RUN_VERIFY=false
-HOST_ARCH=""
 SAMPLE_TMP=""
 declare -a SAMPLE_STAGE_PATHS=()
 
@@ -127,8 +126,7 @@ check_os() {
 
 detect_host_architecture() {
     case "$(uname -m)" in
-        x86_64|amd64) HOST_ARCH=amd64 ;;
-        aarch64|arm64) HOST_ARCH=arm64 ;;
+        x86_64|amd64|aarch64|arm64) ;;
         *)
             log_error "Unsupported architecture: $(uname -m). Open AD Kit supports amd64 and arm64 hosts."
             return 1

@@ -13,7 +13,7 @@ source "${script_dir}/stable_alias_policy.sh"
 : "${PUBLISH_LATEST_ALIASES:?PUBLISH_LATEST_ALIASES is required}"
 : "${STABLE_RELEASE:?STABLE_RELEASE is required}"
 
-stable_release="${STABLE_RELEASE:-false}"
+stable_release="${STABLE_RELEASE}"
 
 # Track alias convergence so a partial promotion is reported and fails the run
 # rather than silently leaving some public aliases on the previous release.

@@ -9,7 +9,7 @@ set -euo pipefail
 : "${STABLE_RELEASE:?STABLE_RELEASE is required}"
 : "${PACKAGER_SHA:?PACKAGER_SHA is required}"
 
-stable_release="${STABLE_RELEASE:-false}"
+stable_release="${STABLE_RELEASE}"
 tab=$(printf "\t")
 bundles_file=$(mktemp)
 trap 'rm -f "${bundles_file}"' EXIT

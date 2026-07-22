@@ -92,8 +92,13 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema && \
     VIRTUALGL_VERSION=3.1.2 && \
     arch="$(dpkg --print-architecture)" && \
-    case "${arch}" in amd64|arm64) ;; *) echo "Unsupported architecture for VirtualGL: ${arch}" >&2; exit 1 ;; esac && \
+    case "${arch}" in \
+      amd64) virtualgl_sha256=b0e989ac4c59b82b2198dea90856a8fb6c41bedff4c792b37fcd259dce958bc8 ;; \
+      arm64) virtualgl_sha256=f189dcfaf64816e092b4d8560df17dbdfdc6ae7d598963f9c4b2d6b8bd363905 ;; \
+      *) echo "Unsupported architecture for VirtualGL: ${arch}" >&2; exit 1 ;; \
+    esac && \
     curl -fsSL -o /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/${VIRTUALGL_VERSION}/virtualgl_${VIRTUALGL_VERSION}_${arch}.deb" && \
+    echo "${virtualgl_sha256}  /tmp/virtualgl.deb" | sha256sum -c - && \
     apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
     rm -f /tmp/virtualgl.deb
 
@@ -115,6 +120,12 @@ RUN install -d -o aw -g aw \
 COPY --chown=aw:aw components/visualizer/etc/xstartup /home/aw/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
 RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
+
+# Report unhealthy if either the noVNC endpoint (6080) or the backing VNC
+# display (5999) stops accepting connections. PID 1 also exits on child failure
+# (entrypoint supervision), but this surfaces a dead endpoint to restart policy.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/6080 && exec 4<>/dev/tcp/127.0.0.1/5999'
 
 USER aw
 ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]

@@ -173,14 +173,19 @@ if [ "${REMOTE_DISPLAY:-true}" == "false" ]; then
 else
     echo "Launching remote rviz2 display"
     configure_vnc
-    if [ $# -eq 0 ]; then
-        sleep infinity
-    else
+
+    # Supervise the long-running children (VNC + websockify, plus the optional
+    # command). wait -n returns as soon as ANY of them exits, so a later failure
+    # of the browser endpoint or VNC display tears the container down and lets
+    # restart policy recover it, instead of PID 1 sleeping forever while a dead
+    # service leaves the container looking healthy.
+    if [ $# -gt 0 ]; then
         "$@" &
         COMMAND_PID=$!
-        command_status=0
-        wait "$COMMAND_PID" || command_status=$?
-        COMMAND_PID=""
-        exit "$command_status"
     fi
+
+    supervised_status=0
+    wait -n "$VNC_PID" "$WEBSOCKIFY_PID" ${COMMAND_PID:+"$COMMAND_PID"} || supervised_status=$?
+    echo "A supervised process exited (status ${supervised_status}); shutting down the visualizer." >&2
+    exit "$supervised_status"
 fi

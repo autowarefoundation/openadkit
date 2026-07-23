@@ -5,8 +5,9 @@ Autoware control commands to CARLA and CARLA sensor data to ROS 2 messages.
 
 !!! note "Platform support"
     The image is published for amd64 + Humble only. The bridge itself does not
-    require a GPU, but the complete CARLA deployment requires an NVIDIA GPU for
-    the CARLA server.
+    require a GPU, but the complete CARLA deployment needs an NVIDIA GPU for the
+    CARLA server **and** defaults to the amd64 `sensing-perception-cuda`
+    Autoware image for perception.
 
 It provides:
 

@@ -45,16 +45,20 @@ AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel
 
 </div>
 
-## Folder Structure
+## Repository layout
 
-This folder contains a per-use-case structure for deploying and running Open AD Kit on AutoSD. Each folder contains at least:
+Runnable AutoSD assets live under
+[`platforms/autosd/`](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd)
+in the Open AD Kit repository. Each use-case directory contains at least:
 
 - **Quadlet files** to define containerized services managed by Podman and systemd
 - **Automotive Image Builder files** to build an AutoSD image
 
-Build and running instructions on this page apply to any use-case subfolder.
+Build and run commands on this page assume you are inside a use-case directory
+such as `platforms/autosd/planning-simulator/`.
 
-- [Planning Simulator](planning-simulator/index.md): Run planning and simulator services in containers (pre-built)
+- [Planning Simulator](planning-simulator/index.md): Platform demo that runs
+  Autoware planning and TIER IV Scenario Simulator under Podman/Quadlet
 
 ## Requirements
 
@@ -72,7 +76,10 @@ Build and running instructions on this page apply to any use-case subfolder.
 
 ## Building an AutoSD Image
 
-This section guides you through running `automotive-image-builder` from a container. Commands assume you are inside one of the sub-directories of this folder.
+This section guides you through running `automotive-image-builder` from a
+container. From a clone of this repository, `cd` into a use-case directory
+(for example `platforms/autosd/planning-simulator/`) before running the
+commands below.
 
 First, download the runner script:
 
@@ -130,20 +137,35 @@ Otherwise, use the following example QEMU command:
 !!! note "Memory sizing"
     The `-m 2G` value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the [hardware requirements](../hardware/index.md) (16 GB minimum, 32 GB recommended) and raise `-m` accordingly. A concrete starting point is `-m 16384` (16 GB); for heavier workloads use `-m 32768` (32 GB).
 
-## Architecture on AutoSD
+## Current demo vs target architecture
 
-AutoSD's mixed-criticality architecture maps naturally to Open AD Kit's component model:
+!!! note "Platform demo, not modular Open AD Kit images"
+    The in-repo [Planning Simulator](planning-simulator/index.md) path is a
+    **platform demo**. It does **not** run the modular
+    `ghcr.io/autowarefoundation/openadkit:*` component images used by Docker
+    Compose deployments. Automotive Image Builder pins:
+
+    - `ghcr.io/autowarefoundation/autoware:universe-0.45.1-amd64` → `localhost/autoware:latest`
+    - `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime` → `localhost/scenario_simulator_v2:runtime`
+
+    After boot, systemd runs two containers in one pod (`awf-oak-planning` and
+    `awf-oak-simulator`) plus a map extraction oneshot — not a full
+    map/planning/control/vehicle/api/visualizer component split, and not BlueChi
+    multi-host orchestration.
+
+AutoSD's mixed-criticality features remain a natural **target** home for Open AD
+Kit's component model on production profiles (see the [roadmap](../../roadmap.md)):
 
 <div class="oak-component-grid">
 
 <div class="oak-component-item">
 <strong>Root Partition</strong>
-<span>Open AD Kit components with higher criticality assumptions (planning, control, vehicle interface) map to the privileged root partition with RT scheduling.</span>
+<span>Higher-criticality workloads (planning, control, vehicle interface) can map to the privileged root partition with RT scheduling.</span>
 </div>
 
 <div class="oak-component-item">
 <strong>QM Partition</strong>
-<span>Non-critical components (visualizer, simulator, development tools) are isolated in the QM partition for safety containment.</span>
+<span>Non-critical workloads (visualizer, simulator, development tools) can be isolated in the QM partition for safety containment.</span>
 </div>
 
 <div class="oak-component-item">
@@ -153,26 +175,32 @@ AutoSD's mixed-criticality architecture maps naturally to Open AD Kit's componen
 
 <div class="oak-component-item">
 <strong>BlueChi + Quadlet</strong>
-<span>Container orchestration via systemd units. Each Open AD Kit component maps to a Quadlet service file managed by systemd (BlueChi is available for multi-host orchestration on production deployments).</span>
+<span>Container orchestration via systemd units. Production profiles may map each Open AD Kit component to a Quadlet service; BlueChi is available for multi-host orchestration.</span>
 </div>
 
 </div>
 
 ```mermaid
 flowchart TB
-    subgraph Root["Root Partition (Safety-Critical)"]
-        R1[Planning]
-        R2[Control]
-        R3[Vehicle System]
+    subgraph Today["Current demo (in repo)"]
+        M[awf-oak-map oneshot]
+        P[awf-oak-planning<br/>autoware:universe]
+        S[awf-oak-simulator<br/>scenario_simulator_v2]
+        M --> P
+        P --- S
     end
 
-    subgraph QM["QM Partition (Non-Critical)"]
-        Q1[Visualizer]
-        Q2[Simulator]
+    subgraph Target["Target mixed-criticality mapping"]
+        subgraph Root["Root Partition"]
+            R1[Planning]
+            R2[Control]
+            R3[Vehicle System]
+        end
+        subgraph QM["QM Partition"]
+            Q1[Visualizer]
+            Q2[Simulator]
+        end
     end
-
-    OSTree[OSTree / Bootc<br/>Atomic Updates] --> Root
-    OSTree --> QM
 ```
 
 ## Related

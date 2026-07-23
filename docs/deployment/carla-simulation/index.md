@@ -4,24 +4,47 @@ Run the full modular Autoware stack against CARLA 0.9.16 in closed loop.
 
 ## Requirements
 
-- amd64, ROS 2 Humble, and Ubuntu 22.04
+Host (no ROS install required):
+
+- amd64 and Ubuntu 22.04
 - Docker with NVIDIA Container Toolkit
 - NVIDIA GPU and Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
 - Host X access only for optional windowed rendering; offscreen mode is default
 
-CARLA 0.9.16 uses Unreal Engine 4.26 and is not validated on Ubuntu 24.04.
+Container images use ROS 2 Humble (including the default
+`sensing-perception-cuda` Autoware image). CARLA 0.9.16 uses Unreal Engine 4.26
+and is not validated on Ubuntu 24.04.
 
 ## Setup
 
+Install Docker and the NVIDIA toolkit once:
+
 ```bash
 {{ install_command }}
-git clone https://github.com/autowarefoundation/openadkit.git
-cd openadkit/deployments/carla-simulation
 ```
 
 --8<-- "includes/docker-group-activation.md"
 
---8<-- "includes/first-release-note.md"
+Choose one layout. Map assets are downloaded by the launcher (not
+`install.sh sample-data`):
+
+=== "Source checkout"
+
+    ```bash
+    git clone https://github.com/autowarefoundation/openadkit.git
+    cd openadkit/deployments/carla-simulation
+    ```
+
+=== "Release bundle"
+
+    ```bash
+    curl -fL https://github.com/autowarefoundation/openadkit/releases/latest/download/carla-simulation.tar.gz | tar xz
+    cd carla-simulation
+    ```
+
+    The CARLA bundle vendors compose and env files but does not ship `install.sh`
+    (host Docker/NVIDIA still come from the install command above; Town01 maps
+    come from `./start-carla-e2e-demo.sh`).
 
 Set the required host UDP buffers before starting:
 

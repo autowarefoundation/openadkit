@@ -175,6 +175,20 @@ The release workflow (`.github/workflows/release.yaml`) has six jobs that run se
 5. **release-images** — Promotes immutable image tags, rechecks the latest-stable policy, then updates mutable aliases only if the policy is unchanged.
 6. **release-github** — Revalidates the exact draft release ID and publishes it after image promotion succeeds.
 
+```mermaid
+flowchart LR
+    A[Build All Images] --> S[Scan Images]
+    S --> V[validate]
+    V --> P[package-bundles]
+    P --> T[release-tag]
+    T --> D[prepare-github-release]
+    D --> I[release-images]
+    I --> G[release-github]
+```
+
+Prerequisite CI (`build-all-images` + passing `scan-images`) runs before the
+release workflow. The six release jobs then run in the order above.
+
 #### Validation Gates
 
 Before any image is tagged, the `validate` job (`.github/scripts/validate_release.sh`) checks:
@@ -212,19 +226,11 @@ Each alias is created independently from the digest — there is no sequential r
 
 #### GitHub Release
 
-The `release-github` job:
-
-1. Creates release notes with a provenance table and image digest list
-2. Creates or updates the GitHub Release with all 5 deployment bundles and metadata as release assets
-
-```mermaid
-flowchart LR
-    A[Build All Images] --> R[Record Build Tag]
-    R --> B[Scan Images]
-    B --> C[Create Git Tag]
-    C --> D[Promote Images]
-    D --> E[Create GitHub Release]
-```
+- **`prepare-github-release`** creates a workflow-owned draft (or verifies an
+  existing published release) with notes, provenance, and the five deployment
+  bundle assets.
+- **`release-github`** revalidates that draft and publishes it only after
+  `release-images` succeeds.
 
 The resulting tag aliases are documented in [How Releases Are Tagged](../getting-started/container-images.md#how-releases-are-tagged).
 

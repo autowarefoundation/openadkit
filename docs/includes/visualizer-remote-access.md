@@ -16,4 +16,9 @@ Use the default password **`openadkit`**. The connection uses a self-signed cert
     # then open https://localhost:8080/vnc.html
     ```
 
-    or put a TLS-terminating reverse proxy in front of `127.0.0.1:6080` and set a strong `REMOTE_PASSWORD` in `base.env`. Editing `docker-compose.yaml` to add a `ports:` mapping has no effect under host networking.
+    or put a TLS-terminating reverse proxy in front of `127.0.0.1:6080` and set a
+    strong `REMOTE_PASSWORD` in the env file the stack actually loads: source
+    checkout → `../base/base.env`; release bundle → the merged
+    `<deployment>.env` (bundles do not ship a separate editable `base.env`).
+    Editing `docker-compose.yaml` to add a `ports:` mapping has no effect under
+    host networking.

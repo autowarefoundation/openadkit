@@ -4,8 +4,10 @@ Thank you for your interest in contributing to Open AD Kit. This project is part
 
 ## Quick Links
 
-- [:material-github: Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and request features
-- [:material-chat: Discord](https://discord.gg/Q94UsPvReQ) — real-time discussion
+- [Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and request features
+- [Discord](https://discord.gg/Q94UsPvReQ) — real-time discussion
+- [Discussions](https://github.com/autowarefoundation/openadkit/discussions) — design and Q&A
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## License
 

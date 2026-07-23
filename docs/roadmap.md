@@ -24,7 +24,7 @@ flowchart LR
 | **v2.2.0** | Oct 2026 | **Readiness + gating**<br>Scenario V2 CI gate, health readiness, restart path |
 | **v2.3.0** | Nov 2026 | **Trust signals**<br>SBOM, provenance, cosign signing, vulnerability policy |
 | **CES 2027** | Jan 6–9 | **Flagship demo**<br>VisionPilot + Safety Island + CARLA (event, not a release gate) |
-| **v2.4.0** | Late Jan–Feb | **Platform profiles**<br>AutoSD/Podman, BlueChi, Zenoh split, S-Core analysis |
+| **v2.4.0** | Late Jan–Feb | **Platform profiles**<br>Production AutoSD/Podman profiles (OAK component images, BlueChi); Zenoh split; S-Core analysis. An experimental AutoSD planning-simulator demo already exists under `platforms/autosd/`. |
 | **v2.5.0** | Mar 2027 | **Update/rollback beta**<br>Staged apply, health promotion, verified rollback |
 | **v3.0.0** | May 2027 | **Closed loop**<br>Build → deploy → test → observe → update → rollback |
 

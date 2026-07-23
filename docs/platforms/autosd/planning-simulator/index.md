@@ -14,6 +14,16 @@ Runnable assets live under [`platforms/autosd/planning-simulator/`](https://gith
 | `components/systemd/` | systemd oneshot service for map extraction |
 | `components/scripts/` | Helper scripts installed into the AutoSD image |
 
+!!! note "Images used by this demo"
+    `aib/image.aib.yml` pulls pinned upstream images, not modular Open AD Kit
+    component tags:
+
+    - `ghcr.io/autowarefoundation/autoware:universe-0.45.1-amd64`
+    - `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime`
+
+    For the modular Docker Compose stack with browser RViz2, use
+    [Planning Simulation](../../../deployment/planning-simulation/index.md).
+
 ## Prerequisites
 
 Before using this deployment, build and boot an AutoSD image following the [AutoSD Platform Overview](../index.md) guide. You need:

@@ -25,7 +25,11 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 ### Perception is very slow or the GPU overlay does not start
 
-- The default sensing and perception image runs on CPU. For GPU acceleration, install the NVIDIA Container Toolkit (`install.sh` does this by default) and start Logging Simulation with its GPU overlay. The CUDA image requires a working NVIDIA runtime and does not automatically fall back to CPU.
+- The default sensing and perception image runs on CPU except where a deployment
+  selects `sensing-perception-cuda` (Logging Simulation GPU overlay;
+  CARLA Simulation by default). Install the NVIDIA Container Toolkit
+  (`install.sh` does this by default). The CUDA image requires a working NVIDIA
+  runtime and does not automatically fall back to CPU.
 
 ## Deployment Issues
 
@@ -39,9 +43,15 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 - Stop the conflicting service. Most deployments run the visualizer under `network_mode: host`, which binds the port directly — `ports:` mappings in `docker-compose.yaml` are ignored in that mode.
 
-### Sample data `file not found`
+### Sample data or artifacts `file not found`
 
-- From a source checkout, re-run the fetch from the deployment directory with `../../install.sh sample-data <deployment> --force`. From a release bundle, use `./install.sh sample-data <deployment> --force`. Data lands in `~/autoware_map`.
+Recovery depends on the deployment:
+
+| Deployment | Recover |
+|------------|---------|
+| `planning-simulation`, `scenario-simulation`, `zenoh-bridge` | Source: `../../install.sh sample-data <deployment> --force`. Bundle: `./install.sh sample-data <deployment> --force`. Maps land under `~/autoware_map`. |
+| `logging-simulation` | Same sample-data step for maps/rosbags. Perception artifacts need root: from a source tree run `sudo ../../install.sh --download-artifacts`; otherwise re-run the host install one-liner from [Logging Simulation](../deployment/logging-simulation/index.md) with `--download-artifacts`. Artifacts land under `~/autoware_data`. |
+| `carla-simulation` | `install.sh sample-data` is **not** supported. Re-run `./start-carla-e2e-demo.sh`, which downloads and validates Town01 under `$HOME/autoware_data/maps` (see `carla-simulation.env`). |
 
 ## Getting Help
 

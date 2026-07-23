@@ -22,6 +22,10 @@ understanding into one build target.
 ## CUDA Variant
 
 `sensing-perception-cuda` accelerates point cloud processing and neural network
-inference on NVIDIA GPUs. It is published for amd64 only, requires NVIDIA
-Container Toolkit, and is enabled through the
-[Logging Simulation GPU overlay](../deployment/logging-simulation/index.md).
+inference on NVIDIA GPUs. It is published for amd64 only and requires NVIDIA
+Container Toolkit. Deployments that use it today:
+
+- [Logging Simulation](../deployment/logging-simulation/index.md) GPU overlay
+  (`docker-compose.gpu.yaml` + `logging-simulation.gpu.env`)
+- [CARLA Simulation](../deployment/carla-simulation/index.md) (default image in
+  `carla-simulation.env`)

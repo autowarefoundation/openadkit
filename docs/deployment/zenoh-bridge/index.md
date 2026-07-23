@@ -41,14 +41,16 @@ Edit `.env` before starting:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `CLOUD_IP` | Cloud router address used by the edge | Docker DNS on one host |
 | `MAP_PATH` | Kashiwanoha map directory | `$HOME/autoware_map/kashiwanoha_map` |
 | `REMOTE_PASSWORD` | Required noVNC password | None |
 | `ZENOH_ROUTER_BIND_IP` | Cloud router host interface | `127.0.0.1` |
 
 Docker Compose reads `.env` as data; helper scripts do not execute it. Exported
-shell variables override file values. The deployment uses wall time and does
-not bridge `/clock`.
+shell variables override file values. For multi-host runs, set `CLOUD_IP` (and
+usually `ZENOH_ROUTER_BIND_IP`) via `export` on each machine — see
+[Separate Machines](#separate-machines). Single-host compose defaults
+`CLOUD_IP` to the `cloud_zenoh_bridge` service name. The deployment uses wall
+time and does not bridge `/clock`.
 
 !!! warning "Zenoh transport is not secured"
     TCP 7448 has no authentication or encryption. For separate machines, use a
@@ -121,7 +123,9 @@ docker compose down
 
 If a bridge is not ready, inspect
 `docker compose logs cloud_zenoh_ready edge_zenoh_ready` and start cloud before
-edge. Ports 6081, 7448, and 7447 must be free. Re-fetch the map with
+edge. Host ports **6081** (noVNC) and **7448** (cloud Zenoh router bind) must
+be free; edge listens on **7447** only inside the compose network (not published
+on the host). Re-fetch the map with
 `../../install.sh sample-data zenoh-bridge --force` from a source checkout or
 `./install.sh sample-data zenoh-bridge --force` from a release bundle.
 

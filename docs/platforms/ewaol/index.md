@@ -8,7 +8,11 @@
 <span class="oak-badge oak-badge--neutral">Upstream reference</span>
 
 !!! note "Not a committed Open AD Kit target"
-    EWAOL is retained as upstream SOAFEE background. Open AD Kit's committed SOAFEE-aligned target is the **Arm Automotive Solutions reference stack / RD-1 AE FVP**. EWAOL-specific deployment assets are **not yet present** in this repository; this page is a pointer to the upstream project, not a validated Open AD Kit deployment path.
+    EWAOL is retained as upstream SOAFEE background. Open AD Kit may explore
+    related Arm Automotive Solutions / RD-1 AE FVP paths later; there is no
+    committed in-repo target or validated deployment for those stacks today.
+    EWAOL-specific deployment assets are **not present** in this repository;
+    this page is a pointer to the upstream project only.
 
 ## What is EWAOL?
 
@@ -16,9 +20,10 @@ EWAOL is delivered via the `meta-ewaol` Yocto layer and provides a container-nat
 
 ## Documentation
 
-For installation and runtime instructions, see the upstream documentation:
+For installation and runtime instructions, see the upstream SOAFEE documentation:
 
-- [EWAOL User Guide](https://ewaol.docs.arm.com/en/kirkstone-dev/user_guide/reproduce.html)
+- [meta-ewaol documentation](https://meta-ewaol.docs.soafee.io/)
+- [meta-ewaol source (GitLab)](https://gitlab.com/soafee/ewaol/meta-ewaol)
 
 ## Related
 

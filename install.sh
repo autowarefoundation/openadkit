@@ -17,13 +17,37 @@ INSTALL_BUILD_DEPS=false
 RUN_VERIFY=false
 SAMPLE_TMP=""
 declare -a SAMPLE_STAGE_PATHS=()
+readonly SAMPLE_DATA_CONFIGS=(
+    "planning-simulation|Download the planning simulation map|true|fetch_planning_simulation"
+    "logging-simulation|Download the logging simulation map and rosbag|true|fetch_logging_simulation"
+    "scenario-simulation|Download the Kashiwanoha scenario map|false|fetch_kashiwanoha"
+    "zenoh-bridge|Download the Kashiwanoha scenario map|false|fetch_kashiwanoha"
+    "all|Download all non-CARLA sample data (default)|true|fetch_planning_simulation fetch_logging_simulation fetch_kashiwanoha"
+)
 
 # Resolve the real invoking user whether the script is run via sudo or directly.
 TARGET_USER="${SUDO_USER:-$(id -un)}"
 USER_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 
 #### Functions ####
+sample_data_config() {
+    local deployment="$1"
+    local config name
+
+    for config in "${SAMPLE_DATA_CONFIGS[@]}"; do
+        IFS='|' read -r name _ <<< "$config"
+        if [ "$name" = "$deployment" ]; then
+            printf '%s\n' "$config"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 print_help() {
+    local config name description
+
     cat <<EOF
 Install Open AD Kit host dependencies and sample data.
 
@@ -37,12 +61,13 @@ Commands:
   sample-data            Download sample maps/rosbags only; defaults to all sample data
 
 Deployments for sample-data:
-  planning-simulation    Download the planning simulation map
-  logging-simulation     Download the logging simulation map and rosbag
-  scenario-simulation    Download the Kashiwanoha scenario map
-  zenoh-bridge           Download the Kashiwanoha scenario map
-  all                    Download all non-CARLA sample data (default)
-
+EOF
+    for config in "${SAMPLE_DATA_CONFIGS[@]}"; do
+        IFS='|' read -r name description _ <<< "$config"
+        printf '  %-23s%s\n' "$name" "$description"
+    done
+    printf '\n'
+    cat <<EOF
 Options:
   --help                  Display this help message
   -h                      Display this help message
@@ -469,22 +494,20 @@ download_autoware_artifacts() {
 
 preflight_sample_data_dependencies() {
     local deployment="$1"
+    local config name description fetchers
     local needs_unzip=false
     local missing=()
 
-    case "$deployment" in
-        all|""|planning-simulation|logging-simulation) needs_unzip=true ;;
-        scenario-simulation|zenoh-bridge) ;;
-        carla-simulation)
+    if ! config="$(sample_data_config "$deployment")"; then
+        if [ "$deployment" = "carla-simulation" ]; then
             log_error "sample-data does not support carla-simulation."
             log_info "Use deployments/carla-simulation/start-carla-e2e-demo.sh instead."
-            return 1
-            ;;
-        *)
+        else
             log_error "Unknown deployment for sample-data: $deployment"
-            return 1
-            ;;
-    esac
+        fi
+        return 1
+    fi
+    IFS='|' read -r name description needs_unzip fetchers <<< "$config"
 
     command -v curl >/dev/null 2>&1 || missing+=(curl)
     command -v realpath >/dev/null 2>&1 || missing+=(realpath)
@@ -507,8 +530,13 @@ preflight_sample_data_dependencies() {
 download_sample_data() {
     local deployment="${1:-all}"
     local force="${2:-false}"
+    local config name description needs_unzip fetcher_names fetcher
+    local -a fetchers
 
     preflight_sample_data_dependencies "$deployment"
+    config="$(sample_data_config "$deployment")"
+    IFS='|' read -r name description needs_unzip fetcher_names <<< "$config"
+    read -r -a fetchers <<< "$fetcher_names"
 
     log_info "Downloading sample map/rosbag data for deployments..."
 
@@ -801,23 +829,9 @@ PY
 
     prepare_sample_map_root
 
-    case "$deployment" in
-        all|"")
-            fetch_planning_simulation
-            fetch_logging_simulation
-            fetch_kashiwanoha
-            ;;
-        planning-simulation)
-            fetch_planning_simulation
-            ;;
-        logging-simulation)
-            fetch_logging_simulation
-            ;;
-        scenario-simulation|zenoh-bridge)
-            fetch_kashiwanoha
-            ;;
-        *) return 1 ;;
-    esac
+    for fetcher in "${fetchers[@]}"; do
+        "$fetcher"
+    done
 
     log_info "Sample data downloaded to ${MAP_ROOT}."
     trap - EXIT HUP INT TERM

@@ -13,6 +13,7 @@ MANAGER = ROOT / ".github/scripts/manage_github_release.sh"
 PACKAGER = ROOT / ".github/scripts/package_release_bundles.sh"
 PROMOTER = ROOT / ".github/scripts/promote_release_images.sh"
 REGISTRY_LOOKUP = ROOT / ".github/scripts/registry_lookup.sh"
+VALIDATOR = ROOT / ".github/scripts/validate_release.sh"
 DIGEST = "sha256:" + "a" * 64
 RELEASE_SHA = "b" * 40
 VERSION = "v9.8.7"
@@ -22,6 +23,79 @@ MARKER = "<!-- openadkit-release-workflow:v1 -->"
 def executable(path, content):
     path.write_text(content)
     path.chmod(0o755)
+
+
+def run_release_rules(tmp_path, *, version, ref_type, input_ref, base_version="1.8.0"):
+    build = tmp_path / "release-input/build"
+    build.mkdir(parents=True)
+    (build / "build-metadata.json").write_text(
+        json.dumps(
+            {
+                "openadkit_sha": RELEASE_SHA,
+                "autoware_input_ref": input_ref,
+                "autoware_ref_type": ref_type,
+                "autoware_base_version": base_version,
+            }
+        )
+    )
+    env = os.environ | {
+        "BUILD_TAG": "123-1",
+        "GH_TOKEN": "test",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
+        "IMAGE_PREFIX_COMPONENT": "ghcr.io/example/openadkit",
+        "VERSION": version,
+    }
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; release_sha="$2"; validate_release_rules',
+            "bash",
+            str(VALIDATOR),
+            RELEASE_SHA,
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("version", "ref_type", "input_ref"),
+    [
+        ("v2.0.0", "tag", "1.8.0"),
+        ("v2.0.0-rc.1", "tag", "1.8.0"),
+        ("v2.0.0-rc.1", "sha", "a" * 40),
+    ],
+)
+def test_release_rules_accept_supported_autoware_refs(
+    tmp_path, version, ref_type, input_ref
+):
+    result = run_release_rules(
+        tmp_path, version=version, ref_type=ref_type, input_ref=input_ref
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("version", "ref_type", "input_ref"),
+    [
+        ("v2.0.0", "sha", "a" * 40),
+        ("v2.0.0-rc.1", "branch", "main"),
+        ("v2.0.0-rc.1", "sha", "abc123"),
+    ],
+)
+def test_release_rules_reject_unsupported_autoware_refs(
+    tmp_path, version, ref_type, input_ref
+):
+    result = run_release_rules(
+        tmp_path, version=version, ref_type=ref_type, input_ref=input_ref
+    )
+    assert result.returncode != 0
 
 
 def test_registry_lookup_retries_and_classifies_failures(tmp_path):

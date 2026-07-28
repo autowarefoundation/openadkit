@@ -29,8 +29,12 @@ elif [ "${AUTOWARE_REF_TYPE}" = "tag" ] && printf '%s\n' "${AUTOWARE_INPUT_REF}"
   echo "This build can be promoted to a stable or pre-release OpenADKit version after a passed full scan."
   echo ""
   echo "To release this build, run **Actions -> release -> Run workflow** and set \`build_tag\` to \`${BUILD_TAG}\`."
+elif [ "${AUTOWARE_REF_TYPE}" = "sha" ] && printf '%s\n' "${AUTOWARE_INPUT_REF}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+  echo "This build can only be promoted to a pre-release OpenADKit version after a passed full scan."
+  echo ""
+  echo "To pre-release this build, run **Actions -> release -> Run workflow** and set \`build_tag\` to \`${BUILD_TAG}\`."
 else
-  echo "This build is not release-eligible. All releases require an exact Autoware SemVer tag."
+  echo "This build is not release-eligible. Stable releases require an Autoware SemVer tag, and pre-releases require a SemVer tag or full SHA."
 fi
 
 if [ "${SCAN_REQUESTED}" != "true" ]; then

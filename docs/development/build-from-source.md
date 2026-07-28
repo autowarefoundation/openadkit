@@ -161,7 +161,7 @@ Before running the release pipeline, verify:
 - **`vars.UPSTREAM_TAG`** is set in the repository or organization Variables on GitHub. This selects the default Autoware source release (e.g. `1.8.0`). Manual `autoware_ref` inputs override it; the workflow derives and pins the matching base-image release from the resolved source ref.
 - **GHCR packages** are accessible: `ghcr.io/autowarefoundation/openadkit`, `ghcr.io/autowarefoundation/openadkit-common`, and the build cache repo `ghcr.io/autowarefoundation/openadkit-buildcache` must accept pushes from CI.
 - **`secrets.RELEASE_TOKEN`** is available when promoting a build commit older than subsequent workflow changes. Use a token with repository Contents and Workflows write access; otherwise the workflow uses `GITHUB_TOKEN`.
-- **A successful build** exists: `build-all-images` completed on `main` from an exact Autoware release tag. Branch and SHA builds remain useful for validation but cannot be promoted. The build summary shows the resulting `build_tag`.
+- **A successful build** exists: `build-all-images` completed on `main` from an exact Autoware release tag or full SHA. Stable releases require a tag; SHA builds can only be promoted to pre-releases. Branch builds cannot be promoted. The build summary shows the resulting `build_tag`.
 - **A successful scan** exists: `scan-images` completed and **passed** for that `build_tag`.
 
 ### Workflow Steps
@@ -204,7 +204,7 @@ Before any image is tagged, the `validate` job (`.github/scripts/validate_releas
 | 7 | **Scan results** | A passing `scan-images` run must exist for the build; scan metadata is validated against the build metadata |
 | 8 | **Metadata schema** | 15+ fields in `build-metadata.json` are validated (types, formats, SHA256 lengths) |
 | 9 | **File integrity** | SHA256 of `autoware-lock.repos`, `image-inventory.json`, and `upstream-images.json` must match the metadata |
-| 10 | **Autoware revision** | Every release, including pre-releases, must use an exact Autoware release tag matching the base version |
+| 10 | **Autoware revision** | Stable releases require an exact Autoware release tag matching the base version; pre-releases also accept a full SHA |
 | 11 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build; no missing or extra images |
 | 12 | **Upstream coverage** | Every required Autoware base is recorded and consumed as an immutable manifest digest |
 | 13 | **Scan coverage** | Every image digest and platform must have a scan result |

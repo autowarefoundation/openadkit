@@ -374,11 +374,19 @@ validate_release_rules() {
   autoware_input_ref=$(jq -r '.autoware_input_ref' release-input/build/build-metadata.json)
   autoware_ref_type=$(jq -r '.autoware_ref_type' release-input/build/build-metadata.json)
   autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
-  if [ "${autoware_ref_type}" != "tag" ] || ! printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}"; then
-    fail "Releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})"
-  fi
-  if [ "${autoware_base_version}" != "${autoware_input_ref}" ]; then
-    fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
+  if [ "${autoware_ref_type}" = "tag" ]; then
+    printf '%s\n' "${autoware_input_ref}" | grep -Eq "${autoware_stable_re}" \
+      || fail "Autoware release tags must use X.Y.Z format (got ${autoware_input_ref})"
+    [ "${autoware_base_version}" = "${autoware_input_ref}" ] \
+      || fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
+  elif ! printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}" \
+    && [ "${autoware_ref_type}" = "sha" ] \
+    && printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+    :
+  elif printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+    fail "Stable releases must be built from an Autoware release tag (got ${autoware_ref_type}:${autoware_input_ref})"
+  else
+    fail "Pre-releases must be built from an Autoware release tag or full SHA (got ${autoware_ref_type}:${autoware_input_ref})"
   fi
 }
 

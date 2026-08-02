@@ -1,0 +1,41 @@
+name: inject-ccache
+# Inject BuildKit cache mounts for the ccache directory.
+#
+# Only ccache is persisted across runs: it is the entire ~4.5x recompile win
+# and stays small (~0.14 GB/leg). apt/pip mounts were dropped to keep the
+# repo-wide 10 GB cache budget clear of LRU eviction (their bandwidth-bound
+# saving is largely covered by the registry layer cache anyway).
+#
+# Usage:
+#   - uses: ./.github/actions/inject-ccache
+#     with:
+#       ros-distro: humble
+#       skip-extraction: "${{ steps.cache-restore.outputs.cache-hit }}"
+
+description: Inject BuildKit cache mounts (ccache) into the Docker build
+
+inputs:
+  ros-distro:
+    description: ROS distribution (used in the ccache mount ID)
+    required: true
+  skip-extraction:
+    description: Set to "true" to skip cache extraction (e.g. on cache hit)
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Inject BuildKit cache mounts
+      uses: reproducible-containers/buildkit-cache-dance@7a38cfab60c63ee1022b7c1a14a031c82f4114c7 # v3
+      with:
+        cache-map: |
+          {
+            "cache-mounts/ccache": {
+              "id": "ccache-${{ inputs.ros-distro }}",
+              "target": "/home/aw/.ccache",
+              "uid": "1000",
+              "gid": "1000"
+            }
+          }
+        skip-extraction: ${{ inputs.skip-extraction }}

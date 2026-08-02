@@ -19,6 +19,7 @@ log/
 
 # Python
 *.pyc
+__pycache__/
 
 # MkDocs
 /site/
@@ -28,3 +29,6 @@ capture/
 
 # CodeChecker
 .codechecker/
+
+# Playwright CLI artifacts
+.playwright-cli/

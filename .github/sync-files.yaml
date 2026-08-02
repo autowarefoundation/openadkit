@@ -25,7 +25,8 @@
     - source: .prettierrc.yaml
     - source: .yamllint.yaml
     - source: CODE_OF_CONDUCT.md
-    - source: CONTRIBUTING.md
+    # CONTRIBUTING.md is Open AD Kit–specific (deployments, bake, compose).
+    # Do not sync it from the generic Autoware template.
     - source: CPPLINT.cfg
     - source: DISCLAIMER.md
     - source: LICENSE

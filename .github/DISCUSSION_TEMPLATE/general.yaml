@@ -3,7 +3,7 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I have read [CODE OF CONDUCT](https://github.com/autowarefoundation/autoware/blob/main/CODE_OF_CONDUCT.md) and [Support Guidelines](https://autowarefoundation.github.io/autoware-documentation/main/support/support-guidelines/#github-discussions) before creating this Discussion post.
+        - label: I have read [CODE OF CONDUCT](https://github.com/autowarefoundation/openadkit/blob/main/CODE_OF_CONDUCT.md) before creating this Discussion post.
           required: true
   - type: textarea
     attributes:

@@ -19,6 +19,7 @@ log/
 
 # Python
 *.pyc
+__pycache__/
 
 # MkDocs
 /site/
@@ -42,3 +43,6 @@ capture/
 /x5h-work/
 /rcar-xos/
 /tmux-x5h-*.log
+
+# Playwright CLI artifacts
+.playwright-cli/

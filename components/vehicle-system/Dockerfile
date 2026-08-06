@@ -33,6 +33,13 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --base-paths \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_vehicle_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_launch \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch \
+        /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
+        /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_launch \
         /tmp/autoware/src/universe/autoware_universe/vehicle \
         /tmp/autoware/src/universe/autoware_universe/system \
         /tmp/autoware/src/universe/autoware_universe/localization/autoware_pose2twist \
@@ -59,17 +66,20 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-COPY --from=vehicle-system-devel /opt/autoware /opt/autoware
-RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
+RUN --mount=from=vehicle-system-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    cp -a /mnt/autoware/. /opt/autoware/ && \
+    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
+    bash /tmp/runtime-cleanup.sh opt
 
-COPY --parents --chown=${USERNAME}:${USERNAME} \
-    autoware/src/**/package.xml \
-    /tmp/
-
-RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/*
+    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
+    rosdep install -y --from-paths /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-cleanup.sh

@@ -9,8 +9,12 @@
 // are supplied by docker/metadata-action via the docker-metadata-action-*
 // targets, not by this file.
 
+// Default ROS distro for local builds. Tracks the documented default distro
+// and the published `<target>` alias, which is Humble for v2.0. CI never relies
+// on this default — build-all-images.yaml sets ROS_DISTRO explicitly per matrix
+// entry. Flip to "jazzy" together with the docs default when Jazzy-primary lands.
 variable "ROS_DISTRO" {
-  default = "jazzy"
+  default = "humble"
 }
 
 // Pin for upstream Autoware images. A concrete release tag (e.g. "1.2.3") is
@@ -36,6 +40,29 @@ function "ctx" {
 function "upstream" {
   params = [name]
   result = "docker-image://${UPSTREAM_REPO}:${name}-${ROS_DISTRO}${UPSTREAM_TAG == "" ? "" : "-${UPSTREAM_TAG}"}"
+}
+
+// Single source of truth for the sensing-perception `--base-paths` package
+// list. Both the CPU and CUDA sensing Dockerfiles consume this via the
+// COLCON_BASE_PATHS arg so a drift cannot silently diverge the two images.
+function "sensing_base_paths" {
+  params = []
+  result = join(" ", [
+    "/tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description",
+    "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch",
+    "/tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description",
+    "/tmp/autoware/src/universe/external/bevdet_vendor",
+    "/tmp/autoware/src/universe/external/cuda_blackboard",
+    "/tmp/autoware/src/universe/external/negotiated",
+    "/tmp/autoware/src/universe/autoware_universe/perception",
+    "/tmp/autoware/src/universe/autoware_universe/sensing",
+    "/tmp/autoware/src/sensor_component",
+  ])
 }
 
 group "default" {
@@ -68,19 +95,20 @@ target "docker-metadata-action-simulator" {}
 target "docker-metadata-action-carla-interface" {}
 
 // Common base for both universe-common stages. The Dockerfile has FROM lines
-// for both ${CORE_DEVEL_IMAGE} (devel stage) and ${CORE_IMAGE} (runtime
+// for both ${CORE_DEVEL_IMAGE} (devel stage) and ${BASE_IMAGE} (runtime
 // stage), so BuildKit needs both ARGs and both contexts resolved at parse
-// time regardless of which target stage is being built — mirrors upstream's
-// `_universe-base` / `_universe-cuda-base` inheritable pattern.
+// time regardless of which target stage is being built. The runtime starts
+// from the lean base and copies the compiled core/common tree from devel;
+// inheriting upstream core would retain its development files in final layers.
 target "_universe-common-base" {
   dockerfile = "components/universe-common/Dockerfile"
   contexts = {
     autoware-core-devel = upstream("core-devel")
-    autoware-core       = upstream("core")
+    autoware-base       = upstream("base")
   }
   args = {
     CORE_DEVEL_IMAGE = "autoware-core-devel"
-    CORE_IMAGE       = "autoware-core"
+    BASE_IMAGE       = "autoware-base"
     ROS_DISTRO       = ROS_DISTRO
   }
 }
@@ -114,6 +142,9 @@ target "sensing-perception" {
   inherits   = ["_component-base", "docker-metadata-action-sensing-perception"]
   dockerfile = "components/sensing-perception/Dockerfile"
   target     = "sensing-perception"
+  args = {
+    COLCON_BASE_PATHS = sensing_base_paths()
+  }
 }
 
 target "localization-mapping" {
@@ -163,11 +194,19 @@ target "sensing-perception-cuda" {
   args = {
     BASE_CUDA_RUNTIME_IMAGE = "autoware-base-cuda-runtime"
     BASE_CUDA_DEVEL_IMAGE   = "autoware-base-cuda-devel"
+    COLCON_BASE_PATHS       = sensing_base_paths()
   }
 }
 
 target "carla-interface" {
-  inherits = ["docker-metadata-action-carla-interface"]
+  inherits   = ["docker-metadata-action-carla-interface"]
   dockerfile = "components/carla-interface/Dockerfile"
-  target = "carla-interface"
+  target     = "carla-interface"
+  contexts = {
+    simulator = ctx("simulator")
+  }
+  args = {
+    SIMULATOR_IMAGE = "simulator"
+    ROS_DISTRO      = ROS_DISTRO
+  }
 }

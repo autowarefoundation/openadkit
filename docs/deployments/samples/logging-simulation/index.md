@@ -1,35 +1,72 @@
-# Autoware Open AD Kit Logging Simulation
+# Logging Simulation
 
-This sample deployment demonstrates the Open AD Kit logging simulation workflow.
+Runs sensing, perception, and localization against a sample rosbag. Checkout
+assets live under `deployments/logging-simulation/`.
 
-## Source of Truth
+## Prerequisites
 
-The complete operational instructions for this deployment live alongside the deployment assets in [`deployments/samples/logging-simulation/README.md`](https://github.com/autowarefoundation/openadkit/blob/main/deployments/samples/logging-simulation/README.md).
-
-That README covers:
-
-- sample map and rosbag download and extraction
-- required Autoware artifacts
-- visualizer access
-- startup and shutdown commands
-
-## Quick Start
-
-From `deployments/samples/logging-simulation/`:
+- Host setup via [`install.sh`](../../../getting-started/index.md)
+- Autoware artifacts (models under `~/autoware_data`):
 
 ```bash
-docker compose --env-file logging-simulation.env up -d
-docker compose --env-file logging-simulation.env up rosbag -d
+sudo ./install.sh --download-artifacts
 ```
 
-Open the visualizer at:
-
-```text
-http://localhost:6080/vnc.html
-```
-
-To stop the deployment:
+- Sample map and rosbag:
 
 ```bash
-docker compose --env-file logging-simulation.env --profile rosbag down
+./install.sh sample-data logging-simulation
 ```
+
+## Run (CPU)
+
+```bash
+cd deployments/logging-simulation
+docker compose \
+  --env-file config.env \
+  up -d
+```
+
+Play the rosbag (separate profile):
+
+```bash
+docker compose \
+  --env-file config.env \
+  --profile rosbag \
+  up -d rosbag
+```
+
+## Run (GPU)
+
+Requires the NVIDIA Container Toolkit. Overlay GPU settings for sensing and
+perception:
+
+```bash
+cd deployments/logging-simulation
+docker compose \
+  --env-file config.env \
+  -f docker-compose.yaml \
+  -f docker-compose.gpu.yaml \
+  up -d
+```
+
+## Visualizer
+
+Open `https://localhost:6080/vnc.html` and use `REMOTE_PASSWORD` from
+`config.env`.
+
+## Stop
+
+```bash
+cd deployments/logging-simulation
+docker compose \
+  --env-file config.env \
+  --profile rosbag \
+  down
+```
+
+## Notes
+
+- The sample rosbag has no camera images (privacy); traffic-light recognition
+  and full object detection accuracy are limited.
+- `config.env` is the complete Compose configuration for this deployment.

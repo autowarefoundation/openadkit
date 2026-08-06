@@ -8,25 +8,16 @@ on:
       - '.github/image-inventory.json'
       - '.github/scripts/**'
       - '.github/workflows/build-all-images.yaml'
-      - 'components/docker-bake.hcl'
-      - 'components/universe-common/**'
-      - 'components/sensing-perception/**'
-      - 'components/localization-mapping/**'
-      - 'components/planning-control/**'
-      - 'components/vehicle-system/**'
-      - 'components/api/**'
-      - 'components/visualizer/**'
-      - 'components/simulator/**'
-      - 'components/carla-interface/**'
+      - 'components/**'
 
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       autoware_ref:
-        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to main.'
+        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to UPSTREAM_TAG, then main.'
         required: false
-        default: main
+        default: ''
       run_scan:
         description: 'Run a full image scan after this build completes.'
         required: false
@@ -66,7 +57,10 @@ jobs:
       - name: Resolve shared build inputs
         id: prepare
         env:
-          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || 'main' }}
+          # Keep source checkout aligned with the Autoware base images used by Bake
+          # (vars.UPSTREAM_TAG). Building universe main against an older core image
+          # produces API mismatches such as VehicleInfo::createFootprint.
+          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || vars.UPSTREAM_TAG || 'main' }}
           RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
         run: |
           set -euo pipefail
@@ -96,13 +90,25 @@ jobs:
             autoware_ref_type="sha"
           fi
 
+          if [ "${autoware_ref_type}" = "ref" ]; then
+            echo "Could not resolve '${autoware_input_ref}' as a branch, tag, or SHA in the Autoware repository" >&2
+            exit 1
+          fi
+
+          # Keep FETCH_HEAD on the requested ref while still loading tags for describe.
           git -C autoware-metadata fetch --filter=blob:none --tags --force origin "${fetch_ref}"
           git -C autoware-metadata checkout --detach FETCH_HEAD
 
           autoware_ref=$(git -C autoware-metadata rev-parse HEAD)
           autoware_base_version=$(
-            git -C autoware-metadata describe --tags --match '[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null || true
+            git -C autoware-metadata describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null \
+              || git -C autoware-metadata describe --tags --match '[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null \
+              || true
           )
+          # When the input is already an exact release tag, prefer it as the base pin.
+          if printf '%s\n' "${autoware_input_ref}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
+            autoware_base_version="${autoware_input_ref#v}"
+          fi
           [ -n "${autoware_base_version}" ] || (echo "Could not infer Autoware base version from ${autoware_input_ref}" && exit 1)
 
           {
@@ -301,7 +307,7 @@ jobs:
       - name: Ensure upstream Autoware base images exist
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
         run: |
           set -euo pipefail
           # universe-common surfaces core/core-devel; sensing-perception-cuda
@@ -365,7 +371,7 @@ jobs:
         uses: docker/bake-action@v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -517,11 +523,31 @@ jobs:
             }
           skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
 
+      # carla-interface FROM simulator via bake context. Wait for this run's
+      # simulator image so we do not rebuild simulator or pull a floating tag.
+      - name: Wait for simulator image (carla-interface)
+        if: matrix.target == 'carla-interface'
+        env:
+          SIMULATOR_REF: ${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+        run: |
+          set -euo pipefail
+          echo "Waiting for ${SIMULATOR_REF}"
+          for _ in $(seq 1 90); do
+            if docker manifest inspect "${SIMULATOR_REF}" >/dev/null 2>&1; then
+              echo "Found ${SIMULATOR_REF}"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Timed out waiting for ${SIMULATOR_REF}" >&2
+          exit 1
+        shell: bash
+
       - name: Build and push ${{ matrix.target }}
         uses: docker/bake-action@v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -533,7 +559,8 @@ jobs:
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
             *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.args.SIMULATOR_IMAGE=${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}
+            carla-interface.contexts.simulator=docker-image://${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            carla-interface.args.SIMULATOR_IMAGE=simulator
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}

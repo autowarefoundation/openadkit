@@ -1,15 +1,45 @@
 #!/usr/bin/env bash
 # cspell:ignore openbox, VNC, tigervnc, novnc, websockify, newkey, xstartup, pixelformat, AUTHTOKEN, authtoken, vncserver, autoconnect, vncpasswd
 # shellcheck disable=SC1090,SC1091
+set -euo pipefail
+
+VNC_PID=""
+WEBSOCKIFY_PID=""
+RVIZ_PID=""
+COMMAND_PID=""
+
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Visualizer must run as a non-root user" >&2
+    exit 1
+fi
+
+terminate_child() {
+    local pid="${1:-}"
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+}
+
+cleanup() {
+    trap - EXIT INT TERM
+    echo "Shutting down VNC and websockify..."
+    terminate_child "$COMMAND_PID"
+    terminate_child "$RVIZ_PID"
+    terminate_child "$WEBSOCKIFY_PID"
+    terminate_child "$VNC_PID"
+}
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 # Check if RVIZ_CONFIG is provided
-if [ -z "$RVIZ_CONFIG" ]; then
-    echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /opt/autoware/share/autoware_launch/rviz/autoware.rviz\e[0m"
-    RVIZ_CONFIG="/opt/autoware/share/autoware_launch/rviz/autoware.rviz"
+if [ -z "${RVIZ_CONFIG:-}" ]; then
+    echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz\e[0m"
+    RVIZ_CONFIG="/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz"
     export RVIZ_CONFIG
 fi
 
-if [ -z "$USE_SIM_TIME" ]; then
+if [ -z "${USE_SIM_TIME:-}" ]; then
     echo -e "\e[31mUSE_SIM_TIME is not set defaulting to false\e[0m"
     USE_SIM_TIME="false"
     export USE_SIM_TIME
@@ -17,8 +47,8 @@ fi
 
 configure_vnc() {
     # Create Openbox application configuration
-    mkdir -p /etc/xdg/openbox
-    cat >/etc/xdg/openbox/rc.xml <<'EOF'
+    mkdir -p "$HOME/.config/openbox" "$HOME/.local/bin"
+    cat >"$HOME/.config/openbox/rc.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <openbox_config xmlns="http://openbox.org/3.4/rc"
                 xmlns:xi="http://www.w3.org/2001/XInclude">
@@ -36,7 +66,7 @@ configure_vnc() {
 </openbox_config>
 EOF
     # Create rviz2 start script
-    cat >/usr/local/bin/start-rviz2.sh <<'EOF'
+    cat >"$HOME/.local/bin/start-rviz2.sh" <<'EOF'
 #!/bin/bash
 source /opt/ros/"$ROS_DISTRO"/setup.bash
 source /opt/autoware/setup.bash
@@ -58,60 +88,107 @@ fi
 
 exec $rviz_launcher rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
 EOF
-    chmod +x /usr/local/bin/start-rviz2.sh
-    echo "echo 'Autostart executed at $(date)' >> /tmp/autostart.log" >>/etc/xdg/openbox/autostart
-    echo "/usr/local/bin/start-rviz2.sh" >>/etc/xdg/openbox/autostart
+    chmod +x "$HOME/.local/bin/start-rviz2.sh"
 
     # Configure VNC password
-    if [ -z "$REMOTE_PASSWORD" ]; then
-        echo -e "\e[31mREMOTE_PASSWORD is not set, using *openadkit* as default\e[0m"
-        REMOTE_PASSWORD="openadkit"
+    if [ -z "${REMOTE_PASSWORD:-}" ]; then
+        echo -e "\e[31mREMOTE_PASSWORD is not set. Please set it before starting.\e[0m"
+        exit 1
     fi
     mkdir -p ~/.vnc
     echo "$REMOTE_PASSWORD" | vncpasswd -f >~/.vnc/passwd && chmod 600 ~/.vnc/passwd
 
-    # Start VNC server with Openbox
+    # Start VNC server with Openbox. -localhost restricts the raw VNC port
+    # (5999) to loopback so only websockify (which connects to localhost:5999
+    # inside the container) can reach it. This is important under
+    # network_mode: host where the container's loopback == the host's.
     echo "Starting VNC server with Openbox..."
-    vncserver :99 -geometry 1024x768 -depth 16 -pixelformat rgb565
-    VNC_RESULT=$?
-
-    if [ $VNC_RESULT -ne 0 ]; then
-        echo "Failed to start VNC server (exit code: $VNC_RESULT)"
-        exit $VNC_RESULT
+    vncserver :99 -fg -localhost -geometry 1024x768 -depth 16 -pixelformat rgb565 &
+    VNC_PID=$!
+    sleep 2
+    if ! kill -0 "$VNC_PID" 2>/dev/null; then
+        wait "$VNC_PID" 2>/dev/null || true
+        VNC_PID=""
+        echo "Failed to start VNC server"
+        return 1
     fi
 
     # Set the DISPLAY variable to match VNC server
     echo "Setting DISPLAY to :99"
-    echo "export DISPLAY=:99" >>~/.bashrc
-    sleep 2
+    export DISPLAY=:99
+    grep -qxF "export DISPLAY=:99" ~/.bashrc || echo "export DISPLAY=:99" >>~/.bashrc
+    # Generate a unique self-signed TLS certificate at runtime so each
+    # container instance has its own key pair (instead of a shared build-time
+    # certificate baked into the image).
+    echo "Generating TLS certificate for NoVNC..."
+    mkdir -p "$HOME/.vnc"
+    if ! openssl req -x509 -nodes -newkey rsa:2048 \
+      -keyout "$HOME/.vnc/novnc.key" \
+      -out "$HOME/.vnc/novnc.crt" \
+      -days 365 \
+      -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1; then
+        echo "Failed to generate TLS certificate for NoVNC"
+        exit 1
+    fi
 
-    # Start NoVNC
+    # Start NoVNC. Under network_mode: host (base deployments) bind to
+    # loopback so noVNC is not exposed on every interface. Under bridge
+    # networking (zenoh-bridge) set WEBSOCKIFY_BIND=0.0.0.0 so Docker's port
+    # forwarding can reach websockify from the bridge interface; the host-side
+    # port mapping (127.0.0.1:6081:6080) still restricts external access to
+    # loopback. The VNC server is always loopback-only (see -localhost above).
     echo "Starting NoVNC..."
-    websockify --daemon --web=/usr/share/novnc/ --cert=/etc/ssl/certs/novnc.crt --key=/etc/ssl/private/novnc.key 6080 localhost:5999
+    local websck_bind="${WEBSOCKIFY_BIND:-127.0.0.1}"
+    websockify --web=/usr/share/novnc/ \
+      --cert="$HOME/.vnc/novnc.crt" --key="$HOME/.vnc/novnc.key" \
+      "${websck_bind}:6080" localhost:5999 &
+    WEBSOCKIFY_PID=$!
+    sleep 1
+    if ! kill -0 "$WEBSOCKIFY_PID" 2>/dev/null; then
+        wait "$WEBSOCKIFY_PID" 2>/dev/null || true
+        WEBSOCKIFY_PID=""
+        echo "Failed to start websockify (NoVNC server)"
+        return 1
+    fi
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
-    echo -e "\033[32mBrowser interface available at local address http://$(hostname -I | cut -d' ' -f1):6080/vnc.html?resize=scale&password=${REMOTE_PASSWORD}&autoconnect=true\033[0m"
-    if curl -s --head 1.1.1.1 >/dev/null 2>&1; then
-        echo -e "\033[32mIf you have a static public ip you can access it on WEB at http://$(curl -s ifconfig.me):6080/vnc.html?resize=scale&password=${REMOTE_PASSWORD}&autoconnect=true\033[0m"
-    else
-        echo -e "\033[31mNo internet connection available\033[0m"
-    fi
+    echo -e "\033[32mBrowser interface available at https://127.0.0.1:6080/vnc.html?resize=scale&autoconnect=true\033[0m"
+    echo -e "\033[32mUse the REMOTE_PASSWORD configured in your env file.\033[0m"
+    echo -e "\033[32mThe websockify server is bound to ${websck_bind}.\033[0m"
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
 }
 
 # Source ROS and Autoware setup files
-source "/opt/ros/$ROS_DISTRO/setup.bash"
+: "${ROS_DISTRO:?ROS_DISTRO must be set (e.g. humble)}"
+set +u
+source "/opt/ros/${ROS_DISTRO}/setup.bash"
 source "/opt/autoware/setup.bash"
+set -u
 
 # Execute passed command if provided, otherwise launch rviz2
-if [ "$REMOTE_DISPLAY" == "false" ]; then
+if [ "${REMOTE_DISPLAY:-true}" == "false" ]; then
     echo "Launching local rviz2 display"
-    [ $# -eq 0 ] && rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
+    if [ $# -eq 0 ]; then
+        exec rviz2 -d "$RVIZ_CONFIG" --ros-args -p use_sim_time:="$USE_SIM_TIME"
+    fi
     exec "$@"
 else
     echo "Launching remote rviz2 display"
     configure_vnc
-    [ $# -eq 0 ] && sleep infinity
-    exec "$@"
+
+    "$HOME/.local/bin/start-rviz2.sh" &
+    RVIZ_PID=$!
+
+    # Any child exit tears the container down so the restart policy can recover.
+    if [ $# -gt 0 ]; then
+        "$@" &
+        COMMAND_PID=$!
+    fi
+
+    supervised_status=0
+    wait -n "$VNC_PID" "$WEBSOCKIFY_PID" "$RVIZ_PID" ${COMMAND_PID:+"$COMMAND_PID"} || supervised_status=$?
+    [ "$supervised_status" -ne 0 ] || supervised_status=1
+    echo "A supervised process exited (status ${supervised_status}); shutting down the visualizer." >&2
+    exit "$supervised_status"
 fi

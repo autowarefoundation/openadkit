@@ -10,23 +10,6 @@ def _env(name, cast=str):
     return cast(os.environ[name])
 
 
-def wait_api():
-    import carla
-
-    client = carla.Client(_env("CARLA_RPC_HOST"), _env("CARLA_RPC_PORT", int))
-    client.set_timeout(_env("CARLA_API_TIMEOUT", float))
-    print(client.get_world().get_map().name)
-
-
-def preload_world():
-    import carla
-
-    client = carla.Client(_env("CARLA_RPC_HOST"), _env("CARLA_RPC_PORT", int))
-    client.set_timeout(_env("CARLA_LOAD_TIMEOUT", float))
-    world = client.load_world(_env("CARLA_WORLD"))
-    print(world.get_map().name)
-
-
 def verify_runtime():
     import carla
     import rclpy
@@ -115,11 +98,8 @@ def set_route_and_engage():
             raise RuntimeError(f"Timed out waiting for {description}")
 
         def wait_for_service(client, timeout, name):
-            deadline = time.time() + timeout
-            while time.time() < deadline:
-                if client.wait_for_service(timeout_sec=1.0):
-                    return
-            raise RuntimeError(f"Timed out waiting for service {name}")
+            if not client.wait_for_service(timeout_sec=timeout):
+                raise RuntimeError(f"Timed out waiting for service {name}")
 
         def call_service(client, request, timeout, name):
             wait_for_service(client, timeout, name)
@@ -159,8 +139,16 @@ def set_route_and_engage():
         request.header.frame_id = "map"
         request.option.allow_goal_modification = True
         request.goal = Pose()
-        request.goal.position.x = start_pose.position.x + forward_distance
-        request.goal.position.y = start_pose.position.y
+        # Project the goal forward along the vehicle's current heading (map-frame
+        # yaw from the odometry quaternion) rather than blindly along +X, so the
+        # goal stays ahead of the vehicle regardless of its orientation.
+        q = start_pose.orientation
+        yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z),
+        )
+        request.goal.position.x = start_pose.position.x + forward_distance * math.cos(yaw)
+        request.goal.position.y = start_pose.position.y + forward_distance * math.sin(yaw)
         request.goal.position.z = 0.0
         request.goal.orientation = start_pose.orientation
 
@@ -252,13 +240,11 @@ def main():
     parser = argparse.ArgumentParser(description="CARLA e2e helper commands")
     parser.add_argument(
         "command",
-        choices=["wait-api", "preload-world", "verify-runtime", "set-route-and-engage", "verify-motion"],
+        choices=["verify-runtime", "set-route-and-engage", "verify-motion"],
     )
     args = parser.parse_args()
 
     commands = {
-        "wait-api": wait_api,
-        "preload-world": preload_world,
         "verify-runtime": verify_runtime,
         "set-route-and-engage": set_route_and_engage,
         "verify-motion": verify_motion,

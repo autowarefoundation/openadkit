@@ -1,0 +1,121 @@
+# Scenario simulation — extends the deployment base with the scenario_simulator
+# runner and the param-file mounts the scenario stack needs.
+include:
+  - ../base/docker-compose.yaml
+
+services:
+  # Overrides on base services (merged onto the base definitions).
+  system:
+    volumes:
+      - ./config/mrm_handler.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro
+
+  api:
+    volumes:
+      - ./config/default_adapi.param.yaml:/opt/autoware/autoware_default_adapi_universe/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro
+
+  # Scenario-only service.
+  scenario_simulator:
+    image: ${SCENARIO_SIMULATOR_IMAGE:-ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime@sha256:80dc759586c0aa55b5c49b120635b9bda8d52ae4fe3ad96478dd0f5a5bfec5ad}
+    container_name: autoware-scenario-simulator
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../base/runtime.env
+    environment:
+      # Passed as runtime environment data (not interpolated into the command
+      # program) so shell metacharacters in a value cannot alter the script.
+      - SCENARIO_READY_TIMEOUT=${SCENARIO_READY_TIMEOUT:-300}
+      - SCENARIO=${SCENARIO}
+      - ARCHITECTURE_TYPE=${ARCHITECTURE_TYPE}
+      - GLOBAL_FRAME_RATE=${GLOBAL_FRAME_RATE}
+      - GLOBAL_TIMEOUT=${GLOBAL_TIMEOUT}
+      - INITIALIZE_DURATION=${INITIALIZE_DURATION}
+      - LAUNCH_AUTOWARE=${LAUNCH_AUTOWARE}
+      - LAUNCH_RVIZ=${LAUNCH_RVIZ}
+      - LAUNCH_VISUALIZATION=${LAUNCH_VISUALIZATION}
+      - OUTPUT_DIRECTORY=${OUTPUT_DIRECTORY}
+      - SCENARIO_SIMULATOR_PORT=${SCENARIO_SIMULATOR_PORT}
+      - RECORD=${RECORD}
+      - SENSOR_MODEL=${SENSOR_MODEL}
+      - USE_CUSTOM_CENTERLINE=${USE_CUSTOM_CENTERLINE}
+      - USE_SIM_TIME=${USE_SIM_TIME}
+      - VEHICLE_MODEL=${VEHICLE_MODEL}
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${OUTPUT_HOST_PATH}:${OUTPUT_DIRECTORY}
+      - ${SCENARIO_HOST_DIR}:/scenarios:ro
+      - ${MAP_PATH}:/autoware_map:ro
+    depends_on:
+      - api
+      - control
+      - map
+      - planning
+      - simulator
+      - system
+      - vehicle
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        ready_timeout="$$SCENARIO_READY_TIMEOUT"
+        case "$$ready_timeout" in
+          ''|*[!0-9]*)
+            echo "ERROR: SCENARIO_READY_TIMEOUT must be a non-negative integer." >&2
+            exit 1
+            ;;
+        esac
+        deadline=$$(( $$(date +%s) + $$ready_timeout ))
+
+        wait_for_topic() {
+          name="$$1"
+          echo "Waiting for ROS topic $$name..."
+          until timeout 5 ros2 topic list 2>/dev/null | grep -Fxq "$$name"; do
+            if [ "$$(date +%s)" -ge "$$deadline" ]; then
+              echo "ERROR: Timed out waiting for ROS topic $$name." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+        }
+
+        wait_for_service() {
+          name="$$1"
+          echo "Waiting for ROS service $$name..."
+          until timeout 5 ros2 service list 2>/dev/null | grep -Fxq "$$name"; do
+            if [ "$$(date +%s)" -ge "$$deadline" ]; then
+              echo "ERROR: Timed out waiting for ROS service $$name." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+        }
+
+        wait_for_topic /map/pointcloud_map
+        wait_for_topic /api/autoware/get/engage
+        wait_for_service /api/autoware/set/engage
+        wait_for_service /api/operation_mode/change_to_autonomous
+
+        set -- "$$SCENARIO"
+        if [ -z "$1" ]; then
+          set -- "$(ros2 pkg prefix --share scenario_test_runner)/scenario/sample.yaml"
+        fi
+        exec ros2 launch scenario_test_runner scenario_test_runner.launch.py \
+          architecture_type:="$$ARCHITECTURE_TYPE" \
+          global_frame_rate:="$$GLOBAL_FRAME_RATE" \
+          global_timeout:="$$GLOBAL_TIMEOUT" \
+          initialize_duration:="$$INITIALIZE_DURATION" \
+          launch_autoware:="$$LAUNCH_AUTOWARE" \
+          launch_rviz:="$$LAUNCH_RVIZ" \
+          launch_visualization:="$$LAUNCH_VISUALIZATION" \
+          output_directory:="$$OUTPUT_DIRECTORY" \
+          port:="$$SCENARIO_SIMULATOR_PORT" \
+          record:="$$RECORD" \
+          scenario:="$1" \
+          sensor_model:="$$SENSOR_MODEL" \
+          use_custom_centerline:="$$USE_CUSTOM_CENTERLINE" \
+          use_sim_time:="$$USE_SIM_TIME" \
+          vehicle_model:="$$VEHICLE_MODEL"
+    restart: "no"

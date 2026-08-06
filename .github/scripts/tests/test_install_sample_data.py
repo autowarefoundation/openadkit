@@ -187,5 +187,5 @@ def test_carla_sample_data_is_unsupported(tmp_path):
     )
 
     assert result.returncode != 0
-    assert "deployments/samples/carla-simulation/start-carla-e2e-demo.sh" in result.stdout
+    assert "deployments/carla-simulation/start-carla-e2e-demo.sh" in result.stdout
     assert not (tmp_path / "maps").exists()

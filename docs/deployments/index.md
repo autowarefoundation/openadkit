@@ -2,12 +2,11 @@
 
 A **deployment** is a running instance of Open AD Kit, a specific combination of Autoware components configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
 
-Planning and logging Compose assets live under `deployments/<name>/` in the
-repository. The remaining deployments retain their `samples/` or `demos/`
-paths until their runtime migration lands.
+Runnable Compose assets live under `deployments/<name>/` in the repository.
+Each directory has a short README that points here for the full guide.
 
-Planning and logging include `deployments/base/` (`docker-compose.yaml` plus
-`runtime.env` for container ROS/DDS) and each has one complete `config.env`:
+Shared base: `deployments/base/` (`docker-compose.yaml` + `runtime.env` for
+container ROS/DDS). Each deployment has one complete `config.env`:
 
 ```bash
 docker compose --env-file config.env up -d
@@ -23,13 +22,13 @@ Fetch maps/rosbags with `./install.sh sample-data <name>` (see
 
 Recommended for **learning and development**.
 
-- [CARLA Simulation](samples/carla-simulation/index.md) — `deployments/samples/carla-simulation/`
+- [CARLA Simulation](samples/carla-simulation/index.md) — `deployments/carla-simulation/`
 - [Planning Simulation](samples/planning-simulation/index.md) — `deployments/planning-simulation/`
-- [Scenario Simulation](samples/scenario-simulation/index.md) — `deployments/samples/scenario-simulation/`
+- [Scenario Simulation](samples/scenario-simulation/index.md) — `deployments/scenario-simulation/`
 - [Logging Simulation](samples/logging-simulation/index.md) — `deployments/logging-simulation/`
 
 ## Demos
 
 Use-case specific topologies.
 
-- [Zenoh Bridge](demos/zenoh-bridge/index.md) — `deployments/demos/zenoh-bridge/` (edge/cloud remote viz + teleop)
+- [Zenoh Bridge](demos/zenoh-bridge/index.md) — `deployments/zenoh-bridge/` (edge/cloud remote viz + teleop)

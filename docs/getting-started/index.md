@@ -46,10 +46,10 @@
 
     ```bash
     ./install.sh sample-data planning-simulation
-    # or: logging-simulation | scenario-simulation | all
+    # or: logging-simulation | scenario-simulation | zenoh-bridge | all
     ```
 
-    > CARLA maps are fetched by `deployments/samples/carla-simulation/start-carla-e2e-demo.sh`, not `sample-data`.
+    > CARLA maps are fetched by `deployments/carla-simulation/start-carla-e2e-demo.sh`, not `sample-data`.
 
 ## Next Steps
 

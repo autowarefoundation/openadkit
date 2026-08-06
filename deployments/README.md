@@ -1,11 +1,26 @@
 # Open AD Kit Deployments
 
-This directory contains deployment configurations for **Open AD Kit**. Each folder contains a README file with detailed instructions on how to deploy the deployment configuration.
+This directory contains deployment configurations for Open AD Kit.
 
-- **Sample deployment** configurations for development and testing.
-  - [CARLA Simulation](./samples/carla-simulation): Simple Open AD Kit deployment that demonstrates the open-source planning stack with CARLA as an external simulator.
-  - [Planning Simulation](./samples/planning-simulation): Simple Open AD Kit deployment that demonstrates the autoware **planning features** with planning simulation.
-  - [Scenario Simulation](./samples/scenario-simulation): Simple Open AD Kit deployment that demonstrates **scenario-based validation** with the TIER IV Scenario Simulator.
-  - [Logging Simulation](./samples/logging-simulation): Simple Open AD Kit deployment that demonstrates the autoware **end-to-end functionality** with sensor simulation using rosbag.
-- **Demo deployment** configurations with specific use case scenarios.
-  - [Zenoh Bridge](./demos/zenoh-bridge): A demo of remote visualization with Zenoh bridge. See the [Zenoh Bridge documentation](../docs/deployments/demos/zenoh-bridge/index.md) for more details.
+## Quick Links
+
+For **complete documentation**, operational steps, and troubleshooting, see the [Open AD Kit Documentation Site](https://autowarefoundation.github.io/openadkit/deployments/).
+
+## Available Deployments
+
+- [Planning Simulation](./planning-simulation) — Planning stack with a sample map
+- [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
+- [Scenario Simulation](./samples/scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
+- [CARLA Simulation](./samples/carla-simulation) — Closed-loop planning with CARLA as an external simulator (experimental, amd64 + GPU)
+- [Zenoh Bridge](./demos/zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
+
+## Directory Layout
+
+```text
+deployments/
+├── base/                     # shared Compose + container runtime.env
+├── planning-simulation/      # complete deployment config.env
+├── logging-simulation/       # complete deployment config.env
+├── samples/                  # scenario and CARLA deployments
+└── demos/                    # Zenoh bridge deployment
+```

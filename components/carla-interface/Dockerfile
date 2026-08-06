@@ -4,7 +4,7 @@ FROM ${SIMULATOR_IMAGE} AS carla-interface
 ARG ROS_DISTRO=humble
 ARG CARLA_PYTHON_VERSION=0.9.16
 
-ENV DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \

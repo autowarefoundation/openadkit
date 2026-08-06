@@ -38,6 +38,9 @@ content:
       path: /etc/systemd/system/awf-oak-map.service
     - source_path: ../components/scripts/awf-oak-extract-map.sh
       path: /usr/local/libexec/awf-oak-extract-map.sh
+    # awf oak shared environment (single source of truth for ROS_DOMAIN_ID, ...)
+    - source_path: ../components/container-files/awf-oak.env
+      path: /etc/containers/systemd/awf-oak.env
     # awf oak pod
     - source_path: ../components/container-files/awf-oak.pod
       path: /etc/containers/systemd/awf-oak.pod

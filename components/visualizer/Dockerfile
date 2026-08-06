@@ -51,23 +51,25 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 FROM ${UNIVERSE_COMMON_IMAGE} AS visualizer
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
-ARG TARGETARCH
 
 USER root
-COPY --from=visualizer-devel /opt/autoware /opt/autoware
-RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
+RUN --mount=from=visualizer-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    cp -a /mnt/autoware/. /opt/autoware/ && \
+    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
+    bash /tmp/runtime-cleanup.sh opt
 
-COPY --parents --chown=${USERNAME}:${USERNAME} \
-    autoware/src/**/package.xml \
-    /tmp/
-
-RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/*
+    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
+    rosdep install -y --from-paths /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-cleanup.sh
 
 # Install VNC / NoVNC / Openbox stack and simulation tooling.
 USER root
@@ -77,6 +79,7 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     apt-get install -y --no-install-recommends \
       curl \
       unzip \
+      openssl \
       openbox \
       tigervnc-standalone-server \
       tigervnc-common \
@@ -88,27 +91,41 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       pipx && \
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install yamale && \
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema && \
-    curl -fsSL -o /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/3.1.2/virtualgl_3.1.2_${TARGETARCH}.deb" && \
+    VIRTUALGL_VERSION=3.1.2 && \
+    arch="$(dpkg --print-architecture)" && \
+    case "${arch}" in \
+      amd64) virtualgl_sha256=b0e989ac4c59b82b2198dea90856a8fb6c41bedff4c792b37fcd259dce958bc8 ;; \
+      arm64) virtualgl_sha256=f189dcfaf64816e092b4d8560df17dbdfdc6ae7d598963f9c4b2d6b8bd363905 ;; \
+      *) echo "Unsupported architecture for VirtualGL: ${arch}" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL -o /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/${VIRTUALGL_VERSION}/virtualgl_${VIRTUALGL_VERSION}_${arch}.deb" && \
+    echo "${virtualgl_sha256}  /tmp/virtualgl.deb" | sha256sum -c - && \
     apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
     rm -f /tmp/virtualgl.deb
 
-# Create SSL certificate for NoVNC.
-RUN openssl req -x509 -nodes -newkey rsa:2048 \
-    -keyout /etc/ssl/private/novnc.key \
-    -out /etc/ssl/certs/novnc.crt \
-    -days 365 \
-    -subj "/O=Autoware-OpenADKit/CN=localhost"
+# Need to expose the NoVNC port when running the container.
+# Port 5999 (TigerVNC) is intentionally loopback-only and not published.
+EXPOSE 6080
 
-# Need to expose VNC and NoVNC ports when running the container.
-EXPOSE 5900 6080
-
-# Add source commands to bash startup.
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc && \
-    echo "source /opt/autoware/setup.bash" >> /root/.bashrc
+# Prepare the unprivileged runtime home and shell setup.
+RUN install -d -o aw -g aw \
+      /home/aw/.config/openbox \
+      /home/aw/.local/bin \
+      /home/aw/.vnc && \
+    touch /home/aw/.bashrc /home/aw/.config/openbox/autostart && \
+    echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/aw/.bashrc && \
+    echo "source /opt/autoware/setup.bash" >> /home/aw/.bashrc && \
+    chown -R aw:aw /home/aw
 
 # Copy startup scripts.
-COPY components/visualizer/etc/xstartup /root/.vnc/xstartup
+COPY --chown=aw:aw components/visualizer/etc/xstartup /home/aw/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
-RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /root/.vnc/xstartup
+RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
 
+# In remote mode, report unhealthy if noVNC (6080) or VNC (5999) stops accepting
+# connections. Local mode has no endpoints; PID 1 exits if its command fails.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD bash -c 'if [ "${REMOTE_DISPLAY:-true}" = false ]; then exit 0; fi; exec 3<>/dev/tcp/127.0.0.1/6080 && exec 4<>/dev/tcp/127.0.0.1/5999'
+
+USER aw
 ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]

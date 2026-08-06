@@ -9,10 +9,10 @@ For **complete documentation**, operational steps, and troubleshooting, see the 
 ## Available Deployments
 
 - [Planning Simulation](./planning-simulation) — Planning stack with a sample map
+- [Scenario Simulation](./scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
-- [Scenario Simulation](./samples/scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
-- [CARLA Simulation](./samples/carla-simulation) — Closed-loop planning with CARLA as an external simulator (experimental, amd64 + GPU)
-- [Zenoh Bridge](./demos/zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
+- [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA as an external simulator (experimental, amd64 + GPU)
+- [Zenoh Bridge](./zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
 
 ## Directory Layout
 
@@ -20,7 +20,8 @@ For **complete documentation**, operational steps, and troubleshooting, see the 
 deployments/
 ├── base/                     # shared Compose + container runtime.env
 ├── planning-simulation/      # complete deployment config.env
+├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env
-├── samples/                  # scenario and CARLA deployments
-└── demos/                    # Zenoh bridge deployment
+├── carla-simulation/         # config.env + asset/start helper
+└── zenoh-bridge/
 ```

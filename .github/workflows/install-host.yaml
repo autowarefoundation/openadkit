@@ -54,8 +54,8 @@ jobs:
             )
           }
           validate deployments/planning-simulation --env-file config.env
+          validate deployments/scenario-simulation --env-file config.env
           validate deployments/logging-simulation --env-file config.env
           validate deployments/logging-simulation --env-file config.env -f docker-compose.yaml -f docker-compose.gpu.yaml
-          validate deployments/samples/scenario-simulation --env-file scenario-simulation.env
-          validate deployments/samples/carla-simulation --env-file carla-simulation.e2e.env
-          validate deployments/demos/zenoh-bridge
+          validate deployments/carla-simulation --env-file config.env
+          validate deployments/zenoh-bridge --env-file .env.example

@@ -1,33 +1,54 @@
-# Autoware Open AD Kit Scenario Simulation
+# Scenario Simulation
 
-This sample deployment demonstrates the Open AD Kit scenario simulation workflow with the official [TIER IV Scenario Simulator container](https://github.com/tier4/scenario_simulator_v2/pkgs/container/scenario_simulator_v2).
+Runs Autoware components with the [TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2).
+Checkout assets live under `deployments/scenario-simulation/`.
 
-## Source of Truth
+## Prerequisites
 
-The complete operational instructions for this deployment live alongside the deployment assets in `deployments/samples/scenario-simulation/README.md`.
-
-## Quick Start
-
-From `deployments/samples/scenario-simulation/`:
+- Host setup via [`install.sh`](../../../getting-started/index.md)
+- Kashiwanoha map (do **not** use `sample-map-planning`):
 
 ```bash
-docker compose --env-file scenario-simulation.env up -d
+./install.sh sample-data scenario-simulation
 ```
 
-Open the visualizer at:
-
-```text
-http://localhost:6080/vnc.html
-```
-
-For remote servers, use `http://<server-ip>:6080/vnc.html` and allow inbound access to port `6080`.
-
-To stop the deployment:
+## Run
 
 ```bash
-docker compose --env-file scenario-simulation.env down
+cd deployments/scenario-simulation
+docker compose \
+  --env-file config.env \
+  up -d
 ```
 
-## Related Documentation
+Open `https://localhost:6080/vnc.html` (`REMOTE_PASSWORD` in `config.env`).
+The scenario runner waits up to `SCENARIO_READY_TIMEOUT` for Autoware readiness
+before launching the one-shot scenario.
 
-[Scenario test simulation](https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/)
+## Configuration
+
+Edit `config.env`:
+
+| Variable | Description |
+| --- | --- |
+| `SCENARIO` | Scenario path inside the container (empty = bundled sample) |
+| `SCENARIO_HOST_DIR` | Host dir mounted at `/scenarios` |
+| `OUTPUT_HOST_PATH` | Host dir for results |
+| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image |
+| `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware readiness |
+| `MAP_PATH` | Host map directory (must match the scenario map) |
+
+Custom scenarios must use the Kashiwanoha map unless you also change `MAP_PATH`
+and map filenames consistently.
+
+## Stop
+
+```bash
+cd deployments/scenario-simulation
+docker compose \
+  --env-file config.env \
+  down
+```
+
+See also [Scenario test simulation](https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/)
+in the Autoware documentation.

@@ -6,7 +6,7 @@
 - NVIDIA Container Toolkit (Optional but highly recommended for sensing and perception tasks)
 - Autoware artifacts (Optional in general, but required for sensing and perception deployments such as Logging Simulation)
 
-    > All the above requirements can be installed by running the **setup.sh** script.
+    > All the above requirements can be installed by running the **install.sh** script.
 
 ## Installation
 
@@ -17,10 +17,16 @@
     cd openadkit
     ```
 
-2. Setup the runtime environment by running the `setup.sh` script located at the root of the repository. This requires sudo privileges (skip if you already have the environment setup on your platform):
+2. Set up the runtime environment by running the `install.sh` script located at the root of the repository. This requires sudo privileges (skip if you already have the environment set up on your platform):
 
     ```bash
-    sudo ./setup.sh
+    sudo ./install.sh
+    ```
+
+    Start a new shell with the Docker group before running Docker without sudo:
+
+    ```bash
+    newgrp docker
     ```
 
     > You can use the `--no-nvidia` flag to skip the installation of the NVIDIA Container Toolkit if you don't have a **NVIDIA GPU**. Otherwise, it's **highly recommended** to install it to utilize CUDA for better performance for sensing and perception tasks.
@@ -28,10 +34,22 @@
 3. Download the Autoware artifacts by running the following command, requires sudo privileges:
 
     ```bash
-    sudo ./setup.sh --download-artifacts
+    sudo ./install.sh --download-artifacts
     ```
 
-    > This step is required for deployments that mount `${HOME}/autoware_data`, including the Logging Simulation sample.
+    > This still runs host Docker setup (idempotent if Docker is already
+    > installed). It is **not** a data-only mode like the old `setup.sh
+    > --download-artifacts`. Required for deployments that mount
+    > `${HOME}/autoware_data`, including Logging Simulation.
+
+4. Download sample maps/rosbags for the deployment you want to run (no sudo):
+
+    ```bash
+    ./install.sh sample-data planning-simulation
+    # or: logging-simulation | scenario-simulation | all
+    ```
+
+    > CARLA maps are fetched by `deployments/samples/carla-simulation/start-carla-e2e-demo.sh`, not `sample-data`.
 
 ## Next Steps
 

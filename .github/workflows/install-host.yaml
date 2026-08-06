@@ -1,0 +1,61 @@
+name: install-host
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'deployments/**'
+      - '.github/scripts/tests/test_install_sample_data.py'
+      - '.github/workflows/install-host.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install-host:
+    name: install-host (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Test sample-data installer safety
+        run: |
+          python3 -m pip install --user pytest
+          python3 -m pytest .github/scripts/tests/test_install_sample_data.py
+
+      - name: Install host dependencies from official packages
+        # Force installation only on this disposable runner so the test cannot
+        # pass solely because GitHub's preinstalled Docker happens to work.
+        run: |
+          sudo env CI=true OPENADKIT_CI_FORCE_DOCKER_INSTALL=true \
+            ./install.sh --no-nvidia --verify
+
+      - name: Validate repository Compose configs
+        run: |
+          set -euo pipefail
+          export REMOTE_PASSWORD="ci-validate"
+          validate() {
+            local dir="$1"
+            shift
+            (
+              cd "${dir}"
+              docker compose "$@" config -q
+            )
+          }
+          validate deployments/planning-simulation --env-file config.env
+          validate deployments/logging-simulation --env-file config.env
+          validate deployments/logging-simulation --env-file config.env -f docker-compose.yaml -f docker-compose.gpu.yaml
+          validate deployments/samples/scenario-simulation --env-file scenario-simulation.env
+          validate deployments/samples/carla-simulation --env-file carla-simulation.e2e.env
+          validate deployments/demos/zenoh-bridge

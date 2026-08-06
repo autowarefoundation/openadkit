@@ -1,0 +1,30 @@
+services:
+  sensing:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  perception:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE}
+    command: >
+      ros2 launch autoware_launch tier4_perception_component.launch.xml
+      data_path:=/autoware_data
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
+      lidar_detection_model:=centerpoint
+      occupancy_grid_map_method:=pointcloud_based
+      perception_mode:=${PERCEPTION_MODE}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_traffic_light_recognition:=${USE_TRAFFIC_LIGHT_RECOGNITION}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,5 @@
+# Planning simulation — runs the Autoware planning/control stack against a
+# pre-recorded map in the built-in simulator. This sample is exactly the
+# deployment base, so it adds no services of its own.
+include:
+  - ../base/docker-compose.yaml

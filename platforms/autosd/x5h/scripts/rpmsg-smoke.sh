@@ -1,7 +1,14 @@
 #!/bin/sh
 # RPMsg dual-boot smoke for the X5H CR52 (runs unchanged on BSP Yocto and
-# AutoSD): load firmware via remoteproc, verify the RPMsg service comes up,
-# run payload-verified echo round-trips, stop, repeat.
+# AutoSD): bring up the RPMsg vdev via remoteproc, verify the service comes
+# up, run verified round-trips, stop.
+#
+# The CR52 firmware is NOT loaded by this script, and not by Linux at all:
+# rcar_gen5_rproc's .load and .stop are both no-ops, so the realtime core runs
+# whatever was flashed into its slot and is already live before Linux boots.
+# `start` only parses the resource table out of the ELF, publishes the vrings
+# and rings the MFIS doorbell. The ELF in /lib/firmware must therefore still
+# match the flashed image, or the vring layout will not agree.
 #
 # Markers on stdout (grep-able, one per line):
 #   RPMSG_SMOKE_PASS cycles=<c> msgs=<n>
@@ -14,7 +21,12 @@ set -u
 FW=rpmsg-echo-cr52.elf
 SERVICE=rpmsg-client-sample
 MSGS=100
-CYCLES=3
+# One session per boot: the CR52 firmware creates and announces its endpoint
+# exactly once, so after a stop/start the channel never reappears and cycle 2
+# would fail on service_timeout no matter how long it waited. Board-confirmed
+# 2026-08-06. More cycles need a hardware reset between them, so -c >1 is
+# opt-in and only meaningful for a firmware that re-announces.
+CYCLES=1
 CHECK=0
 
 while [ $# -gt 0 ]; do

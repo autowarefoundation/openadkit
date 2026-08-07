@@ -1,13 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 /*
- * rpmsg-ping: RPMsg echo round-trip tester over the rpmsg_char uAPI.
+ * rpmsg-ping: RPMsg round-trip tester over the rpmsg_char uAPI.
  *
  * Scans /sys/bus/rpmsg/devices for the device whose `name` matches -s,
  * reads its announced `dst` address, creates a char endpoint through
- * /dev/rpmsg_ctrl*, then write()s sequenced payloads and verifies each
- * echo's leading bytes match what was sent (a prefix compare, not a
- * full-length match). Static-linked so the same binary runs on both the
- * BSP Yocto rootfs and the AutoSD NFS rootfs.
+ * /dev/rpmsg_ctrl*, then write()s sequenced payloads and checks the reply
+ * to each one. Static-linked so the same binary runs on both the BSP Yocto
+ * rootfs and the AutoSD NFS rootfs.
+ *
+ * Two remote protocols exist, so the reply check has two modes:
+ *
+ *   responder (default) -- the remote answers every request with the same
+ *       constant string. This is what the vendor CR52 firmware does: it
+ *       logs "Incoming msg: <our payload>" on its own console and replies
+ *       "Hello world from CR52/Free-RTOS!". Verified per request: a reply
+ *       arrives, is non-empty, and is byte-identical to the first one, so
+ *       a corrupted or mis-sequenced vring still fails the run.
+ *
+ *   echo (-e) -- the remote returns the request verbatim; each reply's
+ *       leading bytes must match what was sent (a prefix compare, not a
+ *       full-length match).
  *
  * Exit 0 + "RPMSG_PING_PASS n=<count>" on success; exit 1 + a
  * "RPMSG_PING_FAIL reason=..." line on any failure.
@@ -111,22 +123,24 @@ static int open_ctrl(void)
 int main(int argc, char **argv)
 {
 	const char *service = NULL;
-	int count = 100, timeout_s = 5, opt, i;
+	int count = 100, timeout_s = 5, opt, i, echo_mode = 0;
 	uint32_t dst = 0;
 	uint64_t before, after;
-	char devpath[64], tx[128], rx[128];
+	char devpath[64], tx[128], rx[128], first_rx[128];
+	ssize_t first_len = -1;
 	int ctrl, ept = -1;
 	struct rpmsg_endpoint_info info;
 
-	while ((opt = getopt(argc, argv, "s:n:t:")) != -1) {
+	while ((opt = getopt(argc, argv, "s:n:t:e")) != -1) {
 		switch (opt) {
 		case 's': service = optarg; break;
 		case 'n': count = atoi(optarg); break;
 		case 't': timeout_s = atoi(optarg); break;
+		case 'e': echo_mode = 1; break;
 		default:
 			printf("RPMSG_PING_FAIL reason=bad_args\n");
 			fprintf(stderr,
-				"usage: %s -s <service> [-n count] [-t timeout_s]\n",
+				"usage: %s -s <service> [-n count] [-t timeout_s] [-e]\n",
 				argv[0]);
 			return 1;
 		}
@@ -195,8 +209,24 @@ int main(int argc, char **argv)
 			       i, errno);
 			goto fail;
 		}
-		if (r < n + 1 || memcmp(tx, rx, (size_t)n + 1)) {
-			printf("RPMSG_PING_FAIL reason=payload_mismatch seq=%d len=%zd rx='%.*s'\n",
+		if (r == 0) {
+			printf("RPMSG_PING_FAIL reason=empty_reply seq=%d\n", i);
+			goto fail;
+		}
+		if (echo_mode) {
+			if (r < n + 1 || memcmp(tx, rx, (size_t)n + 1)) {
+				printf("RPMSG_PING_FAIL reason=payload_mismatch seq=%d len=%zd rx='%.*s'\n",
+				       i, r, (int)r, rx);
+				goto fail;
+			}
+		} else if (first_len < 0) {
+			first_len = r;
+			memcpy(first_rx, rx, (size_t)r);
+		} else if (r != first_len || memcmp(rx, first_rx, (size_t)r)) {
+			/* A responder firmware answers every request with the same
+			 * constant. Drift means a corrupted or mis-sequenced vring,
+			 * which a mere "something came back" check would not catch. */
+			printf("RPMSG_PING_FAIL reason=reply_drift seq=%d len=%zd rx='%.*s'\n",
 			       i, r, (int)r, rx);
 			goto fail;
 		}
@@ -204,7 +234,13 @@ int main(int argc, char **argv)
 	ioctl(ept, RPMSG_DESTROY_EPT_IOCTL);
 	close(ept);
 	close(ctrl);
-	printf("RPMSG_PING_PASS n=%d service=%s dst=0x%x\n", count, service, dst);
+	if (echo_mode)
+		printf("RPMSG_PING_PASS n=%d service=%s dst=0x%x mode=echo\n",
+		       count, service, dst);
+	else
+		printf("RPMSG_PING_PASS n=%d service=%s dst=0x%x mode=responder reply='%.*s'\n",
+		       count, service, dst,
+		       (int)strnlen(first_rx, (size_t)first_len), first_rx);
 	return 0;
 fail:
 	if (ept >= 0) {

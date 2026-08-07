@@ -23,6 +23,7 @@ This folder contains a per use-case structure on how to deploy/run Open AD Kit i
 Build and running instructions in this page applies to any user-case/sub folder.
 
 * [planning-simulator](./planning-simulator/README.md): Run planning and simulator services in containers (pre-built)
+* [x5h](./x5h/README.md): AutoSD on the R-Car X5H board (BSP kernel + AutoSD userspace), validated by a QEMU gate before board bring-up
 
 ## General Instructions
 

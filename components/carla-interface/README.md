@@ -10,7 +10,7 @@ The image has no default launch command. Start the CARLA deployment with:
 ./openadkit run carla-simulation --gpu
 ```
 
-Guide: [CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/samples/carla-simulation/)
+Guide: [CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/)
 
 The image is built by GitHub Actions as part of the component pipeline from `components/docker-bake.hcl`.
 

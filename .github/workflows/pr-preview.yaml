@@ -1,0 +1,54 @@
+name: pr-preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - mkdocs.yaml
+      - openadkit
+      - "openadkit.d/**"
+      - docs/macros.py
+      - .github/image-inventory.json
+      - docs/requirements.txt
+      - "docs/scripts/**"
+      - "**/*.md"
+      - "**/*.svg"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "docs/assets/**"
+      - "docs/overrides/**"
+      - "**/*.pages"
+      - ".github/actions/build-docs/**"
+      - ".github/workflows/pr-preview.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Build docs
+        uses: ./.github/actions/build-docs
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr-preview-site
+          path: site
+          retention-days: 1

@@ -89,6 +89,7 @@ if [ "$CMD" == "up" ]; then
     for map_file in lanelet2_map.osm pointcloud_map.pcd; do
         if [ ! -f "${MAP_DIR}/${map_file}" ]; then
             echo -e "${RED}[Error]${NC} Map file ${map_file} not found in ${MAP_DIR}."
+<<<<<<< HEAD
             echo -e "       From the repository root, run: ./openadkit fetch scenario-simulation"
             exit 1
         fi

@@ -1,12 +1,11 @@
 # Zenoh Bridge
 
-Edge/cloud bridge for remote visualization and teleoperation.
+Bridges Autoware data from edge to cloud for remote visualization and control.
+See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)
+for topology, configuration, and teleoperation.
 
-**Guide (source of truth):**
-[Zenoh Bridge docs](https://autowarefoundation.github.io/openadkit/deployments/demos/zenoh-bridge/)
-
-This standalone demo is not in the CLI inventory. Fetch the shared
-Kashiwanoha map, then start the helpers:
+From the source root, prepare the Kashiwanoha map, then start the standalone
+helpers:
 
 ```bash
 cd ../..
@@ -19,3 +18,5 @@ cd deployments/zenoh-bridge
 Visualizer: `https://localhost:6081/vnc.html`
 
 Zenoh transport stays inside the Compose project and is not published to the host.
+This deployment is not included in the unified release bundle or
+manifest-driven CLI.

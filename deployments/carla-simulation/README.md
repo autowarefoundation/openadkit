@@ -1,7 +1,7 @@
 # CARLA Simulation
 
 Closed-loop Autoware against CARLA 0.9.16. Humble, amd64, and an NVIDIA GPU
-are required.
+are required. See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/).
 
 ```bash
 ./openadkit setup --gpu --verify

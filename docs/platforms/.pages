@@ -1,4 +1,5 @@
 nav:
   - index.md
-  - autosd
-  - ewaol
+  - AutoSD: autosd
+  - EWAOL: ewaol
+  - Hardware: hardware

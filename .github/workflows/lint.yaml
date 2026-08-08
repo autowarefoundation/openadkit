@@ -33,7 +33,16 @@ on:
       - 'platforms/**/*.yml'
       - 'components/**/*.hcl'
       - '.hadolint.yaml'
+      - '.markdownlint.yaml'
       - '.yamllint.yaml'
+      - 'mkdocs.yaml'
+      - 'docs/Makefile'
+      - 'docs/macros.py'
+      - 'docs/requirements.txt'
+      - 'docs/assets/**'
+      - 'docs/overrides/**'
+      - 'docs/**/*.yaml'
+      - 'docs/**/*.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -79,7 +88,12 @@ jobs:
             .github/stale.yml \
             .github/sync-files.yaml \
             deployments/ \
-            platforms/
+            platforms/ \
+            mkdocs.yaml \
+            docs/
+
+      - name: Run markdownlint
+        run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'
 
       - name: Install Docker Compose v5.2+
         # The ubuntu-latest runner ships an older compose plugin that rejects
@@ -137,6 +151,11 @@ jobs:
           docker buildx bake -f components/docker-bake.hcl --print universe-common-devel \
             > /dev/null
           exit "${fail}"
+
+      - name: Smoke-test Dockerized docs build
+        run: |
+          make -C docs build
+          test -f site/index.html
 
       - name: Run Python tests
         run: pytest .github/scripts/

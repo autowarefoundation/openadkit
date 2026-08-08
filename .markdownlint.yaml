@@ -1,0 +1,9 @@
+# markdownlint config, used by the markdownlint job in .github/workflows/lint.yaml.
+# Defaults apply except for style rules that conflict with this repo's
+# MkDocs Material conventions.
+default: true
+MD013: false # line-length: prose lines are not hard-wrapped in this repo
+MD033: false # inline HTML is used by MkDocs Material (icons, grids, buttons)
+MD041: false # pages may start with front matter, snippets, or images
+MD046: false # indented blocks inside admonitions trip the code-block style check
+MD060: false # compact table separators (|---|---|) are the established style here

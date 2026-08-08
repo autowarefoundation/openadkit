@@ -6,7 +6,12 @@ on:
       - main
     paths:
       - mkdocs.yaml
+      - openadkit
+      - "openadkit.d/**"
+      - docs/macros.py
+      - .github/image-inventory.json
       - docs/requirements.txt
+      - "docs/scripts/**"
       - "**/*.md"
       - "**/*.svg"
       - "**/*.png"
@@ -14,66 +19,74 @@ on:
       - "docs/.pages"
       - "docs/**/.pages"
       - "docs/assets/**"
+      - "docs/overrides/**"
+      - "**/*.pages"
+      - ".github/actions/build-docs/**"
+      - ".github/workflows/deploy-docs.yaml"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        required: true
+        type: string
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# All triggers deploy the same production site, so serialize them globally.
 concurrency:
-  group: "pages-${{ github.ref }}"
+  group: pages
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0
+          # Release calls supply their exact tag; manual runs always use main.
+          # Pushes already check out the triggering main commit by default.
+          ref: ${{ inputs.source_ref || (github.event_name == 'workflow_dispatch' && github.event.repository.default_branch) || '' }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Build docs
+        uses: ./.github/actions/build-docs
+
+      - name: Upload production site
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          python-version: '3.11'
+          name: production-docs-site
+          path: site
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Install dependencies
-        run: pip install -r docs/requirements.txt
-
-      - name: Build with MkDocs
-        run: mkdocs build --clean --verbose
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: docs-site
-          path: ./site
-
-  # Deploy to main GitHub Pages
-  deploy-main:
+  deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout deployment repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          name: docs-site
-          path: ./site
+          persist-credentials: false
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Download production site
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          path: ./site
+          name: production-docs-site
+          path: site
 
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
+        with:
+          folder: site
+          branch: gh-pages
+          # PR previews (pr-preview.yaml) live on the same branch; don't wipe them.
+          clean-exclude: pr-preview
+          force: false

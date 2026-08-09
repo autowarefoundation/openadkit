@@ -7,6 +7,26 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${script_dir}/release_tag.sh"
 
 readonly RELEASE_WORKFLOW_MARKER='<!-- openadkit-release-workflow:v1 -->'
+plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
+jq -e '
+  .schemaVersion == 1 and
+  (.release.version | type == "string") and
+  (.release.releaseSha | test("^[0-9a-f]{40}$")) and
+  (.release.stable | type == "boolean") and
+  (.release.publishLatestAliases | type == "boolean") and
+  (.githubAssets | type == "array" and length > 0) and
+  ([.githubAssets[].name] | length == (unique | length)) and
+  all(.githubAssets[];
+    (.name | test("^[A-Za-z0-9._-]+$")) and
+    (.path | type == "string" and length > 0) and
+    (.path | startswith("/") | not) and
+    (.path | split("/") | all(. != ".." and . != ""))
+  )
+' "${plan_file}" >/dev/null
+VERSION=$(jq -r '.release.version' "${plan_file}")
+RELEASE_SHA=$(jq -r '.release.releaseSha' "${plan_file}")
+STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")
+PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
 
 project_release() {
   jq -c '{
@@ -59,17 +79,13 @@ verify_owned_draft() {
 
 write_expected_asset_manifest() {
   {
-    for asset in \
-      release-metadata.json \
-      release-input/build/autoware-lock.repos \
-      release-input/build/upstream-images.json \
-      dist/*.tar.gz; do
-      [ -f "${asset}" ] || {
-        echo "Expected release asset is missing: ${asset}" >&2
+    while IFS=$'\t' read -r path name; do
+      [ -f "${path}" ] || {
+        echo "Expected release asset is missing: ${path}" >&2
         return 1
       }
-      printf '%s  %s\n' "$(sha256sum "${asset}" | cut -d ' ' -f1)" "$(basename "${asset}")"
-    done
+      printf '%s  %s\n' "$(sha256sum "${path}" | cut -d ' ' -f1)" "${name}"
+    done < <(jq -r '.githubAssets[] | [.path, .name] | @tsv' "${plan_file}")
   } | sort -k2,2 > release-assets.sha256
 }
 
@@ -147,6 +163,7 @@ fetch_release_by_tag() {
 verify_published_release() {
   local state="$1"
   local prerelease expected_assets existing_assets existing_dir release_id refreshed
+  local -a download_args
   prerelease=$(expected_prerelease)
   release_id=$(jq -r '.id' <<<"${state}")
   jq -e \
@@ -166,42 +183,33 @@ verify_published_release() {
   refreshed=$(fetch_release_by_id "${release_id}")
   cmp <(jq -S . <<<"${state}") <(jq -S . <<<"${refreshed}")
 
-  expected_assets=$(
-    {
-      printf '%s\n' release-metadata.json autoware-lock.repos upstream-images.json
-      for asset in dist/*.tar.gz; do
-        basename "${asset}"
-      done
-    } | sort
-  )
+  expected_assets=$(jq -r '.githubAssets[].name' "${plan_file}" | sort)
   existing_assets=$(jq -r '.assets[].name' <<<"${state}" | sort)
   diff -u <(printf '%s\n' "${expected_assets}") <(printf '%s\n' "${existing_assets}")
 
   existing_dir=$(mktemp -d)
-  gh release download "${VERSION}" \
-    --dir "${existing_dir}" \
-    --pattern release-metadata.json \
-    --pattern autoware-lock.repos \
-    --pattern upstream-images.json \
-    --pattern '*.tar.gz'
+  download_args=(release download "${VERSION}" --dir "${existing_dir}")
+  while IFS= read -r name; do
+    download_args+=(--pattern "${name}")
+  done < <(jq -r '.githubAssets[].name' "${plan_file}")
+  gh "${download_args[@]}"
   cmp <(jq -S . "${existing_dir}/release-metadata.json") <(jq -S . release-metadata.json)
-  for asset in release-input/build/autoware-lock.repos release-input/build/upstream-images.json dist/*.tar.gz; do
-    cmp "${asset}" "${existing_dir}/$(basename "${asset}")"
-  done
+  while IFS=$'\t' read -r path name; do
+    cmp "${path}" "${existing_dir}/${name}"
+  done < <(jq -r '.githubAssets[] | [.path, .name] | @tsv' "${plan_file}")
   rm -rf "${existing_dir}"
 }
 
 create_draft() {
   local state
+  local -a assets
+  mapfile -t assets < <(jq -r '.githubAssets[].path' "${plan_file}")
   gh release create "${VERSION}" \
     --target "${RELEASE_SHA}" \
     --title "${VERSION}" \
     --notes-file release-notes.md \
     --draft \
-    release-metadata.json \
-    release-input/build/autoware-lock.repos \
-    release-input/build/upstream-images.json \
-    dist/*.tar.gz >/dev/null
+    "${assets[@]}" >/dev/null
   state=$(fetch_release_by_tag) || return
   if [ -z "${state}" ] || ! verify_owned_draft "${state}"; then
     echo "Created draft release ${VERSION} could not be verified" >&2
@@ -272,15 +280,11 @@ publish_release() {
     -f make_latest="${make_latest}" >/dev/null
 }
 
-: "${VERSION:?VERSION is required}"
-: "${RELEASE_SHA:?RELEASE_SHA is required}"
-: "${STABLE_RELEASE:?STABLE_RELEASE is required}"
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
 case "${1:-}" in
   prepare) prepare_release ;;
   publish)
-    : "${PUBLISH_LATEST_ALIASES:?PUBLISH_LATEST_ALIASES is required}"
     publish_release
     ;;
   *)

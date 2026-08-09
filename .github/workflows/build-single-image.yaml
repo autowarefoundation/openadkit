@@ -23,6 +23,7 @@ on:
       - ".github/scripts/export_autoware_lock.py"
       - ".github/scripts/resolve_image_matrices.py"
       - ".github/scripts/resolve_build_inputs.sh"
+      - ".github/scripts/resolve_registry_contexts.sh"
       - ".github/scripts/registry_lookup.sh"
       - ".github/actions/free-disk-space/**"
       - ".github/actions/inject-ccache/**"
@@ -65,8 +66,11 @@ jobs:
       targets_json: ${{ steps.detect.outputs.targets_json }}
       setup_autoware: ${{ steps.detect.outputs.setup_autoware }}
       with_middleware: ${{ steps.detect.outputs.with_middleware }}
-      use_local_common: ${{ steps.detect.outputs.use_local_common }}
-      use_local_simulator: ${{ steps.detect.outputs.use_local_simulator }}
+      use_local_common: ${{ steps.contexts.outputs.use_local_common }}
+      use_local_simulator: ${{ steps.contexts.outputs.use_local_simulator }}
+      devel_context: ${{ steps.contexts.outputs.devel_context }}
+      runtime_context: ${{ steps.contexts.outputs.runtime_context }}
+      simulator_context: ${{ steps.contexts.outputs.simulator_context }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -145,6 +149,23 @@ jobs:
             <<< "${changed_files}" >> "${GITHUB_OUTPUT}"
         shell: bash
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Resolve registry contexts
+        id: contexts
+        env:
+          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
+          USE_LOCAL_COMMON: ${{ steps.detect.outputs.use_local_common }}
+          USE_LOCAL_SIMULATOR: ${{ steps.detect.outputs.use_local_simulator }}
+          AUTOWARE_INPUT_REF: ${{ steps.prepare.outputs.autoware_input_ref }}
+          AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
+          AUTOWARE_REF: ${{ steps.prepare.outputs.autoware_ref }}
+          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+        run: bash .github/scripts/resolve_registry_contexts.sh
+        shell: bash
+
   build:
     needs: prepare
     if: needs.prepare.outputs.targets_json != '[]'
@@ -172,9 +193,9 @@ jobs:
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' }}
-          setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' }}
-          with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' }}
+          free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' || needs.prepare.outputs.use_local_simulator == 'true' }}
+          setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' || needs.prepare.outputs.use_local_simulator == 'true' }}
+          with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
@@ -186,53 +207,6 @@ jobs:
             type=raw,value=${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-pr${{ github.event.pull_request.number || github.run_id }}
           flavor: |
             latest=false
-
-      - name: Resolve registry contexts
-        id: contexts
-        env:
-          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
-          TARGET: ${{ matrix.target }}
-          USE_LOCAL_COMMON: ${{ needs.prepare.outputs.use_local_common }}
-          USE_LOCAL_SIMULATOR: ${{ needs.prepare.outputs.use_local_simulator }}
-          AUTOWARE_INPUT_REF: ${{ needs.prepare.outputs.autoware_input_ref }}
-          AUTOWARE_REF_TYPE: ${{ needs.prepare.outputs.autoware_ref_type }}
-          AUTOWARE_BASE_VERSION: ${{ needs.prepare.outputs.autoware_base_version }}
-        run: |
-          set -euo pipefail
-          source .github/scripts/registry_lookup.sh
-          validate_registry_revision() {
-            local ref="$1"
-            local labels input_ref ref_type base_version
-            labels=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}' | jq '.image.config.Labels')
-            input_ref=$(jq -r '.["org.opencontainers.image.autoware-input-ref"] // .["\"org.opencontainers.image.autoware-input-ref\""] // empty' <<<"${labels}")
-            ref_type=$(jq -r '.["org.opencontainers.image.autoware-ref-type"] // .["\"org.opencontainers.image.autoware-ref-type\""] // empty' <<<"${labels}")
-            base_version=$(jq -r '.["org.opencontainers.image.autoware-base-version"] // .["\"org.opencontainers.image.autoware-base-version\""] // empty' <<<"${labels}")
-            if [ "${input_ref}" != "${AUTOWARE_INPUT_REF}" ] \
-              || [ "${ref_type}" != "${AUTOWARE_REF_TYPE}" ] \
-              || [ "${base_version}" != "${AUTOWARE_BASE_VERSION}" ]; then
-              echo "Registry context ${ref} was built from ${ref_type}:${input_ref} with base ${base_version}; expected ${AUTOWARE_REF_TYPE}:${AUTOWARE_INPUT_REF} with base ${AUTOWARE_BASE_VERSION}" >&2
-              exit 1
-            fi
-          }
-          distro="${ROS_DISTRO:-humble}"
-          # Use stable main-branch tags for universe-common base images.
-          # These are updated on every main push by build-all-images.yaml.
-          devel_tag="universe-common-devel-amd64-${distro}"
-          runtime_tag="universe-common-amd64-${distro}"
-          if [ "${USE_LOCAL_COMMON}" != true ]; then
-            devel_ref="${IMAGE_PREFIX_COMMON}:${devel_tag}"
-            runtime_ref="${IMAGE_PREFIX_COMMON}:${runtime_tag}"
-            validate_registry_revision "${devel_ref}"
-            validate_registry_revision "${runtime_ref}"
-            echo "devel_context=docker-image://${devel_ref}@$(registry_manifest_digest "${devel_ref}")" >> "$GITHUB_OUTPUT"
-            echo "runtime_context=docker-image://${runtime_ref}@$(registry_manifest_digest "${runtime_ref}")" >> "$GITHUB_OUTPUT"
-          fi
-          if [ "${TARGET}" = carla-interface ] && [ "${USE_LOCAL_SIMULATOR}" != true ]; then
-            simulator_ref="${IMAGE_PREFIX_COMPONENT}:simulator-amd64-${distro}"
-            validate_registry_revision "${simulator_ref}"
-            echo "simulator_context=docker-image://${simulator_ref}@$(registry_manifest_digest "${simulator_ref}")" >> "$GITHUB_OUTPUT"
-          fi
-        shell: bash
 
       - name: Restore BuildKit cache mounts
         id: cache-restore
@@ -264,9 +238,9 @@ jobs:
           set: |
             *.platform=linux/amd64
             *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
-            ${{ needs.prepare.outputs.use_local_common != 'true' && format('*.contexts.universe-common-devel={0}', steps.contexts.outputs.devel_context) || '' }}
-            ${{ needs.prepare.outputs.use_local_common != 'true' && format('*.contexts.universe-common={0}', steps.contexts.outputs.runtime_context) || '' }}
-            ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', steps.contexts.outputs.simulator_context) || '' }}
+            ${{ needs.prepare.outputs.devel_context != '' && format('*.contexts.universe-common-devel={0}', needs.prepare.outputs.devel_context) || '' }}
+            ${{ needs.prepare.outputs.runtime_context != '' && format('*.contexts.universe-common={0}', needs.prepare.outputs.runtime_context) || '' }}
+            ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities

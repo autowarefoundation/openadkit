@@ -26,6 +26,7 @@ services:
     environment:
       # Passed as runtime environment data (not interpolated into the command
       # program) so shell metacharacters in a value cannot alter the script.
+      - ROS_DISTRO=${ROS_DISTRO:-humble}
       - SCENARIO_READY_TIMEOUT=${SCENARIO_READY_TIMEOUT:-300}
       - SCENARIO=${SCENARIO}
       - ARCHITECTURE_TYPE=${ARCHITECTURE_TYPE}

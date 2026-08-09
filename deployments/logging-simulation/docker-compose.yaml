@@ -83,9 +83,7 @@ services:
     restart: on-failure
 
   rosbag:
-    # Pinned to a reviewed digest for reproducible source starts; the tag stays
-    # visible and can be re-resolved to bump this deliberately.
-    image: ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175
+    image: ${AUTOWARE_UNIVERSE_IMAGE}
     container_name: autoware-rosbag
     network_mode: host
     init: true

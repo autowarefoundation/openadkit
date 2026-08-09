@@ -10,7 +10,7 @@
 # one complete config.env for Compose interpolation.
 services:
   # Fail fast when MAP_PATH is empty or missing required files (replaces the
-  # former map-init oneshot). Depends on host sample-data already published.
+  # former map-init oneshot). Depends on deployment data already published.
   map-check:
     image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
     container_name: autoware-map-check
@@ -35,7 +35,7 @@ services:
           fi
         done
         if [[ "$${missing}" -ne 0 ]]; then
-          echo "map-check: fetch sample data first, e.g. ../../install.sh sample-data <deployment>" >&2
+          echo "map-check: fetch sample data with ./openadkit data <deployment>" >&2
           exit 1
         fi
         echo "map-check: ok (${LANELET2_MAP_FILE}, ${POINTCLOUD_MAP_FILE})"

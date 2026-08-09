@@ -17,7 +17,6 @@ INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
 ALL_IMAGES_WORKFLOW = (ROOT / ".github/workflows/build-all-images.yaml").read_text()
 SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
-INSTALLER = (ROOT / "install.sh").read_text()
 ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
@@ -175,14 +174,6 @@ def test_carla_registry_simulator_overrides_named_context():
         in SINGLE_IMAGE_WORKFLOW
     )
     assert 'SIMULATOR_IMAGE = "simulator"' in BAKE
-
-
-def test_artifact_prerequisites_fail_before_playbook():
-    assert 'cd "$autoware_tmp" &&' in INSTALLER
-    assert (
-        'ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml" &&'
-        in INSTALLER
-    )
 
 
 def test_zenoh_cloud_bridge_is_internal_only():

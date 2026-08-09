@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "name": "planning-simulation",
+  "description": "Run Autoware planning and control against the built-in simulator",
+  "shared": ["base"],
+  "compose": {
+    "files": ["docker-compose.yaml"],
+    "gpuFiles": [],
+    "profiles": [],
+    "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer"],
+    "resetServices": ["map-check"],
+    "waitTimeout": 300,
+    "groups": {},
+    "features": {}
+  },
+  "requirements": {
+    "architectures": ["amd64", "arm64"],
+    "rosDistros": ["humble", "jazzy"],
+    "gpu": "none"
+  },
+  "data": [
+    {
+      "name": "sample-map-planning",
+      "kind": "zip",
+      "destinationEnv": "MAP_PATH",
+      "expectedRoot": "sample-map-planning",
+      "url": "https://autoware-files.s3.us-west-2.amazonaws.com/maps/demos/sample-map-planning.zip",
+      "sha256": "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9",
+      "requiredFiles": ["lanelet2_map.osm", "pointcloud_map.pcd"]
+    }
+  ],
+  "hooks": {}
+}

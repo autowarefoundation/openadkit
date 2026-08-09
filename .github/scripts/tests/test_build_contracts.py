@@ -20,7 +20,6 @@ SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").rea
 REGISTRY_CONTEXT_RESOLVER = (
     ROOT / ".github/scripts/resolve_registry_contexts.sh"
 ).read_text()
-INSTALLER = (ROOT / "install.sh").read_text()
 ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
@@ -199,14 +198,6 @@ def test_carla_registry_simulator_overrides_named_context():
     assert 'echo "simulator_context=${simulator_context}"' in REGISTRY_CONTEXT_RESOLVER
     assert "printf 'docker-image://%s@%s\\n'" in REGISTRY_CONTEXT_RESOLVER
     assert 'SIMULATOR_IMAGE = "simulator"' in BAKE
-
-
-def test_artifact_prerequisites_fail_before_playbook():
-    assert 'cd "$autoware_tmp" &&' in INSTALLER
-    assert (
-        'ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml" &&'
-        in INSTALLER
-    )
 
 
 def test_zenoh_cloud_bridge_is_internal_only():

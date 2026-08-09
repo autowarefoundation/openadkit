@@ -7,7 +7,10 @@ on:
   pull_request:
     paths:
       - '.gitignore'
+      - 'openadkit'
+      - 'openadkit.d/**'
       - '**/*.sh'
+      - '**/*.json'
       - '**/*.json5'
       - '.github/image-inventory.json'
       - '.github/ISSUE_TEMPLATE/**'
@@ -89,30 +92,13 @@ jobs:
         # each documented stack with its sample env file. It does not pull images.
         run: |
           set -euo pipefail
-          # zenoh-bridge requires a non-empty REMOTE_PASSWORD (its example env
-          # leaves it blank on purpose); a shell value overrides it for validation.
-          export REMOTE_PASSWORD="ci-validate"
-          fail=0
-          validate() {
-            local dir="$1"; shift
-            echo "::group::${dir} $*"
-            if ( cd "${dir}" && docker compose "$@" config -q ); then
-              echo "ok: ${dir} $*"
-            else
-              echo "::error file=${dir}/docker-compose.yaml::invalid docker compose config ($*)"
-              fail=1
-            fi
-            echo "::endgroup::"
-          }
-          # Every deployment carries one complete Compose interpolation file.
-          # The base runtime.env is loaded inside containers via env_file.
-          validate deployments/planning-simulation --env-file config.env
-          validate deployments/scenario-simulation --env-file config.env
-          validate deployments/logging-simulation  --env-file config.env
-          validate deployments/logging-simulation  --env-file config.env -f docker-compose.yaml -f docker-compose.gpu.yaml
-          validate deployments/carla-simulation    --env-file config.env
-          validate deployments/zenoh-bridge        --env-file config.env
-          exit "${fail}"
+          for ros_distro in humble jazzy; do
+            for deployment in planning-simulation scenario-simulation logging-simulation; do
+              ./openadkit validate "${deployment}" --ros-distro "${ros_distro}"
+            done
+            ./openadkit validate logging-simulation \
+              --ros-distro "${ros_distro}" --gpu
+          done
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3

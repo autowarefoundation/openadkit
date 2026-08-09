@@ -79,15 +79,15 @@ docker buildx bake -f components/docker-bake.hcl universe-common
 
 # 6. Build and tag all component images (~2 hours)
 docker buildx bake -f components/docker-bake.hcl \
-  --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception \
-  --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping \
-  --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control \
-  --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system \
-  --set api.tags=ghcr.io/autowarefoundation/openadkit:api \
-  --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer \
-  --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator \
-  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface \
-  --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda \
+  --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-humble \
+  --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping-humble \
+  --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control-humble \
+  --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system-humble \
+  --set api.tags=ghcr.io/autowarefoundation/openadkit:api-humble \
+  --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer-humble \
+  --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator-humble \
+  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-humble \
+  --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda-humble \
   --load \
   component
 
@@ -96,7 +96,9 @@ docker buildx bake -f components/docker-bake.hcl \
 ```
 
 The `--load` flag makes images available in the local Docker store (without it,
-Bake only populates the BuildKit cache).
+Bake only populates the BuildKit cache). Repository-mode `./openadkit` resolves
+component defaults as `<target>-<ros-distro>`, so local tags must carry the
+matching suffix. For Jazzy, build with `ROS_DISTRO=jazzy` and use `-jazzy` tags.
 
 ### Build Targets (Reference)
 

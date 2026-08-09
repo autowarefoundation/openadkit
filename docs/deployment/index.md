@@ -7,7 +7,7 @@ configuration for a specific task.
 |------------|---------|----------|-----|
 | [Planning Simulation](planning-simulation/index.md) | Plan and follow a route on a demo map | Single host | No |
 | [Scenario Simulation](scenario-simulation/index.md) | Execute predefined traffic scenarios | Single host | No |
-| [Logging Simulation](logging-simulation/index.md) | Replay recorded sensor data through the full stack | Single host | Recommended |
+| [Logging Simulation](logging-simulation/index.md) | Replay sensor data through sensing, perception, and localization | Single host | Recommended |
 | [CARLA Simulation](carla-simulation/index.md) | Drive a CARLA ego vehicle in closed loop | Single host | Required |
 | [Zenoh Bridge](zenoh-bridge/index.md) | Separate edge compute from visualization and control | Single Compose project | Varies |
 

@@ -111,4 +111,5 @@ free; Zenoh ports **7447** and **7448** stay inside the Compose networks.
 Re-fetch the map from the repository root with
 `./openadkit data scenario-simulation --force`.
 
-The `autoware` service currently uses the image configured in `config.env`.
+The `autoware` service uses the digest-pinned upstream image declared directly
+in `docker-compose.yaml`.

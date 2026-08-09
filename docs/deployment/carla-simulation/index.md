@@ -47,11 +47,11 @@ are available but commented out.
 --8<-- "includes/visualizer-remote-access.md"
 
 Set a goal with **2D Goal Pose** and select **Auto** in RViz2. To enable
-automatic route selection, engagement, and movement verification, put this in
-`deployments/carla-simulation/config.local.env` before running:
+automatic route selection, engagement, and movement verification, start the
+launcher with:
 
-```dotenv
-AUTOWARE_E2E_AUTO_DRIVE=true
+```bash
+./start-carla-e2e-demo.sh --drive
 ```
 
 ## Stop

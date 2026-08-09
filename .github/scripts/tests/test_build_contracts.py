@@ -17,6 +17,9 @@ INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
 ALL_IMAGES_WORKFLOW = (ROOT / ".github/workflows/build-all-images.yaml").read_text()
 SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
+REGISTRY_CONTEXT_RESOLVER = (
+    ROOT / ".github/scripts/resolve_registry_contexts.sh"
+).read_text()
 INSTALLER = (ROOT / "install.sh").read_text()
 ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
@@ -101,6 +104,7 @@ def test_shared_build_inputs_select_all_targets():
     expected = {image["target"] for image in INVENTORY["images"]}
     for changed in (
         ".github/scripts/registry_lookup.sh",
+        ".github/scripts/resolve_registry_contexts.sh",
         ".github/actions/inject-ccache/action.yaml",
         ".trivyignore",
     ):
@@ -161,7 +165,30 @@ def test_long_pr_build_leaves_time_for_vulnerability_scan():
 
 
 def test_carla_registry_simulator_provenance_is_validated():
-    assert 'validate_registry_revision "${simulator_ref}"' in SINGLE_IMAGE_WORKFLOW
+    assert 'resolve_registry_context "${simulator_ref}"' in REGISTRY_CONTEXT_RESOLVER
+
+
+def test_registry_provenance_mismatch_falls_back_before_source_setup():
+    assert SINGLE_IMAGE_WORKFLOW.index("Resolve registry contexts") < (
+        SINGLE_IMAGE_WORKFLOW.index("Set up build environment")
+    )
+    assert (
+        "use_local_common: ${{ steps.contexts.outputs.use_local_common }}"
+        in SINGLE_IMAGE_WORKFLOW
+    )
+    assert (
+        "setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || "
+        "needs.prepare.outputs.use_local_common == 'true' || "
+        "needs.prepare.outputs.use_local_simulator == 'true' }}"
+        in SINGLE_IMAGE_WORKFLOW
+    )
+    assert (
+        "with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' || "
+        "needs.prepare.outputs.use_local_common == 'true' }}"
+        in SINGLE_IMAGE_WORKFLOW
+    )
+    assert "needs.prepare.outputs.devel_context != ''" in SINGLE_IMAGE_WORKFLOW
+    assert "needs.prepare.outputs.runtime_context != ''" in SINGLE_IMAGE_WORKFLOW
 
 
 def test_carla_registry_simulator_overrides_named_context():
@@ -169,11 +196,8 @@ def test_carla_registry_simulator_overrides_named_context():
         assert "carla-interface.contexts.simulator=" in workflow
         assert "carla-interface.args.SIMULATOR_IMAGE=" not in workflow
 
-    assert (
-        'echo "simulator_context=docker-image://${simulator_ref}'
-        '@$(registry_manifest_digest "${simulator_ref}")"'
-        in SINGLE_IMAGE_WORKFLOW
-    )
+    assert 'echo "simulator_context=${simulator_context}"' in REGISTRY_CONTEXT_RESOLVER
+    assert "printf 'docker-image://%s@%s\\n'" in REGISTRY_CONTEXT_RESOLVER
     assert 'SIMULATOR_IMAGE = "simulator"' in BAKE
 
 

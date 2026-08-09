@@ -187,7 +187,7 @@ jobs:
           flavor: |
             latest=false
 
-      - name: Resolve universe-common registry context
+      - name: Resolve registry contexts
         id: contexts
         env:
           ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
@@ -230,7 +230,7 @@ jobs:
           if [ "${TARGET}" = carla-interface ] && [ "${USE_LOCAL_SIMULATOR}" != true ]; then
             simulator_ref="${IMAGE_PREFIX_COMPONENT}:simulator-amd64-${distro}"
             validate_registry_revision "${simulator_ref}"
-            echo "simulator_image=${simulator_ref}@$(registry_manifest_digest "${simulator_ref}")" >> "$GITHUB_OUTPUT"
+            echo "simulator_context=docker-image://${simulator_ref}@$(registry_manifest_digest "${simulator_ref}")" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -266,7 +266,7 @@ jobs:
             *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
             ${{ needs.prepare.outputs.use_local_common != 'true' && format('*.contexts.universe-common-devel={0}', steps.contexts.outputs.devel_context) || '' }}
             ${{ needs.prepare.outputs.use_local_common != 'true' && format('*.contexts.universe-common={0}', steps.contexts.outputs.runtime_context) || '' }}
-            ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.args.SIMULATOR_IMAGE={0}', steps.contexts.outputs.simulator_image) || '' }}
+            ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', steps.contexts.outputs.simulator_context) || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities

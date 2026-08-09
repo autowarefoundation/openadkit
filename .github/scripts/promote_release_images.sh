@@ -8,10 +8,19 @@ source "${script_dir}/registry_lookup.sh"
 # shellcheck source=.github/scripts/stable_alias_policy.sh
 source "${script_dir}/stable_alias_policy.sh"
 
-: "${VERSION:?VERSION is required}"
-: "${DEFAULT_ROS_DISTRO:?DEFAULT_ROS_DISTRO is required}"
-: "${PUBLISH_LATEST_ALIASES:?PUBLISH_LATEST_ALIASES is required}"
-: "${STABLE_RELEASE:?STABLE_RELEASE is required}"
+plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
+jq -e '
+  .schemaVersion == 1 and
+  (.release.version | type == "string") and
+  (.release.defaultRosDistro | IN("humble", "jazzy")) and
+  (.release.stable | type == "boolean") and
+  (.release.publishLatestAliases | type == "boolean") and
+  (.images | type == "array" and length > 0)
+' "${plan_file}" >/dev/null
+VERSION=$(jq -r '.release.version' "${plan_file}")
+DEFAULT_ROS_DISTRO=$(jq -r '.release.defaultRosDistro' "${plan_file}")
+PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
+STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")
 
 stable_release="${STABLE_RELEASE}"
 
@@ -19,7 +28,7 @@ stable_release="${STABLE_RELEASE}"
 # so a later alias phase cannot expose a partially tagged release.
 PROMOTED_REFS=()
 
-available_distros=$(jq -r '.images | unique_by(.ros_distro) | map(.ros_distro) | join(" ")' release-input/build/build-metadata.json)
+available_distros=$(jq -r '.images | unique_by(.rosDistro) | map(.rosDistro) | join(" ")' "${plan_file}")
 echo "Available ROS distros in build: ${available_distros}"
 
 if ! echo "${available_distros}" | grep -qw "${DEFAULT_ROS_DISTRO}"; then
@@ -80,29 +89,69 @@ promote_tag() {
   return 1
 }
 
-while IFS=$'\t' read -r repo target distro digest; do
-  release_ref="${repo}:${target}-${distro}-${VERSION}"
-  promote_tag "${release_ref}" "${repo}" "${digest}" immutable
-done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
+preflight_images() {
+  local conflicts=0 source_ref release_ref digest source_digest existing_digest lookup_status
+  while IFS=$'\t' read -r source_ref release_ref digest; do
+    lookup_status=0
+    source_digest=$(registry_manifest_digest "${source_ref}") || lookup_status=$?
+    if [ "${lookup_status}" -eq 1 ]; then
+      echo "Source image not found: ${source_ref}" >&2
+      conflicts=1
+    elif [ "${lookup_status}" -ne 0 ]; then
+      return "${lookup_status}"
+    elif [ "${source_digest}" != "${digest}" ]; then
+      echo "Source digest mismatch for ${source_ref}: ${source_digest} != ${digest}" >&2
+      conflicts=1
+    fi
 
-if [ "${stable_release}" = true ]; then
+    lookup_status=0
+    existing_digest=$(registry_manifest_digest "${release_ref}") || lookup_status=$?
+    if [ "${lookup_status}" -eq 0 ] && [ "${existing_digest}" != "${digest}" ]; then
+      echo "Release tag conflict: ${release_ref} points to ${existing_digest}, expected ${digest}" >&2
+      conflicts=1
+    elif [ "${lookup_status}" -ne 0 ] && [ "${lookup_status}" -ne 1 ]; then
+      return "${lookup_status}"
+    fi
+  done < <(jq -r '.images[] | [.sourceRef, .releaseRef, .digest] | @tsv' "${plan_file}")
+  [ "${conflicts}" -eq 0 ]
+}
+
+check_alias_policy() {
+  local current_policy
+  [ "${stable_release}" = true ] || return 0
   current_policy=$(current_latest_alias_policy)
   if [ "${current_policy}" != "${PUBLISH_LATEST_ALIASES}" ]; then
     echo "Latest alias policy changed during release: expected ${PUBLISH_LATEST_ALIASES}, now ${current_policy}; rerun the release workflow" >&2
-    exit 1
+    return 1
   fi
-fi
+}
+
+preflight_aliases() {
+  local alias lookup_status existing_digest
+  while IFS= read -r alias; do
+    [ -n "${alias}" ] || continue
+    lookup_status=0
+    existing_digest=$(registry_manifest_digest "${alias}") || lookup_status=$?
+    if [ "${lookup_status}" -ne 0 ] && [ "${lookup_status}" -ne 1 ]; then
+      return "${lookup_status}"
+    fi
+  done < <(jq -r '.images[].aliases[]?' "${plan_file}")
+}
+
+check_alias_policy
+preflight_images
+preflight_aliases
+
+while IFS=$'\t' read -r release_ref repo digest; do
+  promote_tag "${release_ref}" "${repo}" "${digest}" immutable
+done < <(jq -r '.images[] | [.releaseRef, .repo, .digest] | @tsv' "${plan_file}")
+
+check_alias_policy
 
 if [ "${stable_release}" = true ] && [ "${PUBLISH_LATEST_ALIASES}" = true ]; then
-  while IFS=$'\t' read -r repo target distro digest; do
-    promote_tag "${repo}:${target}-${distro}" "${repo}" "${digest}" alias
-    promote_tag "${repo}:${target}-${distro}-latest" "${repo}" "${digest}" alias
-
-    if [ "${distro}" = "${DEFAULT_ROS_DISTRO}" ]; then
-      promote_tag "${repo}:${target}" "${repo}" "${digest}" alias
-      promote_tag "${repo}:${target}-latest" "${repo}" "${digest}" alias
-    fi
-  done < <(jq -r '.images[] | [.repo, .target, .ros_distro, .digest] | @tsv' release-input/build/build-metadata.json)
+  while IFS=$'\t' read -r alias repo digest; do
+    promote_tag "${alias}" "${repo}" "${digest}" alias
+  done < <(jq -r '.images[] | .repo as $repo | .digest as $digest | .aliases[] | [., $repo, $digest] | @tsv' "${plan_file}")
 fi
 
 echo "Alias promotion summary: ${#PROMOTED_REFS[@]} converged."

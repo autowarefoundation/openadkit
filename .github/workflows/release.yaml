@@ -91,6 +91,7 @@ jobs:
       contents: read
     outputs:
       packager_sha: ${{ steps.packager.outputs.packager_sha }}
+      release_plan_sha256: ${{ steps.package.outputs.release_plan_sha256 }}
     steps:
       - name: Check out release scripts
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -99,7 +100,7 @@ jobs:
           sparse-checkout: |
             .github/scripts/install-compose.sh
             .github/scripts/package_release_bundles.sh
-            .github/scripts/registry_lookup.sh
+            .github/scripts/release_plan.py
 
       - name: Verify packager revision
         id: packager
@@ -121,7 +122,8 @@ jobs:
           ref: ${{ needs.validate.outputs.release_sha }}
           path: src
           sparse-checkout: |
-            install.sh
+            openadkit
+            openadkit.d
             deployments
 
       - name: Download validated release metadata
@@ -139,17 +141,27 @@ jobs:
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Package and validate deployment bundles
+        id: package
         env:
           VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+          PACKAGER_SHA: ${{ steps.packager.outputs.packager_sha }}
           DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
-        run: bash .github/scripts/package_release_bundles.sh
+          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
+          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
+        run: |
+          bash .github/scripts/package_release_bundles.sh
+          echo "release_plan_sha256=$(sha256sum release-plan.json | cut -d ' ' -f1)" \
+            >> "${GITHUB_OUTPUT}"
         shell: bash
 
       - name: Upload deployment bundles
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-bundles-${{ inputs.build_tag }}
-          path: dist/*.tar.gz
+          path: |
+            release-plan.json
+            dist/openadkit-${{ inputs.version }}.tar.gz
           if-no-files-found: error
           retention-days: 7
           overwrite: true
@@ -168,18 +180,30 @@ jobs:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: .github/scripts/release_tag.sh
 
+      - name: Download immutable release plan
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-bundles-${{ inputs.build_tag }}
+          path: release-output
+
       - name: Create or verify git tag
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-        run: bash .github/scripts/release_tag.sh
+          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
+        run: |
+          set -euo pipefail
+          plan=release-output/release-plan.json
+          test "$(sha256sum "${plan}" | cut -d ' ' -f1)" = "${EXPECTED_PLAN_SHA256}"
+          VERSION=$(jq -r '.release.version' "${plan}")
+          RELEASE_SHA=$(jq -r '.release.releaseSha' "${plan}")
+          export VERSION RELEASE_SHA
+          bash .github/scripts/release_tag.sh
         shell: bash
 
   release-images:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    needs: [validate, prepare-github-release]
+    needs: [validate, package-bundles, prepare-github-release]
     environment: release
     permissions:
       actions: read
@@ -195,11 +219,18 @@ jobs:
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
 
-      - name: Download validated release metadata
+      - name: Download immutable release plan
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: validated-release-${{ inputs.build_tag }}
-          path: release-input
+          name: release-bundles-${{ inputs.build_tag }}
+          path: release-output
+
+      - name: Verify immutable release plan
+        env:
+          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
+        run: |
+          test "$(sha256sum release-output/release-plan.json | cut -d ' ' -f1)" \
+            = "${EXPECTED_PLAN_SHA256}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -213,11 +244,8 @@ jobs:
 
       - name: Promote image digests
         env:
-          VERSION: ${{ inputs.version }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
-          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
+          RELEASE_PLAN_FILE: release-output/release-plan.json
         run: bash .github/scripts/promote_release_images.sh
         shell: bash
 
@@ -253,16 +281,18 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-bundles-${{ inputs.build_tag }}
-          path: dist
+          path: .
+
+      - name: Verify immutable release plan
+        env:
+          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
+        run: |
+          test "$(sha256sum release-plan.json | cut -d ' ' -f1)" \
+            = "${EXPECTED_PLAN_SHA256}"
 
       - name: Create release metadata and notes
         env:
-          VERSION: ${{ inputs.version }}
-          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
-          PACKAGER_SHA: ${{ needs.package-bundles.outputs.packager_sha }}
-          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
-          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
+          RELEASE_PLAN_FILE: release-plan.json
         run: bash .github/scripts/write_release_notes.sh
         shell: bash
 
@@ -270,9 +300,7 @@ jobs:
         id: prepare-release
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version }}
-          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
+          RELEASE_PLAN_FILE: release-plan.json
         run: bash .github/scripts/manage_github_release.sh prepare
         shell: bash
 
@@ -288,7 +316,7 @@ jobs:
   release-github:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    needs: [validate, prepare-github-release, release-images]
+    needs: [validate, package-bundles, prepare-github-release, release-images]
     environment: release
     permissions:
       actions: read
@@ -308,16 +336,26 @@ jobs:
           name: release-asset-manifest-${{ inputs.build_tag }}
           path: release-asset-manifest
 
+      - name: Download immutable release plan
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-bundles-${{ inputs.build_tag }}
+          path: release-output
+
+      - name: Verify immutable release plan
+        env:
+          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
+        run: |
+          test "$(sha256sum release-output/release-plan.json | cut -d ' ' -f1)" \
+            = "${EXPECTED_PLAN_SHA256}"
+
       - name: Publish prepared GitHub Release
         if: needs.prepare-github-release.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version }}
           RELEASE_ID: ${{ needs.prepare-github-release.outputs.release_id }}
           RELEASE_BODY_SHA256: ${{ needs.prepare-github-release.outputs.release_body_sha256 }}
           RELEASE_ASSET_MANIFEST: release-asset-manifest/release-assets.sha256
-          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-          PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
-          STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
+          RELEASE_PLAN_FILE: release-output/release-plan.json
         run: bash .github/scripts/manage_github_release.sh publish
         shell: bash

@@ -15,6 +15,7 @@ import resolve_image_matrices as matrices
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
+ALL_IMAGES_WORKFLOW = (ROOT / ".github/workflows/build-all-images.yaml").read_text()
 SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
 INSTALLER = (ROOT / "install.sh").read_text()
 ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
@@ -158,6 +159,19 @@ def test_long_pr_build_leaves_time_for_vulnerability_scan():
 
 def test_carla_registry_simulator_provenance_is_validated():
     assert 'validate_registry_revision "${simulator_ref}"' in SINGLE_IMAGE_WORKFLOW
+
+
+def test_carla_registry_simulator_overrides_named_context():
+    for workflow in (ALL_IMAGES_WORKFLOW, SINGLE_IMAGE_WORKFLOW):
+        assert "carla-interface.contexts.simulator=" in workflow
+        assert "carla-interface.args.SIMULATOR_IMAGE=" not in workflow
+
+    assert (
+        'echo "simulator_context=docker-image://${simulator_ref}'
+        '@$(registry_manifest_digest "${simulator_ref}")"'
+        in SINGLE_IMAGE_WORKFLOW
+    )
+    assert 'SIMULATOR_IMAGE = "simulator"' in BAKE
 
 
 def test_artifact_prerequisites_fail_before_playbook():

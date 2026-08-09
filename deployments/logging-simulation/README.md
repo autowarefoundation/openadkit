@@ -1,7 +1,7 @@
 # Logging Simulation
 
 Replays recorded sensor data through the Autoware sensing, perception, and
-planning stack. Install the host dependencies as described in the
+localization stack. Install the host dependencies as described in the
 [canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/logging-simulation/)
 before starting.
 

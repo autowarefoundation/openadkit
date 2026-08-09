@@ -1,8 +1,9 @@
 # Logging Simulation
 
-Replay a demo rosbag through sensing, perception, localization, planning, and
-control. An NVIDIA GPU with at least 4 GB VRAM is strongly recommended; CPU
-operation is supported but substantially slower.
+Replay a demo rosbag through sensing, perception, and localization while map,
+system, and visualization services provide the supporting runtime. An NVIDIA
+GPU with at least 4 GB VRAM is strongly recommended; CPU operation is supported
+but substantially slower.
 
 ## Setup
 

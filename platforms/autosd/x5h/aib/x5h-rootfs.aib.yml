@@ -8,11 +8,18 @@ content:
   rpms:
     - podman
     - btrfs-progs
+    - e2fsprogs
     - gdisk
     - curl
     - iproute
     - procps-ng
     - iptables-nft
+    # The base AutoSD image ships no SSH server at all (only crypto-policies
+    # fragments mention openssh), so without this the sshd drop-in, the baked
+    # authorized_keys and the "enable sshd.service" preset below all describe
+    # a service that cannot exist. Board-verified 2026-08-07: no /usr/sbin/sshd
+    # and no sshd.service unit in the built rootfs.
+    - openssh-server
   # add_files (org.osbuild.copy) does not create parent directories, and
   # nothing else in the pipeline creates /etc/containers/containers.conf.d
   # (init_rootfs_dirs_stage creates /etc itself, but not this subtree).
@@ -29,10 +36,41 @@ content:
     - path: /etc/containers/containers.conf.d
       parents: true
       exist_ok: true
+    - path: /etc/ssh/authorized_keys.d
+      parents: true
+      exist_ok: true
+    - path: /etc/ssh/sshd_config.d
+      parents: true
+      exist_ok: true
+    - path: /etc/NetworkManager/conf.d
+      parents: true
+      exist_ok: true
+    - path: /etc/systemd/system-preset
+      parents: true
+      exist_ok: true
+    - path: /etc/modprobe.d
+      parents: true
+      exist_ok: true
   add_files:
     # add_files only permits /etc and /usr destinations (rehearsal finding).
     - source_path: ../config/50-x5h.conf
       path: /etc/containers/containers.conf.d/50-x5h.conf
+    # Self-boot / shared-tailnet hardening (see selfboot.md): key-only SSH
+    # so the dev root password stays a serial-console-only credential.
+    - source_path: ../config/50-x5h-sshd.conf
+      path: /etc/ssh/sshd_config.d/50-x5h.conf
+    - source_path: ../config/x5h-authorized-keys
+      path: /etc/ssh/authorized_keys.d/root
+    - source_path: ../config/50-x5h-tsn5-unmanaged.conf
+      path: /etc/NetworkManager/conf.d/50-x5h-tsn5-unmanaged.conf
+    # May collide with a resolv.conf symlink in the base image; if the copy
+    # stage fails CI, drop this entry and stage the file post-dd instead.
+    - source_path: ../config/x5h-resolv.conf
+      path: /etc/resolv.conf
+    - source_path: ../config/x5h-rpmsg-diag.conf
+      path: /etc/modprobe.d/x5h-rpmsg-diag.conf
+    - source_path: ../config/80-x5h.preset
+      path: /etc/systemd/system-preset/80-x5h.preset
 
 auth:
   # root password "autosd" — dev/bench image only, never a board deliverable.

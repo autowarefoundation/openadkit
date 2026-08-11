@@ -479,12 +479,15 @@ along the way. Match the syntax already in the file: newer tailnets use
 ```jsonc
 {
   "groups": {
-    // Identities are whatever the tailnet's identity provider issues. A
+    // An identity is however its issuer spells it. Users who sign in through
+    // the tailnet's own provider are named as that provider names them: a
     // GitHub-backed tailnet uses GitHub logins, not e-mail addresses, and an
     // address that does not exist here yields an empty group and an admin
-    // rule that grants nothing.
+    // rule that grants nothing. Invited external users are the exception --
+    // they pick their own provider, so their identity is usually an e-mail
+    // address and need not have the same shape as the admin's.
     "group:x5h-admin": ["<admin-login>"],
-    "group:x5h-ext":   [],   // external developer logins land here
+    "group:x5h-ext":   [],   // invited external identities land here
     // Optional middle tier: internal developers who need the board and the
     // gateway's serial consoles, but not the rest of the tailnet. Omit the
     // group and its grant below if two tiers are enough.
@@ -539,11 +542,36 @@ interactively — a scheduled outage for an unattended gateway. Check it with
 
 ### Onboarding an external developer
 
-1. Add their login to `group:x5h-ext`.
-2. Append their public key to `/etc/ssh/authorized_keys.d/root` on the
+External developers join as **users of this tailnet**, by invitation. Do not
+share the gateway node with them instead: **a shared node does not carry its
+subnet routes.** The control plane rewrites the ACLs of an externally shared
+subnet router so the recipient reaches that node and nothing behind it, and
+the board is on the far side of the advertised `192.168.0.0/24` — so a share
+leaves the board unreachable, with nothing to correct at either end.
+
+1. Settle it with their employer first. A tailnet by default lets only its
+   own Admins accept an invitation to an *external* tailnet, so a developer
+   whose company runs Tailscale cannot accept until their IT administrator
+   permits it. Discovering this after the invite is issued costs a round
+   trip and presents as a fault at this end.
+2. Invite them from the admin console — Users, then *Invite external users*
+   — by e-mail or by link. Invites are one-time and expire after 30 days,
+   and each user who accepts takes a seat on the tailnet's plan (six on the
+   current free Personal plan, administrator included).
+3. Once they have accepted, read their identity off the Users page and add
+   that string to `group:x5h-ext` exactly as shown. They authenticate with
+   whichever provider they choose — any supported IdP, or a passkey — so
+   what belongs in the group is **not knowable before they accept**, and is
+   usually an e-mail address rather than a login of this tailnet's own
+   provider.
+4. Append their public key to `/etc/ssh/authorized_keys.d/root` on the
    board — or to `config/x5h-authorized-keys` if it should survive an
    image rebuild.
-3. Verify with the checks below, from their node.
+5. Verify with the checks below, from their node.
+
+Steps 3 and 4 are independent, and each is silent when omitted: without the
+grant their SSH hangs, without the key it is refused. Doing one and calling
+it done is the usual result of splitting them across a day.
 
 Offboarding is the reverse; remember the key on the board outlives the
 tailnet removal.

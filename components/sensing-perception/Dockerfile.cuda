@@ -39,7 +39,6 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --base-paths \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch \
-        /tmp/autoware/src/universe/external/trt_batched_nms \
         /tmp/autoware/src/universe/external/bevdet_vendor \
         /tmp/autoware/src/universe/external/cuda_blackboard \
         /tmp/autoware/src/universe/external/negotiated \

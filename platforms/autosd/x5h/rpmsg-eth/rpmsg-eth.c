@@ -13,7 +13,10 @@
  * reset, so this daemon does not fail fast when the channel is absent: it
  * waits (woken by inotify on /dev, so it isn't a busy-poll) and retries,
  * both at startup and whenever the endpoint goes away later (another CR52
- * reset) -- start-order independence in both directions.
+ * reset) -- start-order independence in both directions. tap is kept
+ * drained during that wait so a reset on the CR52 side doesn't also wedge
+ * Linux -> CR52 traffic; frames that arrive with no endpoint to relay them
+ * to are counted and dropped rather than silently lost.
  *
  * -d bypasses discovery and opens a device path directly. It exists as a
  * test seam: test-rpmsg-eth.sh points it at one end of a socat pty pair
@@ -21,7 +24,9 @@
  *
  * usage: rpmsg-eth [-s rpmsg-eth] [-t tap0] [-d /dev/rpmsgN]
  * Bridges frames both ways until SIGTERM/SIGINT, then closes both fds,
- * logs relay counters to stderr, and exits 0.
+ * logs relay counters to stderr, and exits 0 -- including when the signal
+ * arrives while still waiting for the first endpoint, which is a clean
+ * shutdown, not a failure.
  */
 #include <dirent.h>
 #include <errno.h>
@@ -43,7 +48,8 @@ struct rpmsg_endpoint_info {
 	uint32_t src;
 	uint32_t dst;
 };
-#define RPMSG_CREATE_EPT_IOCTL _IOW(0xb5, 0x1, struct rpmsg_endpoint_info)
+#define RPMSG_CREATE_EPT_IOCTL  _IOW(0xb5, 0x1, struct rpmsg_endpoint_info)
+#define RPMSG_DESTROY_EPT_IOCTL _IO(0xb5, 0x2)
 #define RPMSG_ADDR_ANY 0xFFFFFFFF
 
 /*
@@ -183,24 +189,77 @@ static int create_ept(const char *service)
 	return open(devpath, O_RDWR);
 }
 
-/* Block up to 1s for a /dev change, so a pending discovery/reconnect wakes
- * promptly instead of busy-polling. The timeout also re-checks
- * periodically in case the channel appears without a /dev event we're
- * watching for. */
-static void wait_for_dev_change(int inotify_fd)
+/* Tear down a char endpoint the way scripts/rpmsg-ping.c does: destroy the
+ * ept explicitly before closing, rather than relying on release-time
+ * teardown. Harmless (and ignored) on the -d test seam's pty, which isn't
+ * an rpmsg ept and just returns ENOTTY. No-op on a negative fd. */
+static void close_ept(int fd)
 {
-	struct pollfd pfd = { .fd = inotify_fd, .events = POLLIN };
-	char buf[1024];
-
-	if (poll(&pfd, 1, 1000) > 0 && read(inotify_fd, buf, sizeof(buf)) < 0)
+	if (fd < 0)
 		return;
+	ioctl(fd, RPMSG_DESTROY_EPT_IOCTL);
+	close(fd);
+}
+
+/* Write the whole buffer, retrying on a short write (a real possibility on
+ * the pty the test stands the endpoint in with, and cheap insurance on the
+ * real chardev too). Returns 1 on success, 0 on a hard error (errno set by
+ * the failing write()). Counts (but does not fail on) every short write. */
+static int write_full(int fd, const char *buf, size_t len, unsigned long *short_writes)
+{
+	size_t off = 0;
+
+	while (off < len) {
+		ssize_t w = write(fd, buf + off, len - off);
+		if (w < 0) {
+			if (errno == EINTR)
+				continue;
+			return 0;
+		}
+		off += (size_t)w;
+		if (off < len)
+			(*short_writes)++;
+	}
+	return 1;
+}
+
+/* Block up to 1s waiting for either a /dev change (a pending endpoint
+ * discovery/reconnect) or a frame arriving on tap while there is no
+ * endpoint to relay it to. tap frames seen here are counted via
+ * *tap_dropped_no_endpoint and dropped: there is nowhere to put them until
+ * the CR52 comes back, but the drop must be visible rather than silent. */
+static void wait_for_dev_or_tap(int inotify_fd, int tap_fd,
+				 unsigned long *tap_dropped_no_endpoint)
+{
+	struct pollfd pfd[2] = {
+		{ .fd = inotify_fd, .events = POLLIN },
+		{ .fd = tap_fd, .events = POLLIN },
+	};
+	char ibuf[1024], fbuf[BUF_LEN];
+
+	if (poll(pfd, 2, 1000) <= 0)
+		return;
+	if (pfd[0].revents & POLLIN) {
+		if (read(inotify_fd, ibuf, sizeof(ibuf)) < 0 &&
+		    errno != EINTR && errno != EAGAIN)
+			return;
+	}
+	if (pfd[1].revents & POLLIN) {
+		ssize_t n = read(tap_fd, fbuf, sizeof(fbuf));
+		if (n > 0)
+			(*tap_dropped_no_endpoint)++;
+	}
 }
 
 /* Open the endpoint: `device` directly if given (test seam), else wait for
  * the CR52 to announce `service` and bind it. Retries indefinitely (until
  * a signal arrives), so the daemon is start-order independent and survives
- * the endpoint going away and coming back across a CR52 reset. */
-static int open_endpoint(const char *device, const char *service, int inotify_fd)
+ * the endpoint going away and coming back across a CR52 reset. tap is kept
+ * drained (see wait_for_dev_or_tap) while this blocks. Returns -1 only
+ * when g_stop was set (a signal arrived); callers should treat that as a
+ * clean-shutdown request, not an error. */
+static int open_endpoint(const char *device, const char *service, int inotify_fd,
+			  int tap_fd, unsigned long *tap_dropped_no_endpoint)
 {
 	for (;;) {
 		int fd = device ? open(device, O_RDWR) : create_ept(service);
@@ -208,7 +267,7 @@ static int open_endpoint(const char *device, const char *service, int inotify_fd
 			return fd;
 		if (g_stop)
 			return -1;
-		wait_for_dev_change(inotify_fd);
+		wait_for_dev_or_tap(inotify_fd, tap_fd, tap_dropped_no_endpoint);
 	}
 }
 
@@ -233,6 +292,8 @@ int main(int argc, char **argv)
 {
 	const char *service = "rpmsg-eth", *tap_name = "tap0", *device = NULL;
 	unsigned long tap_to_ept = 0, ept_to_tap = 0, dropped_oversize = 0;
+	unsigned long tap_dropped_no_endpoint = 0;
+	unsigned long tap_write_errors = 0, ept_write_errors = 0, short_writes = 0;
 	int opt, tap, ept, inotify_fd;
 	struct sigaction sa;
 
@@ -272,20 +333,29 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	ept = open_endpoint(device, service, inotify_fd);
-	if (ept < 0) {
+	ept = open_endpoint(device, service, inotify_fd, tap, &tap_dropped_no_endpoint);
+	if (ept < 0 && !g_stop) {
+		/* open_endpoint() only gives up when g_stop is set; this is
+		 * defensive, not a path we expect to hit. */
 		fprintf(stderr, "rpmsg-eth: stopped waiting for endpoint\n");
 		close(tap);
+		close(inotify_fd);
 		return 1;
 	}
 
-	while (!g_stop) {
+	/* If a signal arrived while still waiting above, ept is -1 and
+	 * g_stop is set: fall straight through to the shared shutdown path
+	 * below (skipping the loop) so this is exit 0, the same as a signal
+	 * during the loop -- "exit 0 on clean SIGTERM" holds regardless of
+	 * when the signal lands. */
+	while (!g_stop && ept >= 0) {
 		struct pollfd pfd[2] = {
 			{ .fd = tap, .events = POLLIN },
 			{ .fd = ept, .events = POLLIN },
 		};
 		char buf[BUF_LEN];
 		ssize_t n;
+		int reconnected = 0;
 
 		if (poll(pfd, 2, -1) < 0) {
 			if (errno == EINTR)
@@ -296,34 +366,66 @@ int main(int argc, char **argv)
 
 		if (pfd[0].revents & POLLIN) {
 			n = read(tap, buf, sizeof(buf));
-			if (n > MAX_FRAME_LEN)
+			if (n > MAX_FRAME_LEN) {
 				dropped_oversize++;
-			else if (n > 0 && write(ept, buf, (size_t)n) == n)
-				tap_to_ept++;
+			} else if (n > 0) {
+				if (write_full(ept, buf, (size_t)n, &short_writes)) {
+					tap_to_ept++;
+				} else {
+					tap_write_errors++;
+					fprintf(stderr,
+						"rpmsg-eth: write(ept) failed: %s\n",
+						strerror(errno));
+					/* A write error on the endpoint is as
+					 * good a signal as a read EOF that the
+					 * CR52 is gone: rebind now instead of
+					 * waiting for the read side to notice.
+					 * pfd[1].revents below described the
+					 * *old* ept fd, so it must not be
+					 * consulted against the new one. */
+					close_ept(ept);
+					ept = open_endpoint(device, service, inotify_fd,
+							     tap, &tap_dropped_no_endpoint);
+					reconnected = 1;
+				}
+			}
 		}
 
-		if (pfd[1].revents & (POLLIN | POLLHUP | POLLERR)) {
+		if (!reconnected && ept >= 0 &&
+		    (pfd[1].revents & (POLLIN | POLLHUP | POLLERR))) {
 			n = read(ept, buf, sizeof(buf));
 			if (n > 0) {
-				if (write(tap, buf, (size_t)n) == n)
+				if (write_full(tap, buf, (size_t)n, &short_writes)) {
 					ept_to_tap++;
+				} else {
+					ept_write_errors++;
+					fprintf(stderr,
+						"rpmsg-eth: write(tap) failed: %s\n",
+						strerror(errno));
+				}
+			} else if (n < 0 && (errno == EINTR || errno == EAGAIN)) {
+				/* Transient; not a disconnect. Retry next
+				 * poll iteration instead of tearing down a
+				 * live endpoint. */
 			} else {
-				/* Endpoint closed: CR52 reset. Rebind and
-				 * keep going rather than exiting. */
-				close(ept);
-				ept = open_endpoint(device, service, inotify_fd);
-				if (ept < 0)
-					break;
+				/* n == 0 (EOF) or a genuine read error:
+				 * CR52 reset. Rebind and keep going rather
+				 * than exiting. */
+				close_ept(ept);
+				ept = open_endpoint(device, service, inotify_fd,
+						     tap, &tap_dropped_no_endpoint);
 			}
 		}
 	}
 
 	close(tap);
-	if (ept >= 0)
-		close(ept);
+	close_ept(ept);
 	close(inotify_fd);
 	fprintf(stderr,
-		"rpmsg-eth: exiting tap_to_ept=%lu ept_to_tap=%lu dropped_oversize=%lu\n",
-		tap_to_ept, ept_to_tap, dropped_oversize);
+		"rpmsg-eth: exiting tap_to_ept=%lu ept_to_tap=%lu dropped_oversize=%lu "
+		"tap_dropped_no_endpoint=%lu tap_write_errors=%lu ept_write_errors=%lu "
+		"short_writes=%lu\n",
+		tap_to_ept, ept_to_tap, dropped_oversize, tap_dropped_no_endpoint,
+		tap_write_errors, ept_write_errors, short_writes);
 	return 0;
 }

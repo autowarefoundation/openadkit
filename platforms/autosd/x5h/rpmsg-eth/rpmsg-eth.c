@@ -347,7 +347,13 @@ int main(int argc, char **argv)
 	 * g_stop is set: fall straight through to the shared shutdown path
 	 * below (skipping the loop) so this is exit 0, the same as a signal
 	 * during the loop -- "exit 0 on clean SIGTERM" holds regardless of
-	 * when the signal lands. */
+	 * when the signal lands. Otherwise both fds are open and we are
+	 * about to enter the poll loop: print a readiness marker so a
+	 * caller (test-rpmsg-eth.sh, under QEMU TCG in CI, cannot assume a
+	 * fixed startup latency) can wait on it instead of guessing. */
+	if (ept >= 0)
+		fprintf(stderr, "rpmsg-eth: ready\n");
+
 	while (!g_stop && ept >= 0) {
 		struct pollfd pfd[2] = {
 			{ .fd = tap, .events = POLLIN },

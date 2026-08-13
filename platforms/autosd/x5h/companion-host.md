@@ -554,23 +554,28 @@ leaves the board unreachable, with nothing to correct at either end.
    whose company runs Tailscale cannot accept until their IT administrator
    permits it. Discovering this after the invite is issued costs a round
    trip and presents as a fault at this end.
-2. Invite them from the admin console — Users, then *Invite external users*
+2. Ask them, in the same message, for the delivery address for the invite
+   and for the SSH **public** key step 5 installs — the single
+   `ssh-ed25519 …` line from their `.pub` file, never the private key. Both
+   are yours to request rather than theirs to know: nothing reaches you by
+   itself, and an unrequested key eventually arrives in the wrong half.
+3. Invite them from the admin console — Users, then *Invite external users*
    — by e-mail or by link. Invites are one-time and expire after 30 days.
    Each user who accepts counts against the tailnet's plan: a hard cap on
    the free tier, and a per-user charge on the paid ones, where there is no
    user limit to plan around.
-3. Once they have accepted, read their identity off the Users page and add
+4. Once they have accepted, read their identity off the Users page and add
    that string to `group:x5h-ext` exactly as shown. They authenticate with
    whichever provider they choose — any supported IdP, or a passkey — so
    what belongs in the group is **not knowable before they accept**, and is
    usually an e-mail address rather than a login of this tailnet's own
    provider.
-4. Append their public key to `/etc/ssh/authorized_keys.d/root` on the
+5. Append their public key to `/etc/ssh/authorized_keys.d/root` on the
    board — or to `config/x5h-authorized-keys` if it should survive an
    image rebuild.
-5. Verify with the checks below, from their node.
+6. Verify with the checks below, from their node.
 
-Steps 3 and 4 are independent, and each is silent when omitted: without the
+Steps 4 and 5 are independent, and each is silent when omitted: without the
 grant their SSH hangs, without the key it is refused. Doing one and calling
 it done is the usual result of splitting them across a day.
 

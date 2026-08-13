@@ -555,9 +555,10 @@ leaves the board unreachable, with nothing to correct at either end.
    permits it. Discovering this after the invite is issued costs a round
    trip and presents as a fault at this end.
 2. Invite them from the admin console — Users, then *Invite external users*
-   — by e-mail or by link. Invites are one-time and expire after 30 days,
-   and each user who accepts takes a seat on the tailnet's plan (six on the
-   current free Personal plan, administrator included).
+   — by e-mail or by link. Invites are one-time and expire after 30 days.
+   Each user who accepts counts against the tailnet's plan: a hard cap on
+   the free tier, and a per-user charge on the paid ones, where there is no
+   user limit to plan around.
 3. Once they have accepted, read their identity off the Users page and add
    that string to `group:x5h-ext` exactly as shown. They authenticate with
    whichever provider they choose — any supported IdP, or a passkey — so

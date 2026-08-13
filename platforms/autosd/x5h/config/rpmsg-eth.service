@@ -1,0 +1,37 @@
+# rpmsg-eth.service -- bridges the CR52's rpmsg-eth endpoint to a Linux TAP
+# device (tap0), giving the safety island a normal IP link to the A-core
+# side (see platforms/autosd/x5h/rpmsg-eth/rpmsg-eth.c).
+#
+# Plain host unit, not a Quadlet container: the daemon needs direct access
+# to /dev/net/tun, the CR52's /dev/rpmsg_ctrl*/rpmsg<N> chardevs, and the
+# sysfs rpmsg bus (/sys/bus/rpmsg/devices) to discover its endpoint --
+# containerising it would mean punching all three through the container's
+# device cgroup for zero isolation benefit, since this process's entire job
+# IS to bridge two host-level network primitives. The DDS peers that sit on
+# top of this link (domain 2) are containers; this unit is the link-layer
+# plumbing underneath them, deliberately kept off the container path.
+#
+# No After=/Wants= on a specific rpmsg device unit: the daemon's own
+# open_endpoint() retry loop (rpmsg-eth.c) already waits for the CR52's
+# endpoint to appear via inotify on /dev, so an ordering dependency here
+# would be redundant, not load-bearing.
+#
+# Not installed by aib/x5h-rootfs.aib.yml today -- see rpmsg-dualboot.md for
+# the same manual install-to-/usr/local pattern already used for
+# rpmsg-ping/rpmsg-smoke.sh. Install alongside the daemon binary and this
+# unit's ifup helper:
+#   install -m0755 rpmsg-eth /usr/local/bin/rpmsg-eth
+#   install -m0755 rpmsg-eth-ifup.sh /usr/local/sbin/rpmsg-eth-ifup.sh
+#   install -m0644 rpmsg-eth.service /etc/systemd/system/rpmsg-eth.service
+#   systemctl enable --now rpmsg-eth.service
+[Unit]
+Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
+
+[Service]
+ExecStartPre=/usr/local/sbin/rpmsg-eth-ifup.sh
+ExecStart=/usr/local/bin/rpmsg-eth -s rpmsg-eth -t tap0
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

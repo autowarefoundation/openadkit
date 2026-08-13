@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Build the two pinned test images for the x5h gate and board smoke.
+# Build the three pinned test images for the x5h gate and board smoke.
 # Usage: make-test-images.sh <outdir>   (needs docker with arm64 support + skopeo)
 set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$(mkdir -p "$1" && cd "$1" && pwd)"
 
 # 1. busybox: tiny runtime + httpd for the networking assertion. ECR public
@@ -44,4 +45,30 @@ with tarfile.open(sys.argv[1]) as outer:
             continue
 sys.exit(0 if found else "FATAL: no security.capability xattr in any layer")
 EOF
+
+# 4. rpmsg-eth: the Task 9 daemon's own unit test (test-rpmsg-eth.sh) needs a
+#    toolchain (gcc/make) plus socat/tcpdump/xxd/iproute/iputils that the aib
+#    guest rootfs manifest (aib/x5h-rootfs.aib.yml) deliberately does NOT
+#    carry -- that manifest's content.rpms list ships to the REAL board via
+#    make-ufs-rootfs.sh/stage-nfs-rootfs.sh, and a compiler + test-tool
+#    footprint there would be a permanent board-image cost paid for a
+#    CI-only concern. Packaging them into a throwaway test container instead
+#    (same pattern as x5h-captest above) keeps the board image pristine
+#    while still genuinely exercising the booted guest kernel's TUN/TAP
+#    behaviour: the container is run with real /dev/net/tun access and its
+#    own private netns (test-rpmsg-eth.sh's `unshare -rn` self-wrap), so
+#    tap0 is a real interface on the kernel under test, not a mock.
+tmp="$(mktemp -d)"
+cp "$HERE/../rpmsg-eth/rpmsg-eth.c" "$HERE/../rpmsg-eth/Makefile" \
+   "$HERE/../rpmsg-eth/test-rpmsg-eth.sh" "$tmp/"
+cat > "$tmp/Containerfile" <<'EOF'
+FROM quay.io/fedora/fedora:42
+RUN dnf -y install gcc make glibc-static socat tcpdump xxd iproute iputils && \
+    dnf clean all
+COPY rpmsg-eth.c Makefile test-rpmsg-eth.sh /opt/rpmsg-eth/
+EOF
+docker build --platform linux/arm64 -f "$tmp/Containerfile" -t x5h-rpmsg-eth-test:latest "$tmp"
+docker save x5h-rpmsg-eth-test:latest -o "$OUT/rpmsg-eth-docker.tar"
+rm -rf "$tmp"
+
 echo "OK: $OUT"

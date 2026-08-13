@@ -33,8 +33,8 @@ fi
 exit "$st"
 ' EXIT
 sudo mkdir -p "$MNT/var/lib/autosd-test"
-sudo cp "$IMAGES/busybox-oci.tar" "$IMAGES/captest-docker.tar" "$HERE/gate-guest.sh" \
-        "$MNT/var/lib/autosd-test/"
+sudo cp "$IMAGES/busybox-oci.tar" "$IMAGES/captest-docker.tar" "$IMAGES/rpmsg-eth-docker.tar" \
+        "$HERE/gate-guest.sh" "$MNT/var/lib/autosd-test/"
 sudo chmod +x "$MNT/var/lib/autosd-test/gate-guest.sh"
 
 # fstab was written for a disk image and carries a LABEL=ESP entry for

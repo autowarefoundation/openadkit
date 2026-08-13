@@ -481,7 +481,7 @@ disk, which is what `stage-nfs-rootfs.sh` consumes at board time.
 
 The replay needs three inputs: the rootfs tar, the rebuilt kernel's output
 directory (`Image-autosd`, `modules-6.1.102-autosd.tar` and
-`kernelrelease.txt` all come from it), and the two test-image tars. Build
+`kernelrelease.txt` all come from it), and the three test-image tars. Build
 them from source (below) or download a bundle CI already produced. **Neither
 route needs the NDA R-Car xOS SDK or any credential-gated download** — the
 rootfs resolves from public AutoSD 10 and EPEL 10 repos, the kernel builds
@@ -526,10 +526,11 @@ sudo bash ./auto-image-builder.sh build --tar \
 #    only (see "Board deployment" above), never to the gate.
 kernel/build-bsp-kernel.sh /tmp/x5h-kernel
 
-# 3. The two test images. make-test-images.sh also verifies the captest
+# 3. The three test images. make-test-images.sh also verifies the captest
 #    archive really carries a security.capability PAX record, so an xattr
 #    silently dropped at build time cannot reach the gate disguised as a
-#    GATE2 finding.
+#    GATE2 finding. The third, rpmsg-eth-docker.tar, carries the daemon
+#    source and its pty-mock unit test for GATE8 to run in-guest.
 scripts/make-test-images.sh /tmp/x5h-testimages
 ```
 
@@ -580,6 +581,7 @@ gh run download --repo youtalk/openadkit -n x5h-gate-bundle -D /tmp/x5h-bundle \
 #   Image-autosd  r8a78000-ironhide-uio-autosd.dtb  modules-6.1.102-autosd.tar
 #   kernelrelease.txt  config-autosd.txt  x5h-rootfs.tar  x5h-gate.log
 #   testimages/busybox-oci.tar  testimages/captest-docker.tar
+#   testimages/rpmsg-eth-docker.tar
 # There is no ext4 export in it: it is reproducible and large, so the replay
 # rebuilds it from the tar, the same way the CI workflow's own "Derive the
 # ext4 export from the tar" step does.
@@ -655,7 +657,7 @@ sudo umount "$mnt"
 rmdir "$mnt"
 
 # 2. Inject the test payload. Use the script, not a hand-copy: besides the
-#    two test tars and gate-guest.sh, it also neutralizes /etc/fstab
+#    three test tars and gate-guest.sh, it also neutralizes /etc/fstab
 #    (preserving the original as fstab.image) — skip that and the guest
 #    reboot-loops on the stock fstab's ESP entry (see Troubleshooting) —
 #    and now also extracts the rebuilt kernel's module tree from its third
@@ -718,7 +720,7 @@ board-safety invariants; do not reorder it.
 
 The two inputs come from wherever "Running locally" above got them — built from source, or
 unpacked from a CI bundle. The bundle is flat but not entirely flat: the tarball sits at the
-top level while the two test images sit one level down, under `testimages/`. Resolve both by
+top level while the three test images sit one level down, under `testimages/`. Resolve both by
 lookup rather than by assuming a fixed path:
 
 ```bash

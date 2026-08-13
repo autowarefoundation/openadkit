@@ -190,4 +190,35 @@ else
     echo GATE7_SELINUX_BOOLS_OK
 fi
 
+# --- GATE8: rpmsg-eth daemon unit test (Task 9's test-rpmsg-eth.sh), run
+# inside a dedicated Fedora test container that carries the toolchain
+# (gcc/make) and tools (socat/tcpdump/xxd) the daemon's build+test need --
+# see make-test-images.sh for why those live in a throwaway container image
+# instead of the board's own aib manifest. --network=none: the daemon under
+# test only ever talks to a mock pty endpoint and a tap0 it creates inside
+# its OWN private netns (test-rpmsg-eth.sh's `unshare -rn` self-wrap), so it
+# needs no container network at all, and isolating it fully keeps it from
+# ever touching GATE6's podman networking above.
+#
+# GATE_RPMSG_ETH_UNIT_PASS is required to come from BOTH a zero podman-run
+# exit status AND a literal TEST_PASS in its output: exit-status-alone would
+# also read as success if the image failed to load and podman errored out
+# some other way, or if a future edit to the container's entrypoint changed
+# what "container exits 0" means without test-rpmsg-eth.sh actually having
+# run -- the marker must not be able to fire without the real test printing
+# its own, separately-meaningful PASS line.
+podman load -i "$T/rpmsg-eth-docker.tar" >/tmp/g8.log 2>&1
+RPMSGETH="$(podman images --format '{{.Repository}}:{{.Tag}}' | grep -m1 rpmsg-eth)"
+if [ -n "$RPMSGETH" ] && podman run --rm --cap-add=NET_ADMIN --cap-add=SYS_ADMIN \
+        --device /dev/net/tun --network=none "$RPMSGETH" \
+        sh -c 'cd /opt/rpmsg-eth && ./test-rpmsg-eth.sh' >/tmp/g8-run.log 2>&1 \
+        && grep -q TEST_PASS /tmp/g8-run.log; then
+    echo GATE_RPMSG_ETH_UNIT_PASS
+else
+    echo GATE_RPMSG_ETH_UNIT_FAIL
+    tail -5 /tmp/g8.log
+    tail -20 /tmp/g8-run.log
+fi
+podman rmi -af >/dev/null 2>&1
+
 echo GATE_DONE

@@ -40,9 +40,11 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     install -d \
       "${pkg_prefix}/share/ament_index/resource_index/packages" \
       "${pkg_prefix}/share/autoware_ground_segmentation_cuda" \
-      "${pkg_prefix}/share/colcon-core/packages" && \
+      "${pkg_prefix}/share/colcon-core/packages" \
+      /opt/autoware/share/colcon-core/packages && \
     touch "${pkg_prefix}/share/ament_index/resource_index/packages/autoware_ground_segmentation_cuda" && \
     : > "${pkg_prefix}/share/colcon-core/packages/autoware_ground_segmentation_cuda" && \
+    : > /opt/autoware/share/colcon-core/packages/autoware_ground_segmentation_cuda && \
     printf '%s\n' \
       'source;share/autoware_ground_segmentation_cuda/local_setup.dsv' \
       > "${pkg_prefix}/share/autoware_ground_segmentation_cuda/package.dsv" && \

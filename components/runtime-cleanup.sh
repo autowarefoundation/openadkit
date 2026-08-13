@@ -8,6 +8,7 @@ find /opt/autoware /opt/acados \
     -type f \( -name '*.a' -o -name '*.o' \) -delete 2>/dev/null || true
 rm -rf \
     /opt/autoware/include \
+    /opt/autoware/*/include \
     /opt/acados/include \
     /root/.cache \
     /home/aw/.cache

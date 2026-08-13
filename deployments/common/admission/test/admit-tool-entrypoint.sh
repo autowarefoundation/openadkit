@@ -9,14 +9,36 @@
 # stderr first, since silently dropping the QoS check is never safe for a deploy-time gate. The
 # process is replaced with manifest_admit (exec), so the container exit status is manifest_admit's
 # own — 0 accepted / 1 rejection / 2 operational error — which deploy_check.sh propagates verbatim.
+#
+# Exit 1 is therefore reserved for manifest_admit's own admission verdicts: every failure of THIS
+# script exits 2 instead. Otherwise a broken tool image (an overlay that will not source, an install
+# space without the executable) would exit 1 and be reported by deploy_check.sh as an interface
+# rejection of the images under test, which is precisely the conflation the 0/1/2 contract exists to
+# prevent. `set -e` is left on as a backstop for anything unforeseen, but every step below states its
+# own exit 2 explicitly rather than relying on it.
+#
 # The ROS / ament setup scripts reference variables that may be unset, so `set -u` is intentionally
-# NOT enabled here; `set -e` still aborts on a genuine sourcing failure.
+# NOT enabled here.
 set -e
 
 # shellcheck source=/dev/null
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/jazzy/setup.bash || {
+    echo "admit-tool-entrypoint: cannot source /opt/ros/jazzy/setup.bash - broken tool image" >&2
+    exit 2
+}
 # shellcheck source=/dev/null
-source /ws/install/setup.bash
+source /ws/install/setup.bash || {
+    echo "admit-tool-entrypoint: cannot source the admission overlay /ws/install/setup.bash - broken tool image" >&2
+    exit 2
+}
+
+# The admission executable is installed under the package's lib directory rather than on PATH, so it
+# is probed the way it will actually be invoked. Without this guard a missing executable would
+# surface as `ros2 run`'s own non-zero status, which is 1.
+if ! ros2 pkg executables autoware_component_interface_admission 2>/dev/null | grep -q 'manifest_admit$'; then
+    echo "admit-tool-entrypoint: manifest_admit is not installed in this image's autoware_component_interface_admission overlay - broken tool image" >&2
+    exit 2
+fi
 
 manifest_admit_args=()
 if [ -f /opt/autoware/interface_manifest.json ]; then

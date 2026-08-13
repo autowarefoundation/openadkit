@@ -5,8 +5,8 @@
 # It resolves a dedicated ADMIT_TOOL_IMAGE that contains manifest_admit from
 # autoware_component_interface_admission, builds a matrix of label-only fixture images (each
 # carrying a fixture interface manifest as the OCI label org.autoware.interface_manifest), and
-# asserts deploy_check.sh's exit code (and, for broken-config and qos-reject, its diagnostic output)
-# on nine composed image sets:
+# asserts deploy_check.sh's exit code (and, for broken-config and the QoS rejections, its diagnostic
+# output) on eleven composed image sets:
 #   compatible      -> 0 (accepted)
 #   incompatible    -> 1 (MAJOR mismatch)
 #   no-provider     -> 1 (required interface with no provider in the set)
@@ -23,18 +23,30 @@
 #                      manifest_admit's verdict text, not just the exit code. The set holds this one
 #                      publisher-only image, so no pairing exists that could produce a non-zero
 #                      exit for any other reason)
-#   qos-conformant  -> 0 (the same provider with the exact QoS its spec declares: the A/B twin of
-#                      qos-reject, identical except for `reliability`, which pins the verdict above
-#                      down to exact matching)
+#   qos-stronger    -> 1 (the same, but deviating in the STRONGER direction: transient_local where
+#                      the spec declares volatile. This is the row that pins the semantics to exact
+#                      matching, because a rank-based "at least as strong as" rule would ADMIT it,
+#                      whereas qos-reject's weaker deviation is rejected by either rule and so
+#                      cannot tell them apart. Verdict text asserted here too)
+#   qos-conformant  -> 0 (the same provider with the exact QoS its spec declares: the control for
+#                      both rejections above, identical to each of them but for the one field each
+#                      deviates in)
+#   unreadable-fragment -> 2 (the image's only fragment match is a DIRECTORY of that name, so the
+#                      fragment cannot be read. An unreadable fragment is an operational error, and
+#                      must not escape as `cp`'s own status 1, which would read as a rejection)
 #   multi-fragment  -> 1 (one image carries two installed fragments at two different depths —
 #                      one at the documented path, one nested one level deeper the way the
 #                      install(DIRECTORY config ...) CMake trap would install it — and the
 #                      deeper one's unmet requirement must still be caught: NO_PROVIDER)
 #
-# It also runs the spec-manifest-less base tool image directly (bypassing deploy_check.sh) to assert
-# that admit-tool-entrypoint.sh itself warns on stderr when it finds no spec manifest to pass — the
-# tool-side half of the same no-silent-no-op requirement manifest_admit's own CLI test covers on the
-# library side.
+# It also asserts two properties that are about the TOOL rather than the images under test:
+#   * admit-tool-entrypoint.sh warns on stderr when the tool image carries no spec manifest (run
+#     directly against the spec-manifest-less base image, bypassing deploy_check.sh) — the tool-side
+#     half of the same no-silent-no-op requirement manifest_admit's own CLI test covers on the
+#     library side.
+#   * a broken tool image is an operational error (exit 2), never an interface rejection (exit 1).
+#     Three separate breakages are exercised, each of which would otherwise surface as exit 1 and
+#     blame the images under test for a fault in the tool.
 #
 # Admission tool image:
 #   BASE_TOOL_IMAGE (default autoware-admit-tool:jazzy) is the plain tool image built by
@@ -154,6 +166,24 @@ build_fragments_image() {
     docker build -t "${tag}" "${ctx}"
     built_images+=("${tag}")
 }
+# Builds a label-less image whose ONLY `find -name interface_manifest_fragment.json` match is a
+# DIRECTORY of that name (`find` matches by name, so it cannot tell the two apart), which the fragment
+# loop's `cp` must fail on. deploy_check.sh has to report that as an operational error rather than let
+# `cp`'s own exit status 1 escape and be read by the caller as an admission rejection.
+build_directory_fragment_image() {
+    local tag="$1"
+    local ctx
+    ctx="$(mktemp -d "${workdir}/dir_fragment_ctx.XXXXXX")"
+    mkdir -p "${ctx}/share/fixture_pkg_dir/interface_manifest_fragment.json"
+    echo '{}' >"${ctx}/share/fixture_pkg_dir/interface_manifest_fragment.json/placeholder"
+    {
+        echo 'FROM scratch'
+        echo 'CMD ["true"]'
+        echo "COPY share/fixture_pkg_dir/interface_manifest_fragment.json/placeholder /opt/autoware/share/fixture_pkg_dir/interface_manifest_fragment.json/placeholder"
+    } >"${ctx}/Dockerfile"
+    docker build -t "${tag}" "${ctx}"
+    built_images+=("${tag}")
+}
 # Builds an image carrying NO org.autoware.interface_manifest label, with two installed manifest
 # fragments for two different packages at two different depths: one at the documented depth-2 path
 # (share/<pkg>/interface_manifest_fragment.json) and one nested one level deeper
@@ -183,9 +213,11 @@ build_labeled "${TAG_PREFIX}consumer-compatible" "${FIXTURES}/manifests/consumer
 build_labeled "${TAG_PREFIX}consumer-incompatible" "${FIXTURES}/manifests/consumer_incompatible.json"
 build_labeled "${TAG_PREFIX}consumer-no-provider" "${FIXTURES}/manifests/consumer_no_provider.json"
 build_labeled "${TAG_PREFIX}qos-provider-best-effort" "${FIXTURES}/manifests/qos_provider_best_effort.json"
+build_labeled "${TAG_PREFIX}qos-provider-transient-local" "${FIXTURES}/manifests/qos_provider_transient_local.json"
 build_labeled "${TAG_PREFIX}qos-provider-conformant" "${FIXTURES}/manifests/qos_provider_conformant.json"
 build_unlabeled "${TAG_PREFIX}unlabeled"
 build_fragments_image "${TAG_PREFIX}fragment-provider" "${FIXTURES}/manifests/planning_trajectory_provider.json"
+build_directory_fragment_image "${TAG_PREFIX}directory-fragment"
 build_multi_fragment_image "${TAG_PREFIX}multi-fragment" \
     "${FIXTURES}/manifests/planning_trajectory_provider.json" \
     "${FIXTURES}/manifests/consumer_no_provider.json"
@@ -243,7 +275,11 @@ assert_exit 2 "${FIXTURES}/compose/compose.unlabeled.yaml" "unlabeled-image"
 assert_exit_and_stderr 2 "${FIXTURES}/compose/compose.broken-config.yaml" "broken-config" \
     "docker compose -f" "DEPLOY_CHECK_SELF_TEST_MUST_BE_SET" "no images in"
 assert_exit 0 "${FIXTURES}/compose/compose.fragments.yaml" "fragments"
+assert_exit_and_output 2 "${FIXTURES}/compose/compose.unreadable-fragment.yaml" "unreadable-fragment" \
+    "unreadable manifest fragment"
 assert_exit_and_output 1 "${FIXTURES}/compose/compose.qos-reject.yaml" "qos-reject" \
+    "QOS mismatch: endpoint QoS differs from the QoS its spec declares"
+assert_exit_and_output 1 "${FIXTURES}/compose/compose.qos-stronger.yaml" "qos-stronger" \
     "QOS mismatch: endpoint QoS differs from the QoS its spec declares"
 assert_exit 0 "${FIXTURES}/compose/compose.qos-conformant.yaml" "qos-conformant"
 assert_exit 1 "${FIXTURES}/compose/compose.multi-fragment.yaml" "multi-fragment-image"
@@ -259,5 +295,46 @@ no_spec_err="$(docker run --rm -v "${no_spec_in_dir}:/in:ro" "${BASE_TOOL_IMAGE}
 echo "${no_spec_err}" | grep -qF -- "no spec manifest" ||
     fail "no-spec-manifest tool warning: expected stderr to contain 'no spec manifest', got: ${no_spec_err}"
 log "OK no-spec-manifest tool warning: admit-tool-entrypoint.sh warned as expected"
+
+# ---- 6. Assert a broken tool image is an operational error, never a rejection -----------------
+# A fault in the tool must never be reported as an interface rejection of the images under test: exit
+# 1 means "these images are incompatible", and a deploy pipeline acts on that. Each breakage below
+# would produce exit 1 without the guards it exercises — the entrypoint's own `|| exit 2` on each
+# source, its executable probe, and deploy_check.sh's requirement that an exit 1 be accompanied by at
+# least one verdict line (the last of which is what protects the contract for a foreign tool image
+# that does not use this entrypoint at all). Every case runs against compose.compatible.yaml, whose
+# only correct verdicts are ACCEPTED, so a wrong exit 1 could not come from the fixtures.
+build_derived_tool_image() {
+    local tag="$1" body="$2"
+    printf 'FROM %s\n%s\n' "${TOOL_IMAGE}" "${body}" | docker build -t "${tag}" -
+    built_images+=("${tag}")
+}
+
+assert_broken_tool_is_operational_error() {
+    local tag="$1" name="$2" needle="$3" rc=0 combined
+    echo "---- ${name} (expect exit 2, output containing '${needle}') ----------------------------------------------"
+    combined="$(ADMIT_TOOL_IMAGE="${tag}" "${DEPLOY_CHECK}" \
+        "${FIXTURES}/compose/compose.compatible.yaml" 2>&1)" || rc=$?
+    [ "${rc}" -eq 2 ] || fail "${name}: expected exit 2 (operational error), got ${rc}"
+    echo "${combined}" | grep -qF -- "${needle}" ||
+        fail "${name}: expected output to contain '${needle}', got: ${combined}"
+    log "OK ${name}: a broken tool image exited 2, not 1"
+}
+
+build_derived_tool_image "${TAG_PREFIX}admit-tool-no-overlay" 'RUN rm -f /ws/install/setup.bash'
+assert_broken_tool_is_operational_error "${TAG_PREFIX}admit-tool-no-overlay" \
+    "broken-tool-unsourceable-overlay" "cannot source the admission overlay"
+
+build_derived_tool_image "${TAG_PREFIX}admit-tool-no-executable" \
+    'RUN find /ws/install -name manifest_admit -type f -delete'
+assert_broken_tool_is_operational_error "${TAG_PREFIX}admit-tool-no-executable" \
+    "broken-tool-missing-executable" "manifest_admit is not installed"
+
+# A tool image that says nothing and exits 1 — the foreign / non-conforming tool image case, caught by
+# deploy_check.sh itself rather than by anything in admit-tool-entrypoint.sh.
+build_derived_tool_image "${TAG_PREFIX}admit-tool-silent-failure" \
+    'ENTRYPOINT ["/bin/sh", "-c", "exit 1"]'
+assert_broken_tool_is_operational_error "${TAG_PREFIX}admit-tool-silent-failure" \
+    "broken-tool-silent-exit-1" "exited 1 without emitting any verdict line"
 
 log "ALL ASSERTIONS PASSED"

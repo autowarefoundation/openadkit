@@ -20,8 +20,12 @@
 #
 # manifest_admit runs from a dedicated tool image (ADMIT_TOOL_IMAGE), NEVER from an image under
 # test. That image's entrypoint must run manifest_admit with the ROS overlay sourced, taking the
-# manifest JSON file paths as arguments and honouring manifest_admit's 0/1/2 exit-code contract
-# (see test/admit-tool-entrypoint.sh next to this script for the reference tool image).
+# manifest JSON file paths as arguments and honouring manifest_admit's 0/1/2 exit-code contract --
+# in particular it must reserve exit 1 for real admission verdicts and use exit 2 for its own
+# failures (see test/admit-tool-entrypoint.sh next to this script for the reference tool image).
+# This script does not take that on trust: an exit 1 unaccompanied by any verdict line on stdout is
+# re-classified as an operational error (exit 2), so a broken tool image can never be reported as an
+# interface rejection of the images under test.
 #
 # Usage:
 #   ./deploy_check.sh <compose-file>
@@ -34,8 +38,9 @@
 #      given) -- a TOPIC mismatch is a remap-time condition and is never seen here; it is only ever
 #      raised by the runtime trigger (see the README next to this script)
 #   2  operational error (`docker compose config` failed, no images, `docker inspect` failed, an
-#      image has neither the label nor any installed manifest fragment, or the admission tool could
-#      not be run)
+#      image has neither the label nor any installed manifest fragment or carries an unreadable one,
+#      or the admission tool could not be run -- including a tool image that exits 1 without
+#      emitting a single verdict line)
 set -euo pipefail
 
 COMPOSE_FILE="${1:?usage: deploy_check.sh <compose-file>}"
@@ -43,7 +48,13 @@ LABEL="org.autoware.interface_manifest"
 ADMIT_TOOL_IMAGE="${ADMIT_TOOL_IMAGE:-autoware-admit-tool:jazzy}"
 
 workdir="$(mktemp -d)"
-trap 'rm -rf "${workdir}"' EXIT
+# `cid` holds the throwaway container of the fragment fallback below, and is registered with the
+# EXIT trap rather than only removed inline: `docker cp` of a multi-GB component image is the
+# longest operation this script performs, and an interrupt or a CI cancellation in the middle of it
+# would otherwise leak the container. It is set to "" again as soon as it has been removed inline,
+# so the trap never chases an already-removed container.
+cid=""
+trap 'rm -rf "${workdir}"; if [ -n "${cid}" ]; then docker rm -f "${cid}" >/dev/null 2>&1 || true; fi' EXIT
 
 # Resolve the image set the deploy config selects (no pull, no boot). `docker compose`'s own exit
 # status is checked directly against a captured-to-file run, not through a pipe or process
@@ -96,13 +107,25 @@ for img in "${images[@]}"; do
         # ran. A leaked throwaway container is worth a warning, never a wrong exit code.
         if ! docker cp "${cid}:/opt/autoware/share" "${workdir}/share_${i}" 2>"${workdir}/cp_err"; then
             docker rm -f "${cid}" >/dev/null 2>&1 || echo "deploy_check: warning: failed to remove throwaway container ${cid}" >&2
+            cid=""
             echo "deploy_check: image ${img} has neither the ${LABEL} label nor /opt/autoware/share - not IF-versioning conformant" >&2
             exit 2
         fi
         docker rm -f "${cid}" >/dev/null 2>&1 || echo "deploy_check: warning: failed to remove throwaway container ${cid}" >&2
+        cid=""
         found=0
         while IFS= read -r frag; do
-            cp "${frag}" "${workdir}/manifest_${i}_${found}.json"
+            # An unreadable match must exit 2, not fall through to `cp`'s own status: the loop body
+            # runs in this shell, so under `set -e` a bare `cp` failure would abort with status 1 --
+            # indistinguishable, to the caller, from a real admission rejection, and with no
+            # diagnostic at all. `find -name` matches by name only, so the match can be a DIRECTORY
+            # called interface_manifest_fragment.json, or a symlink that `docker cp` extracted
+            # dangling; both are non-conformant images, which is an operational error.
+            if ! cp "${frag}" "${workdir}/manifest_${i}_${found}.json" 2>"${workdir}/frag_cp_err"; then
+                echo "deploy_check: image ${img}: unreadable manifest fragment ${frag#"${workdir}/share_${i}/"}" >&2
+                sed 's/^/  /' "${workdir}/frag_cp_err" >&2
+                exit 2
+            fi
             admit_args+=("/in/manifest_${i}_${found}.json")
             found=$((found + 1))
             # No -maxdepth here: a fragment installed one level deeper than the documented
@@ -128,7 +151,24 @@ done
 
 echo "[deploy_check] running admission over ${i} manifest(s) via ${ADMIT_TOOL_IMAGE} (no boot, no DDS)"
 rc=0
-docker run --rm -v "${workdir}:/in:ro" "${ADMIT_TOOL_IMAGE}" "${admit_args[@]}" || rc=$?
+# The tool's stdout is teed to a log as well as shown, so an exit 1 can be corroborated against the
+# verdict lines that must accompany it (see below). Only stdout is redirected: the tool's stderr
+# (its own warnings) still passes straight through to this script's stderr. `pipefail` is on, and
+# `tee` cannot fail here, so ${rc} is the container's own status and not tee's.
+tool_log="${workdir}/admit_stdout.log"
+docker run --rm -v "${workdir}:/in:ro" "${ADMIT_TOOL_IMAGE}" "${admit_args[@]}" |
+    tee "${tool_log}" || rc=$?
+
+# A rejection is only believed when the tool actually printed a verdict. manifest_admit prints one
+# "<consumer> <- <provider> [<interface>]: <text> (code=N)" line per verdict before returning 1, so
+# an exit 1 with no such line did not come from the admission rule at all -- it is a broken or
+# misbehaving tool image (a failed overlay source, a missing executable, a wrapper that exits 1 on
+# its own). Reporting that as REJECTED would blame the images under test for a fault in the tool, and
+# is exactly the conflation the 0/1/2 split exists to prevent, so it is re-classified as exit 2.
+if [ "${rc}" -eq 1 ] && ! grep -qE '\(code=[0-9]+\)$' "${tool_log}"; then
+    echo "deploy_check: the admission tool image ${ADMIT_TOOL_IMAGE} exited 1 without emitting any verdict line — treating it as an operational error, not a rejection" >&2
+    exit 2
+fi
 
 case "${rc}" in
 0)

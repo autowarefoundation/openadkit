@@ -2,9 +2,11 @@
 # manifest declares for the interface (reliable / volatile), so no QOS_SPEC_MISMATCH row is
 # produced and the set is admitted (exit 0).
 #
-# Twin of compose.qos-reject.yaml, which uses a provider manifest identical to this one except for
-# `reliability`. The A/B pair is what pins the verdict down to exact matching: the same tool image
-# and the same spec manifest reject one and admit the other.
+# The control for the two rejection sets: compose.qos-reject.yaml deviates from the spec in the
+# weaker direction and compose.qos-stronger.yaml in the stronger one, and each uses a provider
+# manifest identical to this one but for that single field. Together the three sets pin the semantics
+# to exact matching -- this one shows conformance is admitted, qos-stronger shows a deviation an
+# ordering rule would have admitted is still rejected -- under the same tool image and spec manifest.
 services:
   provider:
     image: autoware-admission-self-test-qos-provider-conformant

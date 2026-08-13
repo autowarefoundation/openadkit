@@ -1,0 +1,10 @@
+# Unreadable fragment: the image carries no label, and the only thing the fragment fallback's
+# `find -name interface_manifest_fragment.json` matches is a DIRECTORY of that name -- `find` matches
+# by name, so it cannot tell a file from a directory, and the same applies to a symlink `docker cp`
+# extracted dangling. Reading the fragment therefore fails, which is an operational error (exit 2,
+# with a diagnostic naming the fragment). What it must NOT do is let `cp`'s own exit status 1 escape:
+# the loop body runs in deploy_check.sh's own shell, so an unguarded failure would abort with status 1
+# and be read by the caller as "these images are interface-incompatible".
+services:
+  provider:
+    image: autoware-admission-self-test-directory-fragment

@@ -1,0 +1,12 @@
+# Spec-QoS rejection, STRONGER than the spec: a lone provider offers transient_local durability
+# where the fixture spec manifest declares volatile. transient_local delivers everything volatile
+# does and more, so DDS would happily connect and any rank-based "at least as strong as" rule would
+# admit this endpoint. Exact matching rejects it (QOS_SPEC_MISMATCH, exit 1), because the QoS an
+# interface is specified with is a requirement on both sides, not a floor either side may exceed.
+#
+# This is the row that actually pins the semantics: compose.qos-reject.yaml (best_effort, WEAKER
+# than the spec) is rejected by an ordering rule and by exact matching alike, so it cannot tell them
+# apart. Only a deviation in the stronger direction can, which is why this set exists alongside it.
+services:
+  provider:
+    image: autoware-admission-self-test-qos-provider-transient-local

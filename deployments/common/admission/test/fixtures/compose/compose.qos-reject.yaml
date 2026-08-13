@@ -6,7 +6,10 @@
 # pairing exists here that could produce a non-zero exit for any other reason.
 #
 # Twin of compose.qos-conformant.yaml: the two provider manifests are identical except for
-# `reliability`, so the pair isolates the exact-match verdict to that one field.
+# `reliability`, so the pair isolates the verdict to that one field. What the pair does NOT show:
+# best_effort is weaker than reliable under any ordering, so a rank-based "at least as strong as"
+# rule would reject this set too. compose.qos-stronger.yaml is the set that tells exact matching and
+# an ordering rule apart.
 services:
   provider:
     image: autoware-admission-self-test-qos-provider-best-effort

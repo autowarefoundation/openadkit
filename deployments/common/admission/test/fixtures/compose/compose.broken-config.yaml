@@ -1,0 +1,13 @@
+# Invalid deploy config: interpolates a required variable (the Compose Specification's
+# ${VAR:?message} syntax) that is never set in the environment. `docker compose config --images`
+# itself must fail here -- deploy_check.sh must surface that failure as itself (exit 2, a distinct
+# "docker compose ... failed" message) rather than misreporting it as "no images". A missing
+# env_file was tried first, but at least one docker compose version resolves that case anyway
+# (treats the referenced file as simply absent rather than an error), so it does not fail on every
+# version; the required-variable form is specified to always error when the variable is unset, on
+# any compose version that implements the Compose Specification.
+services:
+  provider:
+    image: autoware-admission-self-test-provider
+    environment:
+      DEPLOY_CHECK_SELF_TEST_TOKEN: ${DEPLOY_CHECK_SELF_TEST_MUST_BE_SET:?DEPLOY_CHECK_SELF_TEST_MUST_BE_SET must be set}

@@ -1,0 +1,16 @@
+{
+  "owner": "autowarefoundation",
+  "node_name": "/planning/behavior_planner",
+  "provided": [],
+  "required": [
+    {
+      "ns": "localization",
+      "interface_name": "/localization/kinematic_state",
+      "resolved_name": "/localization/kinematic_state",
+      "type_name": "nav_msgs/msg/Odometry",
+      "accept_major_min": 0,
+      "accept_major_max": 0,
+      "min_minor": 0
+    }
+  ]
+}

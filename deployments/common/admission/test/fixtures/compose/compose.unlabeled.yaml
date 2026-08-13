@@ -1,0 +1,8 @@
+# Non-conformant image set: one image is present but carries no org.autoware.interface_manifest
+# label. deploy_check.sh must fail with an operational error (exit 2) — an image that opts out of
+# the conformance contract cannot be admitted.
+services:
+  provider:
+    image: autoware-admission-self-test-provider
+  legacy:
+    image: autoware-admission-self-test-unlabeled

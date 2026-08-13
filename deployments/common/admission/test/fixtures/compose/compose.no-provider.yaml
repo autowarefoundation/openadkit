@@ -1,0 +1,9 @@
+# No-provider image set: a consumer requires /localization/kinematic_state, but no image in the
+# set provides it. Because the deploy-time image set is complete, deploy_check.sh must REJECT this
+# with NO_PROVIDER (exit 1) — unlike the runtime observe mode, which skips a not-yet-started
+# provider.
+services:
+  provider:
+    image: autoware-admission-self-test-provider
+  consumer:
+    image: autoware-admission-self-test-consumer-no-provider

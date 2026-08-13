@@ -1,0 +1,8 @@
+# Compatible image set: a planning-trajectory provider (0.1.0) and a consumer that accepts
+# MAJOR 0. deploy_check.sh must ACCEPT this set (exit 0). Images are label-only fixtures built by
+# run_self_test.sh; the gate only reads their OCI labels via `docker inspect`, never boots them.
+services:
+  provider:
+    image: autoware-admission-self-test-provider
+  consumer:
+    image: autoware-admission-self-test-consumer-compatible

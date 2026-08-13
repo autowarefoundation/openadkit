@@ -1,0 +1,11 @@
+# Fragment-fallback image set: the provider image carries NO org.autoware.interface_manifest
+# label, only an installed interface_manifest_fragment.json under /opt/autoware/share/<pkg>/ (the
+# convention followed by every package that registers interfaces through
+# autoware_component_interface_utils). deploy_check.sh must fall back to discovering and admitting
+# via that fragment, exactly as if it had read the label, paired here with the ordinary labeled
+# compatible consumer. Expected: exit 0 (accepted).
+services:
+  provider:
+    image: autoware-admission-self-test-fragment-provider
+  consumer:
+    image: autoware-admission-self-test-consumer-compatible

@@ -1,0 +1,12 @@
+# Multi-fragment / install-depth regression: a single image carries two installed manifest
+# fragments for two different packages -- one at the documented depth-2 path
+# (share/<pkg>/interface_manifest_fragment.json) and one nested one level deeper
+# (share/<pkg>/config/interface_manifest_fragment.json), the way
+# install(DIRECTORY config DESTINATION share/${PROJECT_NAME}) would install it (see
+# autoware_component_interface_utils' README). The nested fragment's sole `required` entry has no
+# provider anywhere in this set, so a correct, unbounded fragment search must still reject (exit 1,
+# NO_PROVIDER); if the nested fragment were silently dropped (the old -maxdepth 2 bug in
+# deploy_check.sh), its requirement would vanish too and this would wrongly exit 0.
+services:
+  multi:
+    image: autoware-admission-self-test-multi-fragment

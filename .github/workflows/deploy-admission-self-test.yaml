@@ -1,0 +1,57 @@
+# Self-test for the deploy-time interface-admission gate under
+# deployments/common/admission. It builds the dedicated admission tool image (manifest_admit from
+# autoware_core) and asserts deploy_check.sh's 0/1/2 exit contract over the fixture compose sets.
+#
+# Advisory (non-required): it only becomes meaningful once
+# autoware_component_interface_admission has merged into autoware_core, since the tool image is
+# built from there. Use the workflow_dispatch inputs to point it at a branch that carries the
+# package before then.
+
+name: deploy-admission-self-test
+
+on:
+  pull_request:
+    paths:
+      - 'deployments/common/admission/**'
+      - '.github/workflows/deploy-admission-self-test.yaml'
+  workflow_dispatch:
+    inputs:
+      core-repo:
+        description: 'autoware_core clone URL to build manifest_admit from'
+        required: false
+        default: 'https://github.com/autowarefoundation/autoware_core.git'
+      core-ref:
+        description: 'autoware_core branch or tag to build manifest_admit from'
+        required: false
+        default: 'main'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-test:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # Built as its own step so a tool-image build failure (e.g. the admission package not being
+      # in the given autoware_core checkout) is distinguishable from a failed gate assertion.
+      # run_self_test.sh reuses this image instead of rebuilding it.
+      - name: Build the admission tool image
+        env:
+          CORE_REPO: ${{ inputs.core-repo || 'https://github.com/autowarefoundation/autoware_core.git' }}
+          CORE_REF: ${{ inputs.core-ref || 'main' }}
+        run: |
+          docker build -t autoware-admit-tool:jazzy \
+            -f deployments/common/admission/test/admit-tool.Dockerfile \
+            --build-arg "CORE_REPO=${CORE_REPO}" \
+            --build-arg "CORE_REF=${CORE_REF}" \
+            deployments/common/admission/test
+
+      - name: Run the deploy-admission self-test
+        run: |
+          ./deployments/common/admission/test/run_self_test.sh

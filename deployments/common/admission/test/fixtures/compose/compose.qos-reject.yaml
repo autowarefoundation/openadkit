@@ -1,0 +1,12 @@
+# Spec-QoS rejection: a lone provider offers best_effort reliability for an interface whose spec
+# (the fixture spec manifest baked into the tool image at /opt/autoware/interface_manifest.json)
+# declares reliable. An endpoint's QoS must EQUAL the QoS its spec declares, so this is a
+# QOS_SPEC_MISMATCH rejection (exit 1). The check is per-endpoint, so this single publisher-only
+# image is enough to reject -- no consumer is needed for the violation to be checkable, and no
+# pairing exists here that could produce a non-zero exit for any other reason.
+#
+# Twin of compose.qos-conformant.yaml: the two provider manifests are identical except for
+# `reliability`, so the pair isolates the exact-match verdict to that one field.
+services:
+  provider:
+    image: autoware-admission-self-test-qos-provider-best-effort

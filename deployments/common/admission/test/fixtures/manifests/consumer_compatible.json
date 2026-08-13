@@ -1,0 +1,16 @@
+{
+  "owner": "autowarefoundation",
+  "node_name": "/control/trajectory_follower",
+  "provided": [],
+  "required": [
+    {
+      "ns": "planning",
+      "interface_name": "/planning/scenario_planning/trajectory",
+      "resolved_name": "/planning/scenario_planning/trajectory",
+      "type_name": "autoware_planning_msgs/msg/Trajectory",
+      "accept_major_min": 0,
+      "accept_major_max": 0,
+      "min_minor": 0
+    }
+  ]
+}

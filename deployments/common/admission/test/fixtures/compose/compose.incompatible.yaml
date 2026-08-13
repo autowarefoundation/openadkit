@@ -1,0 +1,7 @@
+# Incompatible image set: the same 0.1.0 provider with a consumer built against MAJOR 1.
+# deploy_check.sh must REJECT this set with a MAJOR mismatch (exit 1).
+services:
+  provider:
+    image: autoware-admission-self-test-provider
+  consumer:
+    image: autoware-admission-self-test-consumer-incompatible

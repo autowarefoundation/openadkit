@@ -46,7 +46,7 @@ with tarfile.open(sys.argv[1]) as outer:
 sys.exit(0 if found else "FATAL: no security.capability xattr in any layer")
 EOF
 
-# 4. rpmsg-eth: the Task 9 daemon's own unit test (test-rpmsg-eth.sh) needs a
+# 4. rpmsg-eth: the daemon's own unit test (test-rpmsg-eth.sh) needs a
 #    toolchain (gcc/make) plus socat/tcpdump/xxd/iproute/iputils that the aib
 #    guest rootfs manifest (aib/x5h-rootfs.aib.yml) deliberately does NOT
 #    carry -- that manifest's content.rpms list ships to the REAL board via

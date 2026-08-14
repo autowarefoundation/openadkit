@@ -11,12 +11,22 @@
  * `dst`, and create the char endpoint via /dev/rpmsg_ctrl* +
  * RPMSG_CREATE_EPT_IOCTL. The CR52 announces its channel exactly once per
  * reset, so this daemon does not fail fast when the channel is absent: it
- * waits (woken by inotify on /dev, so it isn't a busy-poll) and retries,
- * both at startup and whenever the endpoint goes away later (another CR52
- * reset) -- start-order independence in both directions. tap is kept
- * drained during that wait so a reset on the CR52 side doesn't also wedge
- * Linux -> CR52 traffic; frames that arrive with no endpoint to relay them
- * to are counted and dropped rather than silently lost.
+ * waits (paced by the 1s poll() timeout in wait_for_dev_or_tap(), woken
+ * early by inotify on /dev when a device node changes, so it isn't a
+ * busy-poll either way) and retries, both at startup and whenever the
+ * endpoint goes away later (another CR52 reset) -- start-order independence
+ * in both directions. tap is kept drained during that wait so a reset on
+ * the CR52 side doesn't also wedge Linux -> CR52 traffic; frames that
+ * arrive with no endpoint to relay them to are counted and dropped rather
+ * than silently lost.
+ *
+ * Every retry loop iteration is logged: once on entering the wait, once on
+ * the first occurrence of each distinct failure reason (with strerror()
+ * where the failure has one), every ~30 retries thereafter so a stuck wait
+ * is visible on a console with no scrollback, and once on every successful
+ * (re)bind and every endpoint loss. A daemon that retries forever by design
+ * must not be silent about it -- the observable difference between "still
+ * working as designed" and "wedged" is exactly this log output.
  *
  * -d bypasses discovery and opens a device path directly. It exists as a
  * test seam: test-rpmsg-eth.sh points it at one end of a socat pty pair
@@ -26,7 +36,12 @@
  * Bridges frames both ways until SIGTERM/SIGINT, then closes both fds,
  * logs relay counters to stderr, and exits 0 -- including when the signal
  * arrives while still waiting for the first endpoint, which is a clean
- * shutdown, not a failure.
+ * shutdown, not a failure. SIGUSR1 dumps the same counters without
+ * stopping the service, for inspecting a live daemon over a serial console
+ * without destroying the state you wanted to inspect. A poll() failure or
+ * a fatal tap condition (see POLLERR/POLLHUP/POLLNVAL handling below) exits
+ * nonzero instead, so the unit's Restart=on-failure policy actually fires
+ * rather than leaving systemd thinking a broken relay exited cleanly.
  */
 #include <dirent.h>
 #include <errno.h>
@@ -68,11 +83,18 @@ struct rpmsg_endpoint_info {
 #define BUF_LEN 2048
 
 static volatile sig_atomic_t g_stop;
+static volatile sig_atomic_t g_dump;
 
 static void on_signal(int sig)
 {
 	(void)sig;
 	g_stop = 1;
+}
+
+static void on_dump_signal(int sig)
+{
+	(void)sig;
+	g_dump = 1;
 }
 
 /* --- rpmsg endpoint discovery: same approach as scripts/rpmsg-ping.c --- */
@@ -91,15 +113,23 @@ static int read_sysfs(const char *path, char *buf, size_t len)
 	return 0;
 }
 
-/* Find the rpmsg device announcing `service`; return its dst address. */
-static int find_service(const char *service, uint32_t *dst)
+/* Find the rpmsg device announcing `service`; return its dst address.
+ * `opendir_errno` is set to the errno from a failed opendir() (the rpmsg
+ * bus itself isn't there -- e.g. remoteproc0 was never started), or to 0
+ * when the bus exists but no channel named `service` is on it yet (the
+ * ordinary "CR52 hasn't announced yet" case). Callers use this to log a
+ * more specific reason than a bare "not found". */
+static int find_service(const char *service, uint32_t *dst, int *opendir_errno)
 {
 	DIR *d = opendir("/sys/bus/rpmsg/devices");
 	struct dirent *e;
 	char path[512], val[64];
 
-	if (!d)
+	*opendir_errno = 0;
+	if (!d) {
+		*opendir_errno = errno;
 		return -1;
+	}
 	while ((e = readdir(d))) {
 		if (e->d_name[0] == '.')
 			continue;
@@ -153,40 +183,101 @@ static int open_ctrl(void)
 	return -1;
 }
 
+/* The five distinct ways create_ept() can fail to bind an endpoint. Kept
+ * as an enum (rather than folding everything into one -1) so the caller
+ * can log a first-occurrence-per-reason message instead of one opaque
+ * "still waiting" line that never says what it's waiting *on*. */
+enum ept_wait_reason {
+	EPT_WAIT_NO_BUS,        /* no /sys/bus/rpmsg/devices, or no channel
+				 * named `service` on it yet */
+	EPT_WAIT_NO_CTRL,       /* no /dev/rpmsg_ctrl* node */
+	EPT_WAIT_CREATE_FAIL,   /* RPMSG_CREATE_EPT_IOCTL failed */
+	EPT_WAIT_NO_EPTDEV,     /* ioctl succeeded but no new /dev/rpmsgN
+				 * showed up under /sys/class/rpmsg */
+	EPT_WAIT_OPEN_FAIL,     /* open() of the new eptdev failed */
+};
+
 /* Create and open the char endpoint bound to `service`'s announced
  * channel. Returns the open fd, or -1 if the channel isn't announced (yet)
- * or endpoint creation failed. */
-static int create_ept(const char *service)
+ * or endpoint creation failed -- either way, *reason identifies which of
+ * the five steps failed and errbuf carries a human-readable detail
+ * (strerror() where the failure has an errno; a fixed string otherwise). */
+static int create_ept(const char *service, enum ept_wait_reason *reason,
+		       char *errbuf, size_t errbuf_len)
 {
 	struct rpmsg_endpoint_info info;
 	uint32_t dst;
 	uint64_t before, after;
 	char devpath[64];
-	int ctrl, i;
+	int ctrl, fd, i, opendir_errno;
 
-	if (find_service(service, &dst))
+	if (find_service(service, &dst, &opendir_errno)) {
+		*reason = EPT_WAIT_NO_BUS;
+		if (opendir_errno)
+			snprintf(errbuf, errbuf_len,
+				 "opendir(/sys/bus/rpmsg/devices): %s",
+				 strerror(opendir_errno));
+		else
+			snprintf(errbuf, errbuf_len,
+				 "no channel named '%s' on the rpmsg bus yet",
+				 service);
 		return -1;
+	}
 	ctrl = open_ctrl();
-	if (ctrl < 0)
+	if (ctrl < 0) {
+		*reason = EPT_WAIT_NO_CTRL;
+		snprintf(errbuf, errbuf_len, "open(/dev/rpmsg_ctrl*): %s",
+			 strerror(errno));
 		return -1;
+	}
 	memset(&info, 0, sizeof(info));
 	snprintf(info.name, sizeof(info.name), "%s", service);
 	info.src = RPMSG_ADDR_ANY;
 	info.dst = dst;
 	before = eptdev_snapshot();
 	if (ioctl(ctrl, RPMSG_CREATE_EPT_IOCTL, &info)) {
+		*reason = EPT_WAIT_CREATE_FAIL;
+		snprintf(errbuf, errbuf_len, "RPMSG_CREATE_EPT_IOCTL: %s",
+			 strerror(errno));
 		close(ctrl);
 		return -1;
 	}
 	close(ctrl);
 	after = eptdev_snapshot() & ~before;
-	if (!after)
+	if (!after) {
+		*reason = EPT_WAIT_NO_EPTDEV;
+		snprintf(errbuf, errbuf_len,
+			 "ioctl created an endpoint but no new /dev/rpmsgN appeared");
 		return -1;
+	}
 	for (i = 0; i < 64; i++)
 		if (after & (1ULL << i))
 			break;
 	snprintf(devpath, sizeof(devpath), "/dev/rpmsg%d", i);
-	return open(devpath, O_RDWR);
+	fd = open(devpath, O_RDWR);
+	if (fd < 0) {
+		*reason = EPT_WAIT_OPEN_FAIL;
+		snprintf(errbuf, errbuf_len, "open(%s): %s", devpath,
+			 strerror(errno));
+		/* The RPMSG_CREATE_EPT_IOCTL above already created this
+		 * endpoint; failing to open it must not leak it (one
+		 * eptdev leaked per retry, at 1Hz, otherwise). Destroying
+		 * it needs an open fd on the eptdev itself -- there is no
+		 * destroy-by-address path via the ctrl fd -- so make a
+		 * best-effort read-only open purely to issue the destroy.
+		 * If even that fails (e.g. the node race that produced
+		 * EPT_WAIT_NO_EPTDEV, or a permissions problem so total
+		 * that O_RDONLY fails too), there is genuinely no fd to
+		 * destroy it with and the next retry will find it already
+		 * gone or will create another; nothing further to do here. */
+		fd = open(devpath, O_RDONLY);
+		if (fd >= 0) {
+			ioctl(fd, RPMSG_DESTROY_EPT_IOCTL);
+			close(fd);
+		}
+		return -1;
+	}
+	return fd;
 }
 
 /* Tear down a char endpoint the way scripts/rpmsg-ping.c does: destroy the
@@ -204,7 +295,11 @@ static void close_ept(int fd)
 /* Write the whole buffer, retrying on a short write (a real possibility on
  * the pty the test stands the endpoint in with, and cheap insurance on the
  * real chardev too). Returns 1 on success, 0 on a hard error (errno set by
- * the failing write()). Counts (but does not fail on) every short write. */
+ * the failing write()). Counts (but does not fail on) every short write.
+ * A write() returning exactly 0 for a nonzero-length request is treated as
+ * a hard error rather than retried: it is not a short write (no progress
+ * was made at all) and looping on it would spin unbounded rather than
+ * making forward progress. */
 static int write_full(int fd, const char *buf, size_t len, unsigned long *short_writes)
 {
 	size_t off = 0;
@@ -214,6 +309,10 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
 		if (w < 0) {
 			if (errno == EINTR)
 				continue;
+			return 0;
+		}
+		if (w == 0) {
+			errno = EIO;
 			return 0;
 		}
 		off += (size_t)w;
@@ -227,7 +326,12 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
  * discovery/reconnect) or a frame arriving on tap while there is no
  * endpoint to relay it to. tap frames seen here are counted via
  * *tap_dropped_no_endpoint and dropped: there is nowhere to put them until
- * the CR52 comes back, but the drop must be visible rather than silent. */
+ * the CR52 comes back, but the drop must be visible rather than silent.
+ * This 1s poll() timeout, not the inotify watch, is what paces the retry
+ * loop at roughly 1Hz: inotify only wakes it early when a device node
+ * actually changes under /dev, and a channel announcement need not create
+ * anything there at all (the new node appears under /sys/class/rpmsg,
+ * which this function does not watch). */
 static void wait_for_dev_or_tap(int inotify_fd, int tap_fd,
 				 unsigned long *tap_dropped_no_endpoint)
 {
@@ -251,22 +355,76 @@ static void wait_for_dev_or_tap(int inotify_fd, int tap_fd,
 	}
 }
 
+static const char *ept_wait_reason_str(enum ept_wait_reason reason)
+{
+	switch (reason) {
+	case EPT_WAIT_NO_BUS:      return "no rpmsg bus / channel not announced";
+	case EPT_WAIT_NO_CTRL:     return "no /dev/rpmsg_ctrl* node";
+	case EPT_WAIT_CREATE_FAIL: return "endpoint creation ioctl failed";
+	case EPT_WAIT_NO_EPTDEV:   return "no new eptdev appeared";
+	case EPT_WAIT_OPEN_FAIL:   return "open() of the new eptdev failed";
+	}
+	return "unknown";
+}
+
 /* Open the endpoint: `device` directly if given (test seam), else wait for
  * the CR52 to announce `service` and bind it. Retries indefinitely (until
  * a signal arrives), so the daemon is start-order independent and survives
  * the endpoint going away and coming back across a CR52 reset. tap is kept
  * drained (see wait_for_dev_or_tap) while this blocks. Returns -1 only
  * when g_stop was set (a signal arrived); callers should treat that as a
- * clean-shutdown request, not an error. */
+ * clean-shutdown request, not an error.
+ *
+ * Logs once on entering the wait (naming what is being waited for), once
+ * on the first occurrence of each distinct failure reason, every ~30
+ * retries thereafter regardless of reason (so a wait stuck on the same
+ * reason for minutes still produces console output), and once on every
+ * successful bind. A silent 1Hz-forever retry is indistinguishable from a
+ * hang on a serial console with no way to inspect process state; these
+ * lines are the only thing that tells the two apart. */
 static int open_endpoint(const char *device, const char *service, int inotify_fd,
 			  int tap_fd, unsigned long *tap_dropped_no_endpoint)
 {
+	unsigned long attempt = 0;
+	int have_last_reason = 0;
+	enum ept_wait_reason last_reason = EPT_WAIT_NO_BUS;
+
+	fprintf(stderr, "rpmsg-eth: waiting for endpoint (%s)...\n",
+		device ? device : service);
+
 	for (;;) {
-		int fd = device ? open(device, O_RDWR) : create_ept(service);
-		if (fd >= 0)
+		enum ept_wait_reason reason = EPT_WAIT_NO_BUS;
+		char errbuf[160];
+		int fd;
+
+		errbuf[0] = '\0';
+		if (device) {
+			fd = open(device, O_RDWR);
+			if (fd < 0)
+				snprintf(errbuf, sizeof(errbuf), "open(%s): %s",
+					 device, strerror(errno));
+		} else {
+			fd = create_ept(service, &reason, errbuf, sizeof(errbuf));
+		}
+
+		if (fd >= 0) {
+			fprintf(stderr, "rpmsg-eth: endpoint bound (%s)\n",
+				device ? device : service);
 			return fd;
+		}
 		if (g_stop)
 			return -1;
+
+		attempt++;
+		if (!have_last_reason || reason != last_reason ||
+		    attempt % 30 == 0) {
+			fprintf(stderr,
+				"rpmsg-eth: still waiting for endpoint after %lu attempt(s): %s\n",
+				attempt,
+				errbuf[0] ? errbuf : ept_wait_reason_str(reason));
+			last_reason = reason;
+			have_last_reason = 1;
+		}
 		wait_for_dev_or_tap(inotify_fd, tap_fd, tap_dropped_no_endpoint);
 	}
 }
@@ -288,13 +446,27 @@ static int tap_open(const char *name)
 	return fd;
 }
 
+static void print_counters(const char *prefix, unsigned long tap_to_ept,
+			    unsigned long ept_to_tap, unsigned long dropped_oversize,
+			    unsigned long tap_dropped_no_endpoint,
+			    unsigned long tap_write_errors, unsigned long ept_write_errors,
+			    unsigned long short_writes)
+{
+	fprintf(stderr,
+		"rpmsg-eth: %s tap_to_ept=%lu ept_to_tap=%lu dropped_oversize=%lu "
+		"tap_dropped_no_endpoint=%lu tap_write_errors=%lu ept_write_errors=%lu "
+		"short_writes=%lu\n",
+		prefix, tap_to_ept, ept_to_tap, dropped_oversize, tap_dropped_no_endpoint,
+		tap_write_errors, ept_write_errors, short_writes);
+}
+
 int main(int argc, char **argv)
 {
 	const char *service = "rpmsg-eth", *tap_name = "tap0", *device = NULL;
 	unsigned long tap_to_ept = 0, ept_to_tap = 0, dropped_oversize = 0;
 	unsigned long tap_dropped_no_endpoint = 0;
 	unsigned long tap_write_errors = 0, ept_write_errors = 0, short_writes = 0;
-	int opt, tap, ept, inotify_fd;
+	int opt, tap, ept, inotify_fd, fatal_error = 0;
 	struct sigaction sa;
 
 	while ((opt = getopt(argc, argv, "s:t:d:")) != -1) {
@@ -314,6 +486,10 @@ int main(int argc, char **argv)
 	sa.sa_handler = on_signal;
 	sigaction(SIGTERM, &sa, NULL);
 	sigaction(SIGINT, &sa, NULL);
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = on_dump_signal;
+	sigaction(SIGUSR1, &sa, NULL);
 
 	inotify_fd = inotify_init1(IN_NONBLOCK);
 	if (inotify_fd < 0) {
@@ -363,10 +539,45 @@ int main(int argc, char **argv)
 		ssize_t n;
 		int reconnected = 0;
 
+		if (g_dump) {
+			g_dump = 0;
+			print_counters("counters", tap_to_ept, ept_to_tap, dropped_oversize,
+					tap_dropped_no_endpoint, tap_write_errors,
+					ept_write_errors, short_writes);
+		}
+
 		if (poll(pfd, 2, -1) < 0) {
 			if (errno == EINTR)
 				continue;
 			fprintf(stderr, "rpmsg-eth: poll: %s\n", strerror(errno));
+			fatal_error = 1;
+			break;
+		}
+
+		/* POLLERR is delivered regardless of requested events, and
+		 * tun_chr_poll() returns it once the tun device this fd
+		 * refers to stops being a live, registered netdevice --
+		 * which is exactly what `ip link del tap0` does to a
+		 * persistent tap the daemon still holds open (confirmed
+		 * against the 6.1 tun.c: tun_get() failing, or
+		 * dev->reg_state != NETREG_REGISTERED, both return
+		 * EPOLLERR). Without this check the loop would spin on a
+		 * dead tap forever -- POLLIN never sets again, but poll()
+		 * keeps returning immediately with POLLERR set and nothing
+		 * read, sleeps, logs or exits -- a pegged core and a dead
+		 * link while the unit still reads "active (running)". Treat
+		 * it as fatal, matching the endpoint side's existing
+		 * POLLERR/POLLHUP handling below. */
+		if (pfd[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+			fprintf(stderr,
+				"rpmsg-eth: tap %s reported a fatal poll condition "
+				"(POLLERR=%d POLLHUP=%d POLLNVAL=%d) -- exiting so the "
+				"service manager can restart us\n",
+				tap_name,
+				!!(pfd[0].revents & POLLERR),
+				!!(pfd[0].revents & POLLHUP),
+				!!(pfd[0].revents & POLLNVAL));
+			fatal_error = 1;
 			break;
 		}
 
@@ -389,6 +600,8 @@ int main(int argc, char **argv)
 					 * pfd[1].revents below described the
 					 * *old* ept fd, so it must not be
 					 * consulted against the new one. */
+					fprintf(stderr,
+						"rpmsg-eth: endpoint lost (write failed), rebinding\n");
 					close_ept(ept);
 					ept = open_endpoint(device, service, inotify_fd,
 							     tap, &tap_dropped_no_endpoint);
@@ -417,6 +630,8 @@ int main(int argc, char **argv)
 				/* n == 0 (EOF) or a genuine read error:
 				 * CR52 reset. Rebind and keep going rather
 				 * than exiting. */
+				fprintf(stderr,
+					"rpmsg-eth: endpoint lost (EOF/read error), rebinding\n");
 				close_ept(ept);
 				ept = open_endpoint(device, service, inotify_fd,
 						     tap, &tap_dropped_no_endpoint);
@@ -427,11 +642,8 @@ int main(int argc, char **argv)
 	close(tap);
 	close_ept(ept);
 	close(inotify_fd);
-	fprintf(stderr,
-		"rpmsg-eth: exiting tap_to_ept=%lu ept_to_tap=%lu dropped_oversize=%lu "
-		"tap_dropped_no_endpoint=%lu tap_write_errors=%lu ept_write_errors=%lu "
-		"short_writes=%lu\n",
-		tap_to_ept, ept_to_tap, dropped_oversize, tap_dropped_no_endpoint,
-		tap_write_errors, ept_write_errors, short_writes);
-	return 0;
+	print_counters("exiting", tap_to_ept, ept_to_tap, dropped_oversize,
+			tap_dropped_no_endpoint, tap_write_errors, ept_write_errors,
+			short_writes);
+	return fatal_error ? 1 : 0;
 }

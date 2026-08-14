@@ -204,3 +204,96 @@ reboot from both Yocto and AutoSD. See
 - Recovery from any wedge: power cycle. This procedure modifies no boot
   path and writes no flash; the only persistent state it creates is the
   staged files and the blacklist on the target rootfs.
+
+## rpmsg-eth: IP-over-RPMsg bridge
+
+`rpmsg-eth/` (source `rpmsg-eth.c`, `Makefile`, `test-rpmsg-eth.sh`) bridges
+the CR52's `rpmsg-eth` rpmsg channel to a Linux TAP device (`tap0`), one
+Ethernet frame per RPMsg message in both directions — a normal IP link to
+the safety island, on top of the same remoteproc/RPMsg stack described
+above. Frozen wire constants: service name `rpmsg-eth`; MTU **462** / max
+frame 476 (see `scripts/rpmsg-eth-ifup.sh`); Linux side `172.16.52.1/24`,
+MAC `02:5c:52:00:00:01`; CR52 side `172.16.52.2/24`, MAC
+`02:5c:52:00:00:02`; DDS domain 2. The CR52 uses lwIP's `etharp`
+(`NETIF_FLAG_ETHARP`) and resolves peers dynamically, so ARP passes
+through untouched — neither side needs a static peer table.
+
+### Building (cross-compile)
+
+The board image ships no compiler (see the AutoSD rootfs manifest,
+`aib/x5h-rootfs.aib.yml` — no `gcc`/`make`), so `rpmsg-eth` is built on the
+host and staged as a binary, the same pattern as `scripts/rpmsg-ping.c`.
+`rpmsg-eth/Makefile` defaults to `CC ?= cc` with `LDFLAGS ?= -static`
+(static so the one binary runs unmodified on both the BSP Yocto and the
+AutoSD NFS rootfs); override `CC` for an aarch64 target from an x86_64 dev
+host, e.g. with a distro `aarch64-linux-gnu-gcc` cross toolchain and its
+static libc package installed:
+
+```
+cd rpmsg-eth
+CC=aarch64-linux-gnu-gcc make
+```
+
+This is a plain host build, unrelated to and independent from the pinned
+ARM GNU 13.2 toolchain used for the *kernel* rebuild above — that pin
+exists because of a board-specific boot-time layout bug in the kernel
+Image; it has no bearing on a static userspace binary. (CI instead builds
+`rpmsg-eth` natively inside an `arm64`-platform Fedora container — see
+`scripts/make-test-images.sh` — because that container also needs to run
+the binary it builds, on the same architecture, for `test-rpmsg-eth.sh`;
+that path is CI-only and not a stand-in for a documented cross-compile
+invocation for staging onto the board.)
+
+### Staging
+
+Not installed by `aib/x5h-rootfs.aib.yml` today — same manual
+install-to-`/usr/local` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above.
+Stage the daemon, its `ifup` helper and its unit onto the NFS export (see
+"Staging the assets" above for why `/var/tmp`, not `/tmp`, is the export
+path to use), then install on the target:
+
+```
+install -m0755 rpmsg-eth rpmsg-eth-ifup.sh <export>/var/tmp/rpmsg/
+install -m0644 rpmsg-eth.service            <export>/var/tmp/rpmsg/
+```
+
+```
+install -m0755 /var/tmp/rpmsg/rpmsg-eth /usr/local/bin/rpmsg-eth
+install -m0755 /var/tmp/rpmsg/rpmsg-eth-ifup.sh /usr/local/sbin/rpmsg-eth-ifup.sh
+install -m0644 /var/tmp/rpmsg/rpmsg-eth.service /etc/systemd/system/rpmsg-eth.service
+systemctl daemon-reload
+```
+
+### Prerequisites
+
+`rpmsg-eth.service` has no `After=`/`Wants=` on a specific rpmsg device
+unit — the daemon's own endpoint-wait loop already retries until the
+CR52's channel appears (logging its progress; see `rpmsg-eth.c`) — but it
+does **not** load the rpmsg modules or start `remoteproc0` for you. Both
+must already be done, exactly as in the Procedure above:
+
+```
+modprobe rpmsg_ctrl && modprobe rpmsg_char
+echo start > /sys/class/remoteproc/remoteproc0/state
+```
+
+Starting the unit before either of those has happened is not an error —
+the daemon waits and retries rather than failing — but it means the link
+will never come up until they are done, so do them first rather than
+relying on the retry to eventually paper over a skipped step.
+
+```
+systemctl enable --now rpmsg-eth.service
+```
+
+### Smoke
+
+```
+scripts/rpmsg-eth-smoke.sh
+```
+
+Asserts the channel is on the rpmsg bus, `rpmsg-eth.service` is active,
+`tap0` is up with the frozen address/MAC/MTU, then round-trip pings the
+CR52 side requiring 100% reply. `-n` skips the rpmsg-bus channel assertion
+for a bench run against a manually wired peer with no CR52 attached. See
+the script's own header for the full `reason=` vocabulary on failure.

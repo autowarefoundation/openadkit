@@ -60,6 +60,10 @@ DAEMON_LOG="$PTY_DIR/daemon.log"
 TCPDUMP_LOG="$PTY_DIR/tcpdump.log"
 
 pty_pair_ready() {
+	if ! kill -0 "$SOCAT" 2>/dev/null; then
+		echo "TEST_FAIL: socat exited before creating its pty pair" >&2
+		exit 1
+	fi
 	[ -e "$PTY_DIR/epA" ] && [ -e "$PTY_DIR/epB" ]
 }
 
@@ -88,8 +92,26 @@ wait_until "daemon to open both fds and become ready" 300 daemon_ready
 # wait_until's comment on why) rather than left at a couple of seconds;
 # the daemon is already confirmed ready above, so this is only timing
 # out on the actual relay, which is what should make it fail.
+# Captured into a variable, then matched separately, rather than piped
+# straight into `grep -q`: under `set -o pipefail`, grep -q exits (and
+# closes its stdin) the instant it sees a match, and the still-running
+# producer (dd | xxd here) can then be killed by SIGPIPE and report that
+# as its own exit status -- which pipefail then reports as the whole
+# pipeline's, even though the match was genuinely found. Capturing first
+# means there is no live downstream reader left to close early.
+# The trailing `|| true` on the capture is load-bearing, not decorative:
+# under `set -e` a bare `VAR=$(...)` assignment (not part of an if/&&/||)
+# still aborts the whole script on a non-zero pipeline status, and on the
+# genuinely-broken-relay case this exercises, `timeout 10 dd` really does
+# time out (exit 124) with nothing ever having arrived on epB -- that must
+# fall through to the explicit grep-and-TEST_FAIL below, not vanish as a
+# silent `set -e` exit with no diagnostic at all (confirmed against a
+# fault-injected build that disables the relay: without `|| true` here the
+# script died on the bare timeout exit code before ever printing
+# TEST_FAIL).
 ping -c1 -W1 172.16.52.2 >/dev/null 2>&1 || true
-timeout 10 dd if="$PTY_DIR/epB" bs=600 count=1 2>/dev/null | xxd | grep -qi '0806' \
+FRAME="$(timeout 10 dd if="$PTY_DIR/epB" bs=600 count=1 2>/dev/null | xxd)" || true
+grep -qi '0806' <<<"$FRAME" \
   || { echo "TEST_FAIL: no ARP frame relayed tap->endpoint"; exit 1; }
 
 # …and a frame written to epB must reach tap0 *intact* (checked via
@@ -130,8 +152,7 @@ timeout -k 2 5 tcpdump -Z root -c1 -i tap0 -w "$CAP" 'ether src 02:5c:52:00:00:0
 # fork+exec+dynamic-link+filter-compile startup took long enough (on the
 # order of a couple of real seconds, inferred from a ~2.6s gap between
 # tap0 becoming ready and tcpdump actually entering promiscuous mode,
-# plus tcpdump exiting well before the 2s SIGTERM deadline it was given
-# -- see task-9-report.md's CI-failure fix report for the full timeline)
+# plus tcpdump exiting well before the 2s SIGTERM deadline it was given)
 # that the frame was written to epB, and presumably relayed, before
 # tcpdump had attached at all -- the capture then correctly reported 0
 # packets, because there was nothing left to see by the time it started
@@ -152,6 +173,66 @@ wait $TD || {
 	cat "$TCPDUMP_LOG" >&2 2>/dev/null || true
 	exit 1
 }
-tcpdump -Z root -r "$CAP" -A -n 2>/dev/null | grep -q 'test' \
+# Same capture-then-match rationale as the ARP check above -- grep -q
+# closing this pipe early under pipefail must not turn a genuine pass into
+# a SIGPIPE-flavored TEST_FAIL, and `|| true` keeps a genuine tcpdump -r
+# failure falling through to the explicit TEST_FAIL below instead of
+# aborting the script silently under set -e.
+PAYLOAD="$(tcpdump -Z root -r "$CAP" -A -n 2>/dev/null)" || true
+grep -q 'test' <<<"$PAYLOAD" \
   || { echo "TEST_FAIL: frame relayed endpoint->tap but payload truncated"; exit 1; }
+
+# --- I7: exercise the discovery/rebind path (never triggered by anything
+# above; CI would otherwise ship having never run open_endpoint()'s retry
+# logic even once) ---------------------------------------------------------
+# Killing socat tears down BOTH ends of the pty pair it manages ($PTY_DIR's
+# epA and epB are just symlinks to the /dev/pts nodes socat allocated), so
+# the daemon's open fd on epA sees the same read-EOF/write-failure shape a
+# real CR52 reset produces. Confirm three things in order: the daemon
+# survives instead of exiting, it logs the loss (the "endpoint lost" lines
+# added in this review wave), and once a fresh pty pair reappears at the
+# SAME link paths (device mode's -d only ever retries the one path it was
+# given) it rebinds -- logged -- and the relay actually works again, not
+# just that a log line printed.
+OLD_SOCAT="$SOCAT"
+kill "$OLD_SOCAT"
+wait "$OLD_SOCAT" 2>/dev/null || true
+
+rebind_loss_logged() {
+	if ! kill -0 "$DAEMON" 2>/dev/null; then
+		echo "TEST_FAIL: daemon exited after losing its endpoint (should rebind, not die)" >&2
+		cat "$DAEMON_LOG" >&2 2>/dev/null || true
+		exit 1
+	fi
+	grep -q 'endpoint lost' "$DAEMON_LOG" 2>/dev/null
+}
+wait_until "daemon to notice and log the endpoint loss" 300 rebind_loss_logged
+
+# socat's PTY link= refuses to reuse an existing path, so the dead pair's
+# stale symlinks must go before the replacement can claim the same names.
+rm -f "$PTY_DIR/epA" "$PTY_DIR/epB"
+socat -d PTY,raw,echo=0,link="$PTY_DIR/epA" PTY,raw,echo=0,link="$PTY_DIR/epB" & SOCAT=$!
+wait_until "socat's replacement pty pair to appear" 300 pty_pair_ready
+
+rebind_logged() {
+	if ! kill -0 "$DAEMON" 2>/dev/null; then
+		echo "TEST_FAIL: daemon exited before rebinding to the replacement endpoint" >&2
+		cat "$DAEMON_LOG" >&2 2>/dev/null || true
+		exit 1
+	fi
+	[ "$(grep -c 'endpoint bound' "$DAEMON_LOG" 2>/dev/null || true)" -ge 2 ]
+}
+wait_until "daemon to rebind to the recreated endpoint" 300 rebind_logged
+
+# Second round trip, same shape as the first: an ARP probe out of tap0 must
+# reach the NEW epB. Flush the stale neighbor entry first -- 172.16.52.2
+# never actually answered the first probe, so without this the kernel may
+# just replay its existing (failed) ARP resolution state instead of sending
+# a fresh request the dd below can catch.
+ip neigh flush to 172.16.52.2 dev tap0 2>/dev/null || true
+ping -c1 -W1 172.16.52.2 >/dev/null 2>&1 || true
+FRAME2="$(timeout 10 dd if="$PTY_DIR/epB" bs=600 count=1 2>/dev/null | xxd)" || true
+grep -qi '0806' <<<"$FRAME2" \
+  || { echo "TEST_FAIL: no ARP frame relayed tap->endpoint after rebind"; exit 1; }
+
 kill $DAEMON $SOCAT; echo "TEST_PASS"

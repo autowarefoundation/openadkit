@@ -97,10 +97,22 @@ send "sh /var/lib/autosd-test/gate-guest.sh\r"
 # GATE8 (added after GATE7, also output-suppressed until its own verdict)
 # is a second silent stretch, but a much smaller one: a single podman load
 # of a small local tar, one container start, one static-link compile of a
-# ~450-line C file, and test-rpmsg-eth.sh's own internally-bounded waits
-# (two `timeout -k1 2 ...` calls at most). That's comfortably under GATE6's
-# 900s budget on its own, so it rides on the existing ceiling rather than
-# raising it.
+# ~450-line C file, and test-rpmsg-eth.sh's own internally-bounded waits --
+# two `timeout 10 dd` calls (the ARP-relay check, run once before the
+# rebind exercise and once after), a single `timeout -k 2 5 tcpdump`, and
+# six 30s-ceiling `wait_until` polls (socat's initial pty pair, the
+# daemon's readiness marker, tcpdump attaching, the daemon noticing and
+# logging the endpoint loss, socat's replacement pty pair, and the daemon
+# rebinding to it) -- roughly 207s worst case (6*30 + 2*10 + 7), not the
+# "two `timeout -k1 2` calls" this comment used to say (test-rpmsg-eth.sh
+# has grown real internal waits, most recently the rebind exercise added
+# in the final review wave, since that estimate was written; the numbers
+# above are re-derived from its current content, not carried over -- and
+# will go stale again the next time a wait is added or removed, the same
+# as this one did). That's comfortably under GATE6's 900s budget on its
+# own, so it rides on the existing ceiling rather than raising it -- the
+# 900s conclusion survives even though the arithmetic behind "comfortably
+# under" keeps moving.
 set inactivity_timeout 900
 set timeout $inactivity_timeout
 expect {

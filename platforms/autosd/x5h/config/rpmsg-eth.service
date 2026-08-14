@@ -28,7 +28,11 @@
 Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
 
 [Service]
-ExecStartPre=/usr/local/sbin/rpmsg-eth-ifup.sh
+# tap0 appears in both lines below on purpose, not by accident: it is
+# passed as $1 to rpmsg-eth-ifup.sh so the interface name lives in one
+# place (this unit file) instead of also being hardcoded inside the ifup
+# script independently of what ExecStart actually binds to.
+ExecStartPre=/usr/local/sbin/rpmsg-eth-ifup.sh tap0
 ExecStart=/usr/local/bin/rpmsg-eth -s rpmsg-eth -t tap0
 Restart=on-failure
 RestartSec=1

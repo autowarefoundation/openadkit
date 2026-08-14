@@ -190,7 +190,7 @@ else
     echo GATE7_SELINUX_BOOLS_OK
 fi
 
-# --- GATE8: rpmsg-eth daemon unit test (Task 9's test-rpmsg-eth.sh), run
+# --- GATE8: rpmsg-eth daemon unit test (test-rpmsg-eth.sh), run
 # inside a dedicated Fedora test container that carries the toolchain
 # (gcc/make) and tools (socat/tcpdump/xxd) the daemon's build+test need --
 # see make-test-images.sh for why those live in a throwaway container image

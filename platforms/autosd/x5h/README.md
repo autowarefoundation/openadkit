@@ -23,7 +23,9 @@ answered before board time.
 
 - [CR52 dual boot + RPMsg](rpmsg-dualboot.md) — run FreeRTOS on the
   realtime core under AutoSD; remoteproc `start` publishes RPMsg state to
-  a CR52 that is already executing, it does not load or release it.
+  a CR52 that is already executing, it does not load or release it. Also
+  covers `rpmsg-eth`, the IP-over-RPMsg TAP bridge daemon (`rpmsg-eth/`)
+  that gives the CR52 a normal Ethernet link to Linux.
 - [UFS self-boot](selfboot.md) — boot AutoSD unattended from the board's
   own storage, with both netboots kept as named rescue commands; also the
   reset semantics, including why a warm `reboot` restarts the CR52.
@@ -48,6 +50,9 @@ answered before board time.
   only permitted config delta is the `CONFIG_EXTRA_FIRMWARE` pair (see "One
   build, two images")
 - `scripts/`: QEMU gate harness and board staging/smoke scripts
+- `rpmsg-eth/`: the IP-over-RPMsg TAP bridge daemon (source, Makefile, and
+  its own pty-mock unit test) — see [rpmsg-dualboot.md](rpmsg-dualboot.md)
+  for cross-compile, staging, prerequisites and smoke
 - `uboot/`: `bootcmd_autosd` template (site values are filled at session
   time, not committed), and `selfboot-env.txt` — the `env import -t` payload
   defining the UFS self-boot plus both netboot rescue commands
@@ -337,6 +342,8 @@ reused — GATE6 and GATE7 are new, not GATE5's successor under a new name.
 | `GATE7_SELINUX_BOOLS_OK` | `selinux-bools.service` did not fail. It failed under the BSP/retired-mimic kernel's absent SELinux (see the Troubleshooting row) — with SELinux present it must now come up clean. | yes |
 | `GATE7_SELINUX_BOOLS_FAILED` | `selinux-bools.service` failed even with SELinux present — a real regression, not the benign BSP-kernel failure the Troubleshooting row documents. | no |
 | `GATE7_SELINUX_BOOLS_ABSENT` | `selinux-bools.service`'s `LoadState` reads `not-found` — the unit is missing from this image entirely. Disambiguates from `GATE7_SELINUX_BOOLS_OK`: `systemctl is-failed` alone exits nonzero both for "healthy" and for "does not exist", so without this check a dropped unit could otherwise print `_OK`. | no |
+| `GATE_RPMSG_ETH_UNIT_PASS` | GATE8: the `rpmsg-eth` TAP bridge daemon's own unit test (`rpmsg-eth/test-rpmsg-eth.sh`) passed inside its dedicated Fedora test container — real tap0 on the guest kernel under test, a mock endpoint (socat pty), `--network=none`. Requires both a zero `podman run` exit status and a literal `TEST_PASS` in its output (see `gate-guest.sh`'s GATE8 comment for why exit-status-alone is not sufficient). | yes |
+| `GATE_RPMSG_ETH_UNIT_FAIL` | The `rpmsg-eth` unit test failed — either the container/build step itself failed, or `test-rpmsg-eth.sh` ran and reported a `TEST_FAIL`. Not part of the pass path. | no |
 | `GATE_DONE` | `gate-guest.sh` reached the end of its run. | yes |
 
 `qemu-gate.exp` exits 0 only if every "Required: yes" marker above is present

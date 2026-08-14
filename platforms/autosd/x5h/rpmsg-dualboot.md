@@ -282,6 +282,47 @@ the daemon waits and retries rather than failing — but it means the link
 will never come up until they are done, so do them first rather than
 relying on the retry to eventually paper over a skipped step.
 
+**Neither of those two steps survives a reboot**, which was board-confirmed
+during the Stage 2 session: after a warm reboot the modules were unloaded and
+`remoteproc0` was back to `offline`, so the link stayed down (with the daemon
+correctly logging `no channel named 'rpmsg-eth' on the rpmsg bus yet`) until
+both were repeated by hand. Install the two helpers below to make the link come
+up on its own, and the manual commands above become a description of what they
+do rather than something to remember:
+
+```
+install -m0755 cr52-rproc-up.sh          <export>/var/tmp/rpmsg/
+install -m0644 cr52-remoteproc.service   <export>/var/tmp/rpmsg/
+install -m0644 x5h-rpmsg-modules.conf    <export>/var/tmp/rpmsg/
+```
+
+```
+install -m0755 /var/tmp/rpmsg/cr52-rproc-up.sh /usr/local/sbin/cr52-rproc-up.sh
+install -m0644 /var/tmp/rpmsg/cr52-remoteproc.service /etc/systemd/system/cr52-remoteproc.service
+install -m0644 /var/tmp/rpmsg/x5h-rpmsg-modules.conf /etc/modules-load.d/x5h-rpmsg.conf
+# Point remoteproc at the ELF matching what is flashed in the Core1 slot. The
+# staged ELF MUST match the flashed image: `start` parses the resource table out
+# of it to publish the vrings, so a mismatch yields a link that looks configured
+# and passes nothing.
+install -m0644 <the flashed firmware>.elf /lib/firmware/
+printf 'CR52_FIRMWARE=%s\n' "<the flashed firmware>.elf" > /etc/default/cr52-remoteproc
+systemctl daemon-reload
+systemctl enable --now cr52-remoteproc.service
+```
+
+Leaving `CR52_FIRMWARE` unset is also valid: the driver's stock name is
+`rproc-cr52_1-fw`, so a symlink at `/lib/firmware/rproc-cr52_1-fw` works just as
+well. Either way the unit reports what it did — `CR52_RPROC_UP name=… firmware=…`,
+or `CR52_RPROC_SKIP reason=no_firmware path=…` on a board where the ELF has not
+been staged yet, which is the expected state on a freshly imaged board and is
+deliberately not treated as a failure.
+
+Like the daemon, these three files are **not** installed by
+`aib/x5h-rootfs.aib.yml`. That is intentional rather than an omission: the unit's
+`ExecStart` is a script that ships in this repo, not in the image, so baking the
+unit in while the script was absent would leave every first boot with a failed
+unit and nothing gained. The whole `rpmsg-eth` stack is staged together.
+
 ```
 systemctl enable --now rpmsg-eth.service
 ```

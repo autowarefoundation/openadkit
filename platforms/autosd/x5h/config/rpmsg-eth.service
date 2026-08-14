@@ -26,6 +26,23 @@
 #   systemctl enable --now rpmsg-eth.service
 [Unit]
 Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
+# StartLimitIntervalSec=0 disables systemd's default start-rate limit (5
+# starts within a 10s window) outright, rather than leaving it in effect
+# or merely resizing it. Without an explicit override here, that default
+# would apply: the deadline path added to rpmsg-eth.c takes >=
+# RPMSG_ETH_EPT_PROGRESS_TIMEOUT_S (>= 10s, default 10) per failed cycle,
+# so one restart every 10s+ never trips a 5-in-10s limit today -- but that
+# headroom is an artifact of *that one* fatal path's timing, not a
+# guarantee covering every fatal path this daemon has (e.g. a fast
+# tap_open() failure right after RestartSec=1). Hitting the default limit
+# puts the unit in a permanent "failed" state that Restart= no longer
+# acts on at all -- systemd reporting the unit stopped while the link is
+# dead, the exact inverse of the "active (running) while the link is
+# dead" problem this daemon's deadline/exit-code work exists to fix.
+# Disabled outright rather than sized to a specific burst/interval: this
+# daemon already retries indefinitely by design elsewhere (open_endpoint()),
+# and Restart=on-failure here is meant to have that same no-give-up shape.
+StartLimitIntervalSec=0
 
 [Service]
 # tap0 appears in both lines below on purpose, not by accident: it is

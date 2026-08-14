@@ -329,6 +329,39 @@ static void close_ept(int fd)
 	close(fd);
 }
 
+static void print_counters(const char *prefix, unsigned long tap_to_ept,
+			    unsigned long ept_to_tap, unsigned long dropped_oversize,
+			    unsigned long tap_dropped_no_endpoint,
+			    unsigned long tap_write_errors, unsigned long ept_write_errors,
+			    unsigned long short_writes)
+{
+	fprintf(stderr,
+		"rpmsg-eth: %s tap_to_ept=%lu ept_to_tap=%lu dropped_oversize=%lu "
+		"tap_dropped_no_endpoint=%lu tap_write_errors=%lu ept_write_errors=%lu "
+		"short_writes=%lu\n",
+		prefix, tap_to_ept, ept_to_tap, dropped_oversize, tap_dropped_no_endpoint,
+		tap_write_errors, ept_write_errors, short_writes);
+}
+
+/* Pointers to every relay counter, bundled so write_full() can hand them
+ * straight to print_counters() when a SIGUSR1 dump lands while it is
+ * retrying a write against the progress deadline (see the g_dump check in
+ * write_full()'s deadline branch below). Pointers, not a value snapshot
+ * taken at call time, so a dump prints the counters as they stand at the
+ * moment of the signal. short_writes lives here too, rather than as its
+ * own parameter (the shape write_full() used before this task): write_full()
+ * is the only function that ever increments it, and it belongs in every
+ * dump anyway. */
+struct relay_counters {
+	unsigned long *tap_to_ept;
+	unsigned long *ept_to_tap;
+	unsigned long *dropped_oversize;
+	unsigned long *tap_dropped_no_endpoint;
+	unsigned long *tap_write_errors;
+	unsigned long *ept_write_errors;
+	unsigned long *short_writes;
+};
+
 /* write_full()'s four-way return: WRITE_FULL_OK on success (all of `len`
  * written), 0 on a hard I/O error (errno set by the failing write()), or
  * one of these two sentinels -- kept named, not a second use of plain
@@ -360,8 +393,15 @@ static void close_ept(int fd)
  * deadline_s > 0 enables the bounded-progress path this task adds, used
  * only for writes to the rpmsg endpoint (the tap fd stays blocking and is
  * always called with deadline_s == 0, which reproduces the old behaviour
- * exactly: EAGAIN can't happen on a blocking fd, so that branch is simply
- * never taken for tap writes).
+ * exactly: EAGAIN/EWOULDBLOCK can't happen on a blocking fd, and the retry
+ * branch's ENOMEM case is itself gated on deadline_s > 0 (see that branch's
+ * own comment for why), so that branch is simply never taken for tap
+ * writes).
+ *
+ * counters bundles pointers to every relay counter (see its own comment):
+ * short_writes is incremented directly through it, and the retry loop's
+ * g_dump check hands the whole set to print_counters() so a SIGUSR1 dump
+ * requested mid-stall is answered without waiting for this call to return.
  *
  * With the endpoint opened O_NONBLOCK, a CR52 that has stopped returning
  * TX buffers makes write() return EAGAIN/EWOULDBLOCK instead of blocking.
@@ -388,12 +428,16 @@ static void close_ept(int fd)
  *      stuck, which hands control back to the clock check above. Cheap
  *      insurance the very next loop iteration either way: on the expected
  *      path this fires only as a wakeup for an already-EAGAIN-ing fd. */
-static int write_full(int fd, const char *buf, size_t len, unsigned long *short_writes,
+static int write_full(int fd, const char *buf, size_t len, struct relay_counters *counters,
 		       int deadline_s, double *elapsed_s_out)
 {
 	size_t off = 0;
 	struct timespec start = { 0 };
 	int have_deadline = deadline_s > 0;
+	/* See the "Logged once per write_full() call" comment at the retry
+	 * branch below: local (not static), so this resets every call --
+	 * once per frame, not once per process. */
+	int retry_logged = 0;
 
 	if (have_deadline) {
 		clock_gettime(CLOCK_MONOTONIC, &start);
@@ -407,6 +451,44 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
 		if (have_deadline) {
 			struct timespec now;
 			double elapsed;
+
+			/* Checked ahead of g_stop and the deadline itself: an
+			 * operator reaching for SIGUSR1 during a stall is
+			 * precisely the moment a counter dump is wanted, and
+			 * this loop can otherwise sit through the entire -T
+			 * deadline without ever answering it -- the caller's
+			 * own g_dump handling at the top of the relay loop
+			 * doesn't run again until this call returns, which
+			 * for a genuinely wedged endpoint is up to deadline_s
+			 * seconds away. Printing it here instead, gated the
+			 * same as g_stop below (only reached when
+			 * have_deadline is true, which is never the case for
+			 * the tap write -- EAGAIN/EWOULDBLOCK can't happen on
+			 * that blocking fd, and the retry branch's ENOMEM case
+			 * is separately gated on have_deadline too, see that
+			 * branch's own comment -- so the tap write cannot be
+			 * sitting in this retry loop at all), keeps the dump
+			 * within this loop's own 1s poll() bound (see below)
+			 * instead of the -T one.
+			 * Checked before g_stop, not after, so a dump pending
+			 * at the same moment as a stop still prints: once
+			 * WRITE_FULL_STOPPED is returned below, the caller
+			 * breaks out of the relay loop without ever reaching
+			 * its own top-of-loop g_dump check again. This does
+			 * not change g_stop's own precedence -- it still
+			 * takes priority over waiting out the deadline, and a
+			 * dump here can add at most one fprintf() before that
+			 * check runs, not a wait of any length. */
+			if (g_dump) {
+				g_dump = 0;
+				print_counters("counters", *counters->tap_to_ept,
+						*counters->ept_to_tap,
+						*counters->dropped_oversize,
+						*counters->tap_dropped_no_endpoint,
+						*counters->tap_write_errors,
+						*counters->ept_write_errors,
+						*counters->short_writes);
+			}
 
 			/* Checked ahead of the deadline itself: a clean stop
 			 * takes priority over a wedge report, and must not
@@ -436,8 +518,80 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
 
 		w = write(fd, buf + off, len - off);
 		if (w < 0) {
-			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			/* ENOMEM is treated the same as EAGAIN/EWOULDBLOCK,
+			 * not the hard-error path below: upstream
+			 * rpmsg_char.c's rpmsg_trysendto() maps a full TX
+			 * vring's -ENOMEM to -EAGAIN, but only inside the
+			 * `filp->f_flags & O_NONBLOCK` branch -- exactly the
+			 * branch this ept fd takes (see O_NONBLOCK's own
+			 * comment where the fd is opened). This board does
+			 * not run that upstream kernel -- it runs an R-Car
+			 * BSP kernel, and this project has already recorded
+			 * elsewhere that the CI kernel is not the board
+			 * kernel. If that remap is absent, backported
+			 * differently, or simply patched out on this vendor
+			 * tree, a full vring surfaces here as a bare ENOMEM
+			 * instead of EAGAIN. Without this line, write_full()
+			 * would take the hard-error path below, count it as
+			 * a real write failure, and rebind -- silently
+			 * disabling the entire progress-deadline mechanism
+			 * this file exists to add, on the one kernel it has
+			 * to actually work on. The test suite cannot catch
+			 * that regression: the pty this daemon is tested
+			 * against always returns plain EAGAIN and has no way
+			 * to produce ENOMEM instead. Same class of
+			 * not-betting-on-an-unverified-kernel-behaviour as
+			 * the SIGALRM backstop in this function's own
+			 * comment above; it just was not applied to this
+			 * errno too.
+			 *
+			 * `&& have_deadline` is load-bearing, not decoration:
+			 * unlike EAGAIN/EWOULDBLOCK (which genuinely cannot
+			 * happen on a blocking fd), ENOMEM has nothing to do
+			 * with readiness -- the tun/tap write path can return
+			 * it on plain skb allocation failure under memory
+			 * pressure, independent of whether the fd would block.
+			 * An earlier version of this fix accepted ENOMEM
+			 * unconditionally, which reached the tap write too
+			 * (deadline_s == 0): poll(POLLOUT) cannot wait for an
+			 * allocator condition -- tun reports POLLOUT from
+			 * link/socket-writability, not allocator health -- so
+			 * it returns ready immediately and the loop re-writes
+			 * at once, with no alarm, no clock check and no g_stop
+			 * check (all three are gated on have_deadline, further
+			 * below), reproducing this exact family's original
+			 * defect -- an unbounded, SIGTERM-deaf spin -- on the
+			 * tap fd instead of the endpoint. Gating on
+			 * have_deadline keeps a bare ENOMEM on the tap write
+			 * exactly where it was before this fix: the hard-error
+			 * path, a counted, logged, recoverable rebind. */
+			if (errno == EAGAIN || errno == EWOULDBLOCK ||
+			    (errno == ENOMEM && have_deadline)) {
 				struct pollfd pfd = { .fd = fd, .events = POLLOUT };
+
+				/* Logged once per write_full() call (one call
+				 * == one frame), the first time that frame's
+				 * write has to retry -- not every poll() cycle,
+				 * which would otherwise flood the console for
+				 * the entire length of a genuine wedge. This is
+				 * the only place a stall becomes visible before
+				 * either the progress deadline or a SIGUSR1 dump
+				 * fires, and it answers a question the CI seam
+				 * cannot: strerror(errno) here names ENOMEM
+				 * specifically when the vendor kernel's
+				 * TX-vring-full path above is what is actually
+				 * being hit on the board, versus the ordinary
+				 * EAGAIN/EWOULDBLOCK a pty always produces.
+				 * test-rpmsg-eth.sh's SIGUSR1-during-a-stall case
+				 * also waits on this line rather than guessing at
+				 * buffer-fill timing with a fixed sleep. */
+				if (!retry_logged) {
+					retry_logged = 1;
+					fprintf(stderr,
+						"rpmsg-eth: write(fd=%d) not ready (%s), "
+						"retrying\n",
+						fd, strerror(errno));
+				}
 
 				/* Bounded: 1s when a deadline applies (so the
 				 * clock is rechecked periodically even if the
@@ -465,7 +619,7 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
 		}
 		off += (size_t)w;
 		if (off < len)
-			(*short_writes)++;
+			(*counters->short_writes)++;
 	}
 	if (have_deadline)
 		alarm(0);
@@ -649,20 +803,6 @@ static int tap_open(const char *name)
 	return fd;
 }
 
-static void print_counters(const char *prefix, unsigned long tap_to_ept,
-			    unsigned long ept_to_tap, unsigned long dropped_oversize,
-			    unsigned long tap_dropped_no_endpoint,
-			    unsigned long tap_write_errors, unsigned long ept_write_errors,
-			    unsigned long short_writes)
-{
-	fprintf(stderr,
-		"rpmsg-eth: %s tap_to_ept=%lu ept_to_tap=%lu dropped_oversize=%lu "
-		"tap_dropped_no_endpoint=%lu tap_write_errors=%lu ept_write_errors=%lu "
-		"short_writes=%lu\n",
-		prefix, tap_to_ept, ept_to_tap, dropped_oversize, tap_dropped_no_endpoint,
-		tap_write_errors, ept_write_errors, short_writes);
-}
-
 /* Parse -T's argument: a strictly positive base-10 integer count of
  * seconds. Rejects <= 0 and anything non-numeric (trailing garbage,
  * empty string, overflow) -- a silently-clamped or silently-zero deadline
@@ -687,6 +827,19 @@ int main(int argc, char **argv)
 	unsigned long tap_to_ept = 0, ept_to_tap = 0, dropped_oversize = 0;
 	unsigned long tap_dropped_no_endpoint = 0;
 	unsigned long tap_write_errors = 0, ept_write_errors = 0, short_writes = 0;
+	/* See struct relay_counters's own comment: this is what lets
+	 * write_full() answer a SIGUSR1 dump itself while retrying a write
+	 * against the progress deadline, instead of only at the top of the
+	 * relay loop below. */
+	struct relay_counters counters = {
+		.tap_to_ept = &tap_to_ept,
+		.ept_to_tap = &ept_to_tap,
+		.dropped_oversize = &dropped_oversize,
+		.tap_dropped_no_endpoint = &tap_dropped_no_endpoint,
+		.tap_write_errors = &tap_write_errors,
+		.ept_write_errors = &ept_write_errors,
+		.short_writes = &short_writes,
+	};
 	int ept_progress_timeout_s = RPMSG_ETH_EPT_PROGRESS_TIMEOUT_S;
 	int opt, tap, ept, inotify_fd, fatal_error = 0;
 	struct sigaction sa;
@@ -836,7 +989,7 @@ int main(int argc, char **argv)
 				dropped_oversize++;
 			} else if (n > 0) {
 				double stalled_s = 0;
-				int wr = write_full(ept, buf, (size_t)n, &short_writes,
+				int wr = write_full(ept, buf, (size_t)n, &counters,
 						     ept_progress_timeout_s, &stalled_s);
 
 				if (wr == WRITE_FULL_OK) {
@@ -863,11 +1016,15 @@ int main(int argc, char **argv)
 						"so the service manager can restart us\n",
 						device ? device : service, stalled_s,
 						ept_progress_timeout_s);
-					print_counters("counters", tap_to_ept, ept_to_tap,
-							dropped_oversize, tap_dropped_no_endpoint,
-							tap_write_errors, ept_write_errors,
-							short_writes);
 					fatal_error = 1;
+					/* No print_counters() call here: the
+					 * shared shutdown path at the bottom
+					 * of main() prints them once this
+					 * break falls through to it. Printing
+					 * them here too would put the same
+					 * line on a slow serial console twice
+					 * during exactly the incident someone
+					 * is reading it to diagnose. */
 					break;
 				} else if (wr == WRITE_FULL_STOPPED) {
 					/* g_stop was set while this write was
@@ -911,9 +1068,12 @@ int main(int argc, char **argv)
 			if (n > 0) {
 				/* No deadline on this write: it targets tap,
 				 * which stays a blocking fd (see tap_open()),
-				 * so write_full() never sees EAGAIN here and
-				 * this call behaves exactly as it always has. */
-				if (write_full(tap, buf, (size_t)n, &short_writes, 0, NULL) ==
+				 * so write_full() never sees EAGAIN/EWOULDBLOCK
+				 * here, and its ENOMEM case is itself gated on
+				 * deadline_s > 0 (see write_full()'s retry
+				 * branch), so this call behaves exactly as it
+				 * always has. */
+				if (write_full(tap, buf, (size_t)n, &counters, 0, NULL) ==
 				    WRITE_FULL_OK) {
 					ept_to_tap++;
 				} else {

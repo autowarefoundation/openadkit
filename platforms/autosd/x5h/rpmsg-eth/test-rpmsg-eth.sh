@@ -371,13 +371,95 @@ wait_until "stall-test daemon to open both fds and become ready" 300 stall_daemo
 # unfragmented frame.
 socat -u -b 400 OPEN:/dev/zero UDP-SENDTO:172.16.99.2:9 >/dev/null 2>&1 & STALL_FLOOD=$!
 
+# Captured immediately after the flood starts, not after the SIGUSR1 case
+# below -- this is what "stall-test: daemon exited Xs after the wedge
+# began" further down, and STALL_WAIT_ELAPSED's bound, measure against.
+# Capturing it any later would make both drift lenient by however long the
+# SIGUSR1 case takes to run.
+STALL_WAIT_START=$(date +%s)
+
+# --- OAK final review, item 4: a SIGUSR1 sent while the endpoint is
+# wedged must produce a counter dump promptly (well inside the -T
+# deadline), not be silently absorbed until the deadline expires. Reuses
+# this same stall fixture, not a fresh one -- the flood above is already
+# under way and the daemon's write() to epA is already retrying against
+# EAGAIN by the time this runs, the same wedge Defect B's own
+# deadline-expiry check below depends on and relies on forming quickly.
+# Before this fix, write_full()'s retry loop honoured g_stop but never
+# g_dump, so the daemon stays inside a single write_full() call for the
+# whole wedge and the relay loop's own top-of-loop g_dump handling never
+# runs again until the deadline fires -- and the deadline path exits
+# without ever returning to that check. No "counters" line is printed for
+# this SIGUSR1 at all in that case; only wait_until's timeout below fires.
+#
+# Sending SIGUSR1 right after starting the flood, rather than once the
+# daemon is confirmed genuinely wedged, races: land too early and it is
+# answered by the ordinary top-of-relay-loop g_dump handling instead --
+# that path has always existed, is untouched by this fix, and would make
+# this assertion pass against the unfixed code too (confirmed empirically
+# the first time this test was written, with a fixed sleep in place of
+# the wait_until below: it passed against reverted code). A fixed sleep
+# doesn't fix this properly either -- long enough here is not guaranteed
+# long enough on a much slower CI runner (see wait_until's own comment on
+# how much slower QEMU TCG can be), so a short sleep risks the same false
+# pass there instead of here. wait_until on write_full()'s "not ready,
+# retrying" log line (see rpmsg-eth.c's retry branch) avoids guessing at
+# timing altogether: that line only appears once the daemon's write() has
+# actually returned EAGAIN, i.e. once it is genuinely inside the retry
+# loop this task's fix targets, regardless of how fast or slow
+# buffer-fill happens to be on the machine running this.
+stall_write_retrying() {
+	if ! kill -0 "$STALL_DAEMON" 2>/dev/null; then
+		echo "TEST_FAIL: wedged-endpoint daemon exited before its write ever had to retry" >&2
+		cat "$STALL_DAEMON_LOG" >&2 2>/dev/null || true
+		exit 1
+	fi
+	grep -q 'not ready' "$STALL_DAEMON_LOG" 2>/dev/null
+}
+wait_until "the wedged-endpoint daemon's write to start retrying" 300 stall_write_retrying
+
+kill -USR1 "$STALL_DAEMON"
+STALL_DUMP_WAIT_START_MS=$(date +%s%3N)
+stall_dump_logged() {
+	if ! kill -0 "$STALL_DAEMON" 2>/dev/null; then
+		echo "TEST_FAIL: wedged-endpoint daemon exited before answering SIGUSR1" >&2
+		cat "$STALL_DAEMON_LOG" >&2 2>/dev/null || true
+		exit 1
+	fi
+	grep -q 'rpmsg-eth: counters ' "$STALL_DAEMON_LOG" 2>/dev/null
+}
+wait_until "the wedged-endpoint daemon to answer SIGUSR1 with a counter dump" 300 stall_dump_logged
+STALL_DUMP_WAIT_ELAPSED_MS=$(( $(date +%s%3N) - STALL_DUMP_WAIT_START_MS ))
+# A real bound, not just wait_until's 30s ceiling -- same rationale as
+# STALL_WAIT_ELAPSED further below: this is pure signal-response time (the
+# daemon was already confirmed genuinely wedged, via the wait_until
+# above, before the signal was sent), not QEMU-TCG process-startup
+# latency, so the generous 30s ceiling that covers the latter does not
+# excuse this one. write_full()'s retry loop rechecks g_dump at least
+# once per second even in the worst case (its poll() is bounded to
+# 1000ms once a deadline applies), and SIGUSR1's handler has no
+# SA_RESTART (see main()), so it interrupts that poll() immediately with
+# EINTR instead of the daemon waiting it out -- this should be
+# near-instant. Millisecond resolution (date +%s%3N), not whole seconds:
+# a genuinely sub-second latency measured with whole-second `date +%s`
+# could round up to a misleadingly large number purely from where the two
+# reads happen to straddle a second boundary, flaking this bound
+# independently of the daemon's real behaviour. 1500ms (75% of the -T 2
+# deadline below) leaves generous headroom for scheduling jitter on a
+# slower machine while still being unambiguously "well inside" the
+# deadline, not merely a dump that happens to land close to it.
+[ "$STALL_DUMP_WAIT_ELAPSED_MS" -le 1500 ] \
+  || { echo "TEST_FAIL: wedged-endpoint daemon took ${STALL_DUMP_WAIT_ELAPSED_MS}ms to answer SIGUSR1, expected well under the 2000ms -T deadline"; cat "$STALL_DAEMON_LOG" >&2; exit 1; }
+
 # Bounded via wait_until, not a fixed sleep, for the same reason as the
 # endpoint-wait case above: on daemon code with no O_NONBLOCK/deadline,
 # this predicate never becomes true (the daemon is genuinely blocked
 # inside a kernel write(), not merely slow) and wait_until's own ceiling
 # is what turns that into a reported TEST_FAIL instead of this script
 # hanging forever -- the failure-demonstration case this test exists for.
-STALL_WAIT_START=$(date +%s)
+# (STALL_WAIT_START was already captured right after the flood started,
+# above the SIGUSR1 case, so it still measures from when the wedge
+# actually began, not from whenever that case finishes.)
 stall_daemon_exited() {
 	! kill -0 "$STALL_DAEMON" 2>/dev/null
 }

@@ -32,20 +32,31 @@
  * test seam: test-rpmsg-eth.sh points it at one end of a socat pty pair
  * standing in for the real endpoint chardev.
  *
- * usage: rpmsg-eth [-s rpmsg-eth] [-t tap0] [-d /dev/rpmsgN]
+ * The endpoint fd is opened O_NONBLOCK (the tap fd is not). A CR52 that
+ * stops draining its vring must never be able to park this daemon inside
+ * a blocking read()/write() on the endpoint -- that is exactly the board
+ * defect this guards against (100% system time, zero context switches,
+ * unit reporting "active (running)" forever). write_full() pairs the
+ * nonblocking write with a bounded progress deadline (-T, default
+ * RPMSG_ETH_EPT_PROGRESS_TIMEOUT_S) so a wedged remote is noticed and
+ * treated as fatal rather than spinning silently.
+ *
+ * usage: rpmsg-eth [-s rpmsg-eth] [-t tap0] [-d /dev/rpmsgN] [-T seconds]
  * Bridges frames both ways until SIGTERM/SIGINT, then closes both fds,
  * logs relay counters to stderr, and exits 0 -- including when the signal
  * arrives while still waiting for the first endpoint, which is a clean
  * shutdown, not a failure. SIGUSR1 dumps the same counters without
  * stopping the service, for inspecting a live daemon over a serial console
- * without destroying the state you wanted to inspect. A poll() failure or
- * a fatal tap condition (see POLLERR/POLLHUP/POLLNVAL handling below) exits
- * nonzero instead, so the unit's Restart=on-failure policy actually fires
- * rather than leaving systemd thinking a broken relay exited cleanly.
+ * without destroying the state you wanted to inspect. A poll() failure, a
+ * fatal tap condition (see POLLERR/POLLHUP/POLLNVAL handling below), or the
+ * endpoint making no write progress within -T seconds exits nonzero
+ * instead, so the unit's Restart=on-failure policy actually fires rather
+ * than leaving systemd thinking a broken relay exited cleanly.
  */
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
 #include <poll.h>
@@ -56,6 +67,7 @@
 #include <string.h>
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 
 struct rpmsg_endpoint_info {
@@ -82,8 +94,22 @@ struct rpmsg_endpoint_info {
  * captured whole and counted, rather than silently truncated. */
 #define BUF_LEN 2048
 
+/*
+ * How long write_full() tolerates the endpoint making no write progress
+ * before treating it as wedged (see write_full()'s comment). The kernel's
+ * own rpmsg_ctrl driver logs "timeout waiting for a tx buffer" every 15s
+ * once a vring fills and nothing drains it; this must fire before that --
+ * the daemon has to notice the stall itself, not just relay the kernel's
+ * own warning to the console a cycle late. Overridable with -T, chiefly so
+ * the test suite can use a deadline short enough to run quickly.
+ */
+#define RPMSG_ETH_EPT_PROGRESS_TIMEOUT_S 10
+
 static volatile sig_atomic_t g_stop;
 static volatile sig_atomic_t g_dump;
+/* Set by on_ept_deadline() when write_full()'s SIGALRM backstop fires (see
+ * that function). Not touched anywhere else. */
+static volatile sig_atomic_t g_ept_deadline_expired;
 
 static void on_signal(int sig)
 {
@@ -95,6 +121,12 @@ static void on_dump_signal(int sig)
 {
 	(void)sig;
 	g_dump = 1;
+}
+
+static void on_ept_deadline(int sig)
+{
+	(void)sig;
+	g_ept_deadline_expired = 1;
 }
 
 /* --- rpmsg endpoint discovery: same approach as scripts/rpmsg-ping.c --- */
@@ -254,7 +286,12 @@ static int create_ept(const char *service, enum ept_wait_reason *reason,
 		if (after & (1ULL << i))
 			break;
 	snprintf(devpath, sizeof(devpath), "/dev/rpmsg%d", i);
-	fd = open(devpath, O_RDWR);
+	/* O_NONBLOCK: see the header comment at the top of this file and
+	 * write_full()'s comment below. Without it, a CR52 that stops
+	 * draining its vring parks a write() on this fd inside the kernel
+	 * forever; the relay loop's read() tolerates the resulting EAGAIN
+	 * the same way it already tolerates EINTR (see its comment). */
+	fd = open(devpath, O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
 		*reason = EPT_WAIT_OPEN_FAIL;
 		snprintf(errbuf, errbuf_len, "open(%s): %s", devpath,
@@ -292,26 +329,137 @@ static void close_ept(int fd)
 	close(fd);
 }
 
+/* write_full()'s four-way return: WRITE_FULL_OK on success (all of `len`
+ * written), 0 on a hard I/O error (errno set by the failing write()), or
+ * one of these two sentinels -- kept named, not a second use of plain
+ * 0/-1, so callers can't fold distinct outcomes back into one case:
+ *   WRITE_FULL_DEADLINE_EXPIRED -- deadline_s > 0 and the fd made no
+ *     completing write progress within that many seconds. Fatal to the
+ *     caller (rebind would very likely just hit the same wedge again);
+ *     that distinction from a hard I/O error is the entire point of this
+ *     task.
+ *   WRITE_FULL_STOPPED -- g_stop was set (a signal arrived) while this
+ *     call was retrying. Not an error at all: the caller must treat it
+ *     the same as a clean shutdown noticed anywhere else, not log it or
+ *     count it as a failure. Exists so a SIGTERM arriving while the
+ *     endpoint is wedged is not silently absorbed by the EAGAIN retry
+ *     loop below until the unrelated progress deadline happens to expire
+ *     -- see that loop's own g_stop check for why that gap existed. */
+#define WRITE_FULL_OK (1)
+#define WRITE_FULL_DEADLINE_EXPIRED (-1)
+#define WRITE_FULL_STOPPED (-2)
+
 /* Write the whole buffer, retrying on a short write (a real possibility on
  * the pty the test stands the endpoint in with, and cheap insurance on the
- * real chardev too). Returns 1 on success, 0 on a hard error (errno set by
- * the failing write()). Counts (but does not fail on) every short write.
- * A write() returning exactly 0 for a nonzero-length request is treated as
- * a hard error rather than retried: it is not a short write (no progress
- * was made at all) and looping on it would spin unbounded rather than
- * making forward progress. */
-static int write_full(int fd, const char *buf, size_t len, unsigned long *short_writes)
+ * real chardev too). Counts (but does not fail on) every short write. A
+ * write() returning exactly 0 for a nonzero-length request is treated as a
+ * hard error rather than retried: it is not a short write (no progress was
+ * made at all) and looping on it would spin unbounded rather than making
+ * forward progress.
+ *
+ * deadline_s > 0 enables the bounded-progress path this task adds, used
+ * only for writes to the rpmsg endpoint (the tap fd stays blocking and is
+ * always called with deadline_s == 0, which reproduces the old behaviour
+ * exactly: EAGAIN can't happen on a blocking fd, so that branch is simply
+ * never taken for tap writes).
+ *
+ * With the endpoint opened O_NONBLOCK, a CR52 that has stopped returning
+ * TX buffers makes write() return EAGAIN/EWOULDBLOCK instead of blocking.
+ * The old code had no such case to handle at all; the fix is not to spin
+ * on it (that would just trade a blocking-syscall spin for a busy-poll
+ * spin -- the board evidence was 100% *system* time, but a userspace spin
+ * would show as 100% *user* time, an equally silent pegged core) but to
+ * block in poll() for POLLOUT and retry, bounded by deadline_s so a
+ * genuinely wedged remote is eventually reported instead of waited on
+ * forever.
+ *
+ * The bound is enforced two ways, deliberately redundant:
+ *   1. clock_gettime(CLOCK_MONOTONIC, ...) is checked before every write()
+ *      attempt; once elapsed >= deadline_s this returns
+ *      WRITE_FULL_DEADLINE_EXPIRED without attempting another write().
+ *   2. A SIGALRM is armed for deadline_s seconds around the whole call.
+ *      The clock check above only runs between syscalls, so it cannot
+ *      help if write() itself is what's stuck -- the board evidence (100%
+ *      system time, zero voluntary context switches) is consistent with a
+ *      blocking syscall, but does not by itself prove O_NONBLOCK is
+ *      honoured on this particular kernel path all the way down. SIGALRM,
+ *      handled without SA_RESTART (see main()), interrupts a blocking
+ *      write() or poll() with EINTR no matter which one turns out to be
+ *      stuck, which hands control back to the clock check above. Cheap
+ *      insurance the very next loop iteration either way: on the expected
+ *      path this fires only as a wakeup for an already-EAGAIN-ing fd. */
+static int write_full(int fd, const char *buf, size_t len, unsigned long *short_writes,
+		       int deadline_s, double *elapsed_s_out)
 {
 	size_t off = 0;
+	struct timespec start = { 0 };
+	int have_deadline = deadline_s > 0;
+
+	if (have_deadline) {
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		g_ept_deadline_expired = 0;
+		alarm((unsigned int)deadline_s);
+	}
 
 	while (off < len) {
-		ssize_t w = write(fd, buf + off, len - off);
+		ssize_t w;
+
+		if (have_deadline) {
+			struct timespec now;
+			double elapsed;
+
+			/* Checked ahead of the deadline itself: a clean stop
+			 * takes priority over a wedge report, and must not
+			 * wait out however much of the deadline is left. Only
+			 * gated on have_deadline (i.e. only for the endpoint
+			 * write, never the tap write, which stays a plain
+			 * blocking fd and cannot be sitting in this retry
+			 * loop at all) -- see this sentinel's own comment
+			 * above for why. */
+			if (g_stop) {
+				alarm(0);
+				errno = EINTR;
+				return WRITE_FULL_STOPPED;
+			}
+
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			elapsed = (double)(now.tv_sec - start.tv_sec) +
+				  (double)(now.tv_nsec - start.tv_nsec) / 1e9;
+			if (g_ept_deadline_expired || elapsed >= (double)deadline_s) {
+				alarm(0);
+				if (elapsed_s_out)
+					*elapsed_s_out = elapsed;
+				errno = ETIMEDOUT;
+				return WRITE_FULL_DEADLINE_EXPIRED;
+			}
+		}
+
+		w = write(fd, buf + off, len - off);
 		if (w < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				struct pollfd pfd = { .fd = fd, .events = POLLOUT };
+
+				/* Bounded: 1s when a deadline applies (so the
+				 * clock is rechecked periodically even if the
+				 * SIGALRM above were somehow lost, rather than
+				 * trusting a single mechanism), or the classic
+				 * unbounded wait when it doesn't (tap writes;
+				 * matches the pre-O_NONBLOCK behaviour, which
+				 * never spun -- it blocked in write() itself).
+				 * Either way this always blocks in poll();
+				 * never busy-retries. */
+				poll(&pfd, 1, have_deadline ? 1000 : -1);
+				continue;
+			}
 			if (errno == EINTR)
 				continue;
+			if (have_deadline)
+				alarm(0);
 			return 0;
 		}
 		if (w == 0) {
+			if (have_deadline)
+				alarm(0);
 			errno = EIO;
 			return 0;
 		}
@@ -319,7 +467,9 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
 		if (off < len)
 			(*short_writes)++;
 	}
-	return 1;
+	if (have_deadline)
+		alarm(0);
+	return WRITE_FULL_OK;
 }
 
 /* Block up to 1s waiting for either a /dev change (a pending endpoint
@@ -446,7 +596,11 @@ static int open_endpoint(const char *device, const char *service, int inotify_fd
 
 		errbuf[0] = '\0';
 		if (device) {
-			fd = open(device, O_RDWR);
+			/* O_NONBLOCK for the same reason as create_ept()'s
+			 * real-endpoint open above: this -d path is the test
+			 * seam, and the test's mock endpoint stands in for a
+			 * CR52 that can wedge exactly the same way. */
+			fd = open(device, O_RDWR | O_NONBLOCK);
 			if (fd < 0)
 				snprintf(errbuf, sizeof(errbuf), "open(%s): %s",
 					 device, strerror(errno));
@@ -509,23 +663,51 @@ static void print_counters(const char *prefix, unsigned long tap_to_ept,
 		tap_write_errors, ept_write_errors, short_writes);
 }
 
+/* Parse -T's argument: a strictly positive base-10 integer count of
+ * seconds. Rejects <= 0 and anything non-numeric (trailing garbage,
+ * empty string, overflow) -- a silently-clamped or silently-zero deadline
+ * would either never fire or fire immediately, both worse than refusing
+ * to start. Returns 0 and fills *out on success, -1 on a bad value. */
+static int parse_positive_seconds(const char *s, int *out)
+{
+	char *end;
+	long v;
+
+	errno = 0;
+	v = strtol(s, &end, 10);
+	if (end == s || *end != '\0' || errno == ERANGE || v <= 0 || v > INT_MAX)
+		return -1;
+	*out = (int)v;
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	const char *service = "rpmsg-eth", *tap_name = "tap0", *device = NULL;
 	unsigned long tap_to_ept = 0, ept_to_tap = 0, dropped_oversize = 0;
 	unsigned long tap_dropped_no_endpoint = 0;
 	unsigned long tap_write_errors = 0, ept_write_errors = 0, short_writes = 0;
+	int ept_progress_timeout_s = RPMSG_ETH_EPT_PROGRESS_TIMEOUT_S;
 	int opt, tap, ept, inotify_fd, fatal_error = 0;
 	struct sigaction sa;
 
-	while ((opt = getopt(argc, argv, "s:t:d:")) != -1) {
+	while ((opt = getopt(argc, argv, "s:t:d:T:")) != -1) {
 		switch (opt) {
 		case 's': service = optarg; break;
 		case 't': tap_name = optarg; break;
 		case 'd': device = optarg; break;
+		case 'T':
+			if (parse_positive_seconds(optarg, &ept_progress_timeout_s)) {
+				fprintf(stderr,
+					"rpmsg-eth: invalid -T value '%s': must be a "
+					"positive integer number of seconds\n",
+					optarg);
+				return 1;
+			}
+			break;
 		default:
 			fprintf(stderr,
-				"usage: %s [-s service] [-t tap] [-d device]\n",
+				"usage: %s [-s service] [-t tap] [-d device] [-T seconds]\n",
 				argv[0]);
 			return 1;
 		}
@@ -539,6 +721,15 @@ int main(int argc, char **argv)
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = on_dump_signal;
 	sigaction(SIGUSR1, &sa, NULL);
+
+	/* No SA_RESTART (sa.sa_flags is 0 from the memset above, same as the
+	 * other handlers): write_full()'s progress-deadline backstop relies
+	 * on this SIGALRM interrupting a blocking write()/poll() with EINTR
+	 * rather than transparently resuming it -- see write_full()'s
+	 * comment. */
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = on_ept_deadline;
+	sigaction(SIGALRM, &sa, NULL);
 
 	inotify_fd = inotify_init1(IN_NONBLOCK);
 	if (inotify_fd < 0) {
@@ -621,8 +812,11 @@ int main(int argc, char **argv)
 		 * keeps returning immediately with POLLERR set and nothing
 		 * read, sleeps, logs or exits -- a pegged core and a dead
 		 * link while the unit still reads "active (running)". Treat
-		 * it as fatal, matching the endpoint side's existing
-		 * POLLERR/POLLHUP handling below. */
+		 * it as fatal: unlike the endpoint side (which funnels
+		 * POLLERR/POLLHUP into a read() and lets the read's result
+		 * decide -- see that branch's own EAGAIN-plus-latched-flags
+		 * handling below), tap has no rebind path to fall back to,
+		 * so there is nothing productive left to retry into. */
 		if (pfd[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
 			fprintf(stderr,
 				"rpmsg-eth: tap %s reported a fatal poll condition "
@@ -641,8 +835,51 @@ int main(int argc, char **argv)
 			if (n > MAX_FRAME_LEN) {
 				dropped_oversize++;
 			} else if (n > 0) {
-				if (write_full(ept, buf, (size_t)n, &short_writes)) {
+				double stalled_s = 0;
+				int wr = write_full(ept, buf, (size_t)n, &short_writes,
+						     ept_progress_timeout_s, &stalled_s);
+
+				if (wr == WRITE_FULL_OK) {
 					tap_to_ept++;
+				} else if (wr == WRITE_FULL_DEADLINE_EXPIRED) {
+					/* The endpoint took the whole
+					 * progress deadline without accepting
+					 * this frame -- a wedged CR52, the
+					 * defect this task exists to catch.
+					 * Fatal, not a rebind: unlike EOF/a
+					 * write error, nothing here tells us
+					 * the CR52 is gone and a fresh
+					 * endpoint would help: create_ept()
+					 * would very likely just bind the
+					 * same wedged channel again. Exiting
+					 * lets systemd apply its restart
+					 * policy and back off / alert instead
+					 * of this daemon silently retrying
+					 * into the same wall. */
+					fprintf(stderr,
+						"rpmsg-eth: endpoint %s did not finish "
+						"writing a frame within %.1fs (deadline "
+						"%ds) -- treating as wedged and exiting "
+						"so the service manager can restart us\n",
+						device ? device : service, stalled_s,
+						ept_progress_timeout_s);
+					print_counters("counters", tap_to_ept, ept_to_tap,
+							dropped_oversize, tap_dropped_no_endpoint,
+							tap_write_errors, ept_write_errors,
+							short_writes);
+					fatal_error = 1;
+					break;
+				} else if (wr == WRITE_FULL_STOPPED) {
+					/* g_stop was set while this write was
+					 * retrying (e.g. SIGTERM arrived while
+					 * the endpoint was wedged). Not an
+					 * error and not logged as one: fall out
+					 * of the relay loop the same way a
+					 * SIGTERM arriving between poll()
+					 * iterations already does, so a clean
+					 * stop still exits 0 through the single
+					 * exit path at the bottom of main(). */
+					break;
 				} else {
 					tap_write_errors++;
 					fprintf(stderr,
@@ -672,7 +909,12 @@ int main(int argc, char **argv)
 		    (pfd[1].revents & (POLLIN | POLLHUP | POLLERR))) {
 			n = read(ept, buf, sizeof(buf));
 			if (n > 0) {
-				if (write_full(tap, buf, (size_t)n, &short_writes)) {
+				/* No deadline on this write: it targets tap,
+				 * which stays a blocking fd (see tap_open()),
+				 * so write_full() never sees EAGAIN here and
+				 * this call behaves exactly as it always has. */
+				if (write_full(tap, buf, (size_t)n, &short_writes, 0, NULL) ==
+				    WRITE_FULL_OK) {
 					ept_to_tap++;
 				} else {
 					ept_write_errors++;
@@ -680,10 +922,59 @@ int main(int argc, char **argv)
 						"rpmsg-eth: write(tap) failed: %s\n",
 						strerror(errno));
 				}
-			} else if (n < 0 && (errno == EINTR || errno == EAGAIN)) {
-				/* Transient; not a disconnect. Retry next
-				 * poll iteration instead of tearing down a
-				 * live endpoint. */
+			} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) &&
+				   (pfd[1].revents & (POLLHUP | POLLERR))) {
+				/* EAGAIN alone (the branch below) would be an
+				 * ordinary spurious/raced wakeup, safe to just
+				 * retry next poll(). But POLLHUP/POLLERR having
+				 * *also* latched on this fd means poll() will
+				 * keep reporting them on every following call
+				 * regardless of whether there is ever anything
+				 * to read -- with the endpoint's old blocking
+				 * fd that combination could not reach here at
+				 * all (the read would have delivered whatever
+				 * made those flags true instead of EAGAIN), but
+				 * O_NONBLOCK opens up exactly this gap: falling
+				 * into the plain-transient branch below would
+				 * return to poll(pfd, 2, -1) above, which
+				 * reports the same still-latched revents
+				 * immediately, forever -- an unbounded busy
+				 * loop (100% user time this time, not the
+				 * system time the board saw, but an equally
+				 * silent pegged core) on the very fd this task
+				 * exists to stop spinning on. Upstream
+				 * rpmsg_char is not known to produce this
+				 * combination (a destroyed ept gives EPIPE, a
+				 * hung-up chardev gives EIO or a 0-byte read,
+				 * both already handled by the branch further
+				 * below), but this daemon runs against a
+				 * vendor kernel, and betting a busy-loop on
+				 * that mapping holding is exactly the kind of
+				 * assumption write_full()'s SIGALRM backstop
+				 * exists to not make. Treat it the same as the
+				 * EOF/read-error branch further below: rebind
+				 * rather than trust the read side to notice on
+				 * its own. */
+				fprintf(stderr,
+					"rpmsg-eth: endpoint lost (EAGAIN with a latched "
+					"fatal poll condition), rebinding\n");
+				close_ept(ept);
+				ept = open_endpoint(device, service, inotify_fd,
+						     tap, tap_name,
+						     &tap_dropped_no_endpoint);
+				if (ept == OPEN_ENDPOINT_TAP_FATAL)
+					fatal_error = 1;
+			} else if (n < 0 && (errno == EINTR || errno == EAGAIN ||
+					      errno == EWOULDBLOCK)) {
+				/* Transient; not a disconnect. EAGAIN/
+				 * EWOULDBLOCK is expected now that the
+				 * endpoint is O_NONBLOCK: a POLLIN wakeup can
+				 * still race another consumer or be spurious.
+				 * Retry next poll iteration instead of
+				 * tearing down a live endpoint or counting
+				 * this as an error. (The POLLHUP/POLLERR
+				 * variant of this is handled separately above
+				 * -- it must not fall through to here.) */
 			} else {
 				/* n == 0 (EOF) or a genuine read error:
 				 * CR52 reset. Rebind and keep going rather

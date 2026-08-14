@@ -293,4 +293,119 @@ grep -q 'fatal poll condition' "$WAIT_DAEMON_LOG" \
 grep -q 'tap1' "$WAIT_DAEMON_LOG" \
   || { echo "TEST_FAIL: fatal tap condition log did not name the interface"; cat "$WAIT_DAEMON_LOG" >&2; exit 1; }
 
+# --- Defect B: a wedged endpoint that accepts a bind but then services
+# neither reads nor writes must trip the -T progress deadline and exit
+# nonzero, not peg a core silently. This reproduces the board defect: the
+# CR52 wedged, and the daemon (no O_NONBLOCK anywhere) burned 100% of one
+# core in system time forever, never returning to userspace, while
+# systemd kept reporting "active (running)" because the process never
+# exited. The existing round-trip test above cannot catch this class of
+# bug at all -- its mock endpoint (epB) is continuously drained by a `dd`
+# read, so the daemon's write() there always has room and never blocks.
+#
+# Reuses the same two-pty-bridge mock as the round-trip test above (epA
+# exposed to the daemon via -d, epB the corresponding far end) but never
+# reads epB: held open (so it behaves like a connected far end, not a
+# dead one) via a bare `exec` onto an fd this script never reads from.
+# socat, which bridges epA and epB internally, backs off relaying once
+# its own write into epB's unread buffer can no longer proceed, which in
+# turn leaves epA's buffer with nowhere to drain -- so the daemon's own
+# write() to epA is what ultimately sees EAGAIN forever, the same shape
+# as a CR52 that has stopped returning TX buffers.
+STALL_PTY_DIR=$(mktemp -d)
+STALL_DAEMON_LOG="$STALL_PTY_DIR/stall-daemon.log"
+
+socat PTY,raw,echo=0,link="$STALL_PTY_DIR/epA" PTY,raw,echo=0,link="$STALL_PTY_DIR/epB" & STALL_SOCAT=$!
+stall_pty_pair_ready() {
+	if ! kill -0 "$STALL_SOCAT" 2>/dev/null; then
+		echo "TEST_FAIL: stall-test socat exited before creating its pty pair" >&2
+		exit 1
+	fi
+	[ -e "$STALL_PTY_DIR/epA" ] && [ -e "$STALL_PTY_DIR/epB" ]
+}
+wait_until "stall-test socat's pty pair to appear" 300 stall_pty_pair_ready
+
+# Opened but never read and never written -- exactly the mock shape the
+# defect needs: a far end that is live (so writes into it don't just
+# bounce off a closed pty with nobody home) but never services anything,
+# so its buffer fills and stays full. Closed explicitly in the cleanup
+# below, not left to script exit.
+exec {STALL_EPB_FD}<>"$STALL_PTY_DIR/epB"
+
+# A distinct subnet from tap0's 172.16.52.0/24 (tap0 is still up at this
+# point in the script -- only its daemon and socat were killed, not the
+# interface itself): with both on the same subnet the kernel prefers
+# tap0's route, which has nothing reading it any more, and the flood
+# below would silently vanish down the wrong interface instead of ever
+# reaching this test's daemon.
+ip tuntap add dev tap2 mode tap && ip link set tap2 up && ip addr add 172.16.99.1/24 dev tap2
+# A permanent, unresolved-free neighbor entry for the mock CR52 IP:
+# nothing on epB will ever answer an ARP request (the mock never reads,
+# let alone replies), and without this the kernel's neighbor subsystem
+# queues only a handful of packets per unresolved destination and drops
+# the rest -- starving the flood below of the volume it needs to fill
+# both pty buffers in the chain.
+ip neigh add 172.16.99.2 lladdr 02:5c:52:00:00:02 dev tap2 nud permanent
+
+# -T 2: a short deadline so this test runs quickly; RPMSG_ETH_EPT_PROGRESS_TIMEOUT_S's
+# real-world default of 10s is sized against the kernel's own 15s
+# "timeout waiting for a tx buffer" warning, not against test runtime.
+./rpmsg-eth -t tap2 -d "$STALL_PTY_DIR/epA" -T 2 >"$STALL_DAEMON_LOG" 2>&1 & STALL_DAEMON=$!
+stall_daemon_ready() {
+	if ! kill -0 "$STALL_DAEMON" 2>/dev/null; then
+		echo "TEST_FAIL: stall-test daemon exited before becoming ready" >&2
+		cat "$STALL_DAEMON_LOG" >&2 2>/dev/null || true
+		exit 1
+	fi
+	grep -q 'rpmsg-eth: ready' "$STALL_DAEMON_LOG" 2>/dev/null
+}
+wait_until "stall-test daemon to open both fds and become ready" 300 stall_daemon_ready
+
+# Flood tap2 toward the never-draining mock with one long-lived socat
+# rather than many short-lived ones -- both to avoid hundreds of
+# fork+exec calls under QEMU TCG (see wait_until's comment on how slow
+# that gets) and because a continuous stream, not a fixed packet count,
+# is what reliably overruns the buffer chain regardless of its exact
+# size on a given kernel. -b keeps each UDP datagram at 400 bytes,
+# comfortably under the 462 netif MTU so each one leaves as a single
+# unfragmented frame.
+socat -u -b 400 OPEN:/dev/zero UDP-SENDTO:172.16.99.2:9 >/dev/null 2>&1 & STALL_FLOOD=$!
+
+# Bounded via wait_until, not a fixed sleep, for the same reason as the
+# endpoint-wait case above: on daemon code with no O_NONBLOCK/deadline,
+# this predicate never becomes true (the daemon is genuinely blocked
+# inside a kernel write(), not merely slow) and wait_until's own ceiling
+# is what turns that into a reported TEST_FAIL instead of this script
+# hanging forever -- the failure-demonstration case this test exists for.
+STALL_WAIT_START=$(date +%s)
+stall_daemon_exited() {
+	! kill -0 "$STALL_DAEMON" 2>/dev/null
+}
+wait_until "the wedged-endpoint daemon to exit once its progress deadline expires" 300 stall_daemon_exited
+STALL_WAIT_ELAPSED=$(( $(date +%s) - STALL_WAIT_START ))
+echo "stall-test: daemon exited ${STALL_WAIT_ELAPSED}s after the wedge began (deadline was 2s)"
+# A real bound, not just wait_until's 30s ceiling: by this point the daemon
+# was already confirmed `ready` and the flood was already running, so this
+# wait is pure wedge-to-exit time, not QEMU-TCG startup latency -- the
+# generous-slack reasoning that justifies the 30s ceiling elsewhere does
+# not apply to it. 15s against a 2s deadline is still generous (7.5x), but
+# a deadline that silently stopped enforcing itself and instead relied on
+# some unrelated timeout (or no timeout at all) could still exit within
+# 30s and must not be able to pass this assertion.
+[ "$STALL_WAIT_ELAPSED" -le 15 ] \
+  || { echo "TEST_FAIL: wedged-endpoint daemon took ${STALL_WAIT_ELAPSED}s to exit, expected close to the 2s -T deadline"; cat "$STALL_DAEMON_LOG" >&2; exit 1; }
+
+kill "$STALL_FLOOD" 2>/dev/null || true
+wait "$STALL_FLOOD" 2>/dev/null || true
+exec {STALL_EPB_FD}<&-
+kill "$STALL_SOCAT" 2>/dev/null || true
+wait "$STALL_SOCAT" 2>/dev/null || true
+ip link del tap2 2>/dev/null || true
+
+wait "$STALL_DAEMON" && STALL_DAEMON_STATUS=0 || STALL_DAEMON_STATUS=$?
+[ "$STALL_DAEMON_STATUS" -ne 0 ] \
+  || { echo "TEST_FAIL: wedged-endpoint daemon exited 0, expected nonzero (the -T progress deadline should have made it exit fatal)"; cat "$STALL_DAEMON_LOG" >&2; exit 1; }
+grep -q 'did not finish writing a frame' "$STALL_DAEMON_LOG" \
+  || { echo "TEST_FAIL: wedged-endpoint daemon did not name the stall condition in its log"; cat "$STALL_DAEMON_LOG" >&2; exit 1; }
+
 echo "TEST_PASS"

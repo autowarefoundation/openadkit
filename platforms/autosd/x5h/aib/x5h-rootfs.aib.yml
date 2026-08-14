@@ -20,6 +20,19 @@ content:
     # a service that cannot exist. Board-verified 2026-08-07: no /usr/sbin/sshd
     # and no sshd.service unit in the built rootfs.
     - openssh-server
+    # rpmsg-eth-smoke.sh's only end-to-end assertion is an ICMP round trip to
+    # the CR52 side (172.16.52.2), and `ping` lives in iputils -- `iproute`
+    # above provides `ip`, not `ping`. Without this the smoke test can only
+    # report reason=no_ping, so the board gate would prove the tap is
+    # configured and never that IP actually round-trips over RPMsg.
+    #
+    # busybox is NOT a substitute even though a busybox OCI image is already
+    # staged on the board by stage-nfs-rootfs.sh: busybox prints
+    # "N packets transmitted, N packets received", while the smoke script's
+    # summary parser requires ", N received" (iputils' wording). Busybox would
+    # therefore produce a false reason=ping_loss -- precisely the misleading
+    # failure that parser was written to avoid.
+    - iputils
   # add_files (org.osbuild.copy) does not create parent directories, and
   # nothing else in the pipeline creates /etc/containers/containers.conf.d
   # (init_rootfs_dirs_stage creates /etc itself, but not this subtree).

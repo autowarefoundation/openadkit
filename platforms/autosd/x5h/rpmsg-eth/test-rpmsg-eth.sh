@@ -235,4 +235,62 @@ FRAME2="$(timeout 10 dd if="$PTY_DIR/epB" bs=600 count=1 2>/dev/null | xxd)" || 
 grep -qi '0806' <<<"$FRAME2" \
   || { echo "TEST_FAIL: no ARP frame relayed tap->endpoint after rebind"; exit 1; }
 
-kill $DAEMON $SOCAT; echo "TEST_PASS"
+kill $DAEMON $SOCAT
+
+# --- OAK round 2 (final review finding 3, residual): wait_for_dev_or_tap()
+# must treat POLLERR/POLLHUP/POLLNVAL on the tap fd as fatal during the
+# endpoint wait, not just in the steady-state relay loop -- 627df09 fixed
+# only the relay loop (see rpmsg-eth.c's "POLLERR/POLLHUP handling below"
+# comment on the relay loop's own poll() check); wait_for_dev_or_tap()
+# itself still ignored them. That matters because BOTH the initial
+# endpoint wait (the daemon is normally started before the CR52 firmware
+# is up on the real board, so this is the ordinary startup state, not an
+# edge case) and the rebind wait after a CR52 reset go through this exact
+# function. Left unfixed: `ip link del` on the tap latches POLLERR, so
+# poll() returns immediately forever instead of waiting out its 1s
+# timeout, and open_endpoint()'s retry loop spins at full speed instead of
+# pacing at ~1Hz or exiting -- a pegged core and a flooded serial console
+# on a safety-adjacent ECU, not a clean, diagnosable failure.
+#
+# Exercise the endpoint-wait state specifically -- not the relay state
+# already covered above -- by pointing a fresh daemon at a device path
+# that can never appear, so it never leaves open_endpoint()'s retry loop,
+# then deleting its tap device out from under it. Correct behavior: the
+# daemon exits nonzero and logs the fatal condition, naming the interface
+# and which flags fired.
+WAIT_DAEMON_LOG="$PTY_DIR/wait-daemon.log"
+ip tuntap add dev tap1 mode tap && ip link set tap1 up
+
+wait_daemon_waiting() {
+	if ! kill -0 "$WAIT_DAEMON" 2>/dev/null; then
+		echo "TEST_FAIL: endpoint-wait daemon exited before ever entering its wait" >&2
+		cat "$WAIT_DAEMON_LOG" >&2 2>/dev/null || true
+		exit 1
+	fi
+	grep -q 'waiting for endpoint' "$WAIT_DAEMON_LOG" 2>/dev/null
+}
+
+./rpmsg-eth -t tap1 -d "$PTY_DIR/does-not-exist" >"$WAIT_DAEMON_LOG" 2>&1 & WAIT_DAEMON=$!
+wait_until "endpoint-wait daemon to enter open_endpoint()'s retry loop" 300 wait_daemon_waiting
+
+ip link del tap1
+
+# Bounded via wait_until, not a fixed sleep: on the unfixed code this
+# predicate never becomes true (see the header comment above -- the
+# daemon busy-spins instead of exiting) and wait_until's own timeout is
+# what turns that into a reported TEST_FAIL instead of this script hanging
+# forever -- exactly the failure-demonstration case this test exists for.
+wait_daemon_exited() {
+	! kill -0 "$WAIT_DAEMON" 2>/dev/null
+}
+wait_until "endpoint-wait daemon to exit after its tap fd hit a fatal poll condition" 300 wait_daemon_exited
+
+wait "$WAIT_DAEMON" && WAIT_DAEMON_STATUS=0 || WAIT_DAEMON_STATUS=$?
+[ "$WAIT_DAEMON_STATUS" -ne 0 ] \
+  || { echo "TEST_FAIL: endpoint-wait daemon exited 0 after a fatal tap condition, expected nonzero"; cat "$WAIT_DAEMON_LOG" >&2; exit 1; }
+grep -q 'fatal poll condition' "$WAIT_DAEMON_LOG" \
+  || { echo "TEST_FAIL: endpoint-wait daemon did not log the fatal tap condition"; cat "$WAIT_DAEMON_LOG" >&2; exit 1; }
+grep -q 'tap1' "$WAIT_DAEMON_LOG" \
+  || { echo "TEST_FAIL: fatal tap condition log did not name the interface"; cat "$WAIT_DAEMON_LOG" >&2; exit 1; }
+
+echo "TEST_PASS"

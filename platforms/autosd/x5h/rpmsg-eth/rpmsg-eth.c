@@ -331,9 +331,22 @@ static int write_full(int fd, const char *buf, size_t len, unsigned long *short_
  * loop at roughly 1Hz: inotify only wakes it early when a device node
  * actually changes under /dev, and a channel announcement need not create
  * anything there at all (the new node appears under /sys/class/rpmsg,
- * which this function does not watch). */
-static void wait_for_dev_or_tap(int inotify_fd, int tap_fd,
-				 unsigned long *tap_dropped_no_endpoint)
+ * which this function does not watch).
+ *
+ * Returns 1 if the tap fd reported POLLERR/POLLHUP/POLLNVAL -- the same
+ * fatal condition the steady-state relay loop below treats as fatal, and
+ * for the same reason: POLLERR is delivered regardless of requested
+ * events and latches once the tap stops being a live, registered
+ * netdevice (e.g. `ip link del tap0` under the daemon), so poll() would
+ * otherwise return immediately, forever, instead of waiting out its 1s
+ * timeout. That defeats the ~1Hz retry pacing this function exists to
+ * provide and turns the endpoint wait into a full-speed busy loop instead
+ * of a silent hang. Returns 0 otherwise (the ordinary 1s timeout, an
+ * inotify wakeup, or a tap frame drained above). The caller must treat a
+ * 1 as fatal and stop retrying -- there is no timeout left to pace a
+ * retry against once the tap fd itself is broken. */
+static int wait_for_dev_or_tap(int inotify_fd, int tap_fd, const char *tap_name,
+				unsigned long *tap_dropped_no_endpoint)
 {
 	struct pollfd pfd[2] = {
 		{ .fd = inotify_fd, .events = POLLIN },
@@ -342,17 +355,32 @@ static void wait_for_dev_or_tap(int inotify_fd, int tap_fd,
 	char ibuf[1024], fbuf[BUF_LEN];
 
 	if (poll(pfd, 2, 1000) <= 0)
-		return;
+		return 0;
+
+	if (pfd[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+		fprintf(stderr,
+			"rpmsg-eth: tap %s reported a fatal poll condition "
+			"(POLLERR=%d POLLHUP=%d POLLNVAL=%d) while waiting "
+			"for the endpoint -- exiting so the service manager "
+			"can restart us\n",
+			tap_name,
+			!!(pfd[1].revents & POLLERR),
+			!!(pfd[1].revents & POLLHUP),
+			!!(pfd[1].revents & POLLNVAL));
+		return 1;
+	}
+
 	if (pfd[0].revents & POLLIN) {
 		if (read(inotify_fd, ibuf, sizeof(ibuf)) < 0 &&
 		    errno != EINTR && errno != EAGAIN)
-			return;
+			return 0;
 	}
 	if (pfd[1].revents & POLLIN) {
 		ssize_t n = read(tap_fd, fbuf, sizeof(fbuf));
 		if (n > 0)
 			(*tap_dropped_no_endpoint)++;
 	}
+	return 0;
 }
 
 static const char *ept_wait_reason_str(enum ept_wait_reason reason)
@@ -367,13 +395,31 @@ static const char *ept_wait_reason_str(enum ept_wait_reason reason)
 	return "unknown";
 }
 
+/* open_endpoint()'s two ways of giving up without a bound endpoint. Kept
+ * as named negative sentinels, not a bare -1, precisely so a fatal tap
+ * condition can no longer be conflated with a clean-shutdown signal --
+ * that conflation was the bug this fixes. */
+#define OPEN_ENDPOINT_STOPPED   (-1)
+#define OPEN_ENDPOINT_TAP_FATAL (-2)
+
 /* Open the endpoint: `device` directly if given (test seam), else wait for
  * the CR52 to announce `service` and bind it. Retries indefinitely (until
- * a signal arrives), so the daemon is start-order independent and survives
- * the endpoint going away and coming back across a CR52 reset. tap is kept
- * drained (see wait_for_dev_or_tap) while this blocks. Returns -1 only
- * when g_stop was set (a signal arrived); callers should treat that as a
- * clean-shutdown request, not an error.
+ * a signal arrives or the tap fd hits a fatal condition), so the daemon is
+ * start-order independent and survives the endpoint going away and coming
+ * back across a CR52 reset. tap is kept drained (see wait_for_dev_or_tap)
+ * while this blocks.
+ *
+ * Returns the open fd (>= 0) on success, or one of two negative sentinels
+ * on giving up -- these must not be conflated, since only one of them is a
+ * clean shutdown:
+ *   OPEN_ENDPOINT_STOPPED    -- g_stop was set (a signal arrived); callers
+ *                                should treat this as a clean-shutdown
+ *                                request, not an error.
+ *   OPEN_ENDPOINT_TAP_FATAL  -- wait_for_dev_or_tap() saw POLLERR/POLLHUP/
+ *                                POLLNVAL on the tap fd (already logged
+ *                                there); callers must exit nonzero, the
+ *                                same as the steady-state relay loop's
+ *                                handling of the identical condition.
  *
  * Logs once on entering the wait (naming what is being waited for), once
  * on the first occurrence of each distinct failure reason, every ~30
@@ -383,7 +429,8 @@ static const char *ept_wait_reason_str(enum ept_wait_reason reason)
  * hang on a serial console with no way to inspect process state; these
  * lines are the only thing that tells the two apart. */
 static int open_endpoint(const char *device, const char *service, int inotify_fd,
-			  int tap_fd, unsigned long *tap_dropped_no_endpoint)
+			  int tap_fd, const char *tap_name,
+			  unsigned long *tap_dropped_no_endpoint)
 {
 	unsigned long attempt = 0;
 	int have_last_reason = 0;
@@ -413,7 +460,7 @@ static int open_endpoint(const char *device, const char *service, int inotify_fd
 			return fd;
 		}
 		if (g_stop)
-			return -1;
+			return OPEN_ENDPOINT_STOPPED;
 
 		attempt++;
 		if (!have_last_reason || reason != last_reason ||
@@ -425,7 +472,9 @@ static int open_endpoint(const char *device, const char *service, int inotify_fd
 			last_reason = reason;
 			have_last_reason = 1;
 		}
-		wait_for_dev_or_tap(inotify_fd, tap_fd, tap_dropped_no_endpoint);
+		if (wait_for_dev_or_tap(inotify_fd, tap_fd, tap_name,
+					 tap_dropped_no_endpoint))
+			return OPEN_ENDPOINT_TAP_FATAL;
 	}
 }
 
@@ -509,24 +558,30 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	ept = open_endpoint(device, service, inotify_fd, tap, &tap_dropped_no_endpoint);
-	if (ept < 0 && !g_stop) {
-		/* open_endpoint() only gives up when g_stop is set; this is
-		 * defensive, not a path we expect to hit. */
+	ept = open_endpoint(device, service, inotify_fd, tap, tap_name,
+			     &tap_dropped_no_endpoint);
+	if (ept == OPEN_ENDPOINT_TAP_FATAL) {
+		fatal_error = 1;
+	} else if (ept < 0 && !g_stop) {
+		/* open_endpoint() only gives up when g_stop is set or the
+		 * tap fd hit a fatal condition (OPEN_ENDPOINT_TAP_FATAL,
+		 * handled above); this remaining branch is defensive, not a
+		 * path we expect to hit. */
 		fprintf(stderr, "rpmsg-eth: stopped waiting for endpoint\n");
-		close(tap);
-		close(inotify_fd);
-		return 1;
+		fatal_error = 1;
 	}
 
-	/* If a signal arrived while still waiting above, ept is -1 and
-	 * g_stop is set: fall straight through to the shared shutdown path
-	 * below (skipping the loop) so this is exit 0, the same as a signal
-	 * during the loop -- "exit 0 on clean SIGTERM" holds regardless of
-	 * when the signal lands. Otherwise both fds are open and we are
-	 * about to enter the poll loop: print a readiness marker so a
-	 * caller (test-rpmsg-eth.sh, under QEMU TCG in CI, cannot assume a
-	 * fixed startup latency) can wait on it instead of guessing. */
+	/* If we are giving up here -- g_stop was set, or the tap fd hit a
+	 * fatal condition above -- ept is negative, so the while loop below
+	 * never runs and this falls straight through to the shared shutdown
+	 * path at the bottom, which returns fatal_error ? 1 : 0. That keeps
+	 * "exit 0 on a clean SIGTERM" true regardless of when the signal
+	 * lands, while a fatal tap condition still exits nonzero, exactly
+	 * like the steady-state relay loop's handling of the identical
+	 * condition. Otherwise both fds are open and we are about to enter
+	 * the poll loop: print a readiness marker so a caller
+	 * (test-rpmsg-eth.sh, under QEMU TCG in CI, cannot assume a fixed
+	 * startup latency) can wait on it instead of guessing. */
 	if (ept >= 0)
 		fprintf(stderr, "rpmsg-eth: ready\n");
 
@@ -604,7 +659,10 @@ int main(int argc, char **argv)
 						"rpmsg-eth: endpoint lost (write failed), rebinding\n");
 					close_ept(ept);
 					ept = open_endpoint(device, service, inotify_fd,
-							     tap, &tap_dropped_no_endpoint);
+							     tap, tap_name,
+							     &tap_dropped_no_endpoint);
+					if (ept == OPEN_ENDPOINT_TAP_FATAL)
+						fatal_error = 1;
 					reconnected = 1;
 				}
 			}
@@ -634,7 +692,10 @@ int main(int argc, char **argv)
 					"rpmsg-eth: endpoint lost (EOF/read error), rebinding\n");
 				close_ept(ept);
 				ept = open_endpoint(device, service, inotify_fd,
-						     tap, &tap_dropped_no_endpoint);
+						     tap, tap_name,
+						     &tap_dropped_no_endpoint);
+				if (ept == OPEN_ENDPOINT_TAP_FATAL)
+					fatal_error = 1;
 			}
 		}
 	}

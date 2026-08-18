@@ -34,13 +34,17 @@ RUN apt-get update \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Drop back to a non-root user for runtime: DDS uses high UDP ports and the
-# pod already shares the host network namespace, so root buys nothing here.
-# The base image's own final stage leaves USER as root (its runtime stage
-# does `USER root`, copies build artifacts, and never switches back), but it
-# does create a uid-1000 "aw" account (USERNAME=aw in its ENV, build
-# artifacts chowned aw:aw) that every other container in this stack runs as,
-# so we switch to that existing account rather than adding a new one.
-USER aw
+# Deliberately staying root here, not switching to a non-root user: the
+# base image's own final stage does `USER root` and never switches back
+# (confirmed via `docker history` -- its runtime stage copies build
+# artifacts and runs further apt/rosdep steps as root with no later `USER`
+# instruction), and every sibling openadkit-* component image in this stack
+# (images.txt) inherits that same root default. Switching only this image
+# to non-root would make the bridge the one odd container in the stack
+# rather than making anything more consistent. A uid-1000 "aw" account
+# does already exist in the base (USERNAME=aw in its ENV, build artifacts
+# chowned aw:aw) if the whole stack is ever moved off root -- that would be
+# a fix to the base image, not to this Dockerfile alone. Please do not
+# re-add a per-image USER switch here without doing that stack-wide.
 
 ENTRYPOINT ["/entrypoint.sh"]

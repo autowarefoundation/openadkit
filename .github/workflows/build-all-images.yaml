@@ -276,7 +276,7 @@ jobs:
 
       - name: Extract metadata for openadkit-common:universe-common-devel
         id: meta-universe-common-devel
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
           bake-target: docker-metadata-action-universe-common-devel
@@ -288,7 +288,7 @@ jobs:
 
       - name: Extract metadata for openadkit-common:universe-common
         id: meta-universe-common
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_PREFIX_COMMON }}
           bake-target: docker-metadata-action-universe-common
@@ -473,7 +473,7 @@ jobs:
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}

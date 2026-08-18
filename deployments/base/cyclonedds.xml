@@ -8,5 +8,9 @@
         <NetworkInterface name="${CYCLONEDDS_NETWORK_INTERFACE}"/>
       </Interfaces>
     </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
   </Domain>
 </CycloneDDS>

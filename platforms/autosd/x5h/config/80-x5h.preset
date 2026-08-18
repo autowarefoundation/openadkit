@@ -1,1 +1,2 @@
 enable sshd.service
+enable awf-oak-x5h-extract-map.service

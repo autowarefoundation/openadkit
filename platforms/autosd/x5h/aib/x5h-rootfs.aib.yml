@@ -67,6 +67,21 @@ content:
     - path: /etc/udev/rules.d
       parents: true
       exist_ok: true
+    - path: /etc/containers/systemd/launch
+      parents: true
+      exist_ok: true
+    - path: /usr/local/libexec
+      parents: true
+      exist_ok: true
+    - path: /usr/local/sbin
+      parents: true
+      exist_ok: true
+    - path: /var/log/awf
+      parents: true
+      exist_ok: true
+    - path: /opt/tier4/kashiwanoha_map
+      parents: true
+      exist_ok: true
   add_files:
     # add_files only permits /etc and /usr destinations (rehearsal finding).
     - source_path: ../config/50-x5h.conf
@@ -96,6 +111,59 @@ content:
       path: /etc/udev/rules.d/52-x5h-cmem.rules
     - source_path: ../config/80-x5h.preset
       path: /etc/systemd/system-preset/80-x5h.preset
+    # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
+    - source_path: ../components/awf-oak-x5h.pod
+      path: /etc/containers/systemd/awf-oak-x5h.pod
+    - source_path: ../components/awf-oak-map.container
+      path: /etc/containers/systemd/awf-oak-map.container
+    - source_path: ../components/awf-oak-planning.container
+      path: /etc/containers/systemd/awf-oak-planning.container
+    - source_path: ../components/awf-oak-vehicle.container
+      path: /etc/containers/systemd/awf-oak-vehicle.container
+    - source_path: ../components/awf-oak-system.container
+      path: /etc/containers/systemd/awf-oak-system.container
+    - source_path: ../components/awf-oak-control.container
+      path: /etc/containers/systemd/awf-oak-control.container
+    - source_path: ../components/awf-oak-simulator.container
+      path: /etc/containers/systemd/awf-oak-simulator.container
+    - source_path: ../components/awf-oak-api.container
+      path: /etc/containers/systemd/awf-oak-api.container
+    - source_path: ../components/awf-oak-bridge.container
+      path: /etc/containers/systemd/awf-oak-bridge.container
+    - source_path: ../components/awf-oak-scenario.container
+      path: /etc/containers/systemd/awf-oak-scenario.container
+    - source_path: ../components/awf-oak-x5h.env
+      path: /etc/containers/systemd/awf-oak-x5h.env
+    - source_path: ../components/cyclonedds-x5h.xml
+      path: /etc/containers/systemd/cyclonedds-x5h.xml
+    - source_path: ../components/bridge/bridge-config.yaml
+      path: /etc/containers/systemd/bridge-config.yaml
+    - source_path: ../components/mrm_handler.param.yaml
+      path: /etc/containers/systemd/mrm_handler.param.yaml
+    - source_path: ../components/default_adapi.param.yaml
+      path: /etc/containers/systemd/default_adapi.param.yaml
+    - source_path: ../components/launch/control.launch.xml
+      path: /etc/containers/systemd/launch/control.launch.xml
+    - source_path: ../components/awf-oak-x5h-extract-map.service
+      path: /etc/systemd/system/awf-oak-x5h-extract-map.service
+    - source_path: ../components/awf-oak-x5h-extract-map.sh
+      path: /usr/local/libexec/awf-oak-x5h-extract-map.sh
+    # rpmsg-eth: only the unit file and its ifup helper are installed by
+    # this manifest. The daemon binary itself (ExecStart=/usr/local/bin/
+    # rpmsg-eth) is a statically-linked binary built on a host with an
+    # aarch64 cross toolchain from platforms/autosd/x5h/rpmsg-eth/rpmsg-eth.c
+    # and is deliberately NOT checked into the repo or copied by this
+    # manifest -- it is staged onto the board separately, per the manual
+    # install procedure documented in rpmsg-dualboot.md. Because the binary
+    # is not guaranteed to be present at image-build time, 80-x5h.preset
+    # below does NOT enable rpmsg-eth.service: enabling the unit without
+    # the binary staged would leave a second permanently-failed unit at
+    # boot, on top of the one benign ukiboot-set-success.service failure
+    # the board's documented steady state already allows for.
+    - source_path: ../config/rpmsg-eth.service
+      path: /etc/systemd/system/rpmsg-eth.service
+    - source_path: ../scripts/rpmsg-eth-ifup.sh
+      path: /usr/local/sbin/rpmsg-eth-ifup.sh
 
 auth:
   # root password "autosd" — dev/bench image only, never a board deliverable.

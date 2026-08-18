@@ -389,6 +389,7 @@ jobs:
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
           UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
+          LOCAL_IMAGE: ""
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -565,6 +566,7 @@ jobs:
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
           UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
+          LOCAL_IMAGE: ""
         with:
           files: |
             ${{ env.BAKE_FILE }}

@@ -98,7 +98,9 @@ Open AD Kit images are built with `docker buildx bake`, driven by
 images sit on top of upstream Autoware base images published to
 `ghcr.io/autowarefoundation/autoware`.
 
-First prepare the Autoware colcon workspace (the same step CI runs):
+First prepare the Autoware colcon workspace **inside this repository**
+(Bake bind-mounts `autoware/src` from the Open AD Kit root; a symlink
+to a checkout outside the repo is not part of the build context):
 
 ```bash
 pipx install vcs2l
@@ -107,9 +109,13 @@ mkdir -p autoware/src
 vcs import --shallow autoware/src < autoware/repositories/autoware.repos
 ```
 
-Then build:
+Then build. Local images are tagged `ghcr.io/autowarefoundation/openadkit:<target>`
+so deployment Compose files find them without extra `--set`:
 
 ```bash
+# Planning simulation images (no CUDA / CARLA)
+docker buildx bake -f components/docker-bake.hcl planning
+
 # Build everything (default group)
 docker buildx bake -f components/docker-bake.hcl
 

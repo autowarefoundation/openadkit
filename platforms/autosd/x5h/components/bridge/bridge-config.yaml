@@ -1,0 +1,28 @@
+# Name of the domain bridge, used for node naming and logging
+name: safety_island_bridge
+topics:
+  control/trajectory_follower/control_cmd:
+    type: autoware_control_msgs/msg/Control
+    from_domain: 2
+    to_domain: 1
+    # bidirectional: True
+  vehicle/status/steering_status:
+    type: autoware_vehicle_msgs/msg/SteeringReport
+    from_domain: 1
+    to_domain: 2
+  planning/scenario_planning/trajectory:
+    type: autoware_planning_msgs/msg/Trajectory
+    from_domain: 1
+    to_domain: 2
+  system/operation_mode/state:
+    type: autoware_adapi_v1_msgs/msg/OperationModeState
+    from_domain: 1
+    to_domain: 2
+  localization/kinematic_state:
+    type: nav_msgs/msg/Odometry
+    from_domain: 1
+    to_domain: 2
+  localization/acceleration:
+    type: geometry_msgs/msg/AccelWithCovarianceStamped
+    from_domain: 1
+    to_domain: 2

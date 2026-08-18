@@ -16,13 +16,15 @@
 # endpoint to appear via inotify on /dev, so an ordering dependency here
 # would be redundant, not load-bearing.
 #
-# Not installed by aib/x5h-rootfs.aib.yml today -- see rpmsg-dualboot.md for
-# the same manual install-to-/usr/local pattern already used for
-# rpmsg-ping/rpmsg-smoke.sh. Install alongside the daemon binary and this
-# unit's ifup helper:
+# This unit file and its ifup helper (rpmsg-eth-ifup.sh) ARE installed by
+# aib/x5h-rootfs.aib.yml today. The daemon binary is not: see
+# rpmsg-dualboot.md's "Building" section for why it is cross-built
+# separately, and its "Staging" section for the manual install-to-
+# /usr/local/bin pattern already used for rpmsg-ping/rpmsg-smoke.sh.
+# 80-x5h.preset deliberately does not enable this unit -- enabling it
+# without the binary staged would add a second permanently-failed unit to
+# the board's documented steady state. Once the binary is staged:
 #   install -m0755 rpmsg-eth /usr/local/bin/rpmsg-eth
-#   install -m0755 rpmsg-eth-ifup.sh /usr/local/sbin/rpmsg-eth-ifup.sh
-#   install -m0644 rpmsg-eth.service /etc/systemd/system/rpmsg-eth.service
 #   systemctl enable --now rpmsg-eth.service
 [Unit]
 Description=RPMsg-to-TAP Ethernet bridge (CR52 link)

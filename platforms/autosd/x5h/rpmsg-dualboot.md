@@ -246,22 +246,25 @@ invocation for staging onto the board.)
 
 ### Staging
 
-Not installed by `aib/x5h-rootfs.aib.yml` today — same manual
-install-to-`/usr/local` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above.
-Stage the daemon, its `ifup` helper and its unit onto the NFS export (see
+`aib/x5h-rootfs.aib.yml` installs `rpmsg-eth.service` and its `ifup` helper
+(`rpmsg-eth-ifup.sh`) today. Only the daemon binary is not — same manual
+install-to-`/usr/local` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above, and
+the same reason: the board image ships no compiler, so nothing built from
+source lands there except by hand (see "Building" above). `80-x5h.preset`
+deliberately does not enable `rpmsg-eth.service`: enabling it before the
+binary is staged would add a second permanently-failed unit to the
+board's documented steady state. Stage the daemon onto the NFS export (see
 "Staging the assets" above for why `/var/tmp`, not `/tmp`, is the export
-path to use), then install on the target:
+path to use), then install it on the target:
 
 ```
-install -m0755 rpmsg-eth rpmsg-eth-ifup.sh <export>/var/tmp/rpmsg/
-install -m0644 rpmsg-eth.service            <export>/var/tmp/rpmsg/
+install -m0755 rpmsg-eth <export>/var/tmp/rpmsg/
 ```
 
 ```
 install -m0755 /var/tmp/rpmsg/rpmsg-eth /usr/local/bin/rpmsg-eth
-install -m0755 /var/tmp/rpmsg/rpmsg-eth-ifup.sh /usr/local/sbin/rpmsg-eth-ifup.sh
-install -m0644 /var/tmp/rpmsg/rpmsg-eth.service /etc/systemd/system/rpmsg-eth.service
 systemctl daemon-reload
+systemctl enable --now rpmsg-eth.service
 ```
 
 ### Prerequisites

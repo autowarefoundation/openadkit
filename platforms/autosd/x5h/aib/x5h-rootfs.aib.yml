@@ -112,38 +112,69 @@ content:
     - source_path: ../config/80-x5h.preset
       path: /etc/systemd/system-preset/80-x5h.preset
     # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
-    - source_path: ../components/awf-oak-x5h.pod
-      path: /etc/containers/systemd/awf-oak-x5h.pod
-    - source_path: ../components/awf-oak-map.container
-      path: /etc/containers/systemd/awf-oak-map.container
-    - source_path: ../components/awf-oak-planning.container
-      path: /etc/containers/systemd/awf-oak-planning.container
-    - source_path: ../components/awf-oak-vehicle.container
-      path: /etc/containers/systemd/awf-oak-vehicle.container
-    - source_path: ../components/awf-oak-system.container
-      path: /etc/containers/systemd/awf-oak-system.container
-    - source_path: ../components/awf-oak-control.container
-      path: /etc/containers/systemd/awf-oak-control.container
-    - source_path: ../components/awf-oak-simulator.container
-      path: /etc/containers/systemd/awf-oak-simulator.container
+    # All nine `.container` units below carry `[Install] WantedBy=
+    # default.target`, which Quadlet auto-enables at unit-generation time on
+    # every boot regardless of what 80-x5h.preset says -- there is no preset
+    # knob that keeps a Quadlet-generated unit present but dormant. None of
+    # the units set `Pull=`, and awf-oak-x5h-extract-map.service (enabled by
+    # 80-x5h.preset below) runs `podman image exists "$image"` under
+    # `set -euo pipefail`, which is a hard failure, not a wait-and-retry,
+    # when the image has not been loaded onto the board yet.
+    #
+    # Consequence: a freshly built and flashed image, booted before any
+    # container image has been staged onto it, WILL come up with as many as
+    # ten failed units -- the nine `.container` units plus the map
+    # extractor. This is expected on that specific boot, not a regression,
+    # and the human-ruled fix is to document the sequence below rather than
+    # to add `Pull=`, add start conditions, or drop `[Install]` from any
+    # unit -- those would change behavior the component units (Tasks 4/6,
+    # reviewed and frozen) already define. Required bring-up order:
+    #   1. build and flash this image;
+    #   2. stage the container images onto the board:
+    #      scripts/stage-container-images.sh --stage;
+    #   3. start the units (systemctl restart --all, or just reboot).
+    # Once step 2 has run, the units recover on their own restart policy (or
+    # on the reboot in step 3) with no further manifest change needed. The
+    # board's documented steady state -- `systemctl is-system-running` =
+    # `degraded` with `ukiboot-set-success.service` as the only benign
+    # failure -- describes a board that has already been through this
+    # sequence; it does not describe the very first boot after flashing.
+    #
+    # Entries below are ordered alphabetically by target path (ignoring the
+    # common /etc/containers/systemd/ prefix) so a new entry has exactly one
+    # place to go: where its path sorts.
     - source_path: ../components/awf-oak-api.container
       path: /etc/containers/systemd/awf-oak-api.container
     - source_path: ../components/awf-oak-bridge.container
       path: /etc/containers/systemd/awf-oak-bridge.container
+    - source_path: ../components/awf-oak-control.container
+      path: /etc/containers/systemd/awf-oak-control.container
+    - source_path: ../components/awf-oak-map.container
+      path: /etc/containers/systemd/awf-oak-map.container
+    - source_path: ../components/awf-oak-planning.container
+      path: /etc/containers/systemd/awf-oak-planning.container
     - source_path: ../components/awf-oak-scenario.container
       path: /etc/containers/systemd/awf-oak-scenario.container
+    - source_path: ../components/awf-oak-simulator.container
+      path: /etc/containers/systemd/awf-oak-simulator.container
+    - source_path: ../components/awf-oak-system.container
+      path: /etc/containers/systemd/awf-oak-system.container
+    - source_path: ../components/awf-oak-vehicle.container
+      path: /etc/containers/systemd/awf-oak-vehicle.container
     - source_path: ../components/awf-oak-x5h.env
       path: /etc/containers/systemd/awf-oak-x5h.env
-    - source_path: ../components/cyclonedds-x5h.xml
-      path: /etc/containers/systemd/cyclonedds-x5h.xml
+    - source_path: ../components/awf-oak-x5h.pod
+      path: /etc/containers/systemd/awf-oak-x5h.pod
     - source_path: ../components/bridge/bridge-config.yaml
       path: /etc/containers/systemd/bridge-config.yaml
-    - source_path: ../components/mrm_handler.param.yaml
-      path: /etc/containers/systemd/mrm_handler.param.yaml
+    - source_path: ../components/cyclonedds-x5h.xml
+      path: /etc/containers/systemd/cyclonedds-x5h.xml
     - source_path: ../components/default_adapi.param.yaml
       path: /etc/containers/systemd/default_adapi.param.yaml
     - source_path: ../components/launch/control.launch.xml
       path: /etc/containers/systemd/launch/control.launch.xml
+    - source_path: ../components/mrm_handler.param.yaml
+      path: /etc/containers/systemd/mrm_handler.param.yaml
     - source_path: ../components/awf-oak-x5h-extract-map.service
       path: /etc/systemd/system/awf-oak-x5h-extract-map.service
     - source_path: ../components/awf-oak-x5h-extract-map.sh

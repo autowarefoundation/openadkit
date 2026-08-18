@@ -32,6 +32,9 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     colcon build \
       --base-paths \
         /tmp/autoware/src/universe/autoware_universe/visualization \
+        /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description \
+        /tmp/autoware/src/sensor_component/external/sensor_component_description/velodyne_description \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log

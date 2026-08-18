@@ -5,3 +5,15 @@ PodName=awf-oak-x5h
 # which is a host interface created by rpmsg-eth.service, not something a
 # rootless pod network could reach.
 Network=host
+
+# Every container unit in this pod carries BOTH EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+# and Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z.
+# This pair is mandatory, not belt-and-braces: the component images ship
+# their own /home/aw/cyclonedds.xml requesting
+# <SocketReceiveBufferSize min="10MB"/>, while net.core.rmem_max is 212992
+# bytes on this board. Under the image's own config, CycloneDDS aborts at
+# participant creation ("failed to increase socket receive buffer size to
+# at least 10485760 bytes, current is 425984 bytes" -> "error creating
+# node: rcl node's rmw handle is invalid" -> exit 1). The env file's
+# CYCLONEDDS_URI=file:///autoware/cyclonedds.xml (applied over the image's
+# ENV by podman) plus this volume are what let a container start at all.

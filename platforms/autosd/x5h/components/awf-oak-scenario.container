@@ -1,5 +1,8 @@
 [Unit]
 Description=Open AD Kit X5H scenario runner
+Wants=network-online.target
+After=network-online.target
+After=awf-oak-x5h-extract-map.service
 After=awf-oak-api.service awf-oak-control.service awf-oak-simulator.service awf-oak-bridge.service
 
 [Container]
@@ -8,8 +11,8 @@ ContainerName=awf-oak-scenario
 Image=${SCENARIO_SIMULATOR_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Volume=/var/log/awf:/var/log/awf:Z
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
-Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
 Exec=bash -lc 'exec ros2 launch scenario_test_runner scenario_test_runner.launch.py \
   architecture_type:=${ARCHITECTURE_TYPE} global_frame_rate:=${GLOBAL_FRAME_RATE} \
   global_timeout:=${GLOBAL_TIMEOUT} initialize_duration:=${INITIALIZE_DURATION} \

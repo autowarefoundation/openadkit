@@ -1,6 +1,8 @@
 [Unit]
 Description=Open AD Kit X5H control component
+Wants=network-online.target
 Requires=awf-oak-x5h-extract-map.service
+After=network-online.target
 After=awf-oak-x5h-extract-map.service
 After=awf-oak-map.service awf-oak-planning.service awf-oak-system.service
 
@@ -12,11 +14,15 @@ Pod=awf-oak-x5h.pod
 ContainerName=awf-oak-control
 Image=${PLANNING_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
-Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
 Volume=/etc/containers/systemd/launch/control.launch.xml:/opt/autoware/share/tier4_control_launch/launch/control.launch.xml:ro,Z
 Exec=ros2 launch autoware_launch tier4_control_component.launch.xml \
   check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT} component_wise_launch:=true \
   lateral_controller_mode:=${LATERAL_CONTROLLER_MODE} longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE} \
   module_preset:=${CONTROL_MODULE_PRESET} use_sim_time:=${USE_SIM_TIME} \
   vehicle_id:=${VEHICLE_ID} vehicle_model:=${VEHICLE_MODEL}
+
+[Service]
+Restart=on-failure
+RestartSec=5

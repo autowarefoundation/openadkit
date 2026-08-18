@@ -1,8 +1,20 @@
 [Unit]
 Description=Open AD Kit X5H bridge component
+Wants=network-online.target
 Requires=awf-oak-x5h-extract-map.service
+Requires=rpmsg-eth.service
+After=network-online.target
 After=awf-oak-x5h-extract-map.service
 After=awf-oak-map.service
+After=rpmsg-eth.service
+# rpmsg-eth.service brings up tap0 (domain 2's link to the CR52), and this
+# container pins domain 2 to tap0 with autodetermine="false" and starts
+# domain_bridge immediately. Without this Requires=/After= pair the bridge
+# can race a tap0 that does not exist yet. rpmsg-eth.service is
+# deliberately NOT enabled in this profile's boot preset (see
+# rpmsg-dualboot.md), so this dependency documents the requirement and
+# makes `systemctl start awf-oak-bridge` pull the link up itself rather
+# than failing obscurely.
 
 [Install]
 WantedBy=default.target
@@ -12,6 +24,15 @@ Pod=awf-oak-x5h.pod
 ContainerName=awf-oak-bridge
 Image=${BRIDGE_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
-Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
 Volume=/etc/containers/systemd/bridge-config.yaml:/autoware/bridge-config.yaml:ro,Z
+# No Exec=: the image entrypoint runs domain_bridge directly. The
+# entrypoint treats any command it is given as a REPLACEMENT for the
+# bridge (see components/bridge/entrypoint.sh), so setting Exec= here
+# would silently stop domain_bridge from running instead of running
+# alongside it.
+
+[Service]
+Restart=on-failure
+RestartSec=5

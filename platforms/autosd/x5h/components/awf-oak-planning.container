@@ -1,6 +1,8 @@
 [Unit]
 Description=Open AD Kit X5H planning component
+Wants=network-online.target
 Requires=awf-oak-x5h-extract-map.service
+After=network-online.target
 After=awf-oak-x5h-extract-map.service
 After=awf-oak-map.service
 
@@ -12,10 +14,14 @@ Pod=awf-oak-x5h.pod
 ContainerName=awf-oak-planning
 Image=${PLANNING_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
-Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
 Exec=ros2 launch autoware_launch tier4_planning_component.launch.xml \
   component_wise_launch:=true enable_all_modules_auto_mode:=${ENABLE_ALL_MODULES_AUTO_MODE} \
   is_simulation:=${IS_SIMULATION_MODE} module_preset:=${PLANNING_MODULE_PRESET} \
   pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME} use_sim_time:=${USE_SIM_TIME} \
   vehicle_model:=${VEHICLE_MODEL}
+
+[Service]
+Restart=on-failure
+RestartSec=5

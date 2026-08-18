@@ -1,6 +1,8 @@
 [Unit]
 Description=Open AD Kit X5H system component
+Wants=network-online.target
 Requires=awf-oak-x5h-extract-map.service
+After=network-online.target
 After=awf-oak-x5h-extract-map.service
 After=awf-oak-map.service
 
@@ -12,10 +14,14 @@ Pod=awf-oak-x5h.pod
 ContainerName=awf-oak-system
 Image=${VEHICLE_SYSTEM_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
-Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
 Volume=/etc/containers/systemd/mrm_handler.param.yaml:/opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro,Z
 Exec=ros2 launch autoware_launch tier4_system_component.launch.xml \
   launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR} launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER} \
   sensor_model:=${SENSOR_MODEL} system_run_mode:=${SYSTEM_RUN_MODE} \
   use_sim_time:=${USE_SIM_TIME} vehicle_model:=${VEHICLE_MODEL}
+
+[Service]
+Restart=on-failure
+RestartSec=5

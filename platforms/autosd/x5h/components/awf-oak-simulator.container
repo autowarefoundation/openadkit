@@ -1,6 +1,8 @@
 [Unit]
 Description=Open AD Kit X5H simulator component
+Wants=network-online.target
 Requires=awf-oak-x5h-extract-map.service
+After=network-online.target
 After=awf-oak-x5h-extract-map.service
 After=awf-oak-map.service awf-oak-system.service awf-oak-vehicle.service
 
@@ -12,8 +14,8 @@ Pod=awf-oak-x5h.pod
 ContainerName=awf-oak-simulator
 Image=${SIMULATOR_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
-Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
 Exec=ros2 launch autoware_launch tier4_simulator_component.launch.xml \
   initial_engage_state:=${INITIAL_ENGAGE_STATE} launch_dummy_doors:=${LAUNCH_DUMMY_DOORS} \
   launch_dummy_perception:=${LAUNCH_DUMMY_PERCEPTION} launch_dummy_vehicle:=${LAUNCH_DUMMY_VEHICLE} \
@@ -28,3 +30,7 @@ Exec=ros2 launch autoware_launch tier4_simulator_component.launch.xml \
   use_sim_time:=${USE_SIM_TIME} use_pointcloud_container:=${USE_POINTCLOUD_CONTAINER} \
   vehicle_info_param_file:=/opt/autoware/share/${VEHICLE_MODEL}_description/config/vehicle_info.param.yaml \
   vehicle_model:=${VEHICLE_MODEL}
+
+[Service]
+Restart=on-failure
+RestartSec=5

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+
+  <!-- Domain 1: the Open AD Kit component containers. They share the host
+       network namespace, so discovery stays on the loopback path. -->
+  <Domain id="1">
+    <General>
+      <AllowMulticast>spdp</AllowMulticast>
+      <MaxMessageSize>1400B</MaxMessageSize>
+      <Interfaces>
+        <NetworkInterface autodetermine="true" priority="default" multicast="default" />
+      </Interfaces>
+    </General>
+    <Sizing>
+      <ReceiveBufferSize>16384B</ReceiveBufferSize>
+      <ReceiveBufferChunkSize>2048B</ReceiveBufferChunkSize>
+    </Sizing>
+    <Discovery>
+      <ParticipantIndex>none</ParticipantIndex>
+    </Discovery>
+  </Domain>
+
+  <!-- Domain 2: the CR52 actuation module, reached over the rpmsg-eth link.
+       tap0 is a point-to-point link with no multicast, so SPDP has nowhere
+       to multicast and the peer is configured statically. The CR52 side has
+       carried static peers since M6; the S32Z2 target needed the same
+       treatment on IGMP-snooped benches.
+
+       MaxMessageSize stays at 1400B: RTPS fragmentation down to tap0's
+       462-byte MTU happens below this setting, and lowering it here would
+       double-fragment for no benefit. -->
+  <Domain id="2">
+    <General>
+      <AllowMulticast>false</AllowMulticast>
+      <MaxMessageSize>1400B</MaxMessageSize>
+      <Interfaces>
+        <NetworkInterface autodetermine="false" priority="default" multicast="false" name="${X5H_SI_INTERFACE:-tap0}"/>
+      </Interfaces>
+    </General>
+    <Sizing>
+      <ReceiveBufferSize>16384B</ReceiveBufferSize>
+      <ReceiveBufferChunkSize>2048B</ReceiveBufferChunkSize>
+    </Sizing>
+    <Discovery>
+      <ParticipantIndex>none</ParticipantIndex>
+      <Peers>
+        <Peer address="${X5H_SI_PEER:-172.16.52.2}"/>
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

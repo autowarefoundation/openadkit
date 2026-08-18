@@ -34,4 +34,13 @@ RUN apt-get update \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Drop back to a non-root user for runtime: DDS uses high UDP ports and the
+# pod already shares the host network namespace, so root buys nothing here.
+# The base image's own final stage leaves USER as root (its runtime stage
+# does `USER root`, copies build artifacts, and never switches back), but it
+# does create a uid-1000 "aw" account (USERNAME=aw in its ENV, build
+# artifacts chowned aw:aw) that every other container in this stack runs as,
+# so we switch to that existing account rather than adding a new one.
+USER aw
+
 ENTRYPOINT ["/entrypoint.sh"]

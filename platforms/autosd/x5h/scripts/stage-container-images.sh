@@ -18,32 +18,46 @@ set -u
 BOARD="${X5H_BOARD:-root@192.168.0.20}"
 LIST="${X5H_IMAGE_LIST:-$(dirname "$0")/../components/images.txt}"
 WORK="${X5H_STAGE_DIR:-/var/tmp/x5h-oci}"
-# Free space on the board's container store, in bytes. The store is the
-# 32 GB UFS LUN mounted at /var/lib/containers (board-podman-smoke.sh
-# btrfs arm). Measured, never assumed.
 MODE="${1:---audit}"
 
 fail() { echo "$2 reason=$1"; exit 1; }
 
 [ -r "$LIST" ] || fail "no_image_list" "X5H_IMAGE_AUDIT_FAIL"
 
-total=0
+# Layer digest+size pairs across every image accumulate here so the total
+# below can dedupe by digest: the five openadkit-* images share an
+# identical universe-common layer prefix (and scenario-simulator-v2 shares
+# part of it too), and podman's content-addressed store on the board keeps
+# each layer digest once, so summing every image's bytes independently
+# would multiply-count the shared bulk. Removed on every exit path.
+tmp_layers=$(mktemp) || fail "tmpfile" "X5H_IMAGE_AUDIT_FAIL"
+trap 'rm -f "$tmp_layers"' EXIT
+
 while read -r name ref; do
     case "$name" in ''|\#*) continue ;; esac
-    # Sum the compressed layer sizes of the arm64 manifest. This
-    # under-reports the on-disk footprint (layers are stored uncompressed),
-    # so the gate below applies a 2.5x expansion factor rather than
-    # comparing raw bytes to free space and quietly overfilling the LUN.
-    sz=$(skopeo inspect --override-arch arm64 --override-os linux \
-            --format '{{range .LayersData}}{{.Size}}
-{{end}}' "docker://$ref" 2>/dev/null \
-         | awk '{s+=$1} END {print s+0}')
+    # Compressed size of each arm64 layer, one "digest size" pair per
+    # line. This under-reports the on-disk footprint (layers are stored
+    # uncompressed), so the gate below applies a 2.5x expansion factor
+    # rather than comparing raw bytes to free space and quietly
+    # overfilling the LUN.
+    layers=$(skopeo inspect --override-arch arm64 --override-os linux \
+            --format '{{range .LayersData}}{{.Digest}} {{.Size}}
+{{end}}' "docker://$ref" 2>/dev/null)
+    sz=$(printf '%s\n' "$layers" | awk 'NF==2 {s+=$2} END {print s+0}')
     [ "$sz" -gt 0 ] 2>/dev/null || fail "inspect_failed:$name" "X5H_IMAGE_AUDIT_FAIL"
     echo "image=$name compressed_bytes=$sz"
-    total=$((total + sz))
+    printf '%s\n' "$layers" >> "$tmp_layers"
 done < "$LIST"
 
+# total_compressed_bytes is deduplicated by layer digest, not the sum of
+# each image's (overlapping) total -- do not "simplify" this back to a
+# per-image running sum, that is exactly the double-counting bug this
+# dedup exists to fix.
+total=$(sort -u "$tmp_layers" | awk 'NF==2 {s+=$2} END {print s+0}')
 need=$(( total * 5 / 2 ))
+
+# Free space on the board's container store, in bytes: /var/lib/containers
+# is a dedicated ~19 GB partition (/dev/sdc3). Measured, never assumed.
 free=$(ssh -o BatchMode=yes "$BOARD" \
         "df -B1 --output=avail /var/lib/containers | tail -1" 2>/dev/null | tr -d ' ')
 case "$free" in ''|*[!0-9]*) fail "board_unreachable_or_no_store" "X5H_IMAGE_AUDIT_FAIL" ;; esac

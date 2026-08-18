@@ -80,12 +80,34 @@ drive)
     # shellcheck disable=SC1090
     . "$ENVF"
     rm -rf "${OUTPUT_DIRECTORY:?}"/* 2>/dev/null
-    # `systemctl start` on a Type=oneshot unit blocks until the command
-    # exits, so there is nothing to poll for. Do NOT add an
-    # `is-active` wait loop here: RemainAfterExit=yes leaves the unit
-    # active forever after a successful run, and such a loop would never
-    # terminate. scenario_test_runner is itself bounded by GLOBAL_TIMEOUT.
-    systemctl start awf-oak-scenario.service || fail "scenario_start" "DRIVE"
+
+    # Bounded wait for Autoware readiness: After= on the component units
+    # only guarantees the containers were started, not that Autoware
+    # itself is up. The compose sample waits on this same API service
+    # before launching scenario_test_runner; a fixed number of retries
+    # (not an unbounded loop) does the same here.
+    ready=0
+    i=0
+    while [ "$i" -lt 30 ]; do
+        ros1 "timeout 5 ros2 service list" | grep -qFx '/api/autoware/set/engage' \
+            && { ready=1; break; }
+        i=$((i + 1))
+        sleep 2
+    done
+    [ "$ready" -eq 1 ] || fail "autoware_not_ready" "DRIVE"
+
+    # `systemctl restart` (not `start`): RemainAfterExit=yes leaves the
+    # unit active (exited) after a successful run, and `start` on an
+    # already-active unit returns immediately WITHOUT re-running
+    # ExecStart -- fatal for this smoke, which runs `drive` more than
+    # once per boot and always rm -rf's the output directory first, so a
+    # second `start` would report no_junit on a perfectly healthy stack.
+    # `restart` always re-runs ExecStart regardless of the unit's prior
+    # state, and still blocks until the oneshot's ExecStart exits, so the
+    # rule below is unaffected: do NOT add an `is-active` wait loop here,
+    # and do not "simplify" this back to `start`. scenario_test_runner is
+    # itself bounded by GLOBAL_TIMEOUT.
+    systemctl restart awf-oak-scenario.service || fail "scenario_start" "DRIVE"
     junit=$(find "${OUTPUT_DIRECTORY}" -name 'result.junit.xml' | head -1)
     [ -n "$junit" ] || fail "no_junit" "DRIVE"
     fails=$(grep -o 'failures="[0-9]*"' "$junit" | head -1 | tr -dc '0-9')

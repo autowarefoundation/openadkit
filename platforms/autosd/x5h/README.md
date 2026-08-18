@@ -149,9 +149,8 @@ open risk.
 
 ## Running locally
 
-The same gate CI ran can be replayed on an x86 dev host, from the CI
-artifacts, without rebuilding anything. Two reasons this is worth doing
-beyond interactive debugging: it is the only place the tar → ext4
+The same gate CI ran replays on an x86 dev host. Two reasons this is worth
+doing beyond interactive debugging: it is the only place the tar → ext4
 reassembly gets exercised outside CI, and that reassembly is exactly what
 `scripts/stage-nfs-rootfs.sh` does for the board's NFS root (`tar --xattrs
 --xattrs-include='*.*' -xf <tarball> -C <dest-dir>`) — so a green local
@@ -159,50 +158,140 @@ replay is corroborating evidence for the board staging path, not just a
 debugging convenience. It also leaves a local copy of `x5h-rootfs.tar` on
 disk, which is what `stage-nfs-rootfs.sh` consumes at board time.
 
-Host tools: `gh` (authenticated), `qemu-system-aarch64` and `qemu-img`
-(Debian/Ubuntu: packages `qemu-system-arm` and `qemu-utils` — `qemu-img` is
-what `run-qemu-gate.sh` shells out to when `/tmp/x5h-blank.img` doesn't
-already exist, so it's a runtime dependency of this replay, not a build-only
-one), `expect` (the `qemu-gate.exp` interpreter), and `e2fsprogs` for
-`mkfs.ext4`. CI's "Install host tools" step installs `podman`, `skopeo`,
-`qemu-system-arm`, `qemu-utils`, `expect`, `flex`, `bison`, `libssl-dev`,
-`libelf-dev`, and `bc` — `e2fsprogs` and `gh` are not in that list because
-GitHub-hosted runners ship both preinstalled already; the
-`flex`/`bison`/`libssl-dev`/`libelf-dev`/`bc` portion is the aib/kernel/
-container-build toolchain, needed only to produce the artifacts this replay
-downloads pre-built, not to boot them.
+The replay needs three inputs: the rootfs tar, the mimic kernel `Image`, and
+the two test-image tars. Build them from source (below) or download a bundle
+CI already produced. **Neither route needs the Renesas BSP or any
+credential-gated download** — the rootfs resolves from public AutoSD 10 and
+EPEL 10 repos, the mimic kernel is a stock 6.1.y LTS from kernel.org (it is
+deliberately *not* the BSP kernel; see `kernel/bsp-mimic.config`), and the
+test images come from `public.ecr.aws` and `quay.io`. The one BSP-derived
+input this platform has is `<bsp-rootfs-dir>` under "Board bring-up" below,
+which the replay never touches.
 
-Everything through downloading and unpacking the artifact runs as your own
-user. Loop-mounting the ext4 export (step 3's `mount`/`tar`/`umount`) and
-running `qemu-gate.exp` (step 5) need root, so those four commands below are
-prefixed `sudo`. Step 4's `inject-test-images.sh` also needs root for its
-own loop mount, but sudoes internally rather than needing its own invocation
-prefixed — its `sudo mount`/`sudo cp`/`sudo umount` calls are what require
-root, not `./scripts/inject-test-images.sh` itself.
+### Building the inputs from source
+
+The durable route: it depends on nothing that expires. Each command below is
+the one CI runs, in CI's order.
 
 ```bash
 cd platforms/autosd/x5h
 
-# 1. Download the bundle from the most recent green run on this branch (at
-#    the time this was written, that resolves to 30730519760, the same run
-#    cited in "Gate verdict" above).
+# 1. The AutoSD rootfs tar. `--tar` builds the container content straight
+#    into a tar, so there is no `podman create` + `podman export` round trip
+#    here and no root-vs-user podman store question either. The current aib
+#    CLI is bootc-shaped — no `--mode`, no `--export`, no `list-exports` —
+#    so do not reach for the invocation in ../README.md's General
+#    Instructions; it is for planning-simulator and does not apply here.
+curl -fL -o auto-image-builder.sh \
+  "https://gitlab.com/CentOS/automotive/src/automotive-image-builder/-/raw/main/auto-image-builder.sh?ref_type=heads"
+chmod +x auto-image-builder.sh
+sudo bash ./auto-image-builder.sh build-builder --distro autosd10-sig
+sudo bash ./auto-image-builder.sh build --tar \
+  --distro autosd10-sig --target qemu \
+  --define-file aib/vars.yml \
+  aib/x5h-rootfs.aib.yml aib/x5h-rootfs.tar
+
+# 2. The BSP-constraint-mimic kernel. The script pins the newest 6.1.y
+#    longterm release from kernel.org's releases.json, merges
+#    kernel/bsp-mimic.config over arm64 defconfig, then *asserts* the whole
+#    constraint set actually landed — a defconfig that quietly re-enabled
+#    e.g. EXT4_FS_SECURITY fails the build here rather than producing a
+#    kernel that lets GATE2 sail past the blocker it exists to probe.
+kernel/build-mimic-kernel.sh /tmp/x5h-mimic
+
+# 3. The two test images. make-test-images.sh also verifies the captest
+#    archive really carries a security.capability PAX record, so an xattr
+#    silently dropped at build time cannot reach the gate disguised as a
+#    GATE2 finding.
+scripts/make-test-images.sh /tmp/x5h-testimages
+```
+
+Two things to know before running these on an x86_64 host, because CI
+exercises neither — CI is native arm64 (`ubicloud-standard-16-arm`):
+
+- **Every output is aarch64.** Steps 1 and 3 run aarch64 containers, so they
+  need `qemu-user-static` binfmt registered (`sudo apt install
+  qemu-user-static binfmt-support`, or `docker run --privileged --rm
+  tonistiigi/binfmt --install arm64`). Step 2 cross-compiles instead and
+  needs `gcc-aarch64-linux-gnu`; `build-mimic-kernel.sh` selects the cross
+  prefix itself from `uname -m`.
+- **Budget generously, but don't trust a figure.** CI builds all three
+  natively on arm64 in about 25 minutes end to end, QEMU gate included (run
+  30842769817, 18:46:46 → 19:12:20). There is no verified x86 number: the aib
+  build and the two container builds run under binfmt there, so expect
+  materially longer and budget accordingly rather than planning against a
+  number nobody has measured.
+
+`AIB_PODMAN_OPTIONS="-v /run/containers:/run/containers"`, which CI passes to
+both `auto-image-builder.sh` invocations, is a workaround for that runner's
+bind-mounted container storage and is not needed on an ordinary host.
+
+### Downloading a CI bundle instead
+
+A shortcut, not a substitute: **artifacts expire after 14 days**, and every
+bundle this branch has produced is already past that, so expect this to fail
+and fall back to building unless a run finished within the last two weeks.
+The run ID still resolves after its artifact is gone, so the failure surfaces
+at `gh run download`, not at the lookup.
+
+```bash
 gh run download --repo youtalk/openadkit -n x5h-gate-bundle -D /tmp/x5h-bundle \
   "$(gh run list --repo youtalk/openadkit --workflow autosd-x5h-rootfs.yaml \
        --branch feat/autosd-x5h-rootfs --status success --limit 1 \
        --json databaseId --jq '.[0].databaseId')"
 
-# 2. See what's actually there. The workflow stages a flat bundle before
-#    upload (one `testimages/` subdirectory, everything else at the top
-#    level) — `find` rather than a fixed path or a `**` glob, both because
-#    that's more robust and because it matches how the two lookups below
-#    already have to work:
-#      Image  x5h-rootfs.tar  x5h-gate.log  testimages/busybox-oci.tar  testimages/captest-docker.tar
-#    There is no ext4 export in the bundle — it's reproducible and large,
-#    so rebuild it from the tar below, the same way the CI workflow's own
-#    "Derive the ext4 export from the tar" step does.
+# The workflow stages a flat bundle before upload — one `testimages/`
+# subdirectory, everything else at the top level:
+#   Image  x5h-rootfs.tar  x5h-gate.log  testimages/busybox-oci.tar  testimages/captest-docker.tar
+# There is no ext4 export in it: it is reproducible and large, so the replay
+# rebuilds it from the tar, the same way the CI workflow's own "Derive the
+# ext4 export from the tar" step does.
 find /tmp/x5h-bundle -type f
+```
 
-# 3. Rebuild the ext4 export from the tar. truncate/mkfs need no privilege
+### Replaying the gate
+
+Host tools: `qemu-system-aarch64` and `qemu-img` (Debian/Ubuntu: packages
+`qemu-system-arm` and `qemu-utils` — `qemu-img` is what `run-qemu-gate.sh`
+shells out to when `/tmp/x5h-blank.img` doesn't already exist, so it's a
+runtime dependency of this replay, not a build-only one), `expect` (the
+`qemu-gate.exp` interpreter), and `e2fsprogs` for `mkfs.ext4`; plus `gh`
+(authenticated) if you took the download route. CI's "Install host tools"
+step installs `podman`, `skopeo`, `qemu-system-arm`, `qemu-utils`, `expect`,
+`flex`, `bison`, `libssl-dev`, `libelf-dev`, and `bc` — `e2fsprogs` and `gh`
+are not in that list because GitHub-hosted runners ship both preinstalled
+already; the `flex`/`bison`/`libssl-dev`/`libelf-dev`/`bc` portion is the
+aib/kernel/container-build toolchain from "Building the inputs" above.
+
+First point these three at whichever route you took. They are the only
+difference between the two:
+
+```bash
+cd platforms/autosd/x5h   # the relative paths below, and ./scripts/... later, need this
+
+# Built from source:
+TAR=aib/x5h-rootfs.tar
+KERNEL=/tmp/x5h-mimic/Image
+TESTIMAGES=/tmp/x5h-testimages
+
+# ...or from a downloaded bundle. `find` rather than fixed paths, because
+# the lookups have to be depth-agnostic — and note TESTIMAGES resolves to
+# the bundle's `testimages/` subdirectory, not the bundle root.
+TAR="$(find /tmp/x5h-bundle -name x5h-rootfs.tar)"
+KERNEL="$(find /tmp/x5h-bundle -name Image)"
+TESTIMAGES="$(dirname "$(find /tmp/x5h-bundle -name busybox-oci.tar)")"
+```
+
+Everything to this point runs as your own user. Loop-mounting the ext4 export
+(step 1's `mount`/`tar`/`umount`) and running `qemu-gate.exp` (step 3) need
+root, so those commands are prefixed `sudo`. Step 2's
+`inject-test-images.sh` also needs root for its own loop mount, but sudoes
+internally rather than needing its own invocation prefixed — its `sudo
+mount`/`sudo cp`/`sudo umount` calls are what require root, not
+`./scripts/inject-test-images.sh` itself.
+
+```bash
+# 1. Build the ext4 export from the tar. truncate/mkfs need no privilege
 #    (they operate on a plain file); the loop mount does.
 truncate -s 6G /tmp/x5h-replay.ext4
 mkfs.ext4 -q /tmp/x5h-replay.ext4
@@ -213,24 +302,22 @@ sudo mount -o loop /tmp/x5h-replay.ext4 "$mnt"
 # GATE2 fail for the wrong reason (the archive never carried
 # security.capability into the export) instead of the real one
 # (EXT4_FS_SECURITY missing in the mimic kernel).
-sudo tar --xattrs --xattrs-include='*.*' \
-  -xf "$(find /tmp/x5h-bundle -name x5h-rootfs.tar)" -C "$mnt"
+sudo tar --xattrs --xattrs-include='*.*' -xf "$TAR" -C "$mnt"
 sudo umount "$mnt"
 rmdir "$mnt"
 
-# 4. Inject the test payload. Use the script, not a hand-copy: besides the
+# 2. Inject the test payload. Use the script, not a hand-copy: besides the
 #    two test tars and gate-guest.sh, it also neutralizes /etc/fstab
 #    (preserving the original as fstab.image) — skip that and the guest
 #    reboot-loops on the stock fstab's ESP entry (see Troubleshooting).
-./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 \
-  "$(dirname "$(find /tmp/x5h-bundle -name busybox-oci.tar)")"
+./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES"
 
-# 5. Run the gate. /tmp/x5h-blank.img is deliberately not pre-created here:
+# 3. Run the gate. /tmp/x5h-blank.img is deliberately not pre-created here:
 #    run-qemu-gate.sh makes it itself (`qemu-img create -f raw ... 8G`) when
 #    the path doesn't exist yet, the same fallback CI relies on rather than
 #    pre-creating it — which is why qemu-img (qemu-utils) is a listed
 #    prerequisite above, not an optional one.
-#    On this x86 host, run-qemu-gate.sh's aarch64+/dev/kvm check is always
+#    On an x86 host, run-qemu-gate.sh's aarch64+/dev/kvm check is always
 #    false, so this is cross-arch TCG — materially slower than CI's
 #    same-arch TCG (~430 s of guest time in run 30730519760, per "Gate
 #    verdict" above). There is no verified local number for cross-arch TCG;
@@ -239,10 +326,10 @@ rmdir "$mnt"
 #    on every marker, so a slow-but-progressing run will not be killed
 #    early.
 sudo ./scripts/qemu-gate.exp ./scripts/run-qemu-gate.sh \
-  "$(find /tmp/x5h-bundle -name Image)" /tmp/x5h-replay.ext4 \
+  "$KERNEL" /tmp/x5h-replay.ext4 \
   /tmp/x5h-blank.img /tmp/x5h-local-gate.log
 
-# 6. Read the result the same way CI's "Show gate markers" step does.
+# 4. Read the result the same way CI's "Show gate markers" step does.
 grep -E 'GATE[0-9_]+' /tmp/x5h-local-gate.log
 ```
 
@@ -261,24 +348,32 @@ board-safety invariants; do not reorder it.
 
 ### 1. Stage the AutoSD NFS root
 
-The CI workflow uploads a flat artifact bundle, not a nested one, so find the tarball rather
-than assuming a fixed path:
+The two inputs come from wherever "Running locally" above got them — built from source, or
+unpacked from a CI bundle. The bundle is flat but not entirely flat: the tarball sits at the
+top level while the two test images sit one level down, under `testimages/`. Resolve both by
+lookup rather than by assuming a fixed path:
 
 ```bash
-find /tmp/x5h-bundle -name x5h-rootfs.tar
+TAR="$(find /tmp/x5h-bundle -name x5h-rootfs.tar)"
+TESTIMAGES="$(dirname "$(find /tmp/x5h-bundle -name busybox-oci.tar)")"
 ```
+
+Built from source instead, those two are `aib/x5h-rootfs.tar` and whatever output directory
+was passed to `scripts/make-test-images.sh`.
 
 Then, as root on the NFS server host:
 
 ```bash
-scripts/stage-nfs-rootfs.sh <x5h-rootfs.tar> <bsp-rootfs-dir> <dest-dir> <testimages-dir>
+scripts/stage-nfs-rootfs.sh "$TAR" <bsp-rootfs-dir> <dest-dir> "$TESTIMAGES"
 ```
 
 `<bsp-rootfs-dir>` is the existing BSP NFS root — it is only ever read from (to copy
 `/lib/modules/6.1.102-yocto-standard`, since overlayfs/veth/bridge/x_tables are all `=m` on
-the BSP kernel), never modified. `<testimages-dir>` is the directory holding
-`busybox-oci.tar` and `captest-docker.tar` — with the flat CI bundle, that is the same
-bundle directory `find` located above.
+the BSP kernel), never modified. `<testimages-dir>` is the directory that *directly* contains
+`busybox-oci.tar` and `captest-docker.tar` — **with a CI bundle that is the bundle's
+`testimages/` subdirectory, not the bundle root.** The script verifies both tars are present
+before it creates anything, so passing the bundle root fails immediately with a diagnostic
+instead of part-way through staging, with `<dest-dir>` already populated and unstamped.
 
 The script refuses to run if `<dest-dir>` already exists, and prints `OK: staged at
 <dest-dir>` plus a `<dest-dir>/.x5h-stage-complete` stamp file on success. If a previous run

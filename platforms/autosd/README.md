@@ -20,10 +20,15 @@ This folder contains a per use-case structure on how to deploy/run Open AD Kit i
 * quadlet files to define containerized services to  be managed by podman and systemd
 * automotive-image-builder files to build an AutoSD image(s)
 
-Build and running instructions in this page applies to any user-case/sub folder.
-
 * [planning-simulator](./planning-simulator/README.md): Run planning and simulator services in containers (pre-built)
 * [x5h](./x5h/README.md): AutoSD on the R-Car X5H board (BSP kernel + AutoSD userspace), validated by a QEMU gate before board bring-up
+
+The General Instructions below build a bootable qcow2 disk image and are specific to
+[planning-simulator](./planning-simulator/README.md); they assume that folder's `aib/image.aib.yml`.
+They do **not** apply to [x5h](./x5h/README.md), which builds a non-ostree rootfs tar from a
+different distro (`autosd10-sig`), a different manifest (`aib/x5h-rootfs.aib.yml`) and a different
+export flag, then netboots it rather than booting a disk — see its own README for the full build
+and boot path.
 
 ## General Instructions
 

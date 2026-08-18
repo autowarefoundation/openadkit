@@ -8,6 +8,18 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 TARBALL="$1"; BSP="$2"; DEST="$3"; IMAGES="$4"
 KVER=6.1.102-yocto-standard
 [ -d "$BSP/lib/modules/$KVER" ] || { echo "FATAL: $BSP/lib/modules/$KVER not found"; exit 1; }
+# Pre-flight every input before anything is created. Ordering matters: the tar
+# extract and the test-image copy both run after `mkdir -p "$DEST"`, so an
+# input that is missing or misaddressed would otherwise abort partway and
+# leave $DEST populated but unstamped -- and the $DEST-exists guard below then
+# refuses the rerun until it is manually rm -rf'd, on a board session that has
+# no rerun scheduled. The realistic way to get here is $IMAGES: in the CI
+# bundle the two test tars live in a `testimages/` subdirectory, not at the
+# bundle root, so the bundle root is the plausible wrong answer.
+[ -f "$TARBALL" ] || { echo "FATAL: rootfs tarball not found: $TARBALL"; exit 1; }
+for t in busybox-oci.tar captest-docker.tar; do
+    [ -f "$IMAGES/$t" ] || { echo "FATAL: $IMAGES/$t not found -- <testimages-dir> must be the directory directly containing busybox-oci.tar and captest-docker.tar (with a CI bundle that is <bundle>/testimages, not <bundle>)"; exit 1; }
+done
 [ -e "$DEST" ] && { echo "FATAL: $DEST exists — refusing to overwrite (rm -rf it and rerun if a previous stage failed partway)"; exit 1; }
 mkdir -p "$DEST"
 # --xattrs: mirrors CI and the local gate replay exactly (a plain `tar xf`

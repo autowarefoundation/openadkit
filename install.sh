@@ -466,9 +466,11 @@ download_autoware_artifacts() {
     autoware_tmp="${USER_HOME}/.cache/openadkit/autoware-clone"
     sudo install -d -m 0755 -o "$TARGET_USER" -g "$(id -gn "$TARGET_USER")" \
         "$(dirname "$autoware_tmp")"
+    local AUTOWARE_REF="1.9.0"
     sudo -u "$TARGET_USER" env HOME="$USER_HOME" rm -rf "$autoware_tmp"
     sudo -u "$TARGET_USER" env HOME="$USER_HOME" \
-        git clone --depth 1 https://github.com/autowarefoundation/autoware.git "$autoware_tmp"
+        git clone --depth 1 --branch "$AUTOWARE_REF" \
+        https://github.com/autowarefoundation/autoware.git "$autoware_tmp"
 
     # Download artifacts into the user's home
     local data_dir="${USER_HOME}/autoware_data"

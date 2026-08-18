@@ -9,12 +9,10 @@
 // are supplied by docker/metadata-action via the docker-metadata-action-*
 // targets, not by this file.
 
-// Default ROS distro for local builds. Tracks the documented default distro
-// and the published `<target>` alias, which is Humble for v2.0. CI never relies
-// on this default — build-all-images.yaml sets ROS_DISTRO explicitly per matrix
-// entry. Flip to "jazzy" together with the docs default when Jazzy-primary lands.
+// Default ROS distro for local builds. CI never relies on this default —
+// build-all-images.yaml sets ROS_DISTRO explicitly per matrix entry.
 variable "ROS_DISTRO" {
-  default = "humble"
+  default = "jazzy"
 }
 
 // Pin for upstream Autoware images. A concrete release tag (e.g. "1.2.3") is

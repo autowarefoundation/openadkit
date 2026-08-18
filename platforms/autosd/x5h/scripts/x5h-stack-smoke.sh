@@ -16,7 +16,7 @@ set -u
 
 MODE="${1:-stack}"
 ENVF=/etc/containers/systemd/awf-oak-x5h.env
-DDS_URI=file:///etc/containers/systemd/cyclonedds-x5h.xml
+DDS_URI=file:///autoware/cyclonedds.xml
 CORE_UNITS="awf-oak-map awf-oak-planning awf-oak-vehicle awf-oak-system awf-oak-control awf-oak-simulator awf-oak-api"
 
 fail() { echo "X5H_${2}_FAIL reason=$1"; exit 1; }
@@ -25,7 +25,8 @@ ros1() { # run a ros2 command on domain 1 inside the map container
     podman exec awf-oak-map bash -lc \
       "source /opt/ros/\$ROS_DISTRO/setup.bash && source /opt/autoware/setup.bash && $1" 2>/dev/null
 }
-ros2dom() { # run a ros2 command on domain 2, over tap0, from the host
+ros2dom() { # run a ros2 command on domain 2, from inside the bridge
+            # container (podman exec uses the container's mounts)
     podman exec -e ROS_DOMAIN_ID=2 -e CYCLONEDDS_URI="$DDS_URI" awf-oak-bridge bash -lc \
       "source /opt/ros/\$ROS_DISTRO/setup.bash && source /opt/autoware/setup.bash && $1" 2>/dev/null
 }

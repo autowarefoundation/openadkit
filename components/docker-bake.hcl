@@ -8,10 +8,10 @@
 // cross-group references resolve to already-pushed GHCR tags. CI also sets
 // LOCAL_IMAGE="" so only docker-metadata-action tags are published.
 
-// Default ROS distro for local builds. CI never relies on this default —
-// build-all-images.yaml sets ROS_DISTRO explicitly per matrix entry.
+// Default ROS distro for local builds. Matches the published short-tag alias
+// and release DEFAULT_ROS_DISTRO. CI sets ROS_DISTRO per matrix entry.
 variable "ROS_DISTRO" {
-  default = "jazzy"
+  default = "humble"
 }
 
 // Pin for upstream Autoware images. A concrete release tag (e.g. "1.2.3") is
@@ -27,6 +27,7 @@ variable "UPSTREAM_REPO" {
 
 // Local compose defaults (`${COMPONENT_IMAGE:-ghcr.io/.../openadkit:<target>}`).
 // Empty string disables these tags so CI metadata-action is the sole tag source.
+// Short :<target> is Humble-only; every distro also gets :<target>-<ros_distro>.
 variable "LOCAL_IMAGE" {
   default = "ghcr.io/autowarefoundation/openadkit"
 }
@@ -47,7 +48,7 @@ function "upstream" {
 
 function "local_tags" {
   params = [name]
-  result = LOCAL_IMAGE == "" ? [] : ["${LOCAL_IMAGE}:${name}"]
+  result = LOCAL_IMAGE == "" ? [] : ROS_DISTRO == "humble" ? ["${LOCAL_IMAGE}:${name}", "${LOCAL_IMAGE}:${name}-${ROS_DISTRO}"] : ["${LOCAL_IMAGE}:${name}-${ROS_DISTRO}"]
 }
 
 // Single source of truth for the sensing-perception `--base-paths` package

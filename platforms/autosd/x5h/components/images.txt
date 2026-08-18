@@ -1,0 +1,32 @@
+# <local-name> <registry-ref>@<arm64-digest>
+# Digests pinned from `skopeo inspect --raw` on 2026-08-18; see PREFLIGHT.md.
+# Regenerate with: stage-container-images.sh --refresh
+#
+# The five openadkit-* images come from our fork's registry
+# (ghcr.io/youtalk/openadkit) at per-arch tags built by fork workflow run
+# 32105383688 (autoware_ref=1.8.0), not from upstream's bare component
+# tags: upstream's bare tags (ghcr.io/autowarefoundation/openadkit:<name>)
+# are amd64-only because upstream's create-manifests step is skipped
+# whenever any component build fails, and every openadkit fork build from
+# 2026-06-21 to 2026-08-16 failed (autoware_planning_evaluator calls a
+# removed autoware_vehicle_info_utils API), so no bare tag ever picked up
+# an arm64 manifest in that window.
+#
+# Refs below are repo@digest with no tag: skopeo (containers/image) refuses
+# a reference that carries both a tag and a digest ("Docker references
+# with both a tag and digest are currently not supported"), so the
+# per-arch tag each digest was read from is recorded in the comment above
+# each line instead of in the ref itself.
+
+# localization-mapping-arm64-humble-32105383688-1
+openadkit-localization-mapping ghcr.io/youtalk/openadkit@sha256:10f020af0bbd8a838ae532f575f63c5e2af6c420864f4e7341d2e48893f9ace0
+# planning-control-arm64-humble-32105383688-1
+openadkit-planning-control     ghcr.io/youtalk/openadkit@sha256:b9044abf68e829ad31b5052a0ea9552bcc29d5a956bc3f73c6edff4d8d932080
+# vehicle-system-arm64-humble-32105383688-1
+openadkit-vehicle-system       ghcr.io/youtalk/openadkit@sha256:2e2b50bc171505335fa17639e58cdacbf87e6cf009e04e71bfc9e77e9c49ff1d
+# api-arm64-humble-32105383688-1
+openadkit-api                  ghcr.io/youtalk/openadkit@sha256:52e1024c32f61fe84565ec06ede23d9c5d64f61118e1345524a01c371abad918
+# simulator-arm64-humble-32105383688-1
+openadkit-simulator            ghcr.io/youtalk/openadkit@sha256:e94d37810473cf9e49a9af4d81de157cdddef6cf7edc1db983ca3295f21bb645
+# humble-25.0.20-runtime
+scenario-simulator-v2          ghcr.io/tier4/scenario_simulator_v2@sha256:8c89ce8be04888446bc0a6a8f35f5eec31777e2cb620307b0069da953ef0a627

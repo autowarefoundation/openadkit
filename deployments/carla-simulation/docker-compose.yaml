@@ -5,11 +5,6 @@ include:
   - ../base/docker-compose.yaml
 
 services:
-  # Disable the base simulator — CARLA provides its own simulation runtime.
-  simulator:
-    profiles:
-      - disabled
-
   # Override base services with CARLA-specific changes.
   system:
     command: >

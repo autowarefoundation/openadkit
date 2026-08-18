@@ -27,10 +27,10 @@ def test_amd64_only_targets_have_single_arch():
     assert idx[("component", "sensing-perception-cuda", "jazzy")] == "amd64"
 
 
-def test_carla_is_humble_only():
+def test_carla_is_amd64_only():
     idx = manifest_index(r.build_matrices(INVENTORY))
     assert idx[("component", "carla-interface", "humble")] == "amd64"
-    assert ("component", "carla-interface", "jazzy") not in idx
+    assert idx[("component", "carla-interface", "jazzy")] == "amd64"
 
 
 def test_common_images_included_multiarch():

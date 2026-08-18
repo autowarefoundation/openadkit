@@ -112,23 +112,28 @@ content:
     - source_path: ../config/80-x5h.preset
       path: /etc/systemd/system-preset/80-x5h.preset
     # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
-    # All nine `.container` units below carry `[Install] WantedBy=
+    # Eight of the nine `.container` units below carry `[Install] WantedBy=
     # default.target`, which Quadlet auto-enables at unit-generation time on
     # every boot regardless of what 80-x5h.preset says -- there is no preset
-    # knob that keeps a Quadlet-generated unit present but dormant. None of
-    # the units set `Pull=`, and awf-oak-x5h-extract-map.service (enabled by
-    # 80-x5h.preset below) runs `podman image exists "$image"` under
-    # `set -euo pipefail`, which is a hard failure, not a wait-and-retry,
-    # when the image has not been loaded onto the board yet.
+    # knob that keeps a Quadlet-generated unit present but dormant. The
+    # ninth, awf-oak-scenario.container, has no `[Install]` section at all
+    # (deliberate: starting a scenario on every reboot would be wrong), so
+    # Quadlet never auto-enables it -- it only ever runs on demand, from the
+    # smoke script. None of the units set `Pull=`, and
+    # awf-oak-x5h-extract-map.service (enabled by 80-x5h.preset below) runs
+    # `podman image exists "$image"` under `set -euo pipefail`, which is a
+    # hard failure, not a wait-and-retry, when the image has not been loaded
+    # onto the board yet.
     #
     # Consequence: a freshly built and flashed image, booted before any
     # container image has been staged onto it, WILL come up with as many as
-    # ten failed units -- the nine `.container` units plus the map
-    # extractor. This is expected on that specific boot, not a regression,
-    # and the human-ruled fix is to document the sequence below rather than
-    # to add `Pull=`, add start conditions, or drop `[Install]` from any
-    # unit -- those would change behavior the component units (Tasks 4/6,
-    # reviewed and frozen) already define. Required bring-up order:
+    # nine failed units -- the eight auto-enabled `.container` units plus
+    # the map extractor. This is expected on that specific boot, not a
+    # regression, and the human-ruled fix is to document the sequence
+    # below rather than to add `Pull=`, add start conditions, or drop
+    # `[Install]` from any unit -- those would change behavior the
+    # component units (Tasks 4/6, reviewed and frozen) already define.
+    # Required bring-up order:
     #   1. build and flash this image;
     #   2. stage the container images onto the board:
     #      scripts/stage-container-images.sh --stage;

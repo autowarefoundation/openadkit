@@ -89,6 +89,21 @@ def test_valid_sample_install(tmp_path):
     assert (target / "pointcloud_map.pcd").read_text() == "pointcloud"
 
 
+def test_sample_install_makes_files_world_readable(tmp_path):
+    fixture = tmp_path / "sample.zip"
+    with zipfile.ZipFile(fixture, "w") as archive:
+        osm = zipfile.ZipInfo("sample-map-planning/lanelet2_map.osm")
+        osm.external_attr = (0o100644 << 16)
+        archive.writestr(osm, "lanelet")
+        pcd = zipfile.ZipInfo("sample-map-planning/pointcloud_map.pcd")
+        pcd.external_attr = (0o100600 << 16)
+        archive.writestr(pcd, "pointcloud")
+    result, _ = run_install(tmp_path, fixture, checksum_mode="always-ok")
+    assert result.returncode == 0, result.stderr + result.stdout
+    mode = (tmp_path / "maps/sample-map-planning/pointcloud_map.pcd").stat().st_mode
+    assert mode & 0o044, oct(mode)
+
+
 @pytest.mark.parametrize(("complete", "traversal"), [(False, False), (True, True)])
 def test_invalid_archive_preserves_existing_data(tmp_path, complete, traversal):
     fixture = tmp_path / "sample.zip"

@@ -625,6 +625,12 @@ download_sample_data() {
         fi
     }
 
+    normalize_sample_permissions() {
+        local root="$1"
+        find "$root" -type d -exec chmod u+rwx,go+rx {} +
+        find "$root" -type f -exec chmod u+rw,go+r {} +
+    }
+
     validate_sample_dataset() {
         local name="$1" candidate="$2" db3 found_db3=false
         case "$name" in
@@ -755,6 +761,7 @@ PY
                 log_error "$name is incomplete at $target; rerun with --force"
                 return 1
             fi
+            normalize_sample_permissions "$target"
             log_info "$name already present at $target (use --force to re-download)"
             return 0
         fi
@@ -775,6 +782,7 @@ PY
             return 1
         fi
         validate_sample_dataset "$name" "$candidate" || return 1
+        normalize_sample_permissions "$candidate"
         publish_sample_dataset "$candidate" "$target" "$stage" || return 1
         log_info "$name -> $target"
     }
@@ -787,6 +795,7 @@ PY
                 log_error "kashiwanoha_map is incomplete at $target; rerun with --force"
                 return 1
             fi
+            normalize_sample_permissions "$target"
             log_info "kashiwanoha_map already present at $target (use --force to re-download)"
             return 0
         fi
@@ -810,6 +819,7 @@ PY
             sha256_verify "${candidate}/${name}" "$sum" || return 1
         done
         validate_sample_dataset kashiwanoha_map "$candidate" || return 1
+        normalize_sample_permissions "$candidate"
         publish_sample_dataset "$candidate" "$target" "$stage" || return 1
         log_info "kashiwanoha_map -> $target"
     }

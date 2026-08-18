@@ -11,6 +11,6 @@
     {"repo": "component", "target": "api", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
     {"repo": "component", "target": "visualizer", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
     {"repo": "component", "target": "simulator", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "carla-interface", "stage": "component", "platforms": ["linux/amd64"], "ros_distros": ["humble"]}
+    {"repo": "component", "target": "carla-interface", "stage": "component", "platforms": ["linux/amd64"]}
   ]
 }

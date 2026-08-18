@@ -1,0 +1,7 @@
+[Pod]
+PodName=awf-oak-x5h
+# Host networking, matching deployments/samples/scenario-simulation. Domain 1
+# discovery then stays on loopback, and the bridge container can see tap0 --
+# which is a host interface created by rpmsg-eth.service, not something a
+# rootless pod network could reach.
+Network=host

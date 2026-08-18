@@ -1,0 +1,15 @@
+[Install]
+WantedBy=default.target
+
+[Unit]
+# NOT named awf-oak-map.service: awf-oak-map.container generates a unit of
+# that name on this profile, and planning-simulator's extractor already
+# uses it. Two units with one name is a silent override, not an error.
+Description=Open AD Kit X5H Kashiwanoha Map Extractor
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+ExecStart=/usr/bin/bash /usr/local/libexec/awf-oak-x5h-extract-map.sh

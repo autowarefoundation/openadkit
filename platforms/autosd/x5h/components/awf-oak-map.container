@@ -1,0 +1,19 @@
+[Unit]
+Description=Open AD Kit X5H map component
+Requires=awf-oak-x5h-extract-map.service
+After=awf-oak-x5h-extract-map.service
+
+[Install]
+WantedBy=default.target
+
+[Container]
+Pod=awf-oak-x5h.pod
+ContainerName=awf-oak-map
+Image=localhost/openadkit-localization-mapping:latest
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,Z
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,Z
+Exec=ros2 launch autoware_launch tier4_map_component.launch.xml \
+  lanelet2_map_file:=${LANELET2_MAP_FILE} map_path:=/autoware_map \
+  pointcloud_map_file:=${POINTCLOUD_MAP_FILE} use_sim_time:=${USE_SIM_TIME} \
+  vehicle_model:=${VEHICLE_MODEL}

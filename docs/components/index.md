@@ -71,6 +71,7 @@ universe-common compiled packages).
 | Group | Targets |
 |-------|---------|
 | `default` | everything: `universe-common` + `component` |
+| `planning` | `universe-common` plus localization, planning-control, vehicle-system, api, visualizer, simulator |
 | `universe-common` | `universe-common-devel`, `universe-common` |
 | `component` | the eight non-CUDA component images plus `sensing-perception-cuda` |
 

@@ -109,8 +109,10 @@ mkdir -p autoware/src
 vcs import --shallow autoware/src < autoware/repositories/autoware.repos
 ```
 
-Then build. Local images are tagged `ghcr.io/autowarefoundation/openadkit:<target>`
-so deployment Compose files find them without extra `--set`:
+Then build. Humble images are tagged both
+`ghcr.io/autowarefoundation/openadkit:<target>` (Compose default) and
+`ghcr.io/autowarefoundation/openadkit:<target>-humble`. Jazzy images are
+tagged only `:<target>-jazzy` so they do not overwrite the short alias:
 
 ```bash
 # Planning simulation images (no CUDA / CARLA)

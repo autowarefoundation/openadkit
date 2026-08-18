@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
 
+  <!-- Sizing note (applies to both domains' <Sizing> blocks below):
+       ReceiveBufferSize and ReceiveBufferChunkSize are CycloneDDS's
+       internal receive-buffer pool, a different setting from
+       General/SocketReceiveBufferSize below, which is a request to the
+       kernel for a larger SO_RCVBUF on the underlying socket. The values
+       here (16384B / 2048B) are inherited from $ASI/demo/cyclonedds.xml:
+       16384 is an exact multiple of 2048, and the chunk size exceeds both
+       tap0's 462-byte fragment size and the 1400B MaxMessageSize. Whether
+       this pool is thin for six bridged topics is an open question worth
+       flagging here, not retuning in this file.
+
+       This file deliberately does NOT set General/SocketReceiveBufferSize.
+       The stock component images ship a cyclonedds.xml that requests
+       <SocketReceiveBufferSize min="10MB"/>; net.core.rmem_max is 212992
+       bytes (208KB) on both the companion host and the board, so that
+       request fails the kernel's setsockopt and CycloneDDS aborts at
+       participant creation instead of degrading gracefully. Do not paste
+       SocketReceiveBufferSize back into this file. -->
+
   <!-- Domain 1: the Open AD Kit component containers. They share the host
        network namespace, so discovery stays on the loopback path. -->
   <Domain id="1">
@@ -28,7 +47,12 @@
 
        MaxMessageSize stays at 1400B: RTPS fragmentation down to tap0's
        462-byte MTU happens below this setting, and lowering it here would
-       double-fragment for no benefit. -->
+       double-fragment for no benefit.
+
+       The ${X5H_SI_INTERFACE:-tap0} / ${X5H_SI_PEER:-172.16.52.2} defaults
+       exist so a later host rehearsal can retarget domain 2 at a veth rig
+       without a second copy of this file. On the board both defaults are
+       correct and neither variable is set. -->
   <Domain id="2">
     <General>
       <AllowMulticast>false</AllowMulticast>

@@ -13,9 +13,18 @@ DIGEST = f"sha256:{'a' * 64}"
 
 
 def registry_metadata(openadkit_sha, *, matches=True):
-    input_ref = "1.8.0" if matches else "main"
-    ref_type = "tag" if matches else "branch"
-    image_autoware_ref = AUTOWARE_REF if matches else "c" * 40
+    if matches == "same-commit-branch":
+        input_ref = "main"
+        ref_type = "branch"
+        image_autoware_ref = AUTOWARE_REF
+    elif matches:
+        input_ref = "1.8.0"
+        ref_type = "tag"
+        image_autoware_ref = AUTOWARE_REF
+    else:
+        input_ref = "main"
+        ref_type = "branch"
+        image_autoware_ref = "c" * 40
     return json.dumps(
         {
             "manifest": {"digest": DIGEST},
@@ -134,6 +143,16 @@ def test_empty_target_plan_does_not_inspect_registry(tmp_path):
         "use_local_simulator": "false",
     }
     assert inspected == []
+
+
+def test_same_autoware_commit_reuses_branch_labeled_common_contexts(tmp_path):
+    outputs, inspected = run_resolver(
+        tmp_path, ["api"], common_matches="same-commit-branch"
+    )
+    assert outputs["devel_context"].endswith(f"@{DIGEST}")
+    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
+    assert outputs["use_local_common"] == "false"
+    assert len(inspected) == 2
 
 
 def test_non_carla_target_uses_digest_pinned_common_contexts(tmp_path):

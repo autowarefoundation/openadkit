@@ -26,11 +26,9 @@ resolve_registry_context() {
   image_autoware_ref=$(jq -r '.["org.opencontainers.image.autoware-ref"] // .["\"org.opencontainers.image.autoware-ref\""] // empty' <<<"${labels}")
   base_version=$(jq -r '.["org.opencontainers.image.autoware-base-version"] // .["\"org.opencontainers.image.autoware-base-version\""] // empty' <<<"${labels}")
   openadkit_sha=$(jq -r '.["org.opencontainers.image.openadkit-sha"] // .["\"org.opencontainers.image.openadkit-sha\""] // empty' <<<"${labels}")
-  if [ "${input_ref}" != "${AUTOWARE_INPUT_REF}" ] \
-    || [ "${ref_type}" != "${AUTOWARE_REF_TYPE}" ] \
-    || [ "${image_autoware_ref}" != "${AUTOWARE_REF}" ] \
+  if [ "${image_autoware_ref}" != "${AUTOWARE_REF}" ] \
     || [ "${base_version}" != "${AUTOWARE_BASE_VERSION}" ]; then
-    echo "Registry context ${ref} was built from ${ref_type}:${input_ref}@${image_autoware_ref} with base ${base_version}; expected ${AUTOWARE_REF_TYPE}:${AUTOWARE_INPUT_REF}@${AUTOWARE_REF} with base ${AUTOWARE_BASE_VERSION}" >&2
+    echo "Registry context ${ref} was built from ${ref_type}:${input_ref}@${image_autoware_ref} with base ${base_version}; expected Autoware ${AUTOWARE_REF} with base ${AUTOWARE_BASE_VERSION}" >&2
     return 1
   fi
   if ! [[ "${openadkit_sha}" =~ ^[0-9a-f]{40}$ ]] \

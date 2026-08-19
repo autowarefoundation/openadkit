@@ -47,7 +47,13 @@
 #                                   successful start job with an inactive
 #                                   unit. Check the journal for the path.
 #   AUTOWARE: no_trajectory_topic   domain 1 has no planning trajectory
-#             no_kinematic_state    no localization sample on domain 1
+#             no_operation_mode_state
+#                                   no /system/operation_mode/state sample on
+#                                   domain 1, i.e. Autoware itself is not live.
+#                                   NOT a localization check: the ego pose
+#                                   belongs to awf-oak-simulator, which this
+#                                   mode deliberately does not start -- see the
+#                                   comment on the assertion itself.
 #             bridge_active         awf-oak-bridge is up, so this run is
 #                                   NOT the unbridged domain-1-only case
 #                                   this mode claims to measure
@@ -185,8 +191,32 @@ autoware)
     # The point of Stage 1: prove the stack runs before anything is bridged.
     ros1 "timeout 20 ros2 topic list" | grep -q '/planning/scenario_planning/trajectory' \
         || fail "no_trajectory_topic" "AUTOWARE"
-    ros1 "timeout 20 ros2 topic echo --once /localization/kinematic_state" >/dev/null \
-        || fail "no_kinematic_state" "AUTOWARE"
+    # A LIVE SAMPLE, and deliberately NOT /localization/kinematic_state.
+    #
+    # Three of the six bridged topics -- kinematic_state, steering_status and
+    # localization/acceleration -- are published by scenario_simulator_v2's ego
+    # entity in awf-oak-simulator, not by Autoware. awf-oak-autoware runs
+    # planning_simulator.launch.xml with scenario_simulation:=true, and under
+    # that flag the launch deliberately does NOT start a vehicle simulator of
+    # its own, because the scenario runner owns the ego. Board-measured with
+    # awf-oak-autoware alone (174 nodes up): kinematic_state has 0 publishers
+    # and 29 subscribers, steering_status and localization/acceleration 0 each.
+    #
+    # So gating this mode on a kinematic_state sample was unsatisfiable BY
+    # CONSTRUCTION -- Stage 1 exists precisely to run without the simulator, so
+    # the one assertion could never pass, and it reported reason=no_kinematic_state
+    # on a completely healthy stack. Indistinguishable, to an operator, from
+    # Autoware failing to localize.
+    #
+    # /system/operation_mode/state is the right probe: it is also one of the six
+    # bridged topics (so it stays load-bearing for Stage 2), its publisher is
+    # Autoware's own operation mode transition manager, and it is up with
+    # awf-oak-autoware alone -- board-measured, 1 publisher, sample received.
+    # Asserting a SAMPLE rather than topic existence is what makes this liveness
+    # rather than mere discovery: the trajectory check above is existence-only,
+    # and existence alone is satisfied by any subscriber.
+    ros1 "timeout 20 ros2 topic echo --once /system/operation_mode/state" >/dev/null \
+        || fail "no_operation_mode_state" "AUTOWARE"
     echo "X5H_AUTOWARE_MEM_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo)"
     echo "X5H_AUTOWARE_PASS"
     ;;

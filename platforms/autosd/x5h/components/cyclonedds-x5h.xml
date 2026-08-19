@@ -18,15 +18,36 @@
        file.
 
        This file deliberately does NOT set General/SocketReceiveBufferSize.
-       The stock component images ship a cyclonedds.xml that requests
-       <SocketReceiveBufferSize min="10MB"/>; net.core.rmem_max is 212992
-       bytes (208KB) on both the companion host and the board, so that
-       request fails the kernel's setsockopt and CycloneDDS aborts at
-       participant creation instead of degrading gracefully. Do not paste
-       SocketReceiveBufferSize back into this file. -->
+       net.core.rmem_max is 212992 bytes (208KB) on both the companion host
+       and the board, and CycloneDDS treats a SocketReceiveBufferSize
+       minimum it cannot obtain from the kernel as fatal: it aborts at
+       participant creation ("failed to increase socket receive buffer size
+       to at least N bytes, current is 425984 bytes" -> "error creating
+       node: rcl node's rmw handle is invalid" -> exit 1) rather than
+       degrading to what it was given. Any value above rmem_max therefore
+       turns this file into a stack that will not start. Do not add
+       SocketReceiveBufferSize here.
 
-  <!-- Domain 1: the Open AD Kit component containers. They share the host
-       network namespace, so discovery stays on the loopback path. -->
+       This note used to say the images being overridden ship their own
+       cyclonedds.xml requesting <SocketReceiveBufferSize min="10MB"/>, and
+       that avoiding that request was why our config is mounted. That was
+       true of the retired componentized images and is NOT true of the
+       monolithic ones this profile now runs: measured on the board,
+       `find / -xdev -name "cyclonedds*.xml"` returns nothing in either
+       universe-after or scenario-simulator, and neither sets CYCLONEDDS_URI
+       in its image environment. There is no config to override and no
+       10MB request to avoid.
+
+       So the reason this file is mounted is now entirely POSITIVE, and it
+       is what would be lost by unmounting it: domain 2 has to be pinned to
+       tap0 by name with autodetermine="false", multicast disabled, a static
+       peer at the CR52, and a stated FragmentSize. CycloneDDS defaults do
+       none of that, and with no config at all domain 2 would not form. -->
+
+
+  <!-- Domain 1: the Autoware container plus the relay, the restamp node and
+       the scenario runner. All four use Network=host, so discovery stays on
+       the loopback path. -->
   <Domain id="1">
     <General>
       <AllowMulticast>spdp</AllowMulticast>

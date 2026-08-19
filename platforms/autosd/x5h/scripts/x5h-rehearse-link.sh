@@ -61,11 +61,15 @@ case "${1:---measure}" in
     ;;
 --measure)
     [ -d "/sys/class/net/$HOST_IF" ] || fail "no_rig_run_setup_first"
-    # A zero or non-numeric window makes the division below abort before
-    # any marker is printed, which breaks the one-marker-per-run contract.
+    # An empty, non-numeric, or arithmetically-zero window makes the
+    # division below abort before any marker is printed, which breaks the
+    # one-marker-per-run contract. The case guard must run first: [ abc
+    # -gt 0 ] is itself an error in dash, so non-numeric input has to be
+    # rejected before the numeric comparison runs.
     case "$DUR" in
-        ''|*[!0-9]*|0) fail "measure_seconds=$DUR" ;;
+        ''|*[!0-9]*) fail "measure_seconds=$DUR" ;;
     esac
+    [ "$DUR" -gt 0 ] || fail "measure_seconds=$DUR"
     # Count only domain-2 traffic: everything on this interface is domain 2
     # by construction, so interface counters are the measurement.
     # tx_* on the host end == what domain 1 pushes toward the safety

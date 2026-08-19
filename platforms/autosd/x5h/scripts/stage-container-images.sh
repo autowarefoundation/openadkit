@@ -37,9 +37,9 @@ while read -r name ref; do
     case "$name" in ''|\#*) continue ;; esac
     # Compressed size of each arm64 layer, one "digest size" pair per
     # line. This under-reports the on-disk footprint (layers are stored
-    # uncompressed), so the gate below applies a 2.5x expansion factor
-    # rather than comparing raw bytes to free space and quietly
-    # overfilling the LUN.
+    # uncompressed), so the gate below applies an expansion factor rather
+    # than comparing raw bytes to free space and quietly overfilling the
+    # LUN. See the factor's derivation just above `need=`.
     layers=$(skopeo inspect --override-arch arm64 --override-os linux \
             --format '{{range .LayersData}}{{.Digest}} {{.Size}}
 {{end}}' "docker://$ref" 2>/dev/null)
@@ -54,7 +54,30 @@ done < "$LIST"
 # per-image running sum, that is exactly the double-counting bug this
 # dedup exists to fix.
 total=$(sort -u "$tmp_layers" | awk 'NF==2 {s+=$2} END {print s+0}')
-need=$(( total * 5 / 2 ))
+
+# 3.4x, MEASURED on this hardware -- not an estimate any more, and not a
+# round number picked for comfort. The first full `--stage` run of these six
+# images onto the board (2026-08-18) gave:
+#
+#   deduplicated compressed total   3656361314 B  (this script, --audit)
+#   /var/lib/containers free before 19378974720 B (df -B1, same run)
+#   /var/lib/containers free after   7025639424 B (df -B1, after the stage)
+#   -> consumed                     12353335296 B, i.e. 3.378x the total
+#
+# The previous factor was 2.5x. It projected 9140903285 B for that same
+# staging run, so it under-called the real cost by 3.2 GB -- 26% low, on a
+# 19 GB LUN. The gate still passed that day, but only because the store
+# started empty; the margin it reported (10.2 GB free afterwards, against
+# 6.6 GB actual) was fiction, and a second stage sized on it would have
+# filled the partition. 3.4x is the measurement rounded up to two
+# significant figures, so the gate stays conservative rather than exact.
+#
+# Written as *17/5 to keep this in integer arithmetic (the shell has no
+# floats) and multiply before dividing so the truncation is at most 1 byte.
+# Re-derive it, do not nudge it, if the image set changes materially: the
+# ratio is a property of how well these particular layers compress, and
+# btrfs on /dev/sdc3 stores them uncompressed.
+need=$(( total * 17 / 5 ))
 
 # Free space on the board's container store, in bytes: /var/lib/containers
 # is a dedicated ~19 GB partition (/dev/sdc3). Measured, never assumed.

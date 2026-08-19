@@ -298,6 +298,8 @@ services:
     environment:
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
     volumes:
       - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     restart: on-failure

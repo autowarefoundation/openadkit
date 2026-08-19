@@ -68,7 +68,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      actions: read
       contents: write
     steps:
       - name: Checkout deployment repository

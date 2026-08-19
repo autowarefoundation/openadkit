@@ -93,46 +93,74 @@ use_efipart: false
 
 # Keep Quadlet a BOOT-TIME generator instead of an image-build-time one.
 #
-# What goes wrong without this, measured on the board (2026-08-18 Stage 1
-# session): /etc/systemd/system-generators/ holds seventeen symlinks to
-# /dev/null, and podman-system-generator is one of them. Every .container
-# and .pod file aib/x5h-rootfs.aib.yml installs into /etc/containers/systemd
-# therefore produces ZERO systemd units at runtime -- silently. No error, no
-# journal line, no warning: `systemctl daemon-reload` succeeds, and
-# `systemctl list-unit-files "awf-oak*"` simply comes up empty, because a
-# generator masked to /dev/null is a generator systemd skips without
-# comment. The session lost hours to it and had to install a volatile
-# /run/systemd/system-generators/podman-system-generator symlink (which
-# outranks /etc in systemd's generator search path) to get any unit at all.
-# The same mask is why selfboot.md:232 reports that the fstab generator does
-# not run either -- that is not a separate quirk, it is this one seen on a
-# different generator.
+# THE DEFECT THIS FIXES is not "no units are produced". On a default build
+# the component units ARE produced -- and then frozen at image-build time,
+# which is the actual problem.
 #
-# Where the mask comes from, and why it is this variable that removes it:
-# the mask is not something AutoSD does arbitrarily. aib's
-# include/computed-vars.ipp.yml appends podman-system-generator to
-# image_masked_generators only under `mpp-if: pregenerate_quadlets`, and the
-# same flag gates a second stage that runs /usr/bin/quadlet_preprocess in the
-# build chroot to pre-generate the units into /usr/lib/systemd/system.
-# pregenerate_quadlets defaults to `use_ostree` (include/defaults.ipp.yml),
-# and `aib build` pins image_mode=bootc, so it is TRUE for this profile --
-# which is exactly why the board came up with all seventeen masks. Setting it
-# false here drops podman-system-generator from the masked list and drops the
-# pre-generation stage, so the stock generator at
+# aib, with pregenerate_quadlets at its default of true, runs Quadlet inside
+# the build chroot (include/computed-vars.ipp.yml:741 emits an
+# org.osbuild.lorax-script stage running files/quadlet_preprocess.sh, which
+# does `chroot $ROOT /usr/lib/systemd/system-generators/podman-system-generator
+# -no-kmsg-log -v /usr/lib/systemd/system`) and writes the .service files and
+# their default.target.wants symlinks into /usr/lib/systemd/system. Having
+# done so it masks the runtime generator, because it believes the work is
+# already finished: computed-vars.ipp.yml:583-587 appends
+# podman-system-generator to image_masked_generators under
+# `mpp-if: pregenerate_quadlets`, and the org.osbuild.systemd stage at :637
+# materialises that as /etc/systemd/system-generators/podman-system-generator
+# -> /dev/null. Note the pre-generation at :741 comes AFTER the masking at
+# :637 in the same image_extra_stages list, and reaches the generator by its
+# absolute /usr/lib path, so the mask does not stop it. An image built that
+# way boots with working units.
+#
+# What it does not have is a live /etc/containers/systemd. Editing a
+# .container there and running `systemctl daemon-reload` changes nothing --
+# no error, no journal line, no warning, because the generator that would
+# have read the directory is masked. The only way to change a unit becomes a
+# ~23 minute CI image build followed by a reflash.
+#
+# That breaks the workflow every board procedure on this branch is built on:
+# the bring-up sequence documented in x5h-rootfs.aib.yml, the Stage 1/2 board
+# sessions that scp revised units into /etc/containers/systemd and reload,
+# and this manifest's own statement that Quadlet "auto-enables at
+# unit-generation time on every boot". A silently-ignored edit is also
+# precisely the class of failure this profile keeps paying for.
+#
+# WHY THE BOARD SHOWED NO UNITS AT ALL, and why that is not evidence for a
+# stronger claim than the one above. The 2026-08-18 Stage 1 session found
+# /etc/systemd/system-generators/ holding seventeen /dev/null masks and
+# `systemctl list-unit-files "awf-oak*"` completely empty, and had to install
+# a volatile /run/systemd/system-generators/podman-system-generator symlink
+# (that directory outranks /etc in systemd's generator search path) to get
+# any unit at all. The empty listing was NOT the mask suppressing units this
+# manifest installs. That board's image predates this manifest ever carrying
+# them: /etc/build-info says TIMESTAMP="2026-08-07 23:15:22 UTC", while the
+# component files were first added to the manifest by d95985c on 2026-08-18.
+# Pre-generation had nothing to pre-generate -- /usr/lib/systemd/system on
+# that board contains no awf-oak* unit and no awf-oak* entry under
+# default.target.wants -- and the mask then made the files the session
+# hand-copied into /etc/containers/systemd inert, which is the live-directory
+# problem above, hit from the runtime side.
+#
+# WHAT SETTING IT FALSE DOES: podman-system-generator drops out of
+# image_masked_generators and the quadlet_preprocess stage drops out of the
+# build, so the stock generator at
 # /usr/lib/systemd/system-generators/podman-system-generator (present and
 # executable on the board, a symlink to ../../../libexec/podman/quadlet) runs
-# normally on the FIRST boot and on every daemon-reload after it.
+# normally on the FIRST boot and on every daemon-reload after it. Verified by
+# running aib's own mpp preprocessor with the override in place: both the
+# masked-list entry and the pre-generation stage disappear.
 #
-# Why not keep pre-generation, which would also produce units on first boot:
-# because it freezes the units at image-build time. /etc/containers/systemd
-# would become decorative on a running board -- editing a .container there
-# and reloading would change nothing, silently, which is the very failure
-# this profile just paid for. Every operational procedure this branch
-# documents (the bring-up sequence in x5h-rootfs.aib.yml, the board sessions
-# that scp revised units to /etc/containers/systemd, the manifest's own claim
-# that Quadlet "auto-enables at unit-generation time on every boot") assumes
-# a generator that runs on the board. Losing runtime generation would also
-# mean a unit fix could only be validated by a ~23 minute CI image build.
+# NOT the same cause as the fstab generator. selfboot.md:232 reports that
+# systemd-fstab-generator does not run on this image either. That is a
+# DIFFERENT mask: systemd-fstab-generator is a plain entry in aib's
+# unconditional image_masked_generators default
+# (include/defaults.ipp.yml:328, one of the sixteen that are always masked),
+# not something pregenerate_quadlets adds. Setting this flag false does NOT
+# unmask it. selfboot.md's explicit /etc/systemd/system/var-lib-containers.mount
+# workaround therefore remains necessary, and must not be removed on the
+# strength of this change -- without it podman silently uses the root
+# filesystem instead of the btrfs LUN.
 #
 # Why not unmask it from the manifest with an add_symlinks entry pointing
 # /etc/systemd/system-generators/podman-system-generator at
@@ -152,9 +180,10 @@ use_efipart: false
 # second boot onward, which is a worse trap than the bug.
 #
 # The cost of turning pre-generation off is a few hundred milliseconds of
-# generator run per boot. Nothing else in this profile depends on it: the
-# other sixteen masked generators are untouched (they come from aib's
-# unconditional image_masked_generators default), and bootc-systemd-generator
-# in particular stays masked because it is gated on use_bootc, not on this
-# flag.
+# generator run per boot, plus the loss of nothing else: the other sixteen
+# masked generators are untouched, because they come from aib's unconditional
+# image_masked_generators default (include/defaults.ipp.yml:307-334) rather
+# than from this flag. bootc-systemd-generator, for instance, stays masked --
+# it is one of those sixteen plain entries (:334), not something this flag
+# controls.
 pregenerate_quadlets: false

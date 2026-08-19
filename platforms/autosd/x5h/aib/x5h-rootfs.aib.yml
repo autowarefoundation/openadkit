@@ -157,17 +157,21 @@ content:
       path: /etc/systemd/system-preset/80-x5h.preset
     # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
     #
-    # None of this works unless aib/vars.yml keeps `pregenerate_quadlets:
-    # false`. With aib's default (true, because `aib build` pins
-    # image_mode=bootc and pregenerate_quadlets follows use_ostree), the
-    # image ships /etc/systemd/system-generators/podman-system-generator as a
-    # symlink to /dev/null and every file installed below generates NO unit
-    # at all at runtime -- no error, no journal line, `systemctl
-    # list-unit-files "awf-oak*"` simply empty. That was measured on the
-    # board and cost a whole Stage 1 session. See the long note on
-    # `pregenerate_quadlets` in aib/vars.yml for why the fix lives there and
-    # not in this file (an add_symlinks unmask at that same path aborts the
-    # build; a tmpfiles.d `L` line lands one boot too late).
+    # The bring-up sequence below only works because aib/vars.yml keeps
+    # `pregenerate_quadlets: false`. Under aib's default (true, because
+    # `aib build` pins image_mode=bootc and pregenerate_quadlets follows
+    # use_ostree) the files installed below still become units -- aib runs
+    # Quadlet in the build chroot and writes them into /usr/lib/systemd/system
+    # -- but they are FROZEN there at build time, and the runtime generator
+    # is masked to /dev/null. /etc/containers/systemd then stops being live:
+    # editing a .container on the board and running `systemctl daemon-reload`
+    # changes nothing, silently, and the only route to a changed unit is a
+    # ~23 minute CI build plus a reflash. See the long note on
+    # `pregenerate_quadlets` in aib/vars.yml for the mechanism, for why the
+    # fix lives there and not in this file (an add_symlinks unmask at that
+    # same path aborts the build; a tmpfiles.d `L` line lands one boot too
+    # late), and for why this does NOT also unmask the fstab generator that
+    # selfboot.md works around separately.
     #
     # Eight of the nine `.container` units below carry `[Install] WantedBy=
     # default.target`, which Quadlet auto-enables at unit-generation time on

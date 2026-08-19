@@ -65,12 +65,17 @@ total=$(sort -u "$tmp_layers" | awk 'NF==2 {s+=$2} END {print s+0}')
 #   -> consumed                     12353335296 B, i.e. 3.378x the total
 #
 # The previous factor was 2.5x. It projected 9140903285 B for that same
-# staging run, so it under-called the real cost by 3.2 GB -- 26% low, on a
-# 19 GB LUN. The gate still passed that day, but only because the store
-# started empty; the margin it reported (10.2 GB free afterwards, against
-# 6.6 GB actual) was fiction, and a second stage sized on it would have
-# filled the partition. 3.4x is the measurement rounded up to two
-# significant figures, so the gate stays conservative rather than exact.
+# staging run, so it under-called the real cost by 3212432011 B -- 26% low, on
+# a store of 20400025600 B. The gate still passed that day, but only because
+# the store was nearly empty: it held one unrelated image (464 MB as
+# `podman images` reports it, localhost/x5h-ort:1.1.0) and nothing else,
+# 477 MB used in total. The margin 2.5x implied afterwards -- 10238071435 B
+# still free -- was fiction; the real figure was 7025639424 B, and a second
+# stage sized on the projection would have filled the partition. All byte
+# figures in this block are exact and decimal; the `df -h` view of the same
+# store reads 19G/13G/6.6G in binary units. 3.4x is the measurement rounded
+# up to two significant figures, so the gate stays conservative rather than
+# exact.
 #
 # Written as *17/5 to keep this in integer arithmetic (the shell has no
 # floats) and multiply before dividing so the truncation is at most 1 byte.

@@ -31,11 +31,16 @@ Network=host
 # Network=host above means that namespace IS the host's. Both units
 # therefore carry their own `Network=host` in [Container], which is exactly
 # equivalent -- the bridge still sees tap0 for domain 2 and both still reach
-# domain 1 on loopback. Nothing else was inherited: the pod declares no
-# Volume=, no EnvironmentFile= that reaches members, and the ipc/uts sharing
-# a podman pod adds is unused here (CycloneDDS is configured for UDP, not
-# shared memory -- see cyclonedds-x5h.xml -- and USE_POINTCLOUD_CONTAINER is
-# false).
+# domain 1 on loopback. To be exhaustive about the rest, since the point of
+# this note is what leaving the pod costs: the pod declares no Volume= and no
+# EnvironmentFile= that reaches members; the ipc/uts namespaces a podman pod
+# shares are unused here (CycloneDDS is configured for UDP, not shared memory
+# -- see cyclonedds-x5h.xml -- and USE_POINTCLOUD_CONTAINER is false); and
+# the one remaining thing membership conveys, the pod cgroup as the members'
+# cgroup parent (podman's --share-parent, default true), has no consequence
+# on this profile -- the pod sets no resource limits, and Quadlet emits
+# --cgroups=split for every container unit regardless, so systemd owns each
+# container's cgroup either way.
 #
 # Three things -- not two -- are what let any container in this stack start
 # at all, member of this pod or not. All nine container units carry ALL of:

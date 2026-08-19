@@ -53,9 +53,19 @@
 #
 #   # 2. build the thin layer. --pull=never keeps podman off the network
 #   #    for the BASE; the apt-get inside the build still needs the board
-#   #    to be able to reach the ROS 2 apt repositories.
+#   #    to be able to reach the ROS 2 apt repositories, and --network=host
+#   #    is what lets it. THAT FLAG IS REQUIRED, not a preference: podman's
+#   #    default bridge network (10.88.0.0/16) has no working egress on this
+#   #    board -- the nat table carries no masquerade rule for it, so every
+#   #    connection out of a build container times out, DNS included, and
+#   #    apt reports "Temporary failure resolving 'packages.ros.org'" after
+#   #    minutes of silence. Measured 2026-08-19: the same curl that returns
+#   #    200 in ~0.2 s under --network=host times out entirely under the
+#   #    default network. --network=host is a per-build flag; it changes no
+#   #    board configuration.
 #   ssh root@192.168.0.20 \
-#     'podman build --pull=never -t localhost/openadkit-bridge:latest \
+#     'podman build --pull=never --network=host \
+#        -t localhost/openadkit-bridge:latest \
 #        /var/tmp/openadkit-bridge && rm -rf /var/tmp/openadkit-bridge'
 #
 # Building on an amd64 host and streaming the result across (the shape the
@@ -74,7 +84,23 @@ ARG ROS_DISTRO=humble
 WORKDIR /autoware
 
 USER root
-RUN apt-get update \
+# -o Acquire::Check-Date=false: THE BOARD HAS NO CLOCK, and that is a
+# standing property of it rather than a transient skew. Its RTC reads year
+# 2000 (dead cell -- `hwclock -r` times out on it) and neither
+# systemd-timesyncd nor chronyd is installed, so `timedatectl` reports
+# "System clock synchronized: no" with "NTP service: n/a" and systemd falls
+# back to its build epoch: the board comes up at 2026-07-31 every boot and
+# then sits there while real time moves on. Measured 2026-08-19, 19 days
+# adrift, apt refused EVERY repository -- "Release file ... is not valid yet
+# (invalid for another 18d 13h 46min)" for ports.ubuntu.com and 7d 8h for
+# packages.ros.org -- and the build died with exit status 100.
+#
+# The flag relaxes only the Date / Valid-Until freshness check. The InRelease
+# GPG signature is still verified, so a build here installs the same package
+# bytes a correctly-clocked build would. The alternative remedy is to set the
+# clock by hand before every build, which a dead RTC makes a per-boot chore
+# rather than a fix.
+RUN apt-get -o Acquire::Check-Date=false update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-domain-bridge \
     && rm -rf /var/lib/apt/lists/*

@@ -21,13 +21,35 @@
 # rpmsg-dualboot.md's "Building" section for why it is cross-built
 # separately, and its "Staging" section for the manual install-to-
 # /usr/local/bin pattern already used for rpmsg-ping/rpmsg-smoke.sh.
-# 80-x5h.preset deliberately does not enable this unit -- enabling it
-# without the binary staged would add a second permanently-failed unit to
-# the board's documented steady state. Once the binary is staged:
+# Once the binary is staged:
 #   install -m0755 rpmsg-eth /usr/local/bin/rpmsg-eth
 #   systemctl enable --now rpmsg-eth.service
+#
+# 80-x5h.preset deliberately does not enable this unit, but that does NOT
+# keep it out of a normal boot: awf-oak-bridge.container carries
+# Requires=rpmsg-eth.service and [Install] WantedBy=default.target, so
+# Quadlet auto-enables the bridge and the bridge pulls this unit in at
+# boot regardless of the preset. Omitting the preset line only matters on
+# boots where nothing else wants the link -- e.g. an image without the
+# component stack, or a board where the bridge unit is disabled or masked.
+#
+# ConditionPathExists=/usr/local/bin/rpmsg-eth below is therefore what
+# keeps a missing binary benign, not the preset omission. Without it, an
+# unstaged binary means ExecStart fails immediately and Restart=on-failure
+# + RestartSec=1 + StartLimitIntervalSec=0 (all deliberate, see below)
+# retry forever at roughly 1 Hz -- an endless restart loop filling the
+# journal, not the single quiet failure a reader might expect. A condition
+# that is not met is not a unit failure: systemd logs one line naming the
+# missing path, skips the unit, and reports the start job as successful, so
+# awf-oak-bridge.service's Requires= is satisfied cleanly rather than
+# cascading. It is also the better board diagnostic -- "condition failed,
+# /usr/local/bin/rpmsg-eth missing" says what to do; a 1 Hz loop does not.
 [Unit]
 Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
+# See the header above: the daemon binary is staged by hand, so without
+# this condition an unstaged board restart-loops at ~1 Hz instead of
+# logging one skip line.
+ConditionPathExists=/usr/local/bin/rpmsg-eth
 # StartLimitIntervalSec=0 disables systemd's default start-rate limit (5
 # starts within a 10s window) outright, rather than leaving it in effect
 # or merely resizing it. Without an explicit override here, that default

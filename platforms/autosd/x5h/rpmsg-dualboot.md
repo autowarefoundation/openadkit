@@ -250,10 +250,26 @@ invocation for staging onto the board.)
 (`rpmsg-eth-ifup.sh`) today. Only the daemon binary is not — same manual
 install-to-`/usr/local` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above, and
 the same reason: the board image ships no compiler, so nothing built from
-source lands there except by hand (see "Building" above). `80-x5h.preset`
-deliberately does not enable `rpmsg-eth.service`: enabling it before the
-binary is staged would add a second permanently-failed unit to the
-board's documented steady state. Stage the daemon onto the NFS export (see
+source lands there except by hand (see "Building" above).
+
+`80-x5h.preset` deliberately does not enable `rpmsg-eth.service`, but that
+does not keep the unit out of a normal boot: `components/awf-oak-bridge.container`
+carries `Requires=rpmsg-eth.service` together with `[Install]
+WantedBy=default.target`, so Quadlet auto-enables the bridge and the bridge
+pulls the link up at boot whatever the preset says. The preset omission only
+matters on boots where nothing else wants the link — an image without the
+component stack, or a board where the bridge unit is disabled or masked.
+
+What keeps an unstaged binary benign is `ConditionPathExists=/usr/local/bin/rpmsg-eth`
+in the unit. Without it, `ExecStart` fails at once and `Restart=on-failure`
++ `RestartSec=1` + `StartLimitIntervalSec=0` retry forever at roughly 1 Hz
+— an endless restart loop, not the single permanently-failed unit this
+document used to claim. A condition that is not met is not a failure:
+systemd logs one line naming the missing path, skips the unit, and reports
+the start job as successful, so the bridge's `Requires=` is satisfied
+cleanly.
+
+Stage the daemon onto the NFS export (see
 "Staging the assets" above for why `/var/tmp`, not `/tmp`, is the export
 path to use), then install it on the target:
 

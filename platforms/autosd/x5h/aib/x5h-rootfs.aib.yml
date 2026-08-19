@@ -207,12 +207,25 @@ content:
     # aarch64 cross toolchain from platforms/autosd/x5h/rpmsg-eth/rpmsg-eth.c
     # and is deliberately NOT checked into the repo or copied by this
     # manifest -- it is staged onto the board separately, per the manual
-    # install procedure documented in rpmsg-dualboot.md. Because the binary
-    # is not guaranteed to be present at image-build time, 80-x5h.preset
-    # below does NOT enable rpmsg-eth.service: enabling the unit without
-    # the binary staged would leave a second permanently-failed unit at
-    # boot, on top of the one benign ukiboot-set-success.service failure
-    # the board's documented steady state already allows for.
+    # install procedure documented in rpmsg-dualboot.md.
+    #
+    # 80-x5h.preset below does NOT enable rpmsg-eth.service, but that does
+    # not keep the unit out of a normal boot: awf-oak-bridge.container
+    # carries Requires=rpmsg-eth.service and [Install] WantedBy=
+    # default.target, so Quadlet auto-enables the bridge and the bridge
+    # pulls the link up at boot whatever the preset says. The preset
+    # omission only matters on boots where nothing else wants the link.
+    # What keeps an unstaged binary benign is the unit's own
+    # ConditionPathExists=/usr/local/bin/rpmsg-eth: without it, ExecStart
+    # fails at once and Restart=on-failure + RestartSec=1 +
+    # StartLimitIntervalSec=0 retry forever at roughly 1 Hz -- an endless
+    # restart loop, not the single permanently-failed unit this comment
+    # used to claim. A condition that is not met is not a failure, so
+    # systemd logs one line naming the missing path, skips the unit, and
+    # reports the start job as successful, satisfying the bridge's
+    # Requires= cleanly. This is also why rpmsg-eth.service is NOT one of
+    # the up-to-nine failed units described above: it is skipped, not
+    # failed, and it was never failed before either (it looped).
     - source_path: ../config/rpmsg-eth.service
       path: /etc/systemd/system/rpmsg-eth.service
     - source_path: ../scripts/rpmsg-eth-ifup.sh

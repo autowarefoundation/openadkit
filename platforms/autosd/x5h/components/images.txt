@@ -2,7 +2,9 @@
 # Digests pinned from `skopeo inspect --raw` on 2026-08-18.
 # To reproduce a digest by hand for a given <ref>:
 #   skopeo inspect --raw "docker://<ref>" \
-#     | jq -r '.manifests[] | select(.platform.architecture=="arm64") | .digest'
+#     | jq -r '.manifests[]
+#              | select(.platform.architecture=="arm64" and .platform.os=="linux")
+#              | .digest'
 #
 # The five openadkit-* images come from our fork's registry
 # (ghcr.io/youtalk/openadkit) at per-arch tags built by fork workflow run

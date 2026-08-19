@@ -1,36 +1,86 @@
-# <local-name> <registry-ref>@<arm64-digest>
-# Digests pinned from `skopeo inspect --raw` on 2026-08-18.
-# To reproduce a digest by hand for a given <ref>:
-#   skopeo inspect --raw "docker://<ref>" \
-#     | jq -r '.manifests[]
-#              | select(.platform.architecture=="arm64" and .platform.os=="linux")
-#              | .digest'
+# Container images staged onto the board by scripts/stage-container-images.sh.
 #
-# The five openadkit-* images come from our fork's registry
-# (ghcr.io/youtalk/openadkit) at per-arch tags built by fork workflow run
-# 32105383688 (autoware_ref=1.8.0), not from upstream's bare component
-# tags: upstream's bare tags (ghcr.io/autowarefoundation/openadkit:<name>)
-# are amd64-only because upstream's create-manifests step is skipped
-# whenever any component build fails, and every openadkit fork build from
-# 2026-06-21 to 2026-08-16 failed (autoware_planning_evaluator calls a
-# removed autoware_vehicle_info_utils API), so no bare tag ever picked up
-# an arm64 manifest in that window.
+#   <load-ref>  <pull-ref>@<arm64-digest>
 #
-# Refs below are repo@digest with no tag: skopeo (containers/image) refuses
-# a reference that carries both a tag and a digest ("Docker references
-# with both a tag and digest are currently not supported"), so the
-# per-arch tag each digest was read from is recorded in the comment above
-# each line instead of in the ref itself.
+# <load-ref>  the reference the board will carry after `podman load`, and the
+#             exact string awf-oak-x5h.env names in AUTOWARE_IMAGE /
+#             SCENARIO_SIMULATOR_IMAGE. These two MUST agree: every unit sets
+#             Pull=never, so a mismatch is an immediate "image not known"
+#             start failure rather than a pull.
+# <pull-ref>  what skopeo reads the bytes from, addressed by digest so the
+#             transfer is reproducible.
+#
+# WHY THE LOAD REF IS THE FULL REGISTRY NAME and not localhost/<name>:latest,
+# which is what this file's retired six entries used. Three reasons, in order
+# of weight:
+#
+#   1. The env file and the five unit files already name these images by
+#      their registry references, and the board already carries them under
+#      exactly those names (loaded that way during the image survey, before
+#      this file was repinned). Retagging to localhost/ would mean editing
+#      the env file in lockstep and re-staging 12 GB to rename what is
+#      already there.
+#   2. `podman images` on the board then shows where the bytes came from.
+#      With localhost/<name>:latest, provenance lives only in this file, and
+#      the board cannot be audited on its own.
+#   3. Pull=never is what makes a real registry reference safe: a store miss
+#      fails immediately instead of starting a 5 GB pull from the board.
+#
+# The one image that is NOT here: BRIDGE_IMAGE (localhost/openadkit-bridge:latest).
+# It has no registry reference at all -- it is built on the board from
+# components/bridge/Dockerfile -- so this script cannot stage it, and its
+# localhost/ name is correct for that reason rather than by the convention
+# above.
+#
+# REPRODUCING A DIGEST BY HAND. Use this form, which works for both manifest
+# shapes:
+#
+#   skopeo inspect --override-arch arm64 --override-os linux \
+#     --format '{{.Digest}}' "docker://<ref>"
+#
+# This file used to document a `jq '.manifests[] | select(.platform...)'`
+# recipe against `skopeo inspect --raw`. That form reads a manifest LIST (an
+# OCI index or a Docker manifest list) and picks the arm64 member out of it.
+# Both refs below are single-arch manifests -- `skopeo inspect --raw` returns
+# application/vnd.docker.distribution.manifest.v2+json with no `.manifests`
+# key at all -- so the jq recipe returns nothing for them, silently, which
+# reads as "no arm64 build" rather than as "wrong recipe". The
+# --override-arch form above returns the right digest for a manifest list too
+# (it resolves the list and reports the selected member), so there is one
+# recipe rather than two. To tell which shape a ref has:
+#
+#   skopeo inspect --raw "docker://<ref>" | jq -r '.mediaType'
+#
+# skopeo needs XDG_RUNTIME_DIR set (export XDG_RUNTIME_DIR=/run/user/$(id -u));
+# without it it fails while looking for auth.json and reports something that
+# looks like an authentication or network problem instead.
+#
+# THE DIGEST ON THE BOARD WILL NOT MATCH THE DIGEST BELOW, and the pin has not
+# drifted. `skopeo copy` into an oci-archive: destination rewrites a Docker
+# schema-2 manifest into OCI media types, which changes the config blob and
+# therefore the manifest digest. Measured 2026-08-18: registry
+# sha256:d161659c… loads onto the board as sha256:11f418e1… . Do NOT write a
+# verification step that compares `podman images --digests` against this file
+# -- it reports a false mismatch on a correctly staged board. Content identity
+# was verified instead through the layer diff_ids, which survive the format
+# conversion; all 27 matched for universe-after:
+#
+#   ssh root@<board> "podman image inspect <ref> \
+#     --format '{{range .RootFS.Layers}}{{.}}{{\"\n\"}}{{end}}'"
+#   skopeo inspect --config --override-arch arm64 --override-os linux \
+#     "docker://<ref>" | jq -r '.rootfs.diff_ids[]'
+#
+# Digests below re-verified against the registry on 2026-08-19.
+#
+# The six retired entries (five openadkit-* component images from our fork,
+# plus tier4's scenario-simulator-v2) are gone with the nine-unit set. Their
+# provenance note -- upstream's bare tags being amd64-only because the fork's
+# component builds failed from 2026-06-21 to 2026-08-16 -- is preserved in
+# git history and in the plan's image survey; nothing on this profile pulls
+# them any more.
 
-# localization-mapping-arm64-humble-32105383688-1
-openadkit-localization-mapping ghcr.io/youtalk/openadkit@sha256:10f020af0bbd8a838ae532f575f63c5e2af6c420864f4e7341d2e48893f9ace0
-# planning-control-arm64-humble-32105383688-1
-openadkit-planning-control     ghcr.io/youtalk/openadkit@sha256:b9044abf68e829ad31b5052a0ea9552bcc29d5a956bc3f73c6edff4d8d932080
-# vehicle-system-arm64-humble-32105383688-1
-openadkit-vehicle-system       ghcr.io/youtalk/openadkit@sha256:2e2b50bc171505335fa17639e58cdacbf87e6cf009e04e71bfc9e77e9c49ff1d
-# api-arm64-humble-32105383688-1
-openadkit-api                  ghcr.io/youtalk/openadkit@sha256:52e1024c32f61fe84565ec06ede23d9c5d64f61118e1345524a01c371abad918
-# simulator-arm64-humble-32105383688-1
-openadkit-simulator            ghcr.io/youtalk/openadkit@sha256:e94d37810473cf9e49a9af4d81de157cdddef6cf7edc1db983ca3295f21bb645
-# humble-25.0.20-runtime
-scenario-simulator-v2          ghcr.io/tier4/scenario_simulator_v2@sha256:8c89ce8be04888446bc0a6a8f35f5eec31777e2cb620307b0069da953ef0a627
+# Autoware, the whole stack in one image. Mounted by awf-oak-autoware and,
+# for the two relay nodes, by awf-oak-relay and awf-oak-restamp.
+ghcr.io/mitsudome-r/mrm-demo:universe-after-arm64      ghcr.io/mitsudome-r/mrm-demo@sha256:d161659c110c0a27522468a3e5318bed11bfab75a763f8c01075da6916ea18b2
+# scenario_test_runner, the MRM scenario runner. Used by awf-oak-simulator.
+ghcr.io/mitsudome-r/mrm-demo:scenario-simulator-arm64  ghcr.io/mitsudome-r/mrm-demo@sha256:3295e51b3f216e663ddbfa004431edac0e01a57e4c170edb2753217ec02583f3

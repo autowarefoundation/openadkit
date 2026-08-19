@@ -24,7 +24,17 @@ Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
-Volume=/etc/containers/systemd/mrm_handler.param.yaml:/opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro,Z
+# Mount target is the ISOLATED colcon install layout, not a merged one:
+# every staged image lacks /opt/autoware/share, and each package installs
+# under its own /opt/autoware/<pkg>/share/<pkg>/... instead -- confirmed
+# on the board for the analogous default_adapi.param.yaml and
+# control.launch.xml overrides. autoware_launch (the package this file
+# targets) is not yet in any staged image -- a separate branch adds it --
+# so this path is DERIVED from that layout, not independently measured;
+# confirm it once autoware_launch lands by checking
+# /opt/autoware/autoware_launch/share/autoware_launch/config/system/mrm_handler/
+# in VEHICLE_SYSTEM_IMAGE.
+Volume=/etc/containers/systemd/mrm_handler.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro,Z
 Exec=ros2 launch autoware_launch tier4_system_component.launch.xml \
   launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR} launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER} \
   sensor_model:=${SENSOR_MODEL} system_run_mode:=${SYSTEM_RUN_MODE} \

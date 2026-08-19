@@ -24,7 +24,12 @@ Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
-Volume=/etc/containers/systemd/default_adapi.param.yaml:/opt/autoware/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro,Z
+# Mount target is the ISOLATED colcon install layout, not a merged one:
+# API_IMAGE has no /opt/autoware/share at all -- each package installs
+# under its own /opt/autoware/<pkg>/share/<pkg>/..., confirmed on the
+# board via `podman run --rm --pull=never ${API_IMAGE} ...` against this
+# path.
+Volume=/etc/containers/systemd/default_adapi.param.yaml:/opt/autoware/autoware_default_adapi_universe/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro,Z
 Exec=ros2 launch autoware_launch tier4_autoware_api_component.launch.xml \
   component_wise_launch:=true scenario_simulation:=${SCENARIO_SIMULATION} \
   use_sim_time:=${USE_SIM_TIME} vehicle_model:=${VEHICLE_MODEL}

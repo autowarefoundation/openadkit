@@ -21,6 +21,10 @@ answered before board time.
 > mean that fork's runs. Board bring-up is manual either way — no CI has the
 > hardware.
 
+- [CR52 dual boot + RPMsg](rpmsg-dualboot.md) — run FreeRTOS on the
+  realtime core under AutoSD; remoteproc `start` publishes RPMsg state to
+  a CR52 that is already executing, it does not load or release it.
+
 ## Folder Structure
 
 - `aib/`: automotive-image-builder manifest (distro `autosd10-sig`)

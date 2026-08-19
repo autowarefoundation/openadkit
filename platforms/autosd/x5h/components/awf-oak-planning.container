@@ -23,5 +23,15 @@ Exec=ros2 launch autoware_launch tier4_planning_component.launch.xml \
   vehicle_model:=${VEHICLE_MODEL}
 
 [Service]
+# NOT redundant with the [Container] copy above, and must not be deleted as
+# such: Quadlet renames the source [Container] section to [X-Container] in
+# the generated unit, and systemd ignores [X-Container] entirely. The
+# [Container] copy therefore only becomes `podman run --env-file ...` (the
+# container process's own environment). THIS copy is the one systemd reads,
+# and systemd is what expands ${...} in the generated ExecStart -- without
+# it Image=${..._IMAGE} expands to the empty string and podman exits with
+# "repository name must have at least one component". Both are required;
+# see awf-oak-x5h.pod for the full three-part reasoning.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Restart=on-failure
 RestartSec=5

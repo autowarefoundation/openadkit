@@ -41,11 +41,12 @@ content:
     # reason=control_cmd_not_from_cr52 on a perfectly healthy stack,
     # indistinguishable from a genuinely dead link. That check no longer
     # needs tcpdump (it echoes the topic on domain 2 instead), but the
-    # package is installed anyway: the manual board-verification steps in
-    # rpmsg-dualboot.md and component-stack bring-up reach for a packet
-    # capture on tap0 whenever the link misbehaves, and the board has no
-    # `dnf` and no `rpm-ostree`, so a missing tool cannot be installed
-    # mid-session -- it can only be worked around or misread. Note a board
+    # package is installed anyway, because the board has no `dnf` and no
+    # `rpm-ostree`: a tool that is absent mid-session cannot be installed,
+    # only worked around or misread, and tap0 is a link whose failures
+    # (silent oversize drops at MTU 462, RTPS fragments that never
+    # reassemble) are diagnosed by looking at frames rather than at
+    # counters. Note a board
     # flashed from an image built BEFORE this entry existed will not have
     # tcpdump; check with `command -v tcpdump` before relying on it, rather
     # than concluding from an empty capture that the link is dead.
@@ -87,18 +88,44 @@ content:
     - path: /etc/containers/systemd/launch
       parents: true
       exist_ok: true
-    - path: /usr/local/libexec
-      parents: true
-      exist_ok: true
-    - path: /usr/local/sbin
+    - path: /etc/tmpfiles.d
       parents: true
       exist_ok: true
     - path: /var/log/awf
       parents: true
       exist_ok: true
-    - path: /opt/tier4/kashiwanoha_map
-      parents: true
-      exist_ok: true
+  # NOT in make_dirs, deliberately, and do not "fix" these back:
+  #
+  #   /usr/libexec, /usr/sbin -- the two install targets below. aib rejects
+  #     nothing about them, they simply do not need creating: both already
+  #     exist in the built rootfs (verified on the board, both dated from the
+  #     image build) because the filesystem package owns them. This manifest
+  #     declares no /usr directory for that reason.
+  #
+  #   /usr/local/libexec, /usr/local/sbin -- REJECTED by aib outright:
+  #     "Path '/usr/local/libexec' is not allowed for make_dirs. Files and
+  #     directories must be under one of: /etc/, /var/, /usr/, but not under
+  #     /usr/local/". The exclusion is not arbitrary: this rootfs is
+  #     ostree-structured and ships /usr/local as a symlink to
+  #     ../var/usrlocal (see selfboot.md, "A trap when staging files into
+  #     the image"), so an image-build-time mkdir there would write through
+  #     into a /var that is empty until first boot. The build aborts at the
+  #     first offending make_dirs, so the matching add_files entries were
+  #     never even reached -- they would have failed the same way.
+  #
+  #   /opt/tier4/kashiwanoha_map -- same wall for the same reason: /opt is a
+  #     symlink to var/opt on this rootfs, and /opt is not a permitted root
+  #     either. It is created at boot by /etc/tmpfiles.d/awf-oak-x5h.conf
+  #     instead (installed below). The mount path itself is UNCHANGED -- all
+  #     nine unit Volume= lines and the extractor script still say
+  #     /opt/tier4/kashiwanoha_map; only how the directory comes into being
+  #     moved.
+  #
+  # Note this diverges from platforms/autosd/planning-simulator, which has
+  # make_dirs for /opt/tier4/kashiwanoha_map and /usr/local/libexec plus
+  # add_files into /usr/local/libexec. That profile has the same latent
+  # defect and has evidently never been through an aib build; the divergence
+  # here is deliberate and correct, not drift to be reconciled.
   add_files:
     # add_files only permits /etc and /usr destinations (rehearsal finding).
     - source_path: ../config/50-x5h.conf
@@ -197,10 +224,18 @@ content:
       path: /etc/containers/systemd/launch/control.launch.xml
     - source_path: ../components/mrm_handler.param.yaml
       path: /etc/containers/systemd/mrm_handler.param.yaml
+    # /opt is not a permitted make_dirs root (and is a symlink to var/opt on
+    # this rootfs), so /opt/tier4/kashiwanoha_map -- the map directory all
+    # nine units mount -- is created at boot by systemd-tmpfiles instead.
+    # See config/awf-oak-x5h-tmpfiles.conf for the full reasoning and the
+    # ordering argument. Target name drops the source's "-tmpfiles" infix:
+    # everything in /etc/tmpfiles.d is a tmpfiles config already.
+    - source_path: ../config/awf-oak-x5h-tmpfiles.conf
+      path: /etc/tmpfiles.d/awf-oak-x5h.conf
     - source_path: ../components/awf-oak-x5h-extract-map.service
       path: /etc/systemd/system/awf-oak-x5h-extract-map.service
     - source_path: ../components/awf-oak-x5h-extract-map.sh
-      path: /usr/local/libexec/awf-oak-x5h-extract-map.sh
+      path: /usr/libexec/awf-oak-x5h-extract-map.sh
     # rpmsg-eth: only the unit file and its ifup helper are installed by
     # this manifest. The daemon binary itself (ExecStart=/usr/local/bin/
     # rpmsg-eth) is a statically-linked binary built on a host with an
@@ -229,7 +264,7 @@ content:
     - source_path: ../config/rpmsg-eth.service
       path: /etc/systemd/system/rpmsg-eth.service
     - source_path: ../scripts/rpmsg-eth-ifup.sh
-      path: /usr/local/sbin/rpmsg-eth-ifup.sh
+      path: /usr/sbin/rpmsg-eth-ifup.sh
 
 auth:
   # root password "autosd" — dev/bench image only, never a board deliverable.

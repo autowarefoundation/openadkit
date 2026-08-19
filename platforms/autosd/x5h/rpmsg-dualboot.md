@@ -246,11 +246,24 @@ invocation for staging onto the board.)
 
 ### Staging
 
-`aib/x5h-rootfs.aib.yml` installs `rpmsg-eth.service` and its `ifup` helper
-(`rpmsg-eth-ifup.sh`) today. Only the daemon binary is not — same manual
-install-to-`/usr/local` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above, and
-the same reason: the board image ships no compiler, so nothing built from
-source lands there except by hand (see "Building" above).
+`aib/x5h-rootfs.aib.yml` installs `rpmsg-eth.service` (to
+`/etc/systemd/system/`) and its `ifup` helper to **`/usr/sbin/rpmsg-eth-ifup.sh`**
+today, so the manual procedure below covers the daemon binary and nothing
+else. Only the binary is not baked in — same manual
+install-to-`/usr/local/bin` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above,
+and the same reason: the board image ships no compiler, so nothing built
+from source lands there except by hand (see "Building" above).
+
+The `/usr/sbin` helper vs `/usr/local/bin` binary split is deliberate.
+`automotive-image-builder` installs only under `/etc/`, `/usr/` or `/var/`
+and refuses `/usr/local` outright — the build aborts with "Path
+'/usr/local/…' is not allowed" — because this rootfs is ostree-structured
+and ships `/usr/local` as a symlink to `../var/usrlocal` (see
+[selfboot.md](selfboot.md), "A trap when staging files into the image").
+So anything the **image** ships lives under `/usr`; anything the
+**operator** stages by hand after boot lives under `/usr/local`, which is
+the correct place for it at runtime. `cr52-rproc-up.sh` below is
+hand-staged for the same reason and likewise stays in `/usr/local/sbin`.
 
 `80-x5h.preset` deliberately does not enable `rpmsg-eth.service`, but that
 does not keep the unit out of a normal boot: `components/awf-oak-bridge.container`

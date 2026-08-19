@@ -10,7 +10,12 @@
 #              hinge, so "Autoware does not run on this silicon" and "the
 #              consolidation is misconfigured" cannot look alike.
 #
-# Markers on stdout (grep-able, one per line, exactly one per invocation):
+# Output on stdout, grep-able, one item per line. Exactly one TERMINAL marker
+# (a *_PASS or *_FAIL) is printed per invocation; the informational line below
+# is not a marker and does not count against that:
+#   X5H_AUTOWARE_MEM_KB=<n>   (informational, printed on the PASS path only,
+#                              immediately before the marker -- MemAvailable
+#                              at the moment Autoware was proven up)
 #   X5H_AUTOWARE_PASS
 #   X5H_AUTOWARE_FAIL reason=<...>
 #   X5H_STACK_PASS bridged=6 cr52_packets=<n>

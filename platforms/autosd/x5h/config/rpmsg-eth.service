@@ -16,8 +16,9 @@
 # endpoint to appear via inotify on /dev, so an ordering dependency here
 # would be redundant, not load-bearing.
 #
-# This unit file and its ifup helper (rpmsg-eth-ifup.sh) ARE installed by
-# aib/x5h-rootfs.aib.yml today. The daemon binary is not: see
+# This unit file and its ifup helper (rpmsg-eth-ifup.sh, installed at
+# /usr/sbin/rpmsg-eth-ifup.sh) ARE installed by aib/x5h-rootfs.aib.yml
+# today. The daemon binary is not: see
 # rpmsg-dualboot.md's "Building" section for why it is cross-built
 # separately, and its "Staging" section for the manual install-to-
 # /usr/local/bin pattern already used for rpmsg-ping/rpmsg-smoke.sh.
@@ -73,7 +74,18 @@ StartLimitIntervalSec=0
 # passed as $1 to rpmsg-eth-ifup.sh so the interface name lives in one
 # place (this unit file) instead of also being hardcoded inside the ifup
 # script independently of what ExecStart actually binds to.
-ExecStartPre=/usr/local/sbin/rpmsg-eth-ifup.sh tap0
+#
+# The /usr/sbin vs /usr/local/bin split across these two lines is
+# deliberate, not an inconsistency to tidy up. The IMAGE ships the ifup
+# helper, so it must live somewhere automotive-image-builder will install
+# to: aib permits /etc/, /usr/ and /var/ but explicitly refuses /usr/local
+# (which is a symlink to ../var/usrlocal on this ostree-structured rootfs),
+# and a build that tries it aborts. The OPERATOR stages the daemon binary by
+# hand after boot, and /usr/local/bin is exactly the right place for a
+# hand-staged local binary at runtime -- the restriction is only on what the
+# image bakes. Same reasoning for cr52-rproc-up.sh, which is also
+# hand-staged and also stays under /usr/local/sbin.
+ExecStartPre=/usr/sbin/rpmsg-eth-ifup.sh tap0
 ExecStart=/usr/local/bin/rpmsg-eth -s rpmsg-eth -t tap0
 Restart=on-failure
 RestartSec=1

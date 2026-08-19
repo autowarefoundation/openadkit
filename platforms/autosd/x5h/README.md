@@ -415,7 +415,11 @@ Smoke order on the rebuilt kernel (Board bring-up, step 3): `tmpfs` →
 `ext4loop` (a zero-mutation `EXT4_FS_SECURITY` proof on a `/run`-backed loop
 file — no persistent device is touched) → `btrfs <dev>` (same
 tmpfs-must-pass-first interlock as before, unaffected by `ext4loop`'s
-addition). Before running the smoke sequence, start the outbound-SNAT
+addition). `ext4loop` is expected to **fail** on the image as it currently
+ships, with `SMOKE_ext4loop_MKFS_FAIL`: it needs `mkfs.ext4` and the aib
+manifest installs no `e2fsprogs` (see Board bring-up step 3). The interlock
+only gates `btrfs` on `tmpfs`, so that failure does not block the rest of
+the sequence. Before running the smoke sequence, start the outbound-SNAT
 listener on the host PC: `python3 -m http.server 8099 --bind 192.168.0.1` —
 `board-podman-smoke.sh`'s `SMOKE_EXT_URL` env var overrides the target if
 the site's addressing differs, and `SMOKE_EXT_URL=skip` skips the probe
@@ -570,8 +574,9 @@ Host tools: `qemu-system-aarch64` and `qemu-img` (Debian/Ubuntu: packages
 `qemu-system-arm` and `qemu-utils` — `qemu-img` is what `run-qemu-gate.sh`
 shells out to when `/tmp/x5h-blank.img` doesn't already exist, so it's a
 runtime dependency of this replay, not a build-only one), `expect` (the
-`qemu-gate.exp` interpreter), and `e2fsprogs` for `mkfs.ext4`; plus `gh`
-(authenticated) if you took the download route. The arm64 `build-and-gate`
+`qemu-gate.exp` interpreter), `e2fsprogs` for `mkfs.ext4`, and `python3`
+for the SNAT listener step 3 starts; plus `gh` (authenticated) if you took
+the download route. The arm64 `build-and-gate`
 job's "Install host tools" step installs exactly `podman`, `skopeo`,
 `qemu-system-arm`, `qemu-utils` and `expect` — nothing else, because the
 kernel compile no longer happens there: `flex`, `bison`, `libssl-dev`,
@@ -604,7 +609,7 @@ TESTIMAGES="$(dirname "$(find /tmp/x5h-bundle -name busybox-oci.tar)")"
 ```
 
 Everything to this point runs as your own user. Loop-mounting the ext4 export
-(step 1's `mount`/`tar`/`umount`) and running `qemu-gate.exp` (step 3) need
+(step 1's `mount`/`tar`/`umount`) and running `qemu-gate.exp` (step 4) need
 root, so those commands are prefixed `sudo`. Step 2's
 `inject-test-images.sh` also needs root for its own loop mount, but sudoes
 internally rather than needing its own invocation prefixed — its `sudo
@@ -641,7 +646,18 @@ rmdir "$mnt"
 #    prelude and GATE6's nftables driver respectively.
 ./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR"
 
-# 3. Run the gate. /tmp/x5h-blank.img is deliberately not pre-created here:
+# 3. Start the host listener GATE6_SNAT_OK probes. The guest reaches it as
+#    http://10.0.2.2:8099/, which slirp maps onto the host's
+#    127.0.0.1:8099. The CI workflow runs this listener itself, so it is
+#    easy to miss here — and GATE6_SNAT_OK is a *required* marker, so a
+#    replay without it fails the gate with GATE6_SNAT_FAIL for a reason
+#    that has nothing to do with the kernel under test. Bind to loopback,
+#    not 0.0.0.0: slirp only ever needs 127.0.0.1, and this serves the
+#    current directory to whoever can reach it.
+python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 &
+listener=$!
+
+# 4. Run the gate. /tmp/x5h-blank.img is deliberately not pre-created here:
 #    run-qemu-gate.sh makes it itself (`qemu-img create -f raw ... 8G`) when
 #    the path doesn't exist yet, the same fallback CI relies on rather than
 #    pre-creating it — which is why qemu-img (qemu-utils) is a listed
@@ -661,7 +677,10 @@ sudo ./scripts/qemu-gate.exp ./scripts/run-qemu-gate.sh \
   "$KERNEL" /tmp/x5h-replay.ext4 \
   /tmp/x5h-blank.img /tmp/x5h-local-gate.log
 
-# 4. Read the result the same way CI's "Show gate markers" step does.
+# 5. Stop the listener — it outlives the gate otherwise.
+kill "$listener"
+
+# 6. Read the result the same way CI's "Show gate markers" step does.
 grep -E 'GATE[0-9_]+' /tmp/x5h-local-gate.log
 ```
 
@@ -787,8 +806,13 @@ by step 1 — **not** on `PATH`, so invoke it by absolute path (a `command not f
 documented one: `btrfs` refuses to run unless a `tmpfs` run has already passed on this boot.
 On the BSP kernel there are two phases (`tmpfs`, `btrfs`); on the **rebuilt kernel** a third,
 `ext4loop` (also zero board mutation — a `/run`-backed loop file, not a real device), runs
-between them and is expected to pass there — see "Rebuilt kernel (6.1.102-autosd)" above for
-the full three-phase sequence and the outbound-SNAT listener it needs. The walkthrough below
+between them — see "Rebuilt kernel (6.1.102-autosd)" above for the full three-phase sequence
+and the outbound-SNAT listener it needs. **`ext4loop` cannot pass on the image as shipped**:
+it calls `mkfs.ext4`, and `aib/x5h-rootfs.aib.yml` installs no `e2fsprogs`, so the phase ends
+in `SMOKE_ext4loop_MKFS_FAIL`. That is a packaging gap, not a kernel finding — the rebuilt
+kernel's `EXT4_FS_SECURITY` is already proven by GATE2 — and closing it needs a rootfs rebuild,
+which is deliberately out of scope here. Expect that one red marker in a board session and
+carry on to `btrfs`. The walkthrough below
 covers the `tmpfs`/`btrfs` pair common to both kernels; invoke `ext4loop` the same way, with
 no extra argument, between them.
 
@@ -871,7 +895,8 @@ run ends in one of: `SMOKE_<mode>_PASS`; `SMOKE_<mode>_FAIL` (a podman or networ
 failed); `SMOKE_<mode>_MODPROBE_FAIL`; `SMOKE_<mode>_MOUNT_FAIL`; or, mode-specific,
 `SMOKE_<mode>_DEV_FAIL` (`btrfs` only, bad block device), `SMOKE_<mode>_TMPFS_GATE_FAIL`
 (`btrfs` only, no prior `tmpfs` pass), `SMOKE_<mode>_IMG_FAIL`/`SMOKE_<mode>_MKFS_FAIL`
-(`ext4loop` only, backing-file `truncate`/`mkfs.ext4` failed), or `SMOKE_<mode>_STORE_FS_FAIL`
+(`ext4loop` only, backing-file `truncate`/`mkfs.ext4` failed — `MKFS_FAIL` is *expected* on
+the current image, which ships no `e2fsprogs`; see Board bring-up step 3), or `SMOKE_<mode>_STORE_FS_FAIL`
 (`ext4loop`/`btrfs`, mounted but the wrong filesystem) — except an invalid or missing mode
 argument, which prints a plain `usage: ...` line and exits 2 with **no** `SMOKE_` marker at
 all, since the script hasn't chosen a `$MODE` to prefix one with yet. Grep for the full set;

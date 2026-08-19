@@ -37,11 +37,15 @@ fail() { echo "$2 reason=$1"; exit 1; }
 [ -r "$LIST" ] || fail "no_image_list" "X5H_IMAGE_AUDIT_FAIL"
 
 # Layer digest+size pairs across every image accumulate here so the total
-# below can dedupe by digest: the five openadkit-* images share an
-# identical universe-common layer prefix (and scenario-simulator-v2 shares
-# part of it too), and podman's content-addressed store on the board keeps
-# each layer digest once, so summing every image's bytes independently
-# would multiply-count the shared bulk. Removed on every exit path.
+# below can dedupe by digest: podman's content-addressed store on the board
+# keeps each layer digest once, so summing every image's bytes
+# independently multiply-counts whatever the list's images share. It bought
+# a great deal on the retired six-image list, whose five openadkit-* images
+# shared an identical universe-common layer prefix; it buys almost nothing
+# on the current pair, which share exactly one small layer (measured
+# 2026-08-19: 905 B off a 3918292953 B raw total). Kept regardless -- it is
+# a property of the store, not of today's list, and the next image added
+# here may well be built on one of these two. Removed on every exit path.
 tmp_layers=$(mktemp) || fail "tmpfile" "X5H_IMAGE_AUDIT_FAIL"
 trap 'rm -f "$tmp_layers"' EXIT
 

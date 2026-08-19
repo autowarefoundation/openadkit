@@ -52,12 +52,14 @@ answered before board time.
   NetworkManager drop-in keeping `tsn5` kernel-managed, static resolvers,
   the rpmsg sample-driver blacklist, the `uio_pdrv_genirq` `of_id` binding
   and its udev naming rules (see [uio.md](uio.md)), the `rpmsg-eth.service`
-  host unit, the `tmpfiles.d` fragment that creates the stack's scenario directory, and
-  `80-x5h.preset`, which enables `sshd.service` — deliberately not
-  `rpmsg-eth.service`, which `awf-oak-bridge` pulls in itself (see
-  [rpmsg-dualboot.md](rpmsg-dualboot.md)). The preset's second line still
-  enables the retired `awf-oak-x5h-extract-map.service`; that entry is stale
-  and is removed together with the image manifest's unit list
+  host unit, the `tmpfiles.d` fragment that creates the stack's scenario
+  directory, and `80-x5h.preset`, which enables `sshd.service` and nothing
+  else —
+  deliberately not `rpmsg-eth.service`, which `awf-oak-bridge` pulls in
+  itself (see [rpmsg-dualboot.md](rpmsg-dualboot.md)), and deliberately not
+  the five Quadlet units, which Quadlet enables itself from their
+  `[Install]` sections (all but `awf-oak-simulator`, which has none so that
+  no scenario runs at boot)
 - `kernel/`: rebuilt-kernel config fragments + build script, shared by the
   QEMU gate and the board — one build, two images: both boot an
   `Image-autosd` from the same source SHA, toolchain and fragments, and the

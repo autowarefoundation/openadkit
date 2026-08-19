@@ -1,19 +1,57 @@
 # Name of the domain bridge, used for node naming and logging
 name: safety_island_bridge
 topics:
+  # The CR52 publishes control_cmd stamped with its own FreeRTOS uptime
+  # clock (hundreds of seconds) because it has no wall-clock sync, while
+  # domain 1 runs at ~1.78e9. Delivered under the real name those stamps
+  # read as enormously stale: the topic-state monitors and the
+  # control-validation latency check error, and change_to_autonomous is
+  # rejected with "target mode not available". So the bridge lands it on a
+  # _raw name and nodes/control_restamp.py rewrites stamp, lateral.stamp
+  # and longitudinal.stamp onto domain 1's clock before republishing the
+  # real topic. Hardware-verified: /diagnostics non-OK 10 -> 6, and the
+  # engage response changed to "same as current".
   control/trajectory_follower/control_cmd:
     type: autoware_control_msgs/msg/Control
     from_domain: 2
     to_domain: 1
+    remap: control/trajectory_follower/control_cmd_raw
     # bidirectional: True
   vehicle/status/steering_status:
     type: autoware_vehicle_msgs/msg/SteeringReport
     from_domain: 1
     to_domain: 2
-  planning/scenario_planning/trajectory:
+  # DOWNSAMPLED trajectory, not the real one -- this line is load-bearing
+  # for the safety island's survival. A full Autoware trajectory is ~170
+  # points / 14988 B, so it crosses as a fragmented RTPS sample; the CR52
+  # is a RELIABLE reader on a 3 MB heap, its receive pipeline holds every
+  # fragment for defragmentation and every out-of-order sample for
+  # reorder, and the rmsg/rbuf pool exhausts the heap. Measured: firmware
+  # _exit after 51 control commands, ~8 s. That backlog sits below the
+  # reader cache, so KEEP_LAST 1 and the reorder/defrag maxsamples limits
+  # do not bound it.
+  #
+  # nodes/traj_relay.py publishes an arc-length-uniform 13-point / 1172 B
+  # downsample on ..._ds, and the bridge remaps it back to the real name
+  # so nothing on the CR52 side changes. Measured on hardware with this
+  # configuration: 966 MPC cycles, control_cmd at ~6.6 Hz, board alive
+  # past 4.5 minutes.
+  #
+  # reliability: reliable is explicit rather than auto-matched from the
+  # relay's publisher. BEST_EFFORT here is a KNOWN-FAILED fix, not an
+  # untried option: it was tried on hardware and regressed -- lossy plus
+  # no retransmit meant the board received nothing at all, and its
+  # apparent survival was a no-load false positive. Do not "optimise" this
+  # to best_effort. Throttling the trajectory instead of shrinking it is
+  # the other known-failed fix (~5 Hz bought 62 cycles instead of 51, then
+  # died identically).
+  planning/scenario_planning/trajectory_ds:
     type: autoware_planning_msgs/msg/Trajectory
     from_domain: 1
     to_domain: 2
+    remap: planning/scenario_planning/trajectory
+    qos:
+      reliability: reliable
   system/operation_mode/state:
     type: autoware_adapi_v1_msgs/msg/OperationModeState
     from_domain: 1

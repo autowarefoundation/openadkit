@@ -88,18 +88,53 @@ import math
 EXTENT_CAP_M = 25.0
 
 # Point budget. 13 points serialize to 1172 B (measured, see
-# serialized_size_bytes below), which is 228 B clear of the single-message
-# limit. 15 points would still fit at 1348 B but leaves almost nothing for
-# a longer frame_id, and 13 is what was validated on hardware.
+# serialized_size_bytes below), 172 B clear of the fragmentation threshold
+# and 28 B inside SERIALIZED_BYTE_BUDGET, which is the tighter of the two.
+# 13 is both the hardware-validated count and, with frame_id "map", exactly
+# the most the budget admits -- the budget binds first, so this number
+# cannot silently drift upward.
 TARGET_POINT_COUNT = 13
 
-# The size the serialized sample must stay under so CycloneDDS emits it as
-# ONE RTPS DATA submessage instead of a DATA_FRAG train. Above this the
-# defect this node exists to prevent comes straight back, so it is a hard
-# ceiling and not a hint: publish_downsampled() drops points rather than
-# exceed it. Measured on the staged image, a Trajectory with frame_id "map"
-# is 24 B empty and grows 88 B per point, so this admits at most 15 points.
-SINGLE_MESSAGE_BYTE_LIMIT = 1400
+# The two DDS limits that actually govern this node. Both are recorded here
+# so the budget below is a derivation rather than a magic number, and so a
+# change to either shows up as a diff against a stated value.
+#
+# CYCLONEDDS_FRAGMENT_SIZE_B is the BINDING one. CycloneDDS fragments a
+# sample when its serialized size -- inclusive of the CDR encapsulation
+# header, which is what serialized_size_bytes() returns and what
+# rclpy.serialize_message() produces -- exceeds General/FragmentSize:
+#
+#   sz = ddsi_serdata_size (serdata);
+#   if (sz > gv->config.fragment_size || ...)      /* -> DATA_FRAG path */
+#
+# (cyclonedds releases/0.10.x, src/core/ddsi/src/q_transmit.c:836; Humble
+# ships cyclonedds 0.10.5.) Domain 2 in cyclonedds-x5h.xml pins it to the
+# CycloneDDS default of 1344 B. Exceed it and the sample goes out as a
+# DATA_FRAG train, the CR52's reliable receive path holds every fragment
+# for defragmentation, and the heap death this whole node exists to prevent
+# comes straight back.
+#
+# CYCLONEDDS_MAX_MESSAGE_SIZE_B is General/MaxMessageSize, set to 1400 B on
+# both domains. It is NOT the fragmentation trigger -- it bounds the whole
+# RTPS message, headers and INFO_TS and inline QoS included, so the payload
+# it leaves room for is some 60-100 B less than 1400 B. Calibrating against
+# 1400 B, as this constant originally did, was doubly wrong: it ignored the
+# tighter FragmentSize AND it spent the RTPS overhead as if it were payload.
+CYCLONEDDS_FRAGMENT_SIZE_B = 1344
+CYCLONEDDS_MAX_MESSAGE_SIZE_B = 1400
+
+# The hard ceiling on the serialized sample. Not a hint: downsample_indices()
+# drops points rather than exceed it, and on_trajectory() re-checks and
+# refuses to publish rather than exceed it.
+#
+# 1200 B is the empirically validated budget, not a safety factor picked to
+# look comfortable: it is the budget the hardware-validated original
+# downsampler ran under, and the arc-length version that survived 966 MPC
+# cycles came in at 1172 B beneath it. It clears CYCLONEDDS_FRAGMENT_SIZE_B
+# by 144 B and leaves ample room for RTPS overhead under
+# CYCLONEDDS_MAX_MESSAGE_SIZE_B. With frame_id "map" it admits 13 points
+# (1172 B) and rejects 14 (1260 B).
+SERIALIZED_BYTE_BUDGET = 1200
 
 # CDR wire-format constants for autoware_planning_msgs/msg/Trajectory,
 # used by serialized_size_bytes(). Verified against rclpy's own
@@ -143,15 +178,15 @@ def serialized_size_bytes(frame_id_length, point_count):
     return CDR_ENCAPSULATION_BYTES + offset
 
 
-def max_points_within(frame_id_length, byte_limit):
-    """Largest point count whose serialized Trajectory still fits the limit.
+def max_points_within(frame_id_length, byte_budget):
+    """Largest point count whose serialized Trajectory still fits the budget.
 
     Returns 0 when even a single point does not fit, which is the honest
     answer rather than a clamp to 1: publishing an oversized sample is the
     one thing this node must never do.
     """
     count = 0
-    while serialized_size_bytes(frame_id_length, count + 1) <= byte_limit:
+    while serialized_size_bytes(frame_id_length, count + 1) <= byte_budget:
         count += 1
     return count
 
@@ -221,15 +256,17 @@ def downsample_indices(
     frame_id_length,
     extent_cap_m=EXTENT_CAP_M,
     target_point_count=TARGET_POINT_COUNT,
-    byte_limit=SINGLE_MESSAGE_BYTE_LIMIT,
+    byte_budget=SERIALIZED_BYTE_BUDGET,
 ):
     """Full point-selection decision for one trajectory.
 
     Combines the point budget (whichever of the target count and the byte
-    limit is tighter) with uniform arc-length selection over the capped
+    budget is tighter) with uniform arc-length selection over the capped
     extent.
     """
-    budget = min(target_point_count, max_points_within(frame_id_length, byte_limit))
+    budget = min(
+        target_point_count, max_points_within(frame_id_length, byte_budget)
+    )
     if budget <= 0:
         return []
     return select_indices(cumulative_arc_lengths(positions), extent_cap_m, budget)
@@ -255,8 +292,8 @@ def main(args=None):
     target_point_count = node.declare_parameter(
         "target_point_count", TARGET_POINT_COUNT
     ).value
-    byte_limit = node.declare_parameter(
-        "byte_limit", SINGLE_MESSAGE_BYTE_LIMIT
+    byte_budget = node.declare_parameter(
+        "byte_budget", SERIALIZED_BYTE_BUDGET
     ).value
 
     # Matches the QoS Autoware's planning stack publishes the trajectory
@@ -281,19 +318,19 @@ def main(args=None):
             len(msg.header.frame_id),
             extent_cap_m=extent_cap_m,
             target_point_count=target_point_count,
-            byte_limit=byte_limit,
+            byte_budget=byte_budget,
         )
         downsampled = Trajectory()
         downsampled.header = msg.header
         downsampled.points = [msg.points[i] for i in indices]
         size = serialized_size_bytes(len(msg.header.frame_id), len(indices))
-        if size > byte_limit:
+        if size > byte_budget:
             # Unreachable by construction -- downsample_indices() derives
             # the count from the same arithmetic. Kept as a guard because
             # the consequence of being wrong is a dead safety island, not a
             # dropped message.
             node.get_logger().error(
-                f"refusing to publish {size} B (> {byte_limit} B limit)"
+                f"refusing to publish {size} B (> {byte_budget} B budget)"
             )
             return
         publisher.publish(downsampled)
@@ -306,7 +343,7 @@ def main(args=None):
     node.get_logger().info(
         f"relaying {input_topic} -> {output_topic} "
         f"(extent cap {extent_cap_m} m, up to {target_point_count} points, "
-        f"under {byte_limit} B)"
+        f"under {byte_budget} B)"
     )
     try:
         rclpy.spin(node)

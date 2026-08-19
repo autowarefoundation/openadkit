@@ -60,17 +60,46 @@ def test_serialized_size_matches_measured_wire_format():
 def test_default_point_count_is_1172_bytes_and_fits():
     size = r.serialized_size_bytes(MAP_FRAME_LEN, r.TARGET_POINT_COUNT)
     assert size == 1172
-    assert size < r.SINGLE_MESSAGE_BYTE_LIMIT
+    assert size <= r.SERIALIZED_BYTE_BUDGET
 
 
-def test_byte_limit_admits_15_points_and_rejects_16():
-    assert r.max_points_within(MAP_FRAME_LEN, r.SINGLE_MESSAGE_BYTE_LIMIT) == 15
+def test_budget_admits_13_points_and_rejects_14():
+    """Pin the admit/reject boundary so the resampler cannot drift past it.
+
+    With frame_id "map" the 1200 B budget stops exactly at the
+    hardware-validated 13 points. If a future change to the resampler or to
+    the CDR arithmetic moves this boundary, that is a change to how close
+    the wire sits to CycloneDDS's fragmentation threshold, and it should
+    have to break a test to happen.
+    """
+    assert r.max_points_within(MAP_FRAME_LEN, r.SERIALIZED_BYTE_BUDGET) == 13
+    budget = r.SERIALIZED_BYTE_BUDGET
+    assert r.serialized_size_bytes(MAP_FRAME_LEN, 13) == 1172 <= budget
+    assert r.serialized_size_bytes(MAP_FRAME_LEN, 14) == 1260 > budget
+
+
+def test_budget_clears_both_governing_dds_limits():
+    """The budget is a derivation, so assert it against what it derives from.
+
+    FragmentSize is the binding limit: CycloneDDS compares the serialized
+    size, encapsulation header included, against it with a strict `>` and
+    takes the DATA_FRAG path if it loses (q_transmit.c:836). MaxMessageSize
+    bounds the whole RTPS message, so the payload must clear it by the
+    header/INFO_TS/inline-QoS overhead as well.
+    """
+    assert r.SERIALIZED_BYTE_BUDGET < r.CYCLONEDDS_FRAGMENT_SIZE_B
+    assert r.CYCLONEDDS_FRAGMENT_SIZE_B < r.CYCLONEDDS_MAX_MESSAGE_SIZE_B
+    worst_case = r.serialized_size_bytes(MAP_FRAME_LEN, r.TARGET_POINT_COUNT)
+    assert worst_case <= r.CYCLONEDDS_FRAGMENT_SIZE_B - 144
+    # 100 B is the pessimistic end of the RTPS framing overhead that shares
+    # the MaxMessageSize allowance with the payload.
+    assert worst_case + 100 < r.CYCLONEDDS_MAX_MESSAGE_SIZE_B
 
 
 def test_full_trajectory_would_not_fit_in_one_message():
     full = r.serialized_size_bytes(MAP_FRAME_LEN, 170)
     assert full == 14988
-    assert full > 10 * r.SINGLE_MESSAGE_BYTE_LIMIT
+    assert full > 10 * r.CYCLONEDDS_FRAGMENT_SIZE_B
 
 
 def test_empty_trajectory_selects_nothing():
@@ -99,11 +128,38 @@ def test_trajectory_shorter_than_extent_cap_is_covered_end_to_end():
     assert indices[-1] == len(positions) - 1
 
 
-def test_never_exceeds_the_byte_limit_even_when_the_limit_is_tiny():
+def test_never_exceeds_the_byte_budget_even_when_the_budget_is_tiny():
     positions = realistic_trajectory()
-    for limit in (0, 24, 116, 500, 1172, 1400):
-        indices = r.downsample_indices(positions, MAP_FRAME_LEN, byte_limit=limit)
+    for limit in (0, 24, 116, 500, 1172, 1200, 1400):
+        indices = r.downsample_indices(positions, MAP_FRAME_LEN, byte_budget=limit)
         assert r.serialized_size_bytes(MAP_FRAME_LEN, len(indices)) <= max(limit, 24)
+
+
+def test_output_never_exceeds_1200_bytes_for_any_input():
+    """The regression guard: no trajectory of any shape gets past the budget.
+
+    Exceeding it means DATA_FRAG on the wire and the safety island's heap
+    death, so this is asserted over the degenerate shapes and a sweep of
+    lengths and densities rather than only the realistic case.
+    """
+    shapes = [
+        [],
+        [(0.0, 0.0)],
+        [(0.0, 0.0), (1.0, 0.0)],
+        [(7.0, -3.0)] * 500,
+        [(0.001 * i, 0.0) for i in range(5000)],
+        [(50.0 * i, 0.0) for i in range(200)],
+        realistic_trajectory(),
+    ]
+    shapes += [[(0.05 * i, 0.0) for i in range(n)] for n in (3, 17, 61, 400, 3000)]
+    for positions in shapes:
+        for frame_id_length in (0, 3, 8, 32):
+            indices = r.downsample_indices(positions, frame_id_length)
+            size = r.serialized_size_bytes(frame_id_length, len(indices))
+            assert size <= r.SERIALIZED_BYTE_BUDGET, (
+                len(positions), frame_id_length, size,
+            )
+            assert size <= r.CYCLONEDDS_FRAGMENT_SIZE_B
 
 
 def test_realistic_trajectory_yields_13_points_of_1172_bytes():

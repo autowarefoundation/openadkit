@@ -24,19 +24,33 @@ answered before board time.
 - [CR52 dual boot + RPMsg](rpmsg-dualboot.md) — run FreeRTOS on the
   realtime core under AutoSD; remoteproc `start` publishes RPMsg state to
   a CR52 that is already executing, it does not load or release it.
+- [UFS self-boot](selfboot.md) — boot AutoSD unattended from the board's
+  own storage, with both netboots kept as named rescue commands; also the
+  reset semantics, including why a warm `reboot` restarts the CR52.
+- [CR52 slot update](cr52-slot-update.md) — replace the realtime firmware
+  by writing its boot slot from Linux, instead of the vendor serial-download
+  tool and a trip to the board.
+- [Companion host](companion-host.md) — always-on bench gateway that keeps
+  the board reachable remotely and scopes external developers' access.
+  Executed and verified on hardware, 2026-08-10.
 
 ## Folder Structure
 
 - `aib/`: automotive-image-builder manifest (distro `autosd10-sig`)
-- `config/`: containers.conf drop-ins shipped into the image (base) or staged
-  alongside the rebuilt kernel (`60-nftables.conf`)
+- `config/`: files shipped into the image — containers.conf drop-ins (base)
+  or staged alongside the rebuilt kernel (`60-nftables.conf`), plus the
+  self-boot set: key-only sshd drop-in, `authorized_keys`, the
+  NetworkManager drop-in keeping `tsn5` kernel-managed, static resolvers,
+  the rpmsg sample-driver blacklist and the sshd enable preset
 - `kernel/`: rebuilt-kernel config fragments + build script, shared by the
   QEMU gate and the board — one build, two images: both boot an
   `Image-autosd` from the same source SHA, toolchain and fragments, and the
   only permitted config delta is the `CONFIG_EXTRA_FIRMWARE` pair (see "One
   build, two images")
 - `scripts/`: QEMU gate harness and board staging/smoke scripts
-- `uboot/`: `bootcmd_autosd` template (site values are filled at session time, not committed)
+- `uboot/`: `bootcmd_autosd` template (site values are filled at session
+  time, not committed), and `selfboot-env.txt` — the `env import -t` payload
+  defining the UFS self-boot plus both netboot rescue commands
 
 ## QEMU gate semantics
 

@@ -1,0 +1,6 @@
+# Admin key(s) for root@autosd-x5h. Add your own public key here before
+# building the image; the sshd drop-in is key-only, so an image built with
+# this file as-is has no SSH access at all until a key is appended -- either
+# here (image rebuild) or onto the live UFS rootfs at
+# /etc/ssh/authorized_keys.d/root, which is also how external developers are
+# granted access (see companion-host.md).

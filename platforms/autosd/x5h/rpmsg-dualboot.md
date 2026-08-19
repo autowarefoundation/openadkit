@@ -140,9 +140,14 @@ across.
 RPMsg endpoint exactly once per reset. After the smoke's closing `stop`,
 a further `start` brings the Linux vdev back up but the channel is never
 re-announced, so a second cycle can only ever end in `service_timeout`.
-That is why `-c` defaults to 1; running the smoke again needs a hardware
-reset or power cycle, not a `stop`/`start`. A soft `reboot` of Linux does
-*not* reset the realtime core.
+That is why `-c` defaults to 1: what a second run needs is a reset of the
+realtime core, and a `stop`/`start` is not one (see the first bullet under
+Notes). It does **not** need physical access, though — a plain `reboot`
+from Linux is enough. Linux issues PSCI `SYSTEM_RESET`, the firmware
+implements it as a graceful cold reset, and the CR52 restarts and re-loads
+its flashed payload along with the APU; that was observed on every warm
+reboot from both Yocto and AutoSD. See
+[selfboot.md](selfboot.md#reset-behaviour-and-what-restarts-the-realtime-core).
 
 ## Notes
 

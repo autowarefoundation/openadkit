@@ -1,11 +1,8 @@
 [Unit]
-Description=Open AD Kit X5H bridge component
+Description=Open AD Kit X5H domain bridge (DDS domain 1 <-> domain 2)
 Wants=network-online.target
-Requires=awf-oak-x5h-extract-map.service
-Requires=rpmsg-eth.service
 After=network-online.target
-After=awf-oak-x5h-extract-map.service
-After=awf-oak-map.service
+Requires=rpmsg-eth.service
 After=rpmsg-eth.service
 # rpmsg-eth.service brings up tap0 (domain 2's link to the CR52), and this
 # container pins domain 2 to tap0 with autodetermine="false" and starts
@@ -15,21 +12,17 @@ After=rpmsg-eth.service
 # rpmsg-dualboot.md), so this dependency documents the requirement and
 # makes `systemctl start awf-oak-bridge` pull the link up itself rather
 # than failing obscurely.
+#
+# This is the ONLY Requires= anywhere in the five-unit set, and it points
+# at a host unit rather than at another container. No container unit here
+# requires or wants another one; see awf-oak-autoware.container for why
+# that rule exists and what breaks when it is relaxed.
 
 [Install]
 WantedBy=default.target
 
 [Container]
-# NOT a member of awf-oak-x5h.pod, deliberately -- see the MEMBERSHIP note in
-# awf-oak-x5h.pod. Quadlet's generated pod service Wants= every member, so
-# with this unit in the pod, starting any single Autoware component also
-# started the bridge, and "Autoware alone on domain 1" (the Stage 1
-# isolation gate, enforced by x5h-stack-smoke.sh's bridge_active check)
-# could not be reached by any choice of units.
-#
-# Network=host replaces exactly what pod membership used to supply: the pod
-# itself declares Network=host, so its members were on the host namespace
-# anyway. This is the load-bearing line for domain 2 -- tap0 is a host
+# Network=host is the load-bearing line for domain 2: tap0 is a host
 # interface created by rpmsg-eth.service, and cyclonedds-x5h.xml pins domain
 # 2 to it by name with autodetermine="false". Without host networking the
 # bridge would come up in its own netns, tap0 would not exist there, and
@@ -38,34 +31,41 @@ WantedBy=default.target
 Network=host
 ContainerName=awf-oak-bridge
 Image=${BRIDGE_IMAGE}
-# Pull=never, on all nine units: every *_IMAGE in awf-oak-x5h.env is a
-# localhost/* ref, which podman reads as a registry named "localhost",
-# NOT as "use the local store only". A staged image hides that, because
-# the local store satisfies the reference first; a MISSING one does not,
-# and podman then retries HTTPS to localhost three times and reports a
-# TLS/registry error instead of saying the image is absent. See the
-# *_IMAGE note in awf-oak-x5h.env.
+# Pull=never. BRIDGE_IMAGE is a localhost/* reference, which podman reads
+# as a registry literally named `localhost`, NOT as "use the local store
+# only". While the image is present the local store answers first and the
+# mistake is invisible; when it is ABSENT podman retries https://localhost/v2/
+# three times and reports `dial tcp [::1]:443: connect: connection refused`
+# -- a registry error for what is really a missing image. Observed on the
+# board 2026-08-18 for this exact unit. With this key a missing image fails
+# as a missing image.
 Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# `Z` (private label): this unit is the only one that mounts the topic map.
 Volume=/etc/containers/systemd/bridge-config.yaml:/autoware/bridge-config.yaml:ro,Z
-# No Exec=: the image entrypoint runs domain_bridge directly. The
-# entrypoint treats any command it is given as a REPLACEMENT for the
-# bridge (see components/bridge/entrypoint.sh), so setting Exec= here
-# would silently stop domain_bridge from running instead of running
-# alongside it.
+# No Exec=: the image entrypoint runs domain_bridge directly. Ours is the
+# APPEND-shaped entrypoint of the three in this set -- it runs the bridge
+# and treats any command it is given as a REPLACEMENT (see
+# components/bridge/entrypoint.sh), so setting Exec= here would silently
+# stop domain_bridge from running rather than adding to it.
+#
+# The bridge keeps its own image because domain_bridge is in NEITHER
+# monolithic image -- measured, not assumed: `ros2 pkg prefix domain_bridge`
+# reports "Package not found" in universe-after, and there is no
+# share/domain_bridge in either image. components/bridge/Dockerfile now
+# layers ros-humble-domain-bridge onto universe-after, the image the board
+# already holds, so the bridge costs one thin layer rather than a second
+# multi-gigabyte base on a store with ~6.3 GB free.
 
 [Service]
-# NOT redundant with the [Container] copy above, and must not be deleted as
-# such: Quadlet renames the source [Container] section to [X-Container] in
-# the generated unit, and systemd ignores [X-Container] entirely. The
-# [Container] copy therefore only becomes `podman run --env-file ...` (the
-# container process's own environment). THIS copy is the one systemd reads,
-# and systemd is what expands ${...} in the generated ExecStart -- without
-# it Image=${..._IMAGE} expands to the empty string and podman exits with
-# "repository name must have at least one component". Both are required;
-# see awf-oak-x5h.pod for the full three-part reasoning.
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${BRIDGE_IMAGE} expands to the empty string
+# and podman exits with "repository name must have at least one component".
+# Verify by parsing the generated [Service] section, not by grepping the
+# file for the key.
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Restart=on-failure
 RestartSec=5

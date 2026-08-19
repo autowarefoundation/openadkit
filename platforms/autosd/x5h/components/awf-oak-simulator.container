@@ -1,68 +1,95 @@
 [Unit]
-Description=Open AD Kit X5H simulator component
+Description=Open AD Kit X5H scenario runner (MRM scenario)
 Wants=network-online.target
-Requires=awf-oak-x5h-extract-map.service
 After=network-online.target
-After=awf-oak-x5h-extract-map.service
-After=awf-oak-map.service awf-oak-system.service awf-oak-vehicle.service
+# Ordering only, no Requires= -- see the long note in
+# awf-oak-autoware.container. run.yml's `depends_on: planning:
+# service_started` is deliberately service_STARTED rather than
+# service_healthy, so the edge is "after", not "once ready"; the runner's
+# own INITIALIZE_DURATION is what actually waits for Autoware.
+After=awf-oak-autoware.service
 
-[Install]
-WantedBy=default.target
+# NO [Install] SECTION, deliberately. A scenario must never run unbidden at
+# boot. Quadlet auto-enables any .container that has an [Install] section,
+# regardless of what 80-x5h.preset says, and there is no preset knob that
+# keeps a Quadlet-generated unit present but dormant -- omitting [Install]
+# is the only lever. This unit is started on demand, by x5h-stack-smoke.sh's
+# `drive` mode.
+#
+# The retired awf-oak-x5h.pod defeated this: pod members get a Wants= from
+# the generated pod service, so this unit ran without anyone starting it and
+# was killed with SIGTERM when the pod went down (observed 2026-08-18).
+# Dropping the pod is what makes the omission effective again; do not
+# reintroduce any Requires=/Wants= edge that points at this unit.
 
 [Container]
-Pod=awf-oak-x5h.pod
+# Host networking, matching run.yml's `network_mode: host` and putting
+# scenario_test_runner on the same domain 1 loopback path as Autoware.
+Network=host
 ContainerName=awf-oak-simulator
-Image=${SIMULATOR_IMAGE}
-# Pull=never, on all nine units: every *_IMAGE in awf-oak-x5h.env is a
-# localhost/* ref, which podman reads as a registry named "localhost",
-# NOT as "use the local store only". A staged image hides that, because
-# the local store satisfies the reference first; a MISSING one does not,
-# and podman then retries HTTPS to localhost three times and reports a
-# TLS/registry error instead of saying the image is absent. See the
-# *_IMAGE note in awf-oak-x5h.env.
+# NOTE ON THE NAME: `awf-oak-simulator` previously meant the componentized
+# tier4_simulator_component unit. It now means the scenario runner, matching
+# run.yml's `simulator` service. The old meaning is gone with the old image
+# set; a board still carrying the previous unit file must have
+# /etc/containers/systemd reinstalled, not merged.
+Image=${SCENARIO_SIMULATOR_IMAGE}
+# See the Pull=never note in awf-oak-autoware.container -- with a real
+# ghcr.io reference a store miss would otherwise start a 7.13 GB pull.
 Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
-# raw_vehicle_cmd_converter_param_path and vehicle_info_param_file below
-# both target the ISOLATED colcon install layout
-# (/opt/autoware/<pkg>/share/<pkg>/...), not a merged one -- same
-# reasoning as the Volume= lines above, and matching the form the
-# sibling fix/component-images-autoware-launch branch landed in its
-# docker-compose.yaml. autoware_launch is not yet in any staged image
-# (a separate branch adds it), so raw_vehicle_cmd_converter_param_path
-# is derived, not measured. ${VEHICLE_MODEL}_description IS the right
-# package name for vehicle_info_param_file (autoware_core 1.8.0 ships
-# the prefixed autoware_sample_vehicle_description); VEHICLE_MODEL
-# itself stays sample_vehicle because vehicle.launch.xml separately
-# resolves the unprefixed $(var vehicle_model)_launch, which is why the
-# sibling branch is adding vehicle/sample_vehicle_launch rather than
-# reprefixing VEHICLE_MODEL.
-Exec=ros2 launch autoware_launch tier4_simulator_component.launch.xml \
-  initial_engage_state:=${INITIAL_ENGAGE_STATE} launch_dummy_doors:=${LAUNCH_DUMMY_DOORS} \
-  launch_dummy_perception:=${LAUNCH_DUMMY_PERCEPTION} launch_dummy_vehicle:=${LAUNCH_DUMMY_VEHICLE} \
-  launch_scenario_simulator_v2_adapter:=${LAUNCH_SCENARIO_SIMULATOR_V2_ADAPTER} \
-  localization_sim_mode:=${LOCALIZATION_SIM_MODE} \
-  perception/enable_detection_failure:=${PERCEPTION_ENABLE_DETECTION_FAILURE} \
-  perception/enable_object_recognition:=${PERCEPTION_ENABLE_OBJECT_RECOGNITION} \
-  perception/enable_traffic_light:=${PERCEPTION_ENABLE_TRAFFIC_LIGHT} \
-  perception/use_base_link_z:=${PERCEPTION_USE_BASE_LINK_Z} \
-  raw_vehicle_cmd_converter_param_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml \
-  scenario_simulation:=${SCENARIO_SIMULATION} sensing/visible_range:=${SENSING_VISIBLE_RANGE} \
-  use_sim_time:=${USE_SIM_TIME} use_pointcloud_container:=${USE_POINTCLOUD_CONTAINER} \
-  vehicle_info_param_file:=/opt/autoware/${VEHICLE_MODEL}_description/share/${VEHICLE_MODEL}_description/config/vehicle_info.param.yaml \
-  vehicle_model:=${VEHICLE_MODEL}
+# Shared read-write with awf-oak-autoware; `z` not `Z` for that reason, and
+# read-write on purpose. Full reasoning, and the directory's contents, are
+# in awf-oak-autoware.container.
+Volume=/var/lib/awf/scenario-sim:/autoware/scenario-sim:z
+# SCENARIO= in awf-oak-x5h.env points at this exact in-container path, and
+# the scenario's own RoadNetwork/LogicFile and SceneGraphFile entries
+# hard-code /autoware/scenario-sim/map/{lanelet2_map.osm,pointcloud_map.pcd}
+# as absolute in-container paths. The three agree by construction; changing
+# any one of them means changing all three.
+Volume=/etc/containers/systemd/mrm-scenario.yaml:/autoware/scenario-sim/mrm-scenario.yaml:ro,z
+# The verdict path. OUTPUT_DIRECTORY=/var/log/awf/scenario-output in
+# awf-oak-x5h.env writes the junit result here, where the board smoke script
+# reads it. This diverges from the reference demo, which leaves
+# OUTPUT_DIRECTORY unset and lets the result land in the scenario directory
+# -- our milestone's verdict IS the junit file, so it gets a stable path of
+# its own that does not move if the scenario directory layout changes.
+# `Z` (private label) is correct: this unit is the only one that mounts it.
+Volume=/var/log/awf:/var/log/awf:Z
+# NO Exec=, and this is the single most breakable line in the file --
+# there is nothing here to see, which is the problem.
+#
+# This image's /entrypoint.sh runs `run_scenario_simulator` ONLY when it is
+# given no arguments:
+#
+#     if [ $# -gt 0 ]; then exec "$@"; else run_scenario_simulator; fi
+#
+# So any Exec= REPLACES the scenario run instead of configuring it, and the
+# unit then starts cleanly, exits cleanly, and produces no verdict at all.
+# Everything the runner needs is therefore driven through EnvironmentFile=.
+# The ten variables it reads are ARCHITECTURE_TYPE, SENSOR_MODEL,
+# VEHICLE_MODEL, INITIALIZE_DURATION, GLOBAL_FRAME_RATE, OUTPUT_DIRECTORY,
+# SCENARIO, GLOBAL_TIMEOUT, RECORD and USE_SIM_TIME; `launch_autoware` and
+# `launch_rviz` are hard-coded false inside the entrypoint and are NOT read
+# from the environment, which is why LAUNCH_AUTOWARE / LAUNCH_RVIZ /
+# LAUNCH_VISUALIZATION / USE_CUSTOM_CENTERLINE are gone from the env file.
+#
+# The retired awf-oak-scenario unit did the opposite -- it set Exec= and
+# computed scenario:= itself -- because the retired scenario-simulator-v2
+# image had no such entrypoint. Do not port that shape back.
 
 [Service]
-# NOT redundant with the [Container] copy above, and must not be deleted as
-# such: Quadlet renames the source [Container] section to [X-Container] in
-# the generated unit, and systemd ignores [X-Container] entirely. The
-# [Container] copy therefore only becomes `podman run --env-file ...` (the
-# container process's own environment). THIS copy is the one systemd reads,
-# and systemd is what expands ${...} in the generated ExecStart -- without
-# it Image=${..._IMAGE} expands to the empty string and podman exits with
-# "repository name must have at least one component". Both are required;
-# see awf-oak-x5h.pod for the full three-part reasoning.
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${SCENARIO_SIMULATOR_IMAGE} expands to the
+# empty string and podman exits with "repository name must have at least
+# one component". Verify by parsing the generated [Service] section, not by
+# grepping the file for the key.
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
-Restart=on-failure
-RestartSec=5
+# Type=oneshot with RemainAfterExit, carried over from the retired
+# awf-oak-scenario unit: a scenario run terminates, and the unit staying
+# "active (exited)" afterwards is what lets the smoke script distinguish
+# "ran and finished" from "never started".
+Type=oneshot
+RemainAfterExit=yes

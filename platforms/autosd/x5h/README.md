@@ -52,10 +52,12 @@ answered before board time.
   NetworkManager drop-in keeping `tsn5` kernel-managed, static resolvers,
   the rpmsg sample-driver blacklist, the `uio_pdrv_genirq` `of_id` binding
   and its udev naming rules (see [uio.md](uio.md)), the `rpmsg-eth.service`
-  host unit, and `80-x5h.preset`, which enables `sshd.service` and the
-  component stack's map extractor (`awf-oak-x5h-extract-map.service`) —
-  deliberately not `rpmsg-eth.service`, which `awf-oak-bridge` pulls in
-  itself (see [rpmsg-dualboot.md](rpmsg-dualboot.md))
+  host unit, the `tmpfiles.d` fragment that creates the stack's scenario directory, and
+  `80-x5h.preset`, which enables `sshd.service` — deliberately not
+  `rpmsg-eth.service`, which `awf-oak-bridge` pulls in itself (see
+  [rpmsg-dualboot.md](rpmsg-dualboot.md)). The preset's second line still
+  enables the retired `awf-oak-x5h-extract-map.service`; that entry is stale
+  and is removed together with the image manifest's unit list
 - `kernel/`: rebuilt-kernel config fragments + build script, shared by the
   QEMU gate and the board — one build, two images: both boot an
   `Image-autosd` from the same source SHA, toolchain and fragments, and the
@@ -63,15 +65,25 @@ answered before board time.
   build, two images")
 - `ai/`: host-side inputs for the NPU compiler and the board-side accuracy
   check (see [ai/README.md](ai/README.md))
-- `components/`: the Open AD Kit component stack as Quadlet units (issue
-  #120 M7) — nine `.container` units plus the `awf-oak-x5h` pod, the shared
-  `awf-oak-x5h.env` every unit reads, the `cyclonedds-x5h.xml` that splits
-  DDS domain 1 (Autoware, host network) from domain 2 (the CR52 safety
-  island over `tap0`), the map-extractor one-shot and its script, the launch
-  and param overrides the units mount, `images.txt` (the digest-pinned arm64
-  image set `scripts/stage-container-images.sh` stages onto the board), and
-  `bridge/` — the `domain_bridge` container that joins the two domains,
-  including its own build recipe
+- `components/`: the Autoware stack as Quadlet units (issue #120 M7) — five
+  `.container` units, all `Network=host` and none of them a pod member:
+  `awf-oak-autoware` (the whole Autoware stack in one monolithic image,
+  running `planning_simulator.launch.xml`), `awf-oak-simulator` (the
+  scenario runner), `awf-oak-bridge` (`domain_bridge`), `awf-oak-relay` and
+  `awf-oak-restamp` (the two Python nodes the CR52 link needs). Alongside
+  them: the shared `awf-oak-x5h.env` every unit reads, the
+  `cyclonedds-x5h.xml` that splits DDS domain 1 (Autoware, host network)
+  from domain 2 (the CR52 safety island over `tap0`), the `launch/` control
+  stub and `mrm_handler.param.yaml` override the Autoware unit mounts,
+  `scenario/mrm-scenario.yaml` (the MRM test definition; its 39 MB map is
+  staged to the board separately, not committed), `nodes/` (the relay and
+  restamp sources, bind-mounted rather than baked), `images.txt` (the
+  digest-pinned arm64 image set `scripts/stage-container-images.sh` stages
+  onto the board), and `bridge/` — the `domain_bridge` container that joins
+  the two domains, including its own build recipe. The unit set is a Quadlet
+  translation of the working CES2026 demo of this topology; the
+  compose-service-to-unit mapping is recorded at the top of
+  `awf-oak-x5h.env`
 - `scripts/`: QEMU gate harness and board staging/smoke scripts
 - `rpmsg-eth/`: the IP-over-RPMsg TAP bridge daemon (source, Makefile, and
   its own pty-mock unit test) — see [rpmsg-dualboot.md](rpmsg-dualboot.md)

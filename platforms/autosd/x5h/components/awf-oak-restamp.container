@@ -1,0 +1,52 @@
+[Unit]
+Description=Open AD Kit X5H control_cmd restamp node
+Wants=network-online.target
+After=network-online.target
+# Ordering only, no Requires=/Wants= -- see awf-oak-autoware.container. This
+# node subscribes to /control/trajectory_follower/control_cmd_raw, the name
+# the bridge lands the CR52's command on, and republishes
+# /control/trajectory_follower/control_cmd with domain 1's clock in all
+# three stamps. Without the bridge it simply sees nothing; it does not fail.
+After=awf-oak-bridge.service
+
+[Install]
+WantedBy=default.target
+
+[Container]
+Network=host
+ContainerName=awf-oak-restamp
+# Same image as the relay and Autoware, for the same reason: rclpy and the
+# autoware_control_msgs types this node needs are already in it.
+Image=${AUTOWARE_IMAGE}
+# See the Pull=never note in awf-oak-autoware.container.
+Pull=never
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# `Z` (private label): this unit is the only one that mounts this file.
+Volume=/etc/containers/systemd/control_restamp.py:/autoware/nodes/control_restamp.py:ro,Z
+# No `bash -lc` wrapper: /ros_entrypoint.sh sources both the ROS and the
+# Autoware overlays before `exec "$@"`, and both are needed for
+# autoware_control_msgs. See awf-oak-relay.container for the verification
+# command.
+#
+# use_sim_time is NOT passed and MUST NOT BE. This node's whole purpose is
+# to replace the CR52's FreeRTOS uptime stamps (hundreds of seconds) with
+# domain 1's clock, using node.get_clock().now(). With use_sim_time true and
+# no /clock publisher -- which is this stack's configuration, since nothing
+# here publishes /clock -- that call returns zero and every republished
+# command is stamped at the epoch: the same staleness this node exists to
+# remove, arriving from the other direction, and undetectable because the
+# node keeps running and keeps publishing.
+Exec=python3 /autoware/nodes/control_restamp.py
+
+[Service]
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${AUTOWARE_IMAGE} expands to the empty string
+# and podman exits with "repository name must have at least one component".
+# Verify by parsing the generated [Service] section, not by grepping the
+# file for the key.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Restart=on-failure
+RestartSec=5

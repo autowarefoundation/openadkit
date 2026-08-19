@@ -1,0 +1,194 @@
+[Unit]
+Description=Open AD Kit X5H Autoware stack (planning simulator)
+Wants=network-online.target
+After=network-online.target
+# After=, and deliberately NOT Requires= or Wants=, on the bridge.
+#
+# run.yml expresses this edge as `depends_on: bridge: condition:
+# service_healthy`, so the ordering is real: domain 1 should already be
+# joined to domain 2 when Autoware's publishers appear, otherwise the
+# bridge's own subscriptions are created against topics that exist but
+# have no history and the first trajectory samples are lost. After= buys
+# that whenever both units are being started together.
+#
+# What it must NOT buy is a start dependency. x5h-stack-smoke.sh's Stage 1
+# gate is "Autoware alone on domain 1" and asserts `bridge_active` is
+# false; a Requires= (or Wants=) here would start the bridge as a side
+# effect of starting Autoware and make that gate unreachable by any choice
+# of units an operator can make. That is exactly the failure the retired
+# awf-oak-x5h.pod caused -- Quadlet gives a generated pod service a Wants=
+# on every member, so starting one member started all nine -- and the
+# whole point of dropping the pod is that no unit in this set pulls in
+# another. Keep every inter-unit edge an ordering edge only.
+After=awf-oak-bridge.service
+
+[Install]
+WantedBy=default.target
+
+[Container]
+# Host networking, not a pod. Every service in the reference compose file
+# (/home/test/youtalk/CES2026/MRM_repo/run.yml) is `network_mode: host` and
+# none of them share ipc, so the pod this profile used to declare conveyed
+# nothing but the host namespace its members were already on -- while
+# coupling their lifecycles (see the After= note above). Network=host per
+# unit is the exact equivalent minus the coupling: domain 1 discovery stays
+# on loopback, and a container that needs tap0 (the bridge) can see it
+# because tap0 is a host interface created by rpmsg-eth.service.
+Network=host
+ContainerName=awf-oak-autoware
+Image=${AUTOWARE_IMAGE}
+# Pull=never, on every unit in this set. It matters MORE now than it did
+# with the retired localhost/* component images, not less: AUTOWARE_IMAGE
+# and SCENARIO_SIMULATOR_IMAGE are real ghcr.io references, so a store miss
+# would send podman to a real registry and start a multi-gigabyte pull over
+# the board's tailnet -- the exact transfer scripts/stage-container-images.sh
+# exists to keep off that path. With Pull=never a missing image fails
+# immediately, as a missing image. (The same key also rescues the
+# localhost/* form still used by BRIDGE_IMAGE, where podman reads
+# `localhost` as a registry name and reports a TLS/connection error for
+# what is really an unstaged image -- observed on the board 2026-08-18.)
+Pull=never
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# The scenario working directory, mounted READ-WRITE and shared with
+# awf-oak-simulator. It is the translation of run.yml's
+# `${ROOT}/fault_injection_v2:/autoware/scenario-sim` bind mount, which is
+# read-write in the reference for a reason: scenario_test_runner's default
+# OUTPUT_DIRECTORY is /autoware/scenario-sim/output, and that is how the
+# CES demo's junit result reached the host. This profile redirects the
+# verdict to /var/log/awf/scenario-output instead (see OUTPUT_DIRECTORY in
+# awf-oak-x5h.env and the /var/log/awf mount on awf-oak-simulator), so the
+# verdict does not depend on this mount being writable -- but do NOT add
+# :ro. Nothing has established that the runner only reads from its scenario
+# directory, and a read-only mount here turns "the default output path"
+# into a filesystem error rather than a missing file.
+#
+# Contents, and who puts them there:
+#   mrm-scenario.yaml  overlaid by the :ro,z file mount below
+#   map/               lanelet2_map.osm + pointcloud_map.pcd, staged onto
+#                      the board separately (39 MB; deliberately not
+#                      committed). The scenario hard-codes
+#                      /autoware/scenario-sim/map/lanelet2_map.osm and
+#                      .../pointcloud_map.pcd as absolute in-container
+#                      paths, and map_path:= below points at the same
+#                      directory, so this layout is fixed by the scenario
+#                      file, not chosen here.
+#   output/            created by the runner if OUTPUT_DIRECTORY is ever
+#                      left at its default
+# /var/lib/awf/scenario-sim and its map/ subdirectory are created at boot by
+# /etc/tmpfiles.d/awf-oak-x5h.conf; /var/lib is not writable at image build
+# time on this ostree-structured rootfs.
+#
+# `z` (shared), not `Z`: awf-oak-simulator mounts the same source. `:Z`
+# writes a PRIVATE SELinux category label, so two containers given `:Z` on
+# one source relabel it in turn until the earlier one can no longer read it.
+Volume=/var/lib/awf/scenario-sim:/autoware/scenario-sim:z
+# The scenario definition, overlaid on top of the directory mount above.
+# Podman sorts bind mounts by destination depth, so the parent directory is
+# mounted before this file lands inside it.
+#
+# It is a separate mount because the two halves come from different places:
+# the scenario is a committed, reviewable artifact installed into the image
+# (automotive-image-builder's add_files only permits /etc and /usr
+# destinations), while the map beside it is 39 MB of binary staged onto the
+# board at runtime.
+#
+# PROVENANCE: byte-identical copy of
+# /home/test/youtalk/CES2026/fault_injection_v2/mrm-scenario.yaml, the
+# scenario the working CES2026 demo of this exact topology runs.
+# md5 7fc3e1b356bc62f3706cb5877d87bae2, 10572 bytes. Kept byte-identical on
+# purpose -- the md5 is the provenance, so do not add a header comment to
+# the file to record where it came from.
+Volume=/etc/containers/systemd/mrm-scenario.yaml:/autoware/scenario-sim/mrm-scenario.yaml:ro,z
+# The control stub: the mount that makes the CR52 the only source of
+# /control/trajectory_follower/control_cmd. It remaps all 11 of the stock
+# trajectory_follower_node's inputs and outputs to `*_no_publish` names, so
+# Autoware's own controller is loaded and running but wired to nothing.
+#
+# Target path is the MERGED colcon install layout. Both monolithic images
+# install every package under one /opt/autoware/share (408 packages in
+# universe-after), unlike the retired componentized images, which used an
+# isolated /opt/autoware/<pkg>/share/<pkg>/ layout. Verified on the board:
+#   podman run --rm --pull=never --entrypoint bash ${AUTOWARE_IMAGE} -c \
+#     'ls -l /opt/autoware/share/tier4_control_launch/launch/control.launch.xml'
+#   -> 18038 bytes, md5 98706158877256b875b92bff8fa15b88
+#
+# PROVENANCE: byte-identical copy of /home/test/youtalk/CES2026/control.launch.xml
+# -- the top-level file, which is what run.yml mounts, NOT the older
+# demo/launch/ copy of the same name. md5 28c30a105b1dd23be5b2819722bafef4,
+# 18159 bytes, 11 `_no_publish` remappings, trajectory_follower_node stub
+# group intact. `diff -u` against the image's own stock file (extracted with
+# the command above) is ONE hunk containing exactly those 11 suffixes and
+# nothing else -- re-verified here, not taken on trust.
+#
+# This replaced an older copy (md5 9c9cdf0f4f2f1a2feff1edd17673f67a) taken
+# from an Autoware vintage predating this image. That copy carried the same
+# 11 suffixes but also, as side effects of its vintage, dropped
+# vehicle_cmd_gate's `input/emergency/turn_indicators_cmd` remap (which
+# autoware_mrm_handler publishes to, so it is live on an MRM demo), dropped
+# two live control_validator inputs, slowed the stub's ctrl_period from 0.03
+# to 0.15, and named the pre-rename `predicted_path_checker` package.
+# Mounting it over this image would have reverted three unrelated upstream
+# changes to install one stub. Do not restore it.
+Volume=/etc/containers/systemd/launch/control.launch.xml:/opt/autoware/share/tier4_control_launch/launch/control.launch.xml:ro,Z
+# MRM tuning carried forward from the retired awf-oak-system unit, at the
+# merged path. Verified present in the image at
+# /opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml,
+# and verified schema-compatible with this image's stock file: our copy
+# differs only in timeout_operation_mode_availability (0.5 -> 2.5, which the
+# bridged domain-2 round trip needs) and turning_hazard_on.emergency
+# (false -> true). Unlike the api component's default_adapi.param.yaml
+# override -- deleted with that unit because it declared parameters this
+# image's nodes do not have -- this one does not set anything undeclared.
+Volume=/etc/containers/systemd/mrm_handler.param.yaml:/opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro,Z
+# Exec= is safe on THIS image and unsafe on the other two in this set; the
+# three entrypoints have three different contracts and they must not be
+# generalised from one another:
+#   universe-after   /ros_entrypoint.sh sources /opt/ros/humble/setup.bash
+#                    and /opt/autoware/setup.bash, then `exec "$@"`. It
+#                    forwards arguments, runs no sysctl and no `ip link`,
+#                    and its gosu drop is inert because none of LOCAL_UID,
+#                    LOCAL_USER, LOCAL_GID, LOCAL_GROUP is set. So Exec=
+#                    works directly and run.yml's `bash -lc 'source ... &&
+#                    ros2 launch ...'` wrapper is belt-and-braces here.
+#   scenario-simulator  REPLACES the runner on any argument -- see
+#                    awf-oak-simulator.container, which has no Exec= at all.
+#   openadkit-bridge our own entrypoint APPENDS: it runs domain_bridge and
+#                    an Exec= would substitute for it.
+#
+# use_sim_time:=false is load-bearing and must not be "tidied" to follow
+# scenario_simulation. planning_simulator.launch.xml declares
+# `<arg name="use_sim_time" default="$(var scenario_simulation)"/>`, so with
+# scenario_simulation:=true the default is TRUE and this argument is the
+# only thing holding it false. Wall clock is the only configuration ever
+# observed to engage and drive on this topology; and with sim time on,
+# nodes/control_restamp.py -- whose entire job is replacing the CR52's
+# FreeRTOS uptime stamps with domain 1's clock -- would read a /clock that
+# never arrives, stamp everything zero, and reproduce the staleness it
+# exists to fix from the other side.
+#
+# rviz:=false is a literal, not a variable: the board is headless and the
+# verdict is a junit file, so there is no configuration in which this is
+# true and no reason to make it settable.
+Exec=ros2 launch autoware_launch planning_simulator.launch.xml \
+  map_path:=/autoware/scenario-sim/map \
+  vehicle_model:=${VEHICLE_MODEL} sensor_model:=${SENSOR_MODEL} \
+  scenario_simulation:=${SCENARIO_SIMULATION} rviz:=false \
+  use_sim_time:=${USE_SIM_TIME}
+
+[Service]
+# NOT redundant with the [Container] copy above, and must not be deleted as
+# such: Quadlet renames the source [Container] section to [X-Container] in
+# the generated unit, and systemd ignores [X-Container] entirely. The
+# [Container] copy therefore only becomes `podman run --env-file ...` (the
+# container process's own environment). THIS copy is the one systemd reads,
+# and systemd is what expands ${...} in the generated ExecStart -- without
+# it Image=${AUTOWARE_IMAGE} expands to the empty string and podman exits
+# with "repository name must have at least one component", which the board
+# smoke reports as a plain unit_inactive with no hint that an env file is
+# missing. Verify this invariant by PARSING the generated [Service]
+# section, never by grepping the file for the key: a section-blind grep
+# sees the [Container] copy and wrongly declares the unit fine.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Restart=on-failure
+RestartSec=5

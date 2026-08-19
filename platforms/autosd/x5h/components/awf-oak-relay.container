@@ -1,0 +1,61 @@
+[Unit]
+Description=Open AD Kit X5H trajectory downsample relay
+Wants=network-online.target
+After=network-online.target
+# Ordering only, no Requires=/Wants= -- see awf-oak-autoware.container. This
+# node is a pure domain 1 participant: it subscribes to
+# /planning/scenario_planning/trajectory and republishes
+# /planning/scenario_planning/trajectory_ds on the same domain. It neither
+# needs the bridge to start nor breaks without it; the bridge is what
+# carries _ds into domain 2, remapped back to the real name.
+After=awf-oak-bridge.service awf-oak-autoware.service
+
+[Install]
+WantedBy=default.target
+
+[Container]
+# Host networking: domain 1 discovery is on the loopback path, which is
+# where Autoware's publishers are.
+Network=host
+ContainerName=awf-oak-relay
+# Runs in the Autoware image rather than an image of its own. Measured on
+# the board: universe-after already provides python3, rclpy and
+# autoware_planning_msgs / autoware_control_msgs, so a dedicated image would
+# be a second multi-gigabyte base to add nothing.
+Image=${AUTOWARE_IMAGE}
+# See the Pull=never note in awf-oak-autoware.container.
+Pull=never
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# `Z` (private label): this unit is the only one that mounts this file. The
+# node is bind-mounted rather than baked, matching how every other
+# behavioural override on this profile is delivered (the control stub, the
+# bridge topic map, the DDS config) -- one place to edit, no rebuild.
+Volume=/etc/containers/systemd/traj_relay.py:/autoware/nodes/traj_relay.py:ro,Z
+# Exec= with no `bash -lc` wrapper and no explicit `source`: this image's
+# /ros_entrypoint.sh sources /opt/ros/humble/setup.bash AND
+# /opt/autoware/setup.bash before `exec "$@"`, and BOTH are required --
+# the autoware_*_msgs packages this node imports are invisible from the ROS
+# overlay alone. Verified end to end on the board:
+#   podman run --rm --pull=never ${AUTOWARE_IMAGE} \
+#     python3 -c 'import rclpy, autoware_planning_msgs.msg'
+# succeeds through the entrypoint with no wrapper.
+#
+# No use_sim_time argument is passed, so the node's implicit use_sim_time
+# parameter stays false and node.get_clock().now() is the wall clock. That
+# is deliberate and matches USE_SIM_TIME=false in awf-oak-x5h.env; see the
+# use_sim_time note in awf-oak-autoware.container for why sim time is not
+# an option anywhere in this stack.
+Exec=python3 /autoware/nodes/traj_relay.py
+
+[Service]
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${AUTOWARE_IMAGE} expands to the empty string
+# and podman exits with "repository name must have at least one component".
+# Verify by parsing the generated [Service] section, not by grepping the
+# file for the key.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Restart=on-failure
+RestartSec=5

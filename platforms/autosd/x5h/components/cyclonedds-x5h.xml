@@ -6,11 +6,14 @@
        internal receive-buffer pool, a different setting from
        General/SocketReceiveBufferSize below, which is a request to the
        kernel for a larger SO_RCVBUF on the underlying socket. The values
-       here (16384B / 2048B) are inherited from $ASI/demo/cyclonedds.xml:
-       16384 is an exact multiple of 2048, and the chunk size exceeds both
-       tap0's 462-byte fragment size and the 1400B MaxMessageSize. Whether
-       this pool is thin for six bridged topics is an open question worth
-       flagging here, not retuning in this file.
+       here (16384B / 2048B) are carried over unchanged from the CR52-side
+       DDS configuration this file was written to interoperate with, so that
+       both ends of the domain-2 link size their receive pools the same way.
+       They are internally coherent: 16384 is an exact multiple of 2048, and
+       the chunk size exceeds both tap0's 462-byte fragment size and the
+       1400B MaxMessageSize. Whether this pool is thin for six bridged
+       topics is an open question worth flagging here, not retuning in this
+       file.
 
        This file deliberately does NOT set General/SocketReceiveBufferSize.
        The stock component images ship a cyclonedds.xml that requests
@@ -42,8 +45,7 @@
   <!-- Domain 2: the CR52 actuation module, reached over the rpmsg-eth link.
        tap0 is a point-to-point link with no multicast, so SPDP has nowhere
        to multicast and the peer is configured statically. The CR52 side has
-       carried static peers since M6; the S32Z2 target needed the same
-       treatment on IGMP-snooped benches.
+       carried static peers since M6, so both ends of the link agree.
 
        MaxMessageSize stays at 1400B: RTPS fragmentation down to tap0's
        462-byte MTU happens below this setting, and lowering it here would

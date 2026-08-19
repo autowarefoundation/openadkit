@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# Adapted from autoware-safety-island's demo/bridge/entrypoint.sh, with the
-# command-override check moved ahead of the bridge invocation: ros2 run
-# domain_bridge blocks in the foreground for the life of the bridge, so a
-# check placed after it (as in the original) would never run in practice.
-# A command passed by the unit (e.g. `bash -lc 'ros2 topic list'` for
-# debugging) therefore replaces the bridge entirely instead of running
-# after it dies.
+# Entrypoint for the domain_bridge container built by the Dockerfile beside
+# this file: source the ROS 2 and Autoware overlays, then run the bridge over
+# /autoware/bridge-config.yaml -- the conventional shape for a domain_bridge
+# container, and reconstructible from the domain_bridge package's own
+# documentation plus the topic map in bridge-config.yaml beside this file.
+#
+# One deliberate departure from that conventional shape: the
+# command-override check sits AHEAD of the bridge invocation, not after it.
+# `ros2 run domain_bridge` blocks in the foreground for the life of the
+# bridge, so a check placed after it could only ever run once the bridge had
+# already died. Putting it first means a command passed by the unit (e.g.
+# `bash -lc 'ros2 topic list'` for debugging) replaces the bridge, which is
+# what an override is for.
 set -euo pipefail
 
 # ROS 2's own setup.bash references unset variables (e.g.

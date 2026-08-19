@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # domain_bridge for the X5H single-ECU topology: joins DDS domain 1 (the
-# Open AD Kit component containers on the application cluster) to domain 2
-# (the CR52 actuation module over the rpmsg-eth link).
+# Autoware stack on the application cluster) to domain 2 (the CR52
+# actuation module over the rpmsg-eth link).
 #
 # Provenance: the conventional domain_bridge container recipe -- install
 # ros-${ROS_DISTRO}-domain-bridge on a ROS 2 Humble base, then run
@@ -11,48 +11,63 @@
 # are readable on their own terms and neither depends on an external tree,
 # so this image can be rebuilt from what is committed here.
 #
-# Based on an Open AD Kit component image rather than
+# Based on the Autoware image this profile already runs
+# (AUTOWARE_IMAGE in ../awf-oak-x5h.env), not on
 # ghcr.io/autowarefoundation/autoware:universe, which is the base the plain
-# domain_bridge recipe would reach for. The board stages planning-control
-# anyway, so building on it costs one thin layer instead of a second
-# multi-gigabyte base on the board's ~19 GB container-store partition
-# (/dev/sdc3, inside a 32 GB UFS LUN -- see scripts/stage-container-images.sh,
-# which gates on the measured free space of that partition).
+# domain_bridge recipe would reach for. Two reasons, both measured:
 #
-# The default below is the amd64 build (tag
-# planning-control-amd64-humble-32105383688-1) for host rehearsal: upstream's
-# bare tag (ghcr.io/autowarefoundation/openadkit:planning-control) publishes
-# no arm64 manifest at all and its amd64 build dates from 2026-02-25, so we
-# pin our fork's per-arch build by digest instead.
-# A ref cannot carry both a tag and a digest (containers-image rejects it),
-# so the tag the digest below was read from is recorded here instead of in
-# the ref itself.
+#   1. domain_bridge is in NEITHER image this milestone stages. `ros2 pkg
+#      prefix domain_bridge` reports "Package not found" in universe-after,
+#      and there is no share/domain_bridge in universe-after or in
+#      scenario-simulator. So a bridge image is genuinely required; it is
+#      not a leftover from the retired component stack.
+#   2. The board's container store (/dev/sdc3, ~19 GB, inside a 32 GB UFS
+#      LUN) has about 6.3 GB free with the two monolithic images loaded --
+#      LESS headroom than the six componentized images left, not more.
+#      There is no room for a second multi-gigabyte base. Layering on the
+#      resident universe-after costs only the ros-humble-domain-bridge
+#      layer.
 #
-# The arm64 board build overrides BASE_IMAGE with the digest recorded for
-# openadkit-planning-control in ../images.txt. Nothing else in this repo
-# produces localhost/openadkit-bridge:latest -- images.txt cannot stage it,
-# because it has no registry ref -- so the whole recipe is here:
+# This replaced a base of ghcr.io/youtalk/openadkit@sha256:b9044abf... (the
+# openadkit-planning-control component image), which has been deleted from
+# the board along with the rest of the componentized set. The old rationale
+# -- "the board stages planning-control anyway" -- no longer holds; the
+# reasoning is the same shape, applied to the image the board now holds.
 #
-#   # 1. build for the board's architecture. On an amd64 host this needs
-#   #    qemu-user-static + binfmt registered, and the apt-get layer above
-#   #    then runs under emulation (slow, but it is one thin layer).
-#   podman build --platform linux/arm64 \
-#     --build-arg BASE_IMAGE=ghcr.io/youtalk/openadkit@sha256:b9044abf68e829ad31b5052a0ea9552bcc29d5a956bc3f73c6edff4d8d932080 \
-#     -t localhost/openadkit-bridge:latest \
-#     platforms/autosd/x5h/components/bridge
+# BASE_IMAGE IS A TAG, NOT A DIGEST, and that is deliberate. The registry
+# digest for this image is
+# sha256:d161659c110c0a27522468a3e5318bed11bfab75a763f8c01075da6916ea18b2,
+# but the copy on the board does NOT carry it: it was loaded from an OCI
+# archive, and `skopeo copy` to oci-archive rewrites the Docker schema-2
+# manifest to OCI media types, which changes both the config blob and the
+# manifest digest. A digest reference would therefore miss in the local
+# store and send podman to ghcr.io for a 5.02 GB pull. Content identity of
+# the loaded image was verified a different way, by matching all 27
+# rootfs.diff_ids against the registry.
 #
-#   # 2. transfer it onto the board, streamed rather than staged to disk --
-#   #    the same shape stage-container-images.sh uses for the six
-#   #    registry-sourced images, and for the same reason: the board's
-#   #    /var/tmp is not sized for a second full copy.
-#   podman save localhost/openadkit-bridge:latest \
-#     | ssh -o BatchMode=yes root@192.168.0.20 "podman load"
+# Build ON THE BOARD, where the base already is:
 #
-# The BASE_IMAGE digest in step 1 is openadkit-planning-control's arm64
-# digest from ../images.txt; re-read it from that file rather than copying
-# it from here, so the bridge and the component it builds on can never
-# drift apart. BRIDGE_IMAGE in ../awf-oak-x5h.env is the tag step 1 sets.
-ARG BASE_IMAGE=ghcr.io/youtalk/openadkit@sha256:f8fb6ad96df6a90232b25f5f3c65961272ab03bc066ecdfed44b0348a029c6c2
+#   # 1. copy this directory across (it is three small files)
+#   scp -r platforms/autosd/x5h/components/bridge \
+#     root@192.168.0.20:/var/tmp/openadkit-bridge
+#
+#   # 2. build the thin layer. --pull=never keeps podman off the network
+#   #    for the BASE; the apt-get inside the build still needs the board
+#   #    to be able to reach the ROS 2 apt repositories.
+#   ssh root@192.168.0.20 \
+#     'podman build --pull=never -t localhost/openadkit-bridge:latest \
+#        /var/tmp/openadkit-bridge && rm -rf /var/tmp/openadkit-bridge'
+#
+# Building on an amd64 host and streaming the result across (the shape the
+# previous recipe used, and what stage-container-images.sh does for
+# registry images) still works, but it costs a multi-gigabyte
+# `podman save | ssh podman load` for a layer of a few tens of megabytes,
+# because the saved archive carries the whole base. Prefer the board build.
+#
+# BRIDGE_IMAGE in ../awf-oak-x5h.env is the tag step 2 sets. Nothing else in
+# this repo produces it -- images.txt cannot stage it, because it has no
+# registry ref -- so the whole recipe is here.
+ARG BASE_IMAGE=ghcr.io/mitsudome-r/mrm-demo:universe-after-arm64
 FROM ${BASE_IMAGE}
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO=humble
@@ -68,16 +83,15 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Deliberately staying root here, not switching to a non-root user: the
-# base image's own final stage does `USER root` and never switches back
-# (confirmed via `docker history` -- its runtime stage copies build
-# artifacts and runs further apt/rosdep steps as root with no later `USER`
-# instruction), and every sibling openadkit-* component image in this stack
-# (images.txt) inherits that same root default. Switching only this image
-# to non-root would make the bridge the one odd container in the stack
-# rather than making anything more consistent. A uid-1000 "aw" account
-# does already exist in the base (USERNAME=aw in its ENV, build artifacts
-# chowned aw:aw) if the whole stack is ever moved off root -- that would be
-# a fix to the base image, not to this Dockerfile alone. Please do not
-# re-add a per-image USER switch here without doing that stack-wide.
+# base image declares no USER at all (`podman image inspect` reports an
+# empty User, i.e. root), and so its entrypoint and every other unit in
+# this stack run as root. Switching only this image to non-root would make
+# the bridge the one odd container in the stack rather than making
+# anything more consistent -- and /ros_entrypoint.sh in the base has its
+# own uid-remap path (LOCAL_UID / LOCAL_USER / LOCAL_GID / LOCAL_GROUP,
+# gosu) that our entrypoint replaces, so a USER line here would interact
+# with a mechanism that is no longer in the picture. Moving off root is a
+# stack-wide change, not a per-image one. Please do not re-add a per-image
+# USER switch here without doing it stack-wide.
 
 ENTRYPOINT ["/entrypoint.sh"]

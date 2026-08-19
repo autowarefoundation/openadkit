@@ -76,6 +76,7 @@
           <remap from="input/external_emergency_stop_heartbeat" to="/external/selected/heartbeat"/>
           <remap from="input/gate_mode" to="/control/gate_mode_cmd"/>
           <remap from="input/emergency/control_cmd" to="/system/emergency/control_cmd"/>
+          <remap from="input/emergency/turn_indicators_cmd" to="/system/emergency/turn_indicators_cmd"/>
           <remap from="input/emergency/hazard_lights_cmd" to="/system/emergency/hazard_lights_cmd"/>
           <remap from="input/emergency/gear_cmd" to="/system/emergency/gear_cmd"/>
           <remap from="input/mrm_state" to="/system/fail_safe/mrm_state"/>
@@ -126,7 +127,6 @@
       </node_container>
 
       <!-- trajectory_follower_node -->
-      <!-- TODO: Remove once the need to run stub trajectory_follower_node is removed -->
       <group if="$(eval &quot;'$(var trajectory_follower_mode)' == 'trajectory_follower_node'&quot;)">
         <load_composable_node target="/control/control_container">
           <composable_node pkg="autoware_trajectory_follower_node" plugin="autoware::motion::control::trajectory_follower_node::Controller" name="controller_node_exe" namespace="trajectory_follower">
@@ -135,24 +135,20 @@
             <remap from="~/input/current_steering" to="/vehicle/status/steering_status_no_publish"/>
             <remap from="~/input/current_accel" to="/localization/acceleration_no_publish"/>
             <remap from="~/input/current_operation_mode" to="/system/operation_mode/state_no_publish"/>
-            
             <remap from="~/output/predicted_trajectory" to="lateral/predicted_trajectory_no_publish"/>
             <remap from="~/output/lateral_diagnostic" to="lateral/diagnostic_no_publish"/>
             <remap from="~/output/slope_angle" to="longitudinal/slope_angle_no_publish"/>
             <remap from="~/output/longitudinal_diagnostic" to="longitudinal/diagnostic_no_publish"/>
             <remap from="~/output/stop_reason" to="longitudinal/stop_reason_no_publish"/>
-            <remap from="~/output/control_cmd" to="/control/trajectory_follower/control_cmd_no_publish"/>
-            
+            <remap from="~/output/control_cmd" to="control_cmd_no_publish"/>
             <param name="lateral_controller_mode" value="$(var lateral_controller_mode)"/>
             <param name="longitudinal_controller_mode" value="$(var longitudinal_controller_mode)"/>
             <param from="$(var nearest_search_param_path)"/>
-            
+            <param from="$(var trajectory_follower_node_param_path)"/>
             <param from="$(var lon_controller_param_path)"/>
             <param from="$(var lat_controller_param_path)"/>
             <param from="$(var vehicle_param_file)"/>
-            <param name="ctrl_period" value="0.15"/>
-            <param name="timeout_thr_sec" value="0.5"/>
-            
+            <extra_arg name="use_intra_process_comms" value="$(var use_intra_process)"/>
           </composable_node>
         </load_composable_node>
       </group>
@@ -206,7 +202,9 @@
       <group if="$(var launch_control_validator)">
         <load_composable_node target="/control/control_check_container">
           <composable_node pkg="autoware_control_validator" plugin="autoware::control_validator::ControlValidator" name="control_validator">
+            <remap from="~/input/control_cmd" to="/control/command/control_cmd"/>
             <remap from="~/input/kinematics" to="/localization/kinematic_state"/>
+            <remap from="~/input/measured_acceleration" to="/localization/acceleration"/>
             <remap from="~/input/reference_trajectory" to="/planning/scenario_planning/trajectory"/>
             <remap from="~/input/predicted_trajectory" to="/control/trajectory_follower/lateral/predicted_trajectory"/>
             <remap from="~/output/validation_status" to="~/validation_status"/>
@@ -262,7 +260,7 @@
       <!-- predicted path checker -->
       <group if="$(var launch_predicted_path_checker)">
         <load_composable_node target="/control/control_check_container">
-          <composable_node pkg="predicted_path_checker" plugin="autoware::motion::control::predicted_path_checker::PredictedPathCheckerNode" name="predicted_path_checker">
+          <composable_node pkg="autoware_predicted_path_checker" plugin="autoware::predicted_path_checker::PredictedPathCheckerNode" name="predicted_path_checker">
             <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
             <remap from="~/input/reference_trajectory" to="/planning/scenario_planning/trajectory"/>
             <remap from="~/input/current_accel" to="/localization/acceleration"/>

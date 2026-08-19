@@ -1,0 +1,39 @@
+name: x5h-rootfs
+
+image:
+  hostname: autosd-x5h
+  image_size: 6 GiB
+
+content:
+  rpms:
+    - podman
+    - btrfs-progs
+    - gdisk
+    - curl
+    - iproute
+    - procps-ng
+    - iptables-nft
+  # add_files (org.osbuild.copy) does not create parent directories, and
+  # nothing else in the pipeline creates /etc/containers/containers.conf.d
+  # (init_rootfs_dirs_stage creates /etc itself, but not this subtree).
+  # aib's own add_files glob path handles this automatically via
+  # _ensure_parent_directory, but that helper is never reached for an
+  # explicit source_path -> path pair like ours, so the mkdir has to be
+  # requested explicitly. make_dirs is emitted as its own org.osbuild.mkdir
+  # stage strictly before the org.osbuild.copy stage that add_files feeds
+  # (files/simple.mpp.yml's rootfs pipeline: simple_mkdir at stage index 4,
+  # simple_copy at stage index 6 -- osbuild runs a pipeline's stages in the
+  # order the manifest lists them), so this lands ahead of the copy that
+  # needs it.
+  make_dirs:
+    - path: /etc/containers/containers.conf.d
+      parents: true
+      exist_ok: true
+  add_files:
+    # add_files only permits /etc and /usr destinations (rehearsal finding).
+    - source_path: ../config/50-x5h.conf
+      path: /etc/containers/containers.conf.d/50-x5h.conf
+
+auth:
+  # root password "autosd" — dev/bench image only, never a board deliverable.
+  root_password: '$6$G8EEOdazon1o20yt$T22wsSokbA6eqYp86lCfEOSxNErCZkUjFNJfigB.PF4ijgJTzbrDA4GNHKNufhBc1vyiLm6Be7Elb16olXv590'

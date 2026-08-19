@@ -1,0 +1,139 @@
+#!/usr/bin/expect -f
+# Drive the x5h QEMU gate: login, run gate-guest.sh, save the session log.
+# Usage: qemu-gate.exp <run-qemu-gate.sh> <Image> <rootfs.ext4> <blank-disk> <logfile>
+set runner [lindex $argv 0]
+set kimg   [lindex $argv 1]
+set rootfs [lindex $argv 2]
+set blank  [lindex $argv 3]
+set logf   [lindex $argv 4]
+log_file -noappend $logf
+
+spawn $runner $kimg $rootfs $blank
+
+# Boot can legitimately take a while under TCG (especially cross-arch on
+# x86 in Task 7), so this first wait keeps a generous fixed budget. A true
+# autologin console never prints "login:" at all, so a bare shell prompt is
+# accepted here too (Task 2 does set a root password, so this is a belt and
+# braces case, not the expected path).
+#
+# Boot loop guard: a stock fstab ESP entry with no matching partition on
+# this bare ext4 export makes AutoSD's emergency.service ("Emergency Shell
+# Override - Reboot") reboot instead of dropping to a shell, so an
+# unhealthy image reboots forever instead of just hanging once. "Booting
+# Linux on physical CPU" is the kernel's very first boot line, printed
+# exactly once per boot, so counting it catches a loop directly instead of
+# burning the full 1800s to notice nothing else ever arrived. A single
+# healthy boot only ever sees this once before "login:" (or a shell
+# prompt) matches and the block returns, so any repeat here is
+# unambiguous; failing on the third occurrence (two confirmed reboots)
+# leaves a little room for a one-off restart without giving up much of the
+# fail-fast benefit -- a real loop repeats every ~30-45s here, not once.
+set boot_count 0
+set timeout 1800
+expect {
+    -re {Booting Linux on physical CPU} {
+        incr boot_count
+        if {$boot_count >= 3} {
+            puts "FATAL: guest rebooted $boot_count times without reaching a login prompt"
+            exit 2
+        }
+        exp_continue
+    }
+    -re "login:" {}
+    -re {[#$] $} { set already_logged_in 1 }
+    eof { puts "FATAL: qemu exited before a login prompt appeared (check runner logs / kernel path)"; exit 2 }
+    timeout { puts "FATAL: no login prompt within ${timeout}s"; exit 2 }
+}
+
+if {![info exists already_logged_in]} {
+    send "root\r"
+
+    # Short, bounded interactive exchange: either a password prompt (send it)
+    # or, on an autologin console, we land straight on a shell prompt.
+    set timeout 60
+    expect {
+        "Password:" { send "autosd\r" }
+        -re {[#$] $} { set already_at_prompt 1 }
+        eof { puts "FATAL: guest console closed while waiting for the password prompt"; exit 2 }
+        timeout { puts "FATAL: no password prompt (or shell prompt) after sending username"; exit 2 }
+    }
+    if {![info exists already_at_prompt]} {
+        expect {
+            -re {[#$] $} {}
+            eof { puts "FATAL: guest console closed while waiting for the shell prompt after login"; exit 2 }
+            timeout { puts "FATAL: no shell prompt after sending the password"; exit 2 }
+        }
+    }
+}
+send "sh /var/lib/autosd-test/gate-guest.sh\r"
+
+# The guest-side run does several podman loads, an mkfs.btrfs, and two
+# poll-and-curl cycles -- its total length varies with TCG speed and isn't a
+# meaningful thing to budget as one fixed number. Instead, re-arm an
+# inactivity timer on every complete "GATE<n>_..." marker line, so a run
+# that's merely slow keeps proceeding while a run that goes truly silent (or
+# whose guest dies) still fails fast and with a clear diagnostic.
+#
+# GATE5 is the longest silent stretch: every command between the last
+# GATE4_* marker and the eventual GATE5_* verdict is output-suppressed, so
+# nothing re-arms the timer for the whole block. That stretch is bounded
+# arithmetically, not by a TCG-speed guess: two 30-iteration poll loops
+# (curl --max-time 5 + sleep 2 each) cap at 210s apiece = 420s of pure
+# network/sleep wall-clock alone (this is a hard ceiling: curl's --max-time
+# and sleep are wall-clock, not CPU-bound, so TCG slowness doesn't shrink
+# it), plus a busybox podman load, two "podman run -d", up to 30 "podman
+# inspect" calls and two "podman rm -f" -- all process-spawn overhead that
+# does scale with TCG speed. Budgeting that at up to ~30-60s per operation
+# (image load, each run/rm) and ~2s per inspect adds roughly another 170s,
+# for a padded worst-case estimate around 590s. inactivity_timeout is set
+# well above that combined estimate; if a future change makes the GATE5
+# loops longer (more iterations, a longer --max-time, more polled
+# operations), raise this number to match -- it is coupled to those bounds,
+# not an independent knob.
+set inactivity_timeout 900
+set timeout $inactivity_timeout
+expect {
+    "GATE_DONE" {}
+    -re {GATE[0-9]_[^\r\n]*\r?\n} { exp_continue }
+    eof { puts "FATAL: guest console closed before GATE_DONE"; exit 2 }
+    timeout { puts "FATAL: gate produced no new marker output for ${inactivity_timeout}s (stalled)"; exit 2 }
+}
+
+# By this point GATE_DONE has already matched above: every marker is in the
+# log and the run's verdict is already decided, win or lose. This block only
+# tries to power the guest off cleanly -- a courtesy, not a judgment step --
+# so a miss here must WARN and fall through to judging, the same treatment
+# the poweroff block below it already gets, not FATAL/exit 2. Exiting 2 here
+# would throw away an already-green run over a shell-prompt regex miss (the
+# same end-of-buffer fragility this whole file works around elsewhere) or a
+# guest that died after finishing its job, burning a multi-hour arm64 CI
+# cycle for a reason that has nothing to do with whether the gate passed.
+set timeout 60
+set guest_alive 1
+expect {
+    -re {[#$] $} {}
+    eof { puts "WARN: guest console closed while waiting for the shell prompt after the gate run; continuing to judge captured markers"; set guest_alive 0 }
+    timeout { puts "WARN: no shell prompt after the gate run finished; continuing to judge captured markers" }
+}
+if {$guest_alive} {
+    send "poweroff\r"
+    set timeout 60
+    expect {
+        eof {}
+        timeout { puts "WARN: guest did not power off within ${timeout}s; continuing to judge captured markers" }
+    }
+}
+
+# Judge the markers from the captured log.
+set fh [open $logf r]; set log [read $fh]; close $fh
+set fail 0
+foreach must {GATE1_LOGIN_OK GATE3_TMPFS_OK GATE3_STORE_FS=tmpfs GATE4_BTRFS_OK GATE4_STORE_FS=btrfs GATE_DONE} {
+    if {![string match "*$must*" $log]} { puts "MISSING: $must"; set fail 1 }
+}
+if {![string match "*GATE2_EXT4_FAIL_OK*" $log] && ![string match "*GATE2_EXT4_UNEXPECTED_PASS*" $log]} {
+    puts "MISSING: GATE2 verdict (got neither FAIL_OK nor UNEXPECTED_PASS)"; set fail 1
+}
+if {![string match "*GATE5_IPTABLES_OK*" $log] && ![string match "*GATE5_NONE_OK*" $log]} {
+    puts "MISSING: GATE5 (neither iptables nor none-fallback passed)"; set fail 1
+}
+exit $fail

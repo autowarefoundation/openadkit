@@ -1,0 +1,92 @@
+containers_read_only: false
+disable_ipv6: false
+
+# btrfs is the only viable persistent container store on the X5H's BSP
+# kernel (no CONFIG_XFS_FS, no CONFIG_F2FS_FS, ext4 has no security
+# xattrs), so btrfs-progs is not optional; gdisk is needed alongside it.
+# Both packages were moved out of the AutoSD 10 / CentOS Stream 10 repos
+# upstream and now live in EPEL 10 (verified present at
+# https://dl.fedoraproject.org/pub/epel/10/Everything/aarch64/Packages/{b/btrfs-progs-6.12-3.el10_0,g/gdisk-1.0.10-2.el10_0}.aarch64.rpm).
+#
+# baseurl is a literal "aarch64", not "$arch". $variable substitution
+# through --define-file values does actually work here (verified by
+# running the real mpp/aib-osbuild-mpp preprocessor with `arch` supplied
+# via -D, the same way aib/osbuild.py drives it: the resulting
+# extra_repos entry does come out with "$arch" expanded to "aarch64").
+# The literal is used anyway because this platform is aarch64-only (the
+# X5H board) and this workflow has no other-arch leg, so a hardcoded
+# value is simpler and does not depend on a mechanism this file has no
+# other use for.
+#
+# gpgcheck: false is deliberate, not a shortcut: aib's repo schema
+# (_SUPPORTED_REPO_KEYS in mpp/aib-osbuild-mpp) has no per-repo gpgkey
+# field at all, only a per-repo gpgcheck boolean -- GPG trust is otherwise
+# a single global key list (distro_gpg_keys, currently the CentOS
+# Stream 10 and Red Hat 10 keys concatenated) shared by every repo.
+# Disabling gpgcheck for this one repo (which is exactly what dnf's own
+# gpgcheck=0 does for a .repo file) avoids a GPG failure without touching
+# that global list or affecting verification of any other repo's
+# packages. The alternative -- appending EPEL's own key to
+# distro_gpg_keys so gpgcheck could stay on -- was considered and
+# rejected for this iteration: it requires overriding a scalar the
+# distro file already sets (replacing, not merging) and embedding a
+# large PEM block by hand, which risks more breakage in a single edit
+# than this fork-only CI validation build's threat model justifies. The
+# fetch itself is HTTPS from the official Fedora mirror.
+#
+# No explicit priority: btrfs-progs/gdisk are unique to EPEL (not carried
+# by any AutoSD/CentOS repo), so there is no same-named package for a
+# priority to arbitrate, and dnf priority excludes same-named packages
+# from worse-priority repos outright rather than just de-preferring them.
+# Setting one here (e.g. matching local_repo_prio's 15) would rank this
+# repo *above* the "automotive" CentOS SIG repo, which carries no
+# explicit priority of its own (defaults to 99) -- an unintended
+# relationship for no actual benefit. Leaving it unset defaults to 99,
+# same tier as "automotive".
+extra_repos:
+  - id: epel10
+    baseurl: https://dl.fedoraproject.org/pub/epel/10/Everything/aarch64/
+    gpgcheck: false
+
+# The image ships an enabled boot-efi.mount unit (computed-vars.ipp.yml
+# copies it to /usr/lib/systemd/system/boot-efi.mount and adds it to
+# image_enabled_services) that requires /dev/disk/by-label/ESP. On both
+# gate paths -- the bare ext4 export QEMU boots directly via -kernel, and
+# the tar staged as the board's NFS root -- there is no ESP partition, so
+# that device unit times out, local-fs.target fails, and AutoSD's
+# emergency.service ("Emergency Shell Override - Reboot") reboots instead
+# of dropping to a shell. Forever. Neutralizing fstab (done in
+# inject-test-images.sh / stage-nfs-rootfs.sh) does not touch this: the
+# unit is not driven by fstab at all.
+#
+# use_efipart: false is the fix, not use_efipart_mount directly.
+# computed-vars.ipp.yml's use_efipart is only computed from use_ukiboot
+# "if not already in locals()" -- the same override mechanism extra_repos
+# above relies on (--define-file values land in the mpp preprocessor's
+# overrides dict, which always wins the final {**vars, **overrides} merge
+# every mpp-if/mpp-eval reads via get_vars(), regardless of what a
+# same-named key in vars gets recomputed to independently). Setting
+# use_efipart here means that recompute is skipped and our value wins.
+# use_efipart_mount, by contrast, has no such guard -- it is an
+# unconditional `mpp-eval: use_efipart` every time computed-vars.ipp.yml
+# is processed, so it correctly follows use_efipart down to false without
+# needing to be set itself; setting it directly would just be recomputed
+# over.
+#
+# Confirmed this only affects disk-image assembly, never rootfs content:
+# every reference to the efi partition/device (build.ipp.yml's
+# base_partitions, content.ipp.yml's disk_yaml partition table,
+# image.ipp.yml's org.osbuild.mkfs.fat stage and the image pipeline's
+# mount-and-copy device map) lives inside the disk-image-building `image`
+# pipeline and is independently gated on its own `mpp-if: use_efipart`.
+# That pipeline produces a disk.img artifact neither export path
+# consumes: this workflow's `aib build --tar` never requests a disk
+# output, the QEMU gate boots the extracted ext4 directly via -kernel
+# (never through any bootloader the image would have shipped), and the
+# board nets boot the BSP kernel over the existing path. use_ukiboot
+# stays true (the default for --target qemu) and is unaffected --
+# nothing that is use_ukiboot-gated also depends on use_efipart; the one
+# other use_ukiboot-gated place that touches EFI-ish paths
+# (content.ipp.yml's signing_info for aboot.img/ukibootN.efi) is
+# secure-boot signing metadata, unrelated to the partition/device layer.
+use_efipart: false

@@ -10,8 +10,10 @@
        DDS configuration this file was written to interoperate with, so that
        both ends of the domain-2 link size their receive pools the same way.
        They are internally coherent: 16384 is an exact multiple of 2048, and
-       the chunk size exceeds both tap0's 462-byte fragment size and the
-       1400B MaxMessageSize. Whether this pool is thin for six bridged
+       the chunk size exceeds both tap0's 462-byte MTU and the 1400B
+       MaxMessageSize. ("MTU" deliberately, not "fragment size": domain 2
+       now sets General/FragmentSize explicitly and the two are unrelated
+       numbers.) Whether this pool is thin for six bridged
        topics is an open question worth flagging here, not retuning in this
        file.
 
@@ -51,6 +53,29 @@
        462-byte MTU happens below this setting, and lowering it here would
        double-fragment for no benefit.
 
+       FragmentSize is pinned to 1344B, which IS the CycloneDDS default;
+       this changes no behaviour today, and that is the point. It is the
+       threshold that decides whether a sample goes out whole or as a
+       DATA_FRAG train: CycloneDDS compares the serialized sample size,
+       CDR encapsulation header included, against it with a strict ">" and
+       fragments if it loses (releases/0.10.x
+       src/core/ddsi/src/q_transmit.c:836; Humble ships cyclonedds 0.10.5).
+       On this link fragmentation is not a performance question. The CR52
+       is a RELIABLE reader on a 3MB heap, its receive path holds every
+       fragment for defragmentation, and the pool exhausts the heap and
+       _exits the firmware in about 8 s.
+
+       It is pinned because components/nodes/traj_relay.py sizes every
+       trajectory it publishes against this number: its SERIALIZED_BYTE_BUDGET
+       of 1200B exists to clear this 1344B with 144B to spare. Left as an
+       inherited default, a CycloneDDS upgrade could lower it and reintroduce
+       the heap death with no diff anywhere to point at. THE TWO NUMBERS MOVE
+       TOGETHER: change this and the relay's budget has to change with it.
+
+       Domain 1 is deliberately left alone. Its readers are Autoware
+       containers on the host loopback path with no such heap constraint,
+       and the failure this pin guards against is specific to the CR52.
+
        The ${X5H_SI_INTERFACE:-tap0} / ${X5H_SI_PEER:-172.16.52.2} defaults
        exist so a later host rehearsal can retarget domain 2 at a veth rig
        without a second copy of this file. On the board both defaults are
@@ -59,6 +84,7 @@
     <General>
       <AllowMulticast>false</AllowMulticast>
       <MaxMessageSize>1400B</MaxMessageSize>
+      <FragmentSize>1344B</FragmentSize>
       <Interfaces>
         <NetworkInterface autodetermine="false" priority="default" multicast="false" name="${X5H_SI_INTERFACE:-tap0}"/>
       </Interfaces>

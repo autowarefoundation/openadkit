@@ -3,8 +3,9 @@
 # Runs ON the board. One terminal marker per invocation, judged by string
 # match, following the repo's rpmsg-smoke.sh convention.
 #
-#   stack   -- units active, six bridged topics in the right direction,
-#              control_cmd demonstrably sourced on the CR52
+#   stack   -- units active, link at the frozen MTU, and control_cmd
+#              demonstrably sourced on the CR52. Starts the scenario briefly,
+#              because without an ego the CR52 emits nothing -- see the mode.
 #   drive   -- cycle the stack, run the scenario once, report its junit
 #   autoware-- domain 1 only: no bridge, no CR52. The Stage 1 isolation
 #              hinge, so "Autoware does not run on this silicon" and "the
@@ -18,7 +19,7 @@
 #                              at the moment Autoware was proven up)
 #   X5H_AUTOWARE_PASS
 #   X5H_AUTOWARE_FAIL reason=<...>
-#   X5H_STACK_PASS bridged=6 cr52_packets=<n>
+#   X5H_STACK_PASS cr52_control_cmd=1 cr52_packets=<n>
 #   X5H_STACK_FAIL reason=<...>
 #   X5H_DRIVE_PASS junit=<path> tests=<n> failures=<n> errors=<n>
 #   X5H_DRIVE_FAIL reason=<...>
@@ -61,27 +62,35 @@
 #                                   catch-all for a bad invocation)
 #             rpmsg_eth_inactive    the CR52 link daemon is not running
 #             tap0_mtu=<n>          tap0 is up at the wrong MTU
-#             not_bridged_to_domain2:<topic>
-#                                   a domain 1 -> 2 topic never arrived
-#             no_control_cmd_on_domain1
-#                                   nothing republished control_cmd onto
-#                                   domain 1
-#             no_control_cmd_on_domain2
-#                                   nothing published control_cmd on
-#                                   domain 2 -- i.e. no CR52 (see below)
+#             scenario_start        the scenario unit would not start, so no
+#                                   ego could be brought up to give the CR52
+#                                   something to follow
+#             no_cr52_control_cmd   no sample on control_cmd_raw within
+#                                   CR52_TIMEOUT. That name is published ONLY
+#                                   by the bridge, carrying the CR52's
+#                                   domain-2 control_cmd, so this means the
+#                                   safety island produced nothing -- read the
+#                                   CR52 console on ttyUSB1 next
 #             no_tap0_counters      /sys/class/net/tap0/statistics is
 #                                   unreadable, so the corroborating
 #                                   packet delta could not be measured
 #             no_cr52_packets_on_tap0
-#                                   tap0 received nothing while the
-#                                   domain-2 echo above ran
+#                                   tap0 received nothing while the poll above
+#                                   ran
 #   DRIVE:    no_env_file           $ENVF missing/unreadable, so
 #                                   OUTPUT_DIRECTORY cannot be resolved
 #             stack_down            the stack would not stop
 #             stack_up              the stack would not start
 #             autoware_not_ready    /api/autoware/set/engage never appeared
 #             scenario_start        the scenario unit failed to run
-#             no_junit              the run produced no result.junit.xml
+#             no_junit              the run produced no result.junit.xml. The
+#                                   interpreter writes one only when it reaches
+#                                   a VERDICT; if scenario_test_runner's
+#                                   global_timeout preempts the scenario's own
+#                                   exit conditions it writes NOTHING. So this
+#                                   reason means "GLOBAL_TIMEOUT is too small",
+#                                   not "the drive failed" -- see
+#                                   awf-oak-x5h.env's GLOBAL_TIMEOUT note.
 #             junit_unparsable      a junit file exists but its top-level
 #                                   counts could not be read
 #
@@ -104,6 +113,17 @@ MTU=462
 # argument needs the value in front of them, not just in prose.
 # shellcheck disable=SC2034
 PEER=172.16.52.2
+# The bridge's domain-1 name for the CR52's domain-2 control_cmd, set by
+# `remap:` in components/bridge/bridge-config.yaml. The bridge is the ONLY
+# publisher of this name on domain 1, which is what makes it proof of origin;
+# the un-suffixed control_cmd is published locally by control_restamp.py and
+# proves nothing about the CR52. Keep the two straight.
+RAW_CMD=/control/trajectory_follower/control_cmd_raw
+# How long `stack` waits for the CR52's first control_cmd after the scenario
+# starts. It must cover the scenario's own initialisation before an ego exists
+# (INITIALIZE_DURATION defaults to 90) plus the follower's first cycle, so it
+# is deliberately larger than any single echo timeout in this script.
+CR52_TIMEOUT="${X5H_CR52_TIMEOUT:-150}"
 
 # THE UNIT VOCABULARY. Three sets, and which unit is in which is the whole
 # correctness argument of this script:
@@ -120,9 +140,10 @@ CORE_UNITS="awf-oak-autoware"
 # accessories: bridge-config.yaml routes the trajectory through traj_relay
 # (domain 2's MTU 462 cannot carry a full trajectory) and control_cmd back
 # through control_restamp (the CR52 stamps with its own uptime clock). With
-# either one down, a completely healthy board fails
-# not_bridged_to_domain2:/planning/scenario_planning/trajectory or
-# no_control_cmd_on_domain1, and the failure points at the bridge.
+# either one down, a completely healthy board fails no_cr52_control_cmd: with
+# the relay down the CR52 never receives a trajectory it can carry, and with
+# restamp down control_cmd_raw still arrives but nothing rewrites it onto
+# domain 1's clock. Either way the failure points at the bridge path.
 STACK_UNITS="$CORE_UNITS awf-oak-bridge awf-oak-relay awf-oak-restamp"
 # Never in a checked set, and never started except by `drive`. It has no
 # [Install] section precisely so it cannot come up at boot, and it is
@@ -228,54 +249,82 @@ stack)
     mtu=$(cat /sys/class/net/tap0/mtu 2>/dev/null)
     [ "$mtu" = "$MTU" ] || fail "tap0_mtu=$mtu" "STACK"
 
-    # Five topics domain 1 -> domain 2: present on domain 2.
-    for t in /vehicle/status/steering_status /planning/scenario_planning/trajectory \
-             /system/operation_mode/state /localization/kinematic_state \
-             /localization/acceleration; do
-        ros2dom "timeout 20 ros2 topic echo --once $t" >/dev/null \
-            || fail "not_bridged_to_domain2:$t" "STACK"
-    done
+    # HOW THE SIX BRIDGED TOPICS ARE PROVEN, AND WHY NOT ONE ECHO PER TOPIC.
+    #
+    # The retired form of this check echoed each of the five domain 1 -> 2
+    # topics ON DOMAIN 2, from a `ros2` process started inside the bridge
+    # container. That instrument is structurally blind and its failures were
+    # indistinguishable from a dead link. cyclonedds-x5h.xml gives domain 2
+    # AllowMulticast=false and exactly ONE static peer, the CR52 -- so a
+    # SECOND participant joining domain 2 has no discovery path to the
+    # bridge's own domain-2 participant and cannot see anything the bridge
+    # publishes there. Board-measured: all five topics reported
+    # not_bridged_to_domain2 while tap0 simultaneously took 739 packets from
+    # the CR52 on a stack that was working. The instrument before that one
+    # was tcpdump, which is not in the board image at all (confirmed: no
+    # tcpdump, no dnf, no rpm-ostree). Two instruments, both blind.
+    #
+    # What is used instead is the ONE observation that is both decisive and
+    # made with a working instrument: a live control_cmd from the CR52,
+    # observed on DOMAIN 1, where every container can see it.
+    #
+    # It proves BOTH directions at once, transitively:
+    #   - 2 -> 1 directly. bridge-config.yaml lands the CR52's domain-2
+    #     control_cmd on domain 1 under the REMAPPED name
+    #     control/trajectory_follower/control_cmd_raw. The bridge is the only
+    #     publisher of that name on domain 1 -- control_restamp.py subscribes
+    #     to it and republishes the real topic -- so a sample on _raw came off
+    #     the rpmsg-eth wire and nothing local can manufacture it. (Checking
+    #     the real control_cmd instead would NOT prove this: restamp publishes
+    #     that one locally.)
+    #   - 1 -> 2 transitively. The CR52 runs the trajectory follower. It
+    #     cannot emit control_cmd at all without having received the
+    #     trajectory and the ego state over domain 2. So a control_cmd that
+    #     exists is evidence the 1 -> 2 half delivered.
+    #
+    # WHY THIS MODE NOW STARTS THE SCENARIO. The ego -- and therefore
+    # kinematic_state, steering_status and localization/acceleration -- is
+    # published by scenario_simulator_v2, not by Autoware (see the `autoware`
+    # mode's comment). With no ego the CR52 has nothing to follow and emits
+    # nothing: board-measured, a full 25 s echo on _raw with the stack up and
+    # no scenario running returned NOTHING, while tap0 still carried 237
+    # discovery packets. So a pre-scenario X5H_STACK_PASS is not reachable by
+    # any instrument, and this mode brings an ego into existence rather than
+    # asserting something unsatisfiable.
+    #
+    # --no-block is required, not stylistic: the scenario unit is
+    # Type=oneshot, so a plain `systemctl start` blocks until the whole run
+    # finishes and there would be no live window left to observe.
+    systemctl start --no-block "${SCENARIO_UNIT}.service" \
+        || fail "scenario_start" "STACK"
 
-    # One topic domain 2 -> domain 1. Presence on domain 1 is necessary but
-    # NOT sufficient evidence: a stray local publisher on domain 1 would
-    # satisfy it just as well, so it is checked first and then backed by
-    # the domain-2 check below.
-    ros1 "timeout 20 ros2 topic echo --once /control/trajectory_follower/control_cmd" >/dev/null \
-        || fail "no_control_cmd_on_domain1" "STACK"
-
-    # The decisive check, the one the milestone turns on: the same topic
-    # echoed ON DOMAIN 2, which only the CR52 can satisfy.
-    #   - awf-oak-bridge SUBSCRIBES to control_cmd on domain 2 and
-    #     republishes it on domain 1 (components/bridge/bridge-config.yaml);
-    #     it never publishes it on domain 2.
-    #   - domain 2 has AllowMulticast=false and exactly one static peer,
-    #     $PEER, over tap0 (components/cyclonedds-x5h.xml), so there is no
-    #     discovery path to anything else.
-    #   - no other container joins domain 2. awf-oak-restamp republishes the
-    #     bridge's output ON DOMAIN 1 and joins domain 2 not at all, so it
-    #     cannot satisfy this check either.
-    # So a sample arriving here came off the rpmsg-eth wire from the safety
-    # island. This deliberately needs no tooling beyond what the stack
-    # already runs: the previous form of this check shelled out to tcpdump,
-    # which is absent from the board image, so it always yielded zero and
-    # reported reason=control_cmd_not_from_cr52 -- a dead-link verdict on a
-    # healthy stack, on the single check that proves the milestone.
     rx0=$(cat /sys/class/net/tap0/statistics/rx_packets 2>/dev/null)
-    ros2dom "timeout 20 ros2 topic echo --once /control/trajectory_follower/control_cmd" >/dev/null \
-        || fail "no_control_cmd_on_domain2" "STACK"
+    # Bounded poll rather than one long echo: the ego appears some way into
+    # the scenario's initialisation, so the first echoes legitimately find
+    # nothing. Deadline, not a retry count, so the wait is a stated duration.
+    got=0
+    deadline=$(( $(date +%s) + CR52_TIMEOUT ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        if ros1 "timeout 10 ros2 topic echo --once $RAW_CMD" >/dev/null; then
+            got=1; break
+        fi
+    done
     rx1=$(cat /sys/class/net/tap0/statistics/rx_packets 2>/dev/null)
 
-    # Corroboration, not the primary evidence: tap0 must actually have
-    # received frames across that window, so a PASS carries a number the
-    # operator can read rather than a bare assertion. Bounded by the echo
-    # above -- no polling loop.
+    # Stopped before the verdict is printed, so this mode leaves the stack in
+    # the state it found it in -- `drive` does its own full cycle and must not
+    # inherit a half-run scenario.
+    systemctl stop "${SCENARIO_UNIT}.service" >/dev/null 2>&1
+
+    [ "$got" -eq 1 ] || fail "no_cr52_control_cmd" "STACK"
+
     for v in "$rx0" "$rx1"; do
         case "$v" in ''|*[!0-9]*) fail "no_tap0_counters" "STACK" ;; esac
     done
     n=$((rx1 - rx0))
     [ "$n" -ge 1 ] || fail "no_cr52_packets_on_tap0" "STACK"
 
-    echo "X5H_STACK_PASS bridged=6 cr52_packets=$n"
+    echo "X5H_STACK_PASS cr52_control_cmd=1 cr52_packets=$n"
     ;;
 drive)
     # Precondition, checked before anything is touched: this mode runs on a
@@ -297,9 +346,8 @@ drive)
     #
     # scenario_simulator_v2 is one-shot in a stronger sense than
     # Type=oneshot: it drives Autoware through a state machine, and it ends
-    # by design at a fixed duration -- roughly 125 s of "timed out.
-    # Forcibly inactivate", which is this scenario's NORMAL ending, not a
-    # failure. What it leaves behind is an Autoware that has already been
+    # by reaching one of the scenario's own exit conditions. What it leaves
+    # behind is an Autoware that has already been
     # routed and engaged and is sitting in a post-run state. Restarting only
     # the scenario against that leaves it in WAITING_FOR_ROUTE, and the
     # engage step never reproduces -- so run 2 fails while run 1 passed, on

@@ -15,8 +15,8 @@ usage() {
   cat <<'EOF'
 Usage: ./start-carla-e2e-demo.sh [options]
 
-Starts the closed-loop CARLA e2e demo using CARLA on the host display and
-Autoware's in-tree autoware_carla_interface.
+Starts the closed-loop CARLA e2e demo using headless CARLA 0.9.16
+(-RenderOffScreen) and Autoware's in-tree autoware_carla_interface.
 
 Options:
   --build               Build the local CARLA interface image from components
@@ -220,13 +220,6 @@ stop_container_carla() {
 }
 
 start_container_carla() {
-  local display_num="${CARLA_DISPLAY##*:}"
-  display_num="${display_num%%.*}"
-  if [[ "$DRY_RUN" == false && ! -S "/tmp/.X11-unix/X${display_num}" ]]; then
-    printf 'X display socket for %s was not found under /tmp/.X11-unix\n' "$CARLA_DISPLAY" >&2
-    return 1
-  fi
-
   stop_container_carla
   run_compose up -d --force-recreate carla
 

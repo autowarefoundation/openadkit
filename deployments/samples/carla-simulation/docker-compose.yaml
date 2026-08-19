@@ -7,21 +7,12 @@ services:
     ipc: host
     runtime: nvidia
     environment:
-      - DISPLAY=${CARLA_DISPLAY}
-      - SDL_VIDEODRIVER=x11
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,display
-      - VK_ICD_FILENAMES=${CARLA_VK_ICD_CONTAINER_PATH}
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
-      - ${CARLA_VK_ICD_HOST_PATH}:${CARLA_VK_ICD_CONTAINER_PATH}:ro
+      - NVIDIA_DRIVER_CAPABILITIES=all
     command: >
       /bin/bash ./CarlaUE4.sh
-      -windowed
-      -vulkan
+      -RenderOffScreen
       -nosound
-      -ResX=${CARLA_RESX}
-      -ResY=${CARLA_RESY}
       -quality-level=${CARLA_QUALITY}
       -carla-rpc-port=${CARLA_RPC_PORT}
       -world-port=${CARLA_WORLD_PORT}
@@ -35,11 +26,13 @@ services:
     network_mode: host
     init: true
     ipc: host
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
     volumes:
       - ./sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - carla
     command: >
@@ -58,11 +51,13 @@ services:
     network_mode: host
     init: true
     ipc: host
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
     volumes:
       - ${MAP_PATH}:/autoware_map:ro
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     command: >
       ros2 launch autoware_launch tier4_map_component.launch.xml
       lanelet2_map_file:=${LANELET2_MAP_FILE}
@@ -79,14 +74,17 @@ services:
     init: true
     ipc: host
     pid: service:map
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
     command: >
       ros2 launch autoware_launch tier4_system_component.launch.xml
-      diagnostic_graph_aggregator_graph_path:=/opt/autoware/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
       launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
       launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
       sensor_model:=${SENSOR_MODEL}
@@ -102,11 +100,14 @@ services:
     ipc: host
     pid: service:map
     runtime: nvidia
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - carla-interface
@@ -129,13 +130,15 @@ services:
     ipc: host
     pid: service:map
     runtime: nvidia
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - sensing
@@ -161,9 +164,12 @@ services:
     init: true
     ipc: host
     pid: service:map
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - sensing
@@ -183,9 +189,12 @@ services:
     init: true
     ipc: host
     pid: service:map
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - localization
@@ -209,16 +218,19 @@ services:
     init: true
     ipc: host
     pid: service:map
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - carla-interface
     command: >
       ros2 launch tier4_vehicle_launch vehicle.launch.xml
       launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE}
-      raw_vehicle_cmd_converter_param_path:=/opt/autoware/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
+      raw_vehicle_cmd_converter_param_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
       sensor_model:=${SENSOR_MODEL}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_id:=${VEHICLE_ID}
@@ -232,9 +244,14 @@ services:
     init: true
     ipc: host
     pid: service:map
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ../../base/config/vehicle_cmd_gate.param.yaml:/opt/autoware/autoware_vehicle_cmd_gate/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml:ro
+      - ../../base/config/vehicle_cmd_gate.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml:ro
     depends_on:
       - map
       - planning
@@ -258,9 +275,12 @@ services:
     init: true
     ipc: host
     pid: service:map
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - system
@@ -280,17 +300,17 @@ services:
     ipc: host
     pid: service:map
     runtime: nvidia
+    env_file:
+      - ../../base/runtime.env
     environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
-      # GPU-accelerate RViz via VirtualGL when a GPU is present; the
-      # visualizer entrypoint auto-detects and falls back to software
-      # rendering otherwise (override with RVIZ_GPU=on|off).
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
       - RVIZ_GPU=auto
+    volumes:
+      - ../../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - api

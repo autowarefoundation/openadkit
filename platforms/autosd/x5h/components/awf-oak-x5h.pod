@@ -1,13 +1,44 @@
 [Pod]
 PodName=awf-oak-x5h
 # Host networking, matching deployments/samples/scenario-simulation. Domain 1
-# discovery then stays on loopback, and the bridge container can see tap0 --
-# which is a host interface created by rpmsg-eth.service, not something a
-# rootless pod network could reach.
+# discovery then stays on loopback, and a container sharing this namespace
+# can see tap0 -- a host interface created by rpmsg-eth.service, not
+# something a rootless pod network could reach.
 Network=host
 
-# Three things -- not two -- are what let a container in this pod start at
-# all. Every container unit carries ALL of:
+# MEMBERSHIP: this pod holds the SEVEN core Autoware components only --
+# map, planning, vehicle, system, control, simulator, api. awf-oak-bridge
+# and awf-oak-scenario are deliberately NOT members, and must not be
+# "reunified" back in.
+#
+# Why: Quadlet gives the generated pod service a `Wants=` on every member,
+# and gives every member a `BindsTo=` on the pod. Starting any single
+# component therefore starts the pod, and the pod then starts every other
+# member. With all nine in the pod, `systemctl start awf-oak-map` also
+# started awf-oak-bridge and awf-oak-scenario -- observed on the board,
+# 2026-08-18 -- which makes "Autoware alone on domain 1", the entire premise
+# of the Stage 1 isolation gate, unreachable by any choice of units an
+# operator can make. x5h-stack-smoke.sh's `autoware` mode asserts
+# `bridge_active` is false precisely so a Stage 1 PASS cannot be collected on
+# a bridged board; with the bridge in the pod that assertion fires on every
+# run. The scenario runner is the same problem in a worse form: it has no
+# `[Install]` section specifically so a scenario never runs at boot, and pod
+# membership defeated that (observed: awf-oak-scenario killed with SIGTERM
+# after being started by nobody).
+#
+# What the two ex-members lose by leaving, and how they get it back: pod
+# membership here conveyed only the shared network namespace, because
+# Network=host above means that namespace IS the host's. Both units
+# therefore carry their own `Network=host` in [Container], which is exactly
+# equivalent -- the bridge still sees tap0 for domain 2 and both still reach
+# domain 1 on loopback. Nothing else was inherited: the pod declares no
+# Volume=, no EnvironmentFile= that reaches members, and the ipc/uts sharing
+# a podman pod adds is unused here (CycloneDDS is configured for UDP, not
+# shared memory -- see cyclonedds-x5h.xml -- and USE_POINTCLOUD_CONTAINER is
+# false).
+#
+# Three things -- not two -- are what let any container in this stack start
+# at all, member of this pod or not. All nine container units carry ALL of:
 #
 #   1. EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env in [Service],
 #      so *systemd* can expand the ${...} references in the ExecStart=
@@ -17,8 +48,8 @@ Network=host
 #      is the one that is easy to lose, precisely because sitting next to
 #      the [Container] copy it looks redundant: delete it and every
 #      ${...} in ExecStart expands to the empty string, podman exits with
-#      "repository name must have at least one component", and all nine
-#      units fail at once -- which the board smoke reports as a plain
+#      "repository name must have at least one component", and every
+#      unit fails at once -- which the board smoke reports as a plain
 #      unit_inactive, giving no hint that an env file is missing.
 #   2. EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env in
 #      [Container], which Quadlet turns into `podman run --env-file`, so the

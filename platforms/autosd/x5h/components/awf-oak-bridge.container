@@ -20,7 +20,22 @@ After=rpmsg-eth.service
 WantedBy=default.target
 
 [Container]
-Pod=awf-oak-x5h.pod
+# NOT a member of awf-oak-x5h.pod, deliberately -- see the MEMBERSHIP note in
+# awf-oak-x5h.pod. Quadlet's generated pod service Wants= every member, so
+# with this unit in the pod, starting any single Autoware component also
+# started the bridge, and "Autoware alone on domain 1" (the Stage 1
+# isolation gate, enforced by x5h-stack-smoke.sh's bridge_active check)
+# could not be reached by any choice of units.
+#
+# Network=host replaces exactly what pod membership used to supply: the pod
+# itself declares Network=host, so its members were on the host namespace
+# anyway. This is the load-bearing line for domain 2 -- tap0 is a host
+# interface created by rpmsg-eth.service, and cyclonedds-x5h.xml pins domain
+# 2 to it by name with autodetermine="false". Without host networking the
+# bridge would come up in its own netns, tap0 would not exist there, and
+# CycloneDDS would fail to find the configured interface. Domain 1 stays
+# reachable on loopback for the same reason.
+Network=host
 ContainerName=awf-oak-bridge
 Image=${BRIDGE_IMAGE}
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env

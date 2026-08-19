@@ -9,6 +9,18 @@ After=network-online.target
 # own INITIALIZE_DURATION is what actually waits for Autoware.
 After=awf-oak-autoware.service
 
+# Same map guard as awf-oak-autoware, and it belongs here independently:
+# this unit does not read map_path, it reads the scenario, and the
+# scenario's RoadNetwork hard-codes
+# /autoware/scenario-sim/map/lanelet2_map.osm (LogicFile) and
+# .../pointcloud_map.pcd (SceneGraphFile). With the map directory empty the
+# runner starts, fails to build the road network, and the run ends as a
+# timeout rather than as "the map is missing". See the long note in
+# awf-oak-autoware.container for why this is Condition and not Assert, and
+# for what the retired extractor's Requires= edge used to guarantee.
+ConditionPathExists=/var/lib/awf/scenario-sim/map/lanelet2_map.osm
+ConditionPathExists=/var/lib/awf/scenario-sim/map/pointcloud_map.pcd
+
 # NO [Install] SECTION, deliberately. A scenario must never run unbidden at
 # boot. Quadlet auto-enables any .container that has an [Install] section,
 # regardless of what 80-x5h.preset says, and there is no preset knob that
@@ -27,11 +39,26 @@ After=awf-oak-autoware.service
 # scenario_test_runner on the same domain 1 loopback path as Autoware.
 Network=host
 ContainerName=awf-oak-simulator
-# NOTE ON THE NAME: `awf-oak-simulator` previously meant the componentized
-# tier4_simulator_component unit. It now means the scenario runner, matching
-# run.yml's `simulator` service. The old meaning is gone with the old image
-# set; a board still carrying the previous unit file must have
-# /etc/containers/systemd reinstalled, not merged.
+# NOTE ON THE NAME, AND THE TRAP IT SETS: `awf-oak-simulator` previously
+# meant the componentized tier4_simulator_component unit. It now means the
+# scenario runner, matching run.yml's `simulator` service. The old meaning
+# is gone with the old image set, so a board still carrying the previous
+# unit file must have /etc/containers/systemd reinstalled, not merged.
+#
+# The sharper hazard is in scripts/x5h-stack-smoke.sh, which still lists
+# `awf-oak-simulator` in CORE_UNITS -- the set it starts for the Stage 1
+# "Autoware alone on domain 1" isolation gate. Under the new meaning that
+# line starts a SCENARIO RUN as part of an isolation gate. And because a
+# unit of that name still EXISTS, the mistake does not announce itself:
+# systemctl succeeds, check_units is satisfied, and the gate reports on a
+# board that is quietly driving a scenario. A rename that deleted the name
+# outright would have failed loudly instead; reusing it is what converts
+# the error into a silent one.
+#
+# That script is updated by a separate change (it also has to swap
+# awf-oak-map for awf-oak-autoware and awf-oak-scenario for this unit), so
+# it is deliberately not edited here -- but nothing in this file should be
+# read as saying the collision is harmless until it is.
 Image=${SCENARIO_SIMULATOR_IMAGE}
 # See the Pull=never note in awf-oak-autoware.container -- with a real
 # ghcr.io reference a store miss would otherwise start a 7.13 GB pull.

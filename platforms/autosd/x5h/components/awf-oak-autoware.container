@@ -22,6 +22,43 @@ After=network-online.target
 # another. Keep every inter-unit edge an ordering edge only.
 After=awf-oak-bridge.service
 
+# THE MAP MUST BE STAGED, AND WITHOUT THIS THE FAILURE IS SILENT.
+# map_path:= below points at /autoware/scenario-sim/map, which is the
+# /var/lib/awf/scenario-sim mount. /etc/tmpfiles.d/awf-oak-x5h.conf
+# guarantees only that the DIRECTORY exists -- the 39 MB of map data is
+# staged onto the board separately and is deliberately not in the image.
+#
+# With an empty map directory this container starts, Type=notify reports
+# success, the unit sits there green, and Autoware hangs in INITIALIZING
+# for ever. That is the same state the reference demo's own recorded junit
+# result captured ("The simulator attempted to request Autoware to engage,
+# but was aborted because Autoware's current state is INITIALIZING"), and
+# from the outside it is indistinguishable from a slow start.
+#
+# The retired nine-unit set could not reach this state: every consumer
+# carried Requires=awf-oak-x5h-extract-map.service, and that one-shot
+# either produced a map or failed hard. Collapsing to five units removed
+# that edge along with the extractor, and a tmpfiles directory is a weaker
+# guarantee than the one-shot was. These two conditions are what replaces
+# it.
+#
+# Condition, not Assert, deliberately: a condition that is not met is not a
+# failure, so systemd logs one line naming the missing path, skips the
+# unit, and does not then retry it every 5 s under Restart=on-failure. The
+# unit reports inactive, which is exactly what x5h-stack-smoke.sh's
+# check_units already treats as a failure -- so the smoke still fails, but
+# with "map is missing" in the journal instead of a green unit and a
+# 180-second scenario timeout. This matches rpmsg-eth.service, which uses
+# the same mechanism for its hand-staged binary.
+#
+# Both files, ANDed (repeated conditions of one type must all pass): the
+# scenario's RoadNetwork references both by absolute in-container path, and
+# autoware_map_projection_loader falls back to deriving MGRS from
+# lanelet2_map.osm when no projector-info file is present, so neither file
+# is optional.
+ConditionPathExists=/var/lib/awf/scenario-sim/map/lanelet2_map.osm
+ConditionPathExists=/var/lib/awf/scenario-sim/map/pointcloud_map.pcd
+
 [Install]
 WantedBy=default.target
 
@@ -130,17 +167,7 @@ Volume=/etc/containers/systemd/mrm-scenario.yaml:/autoware/scenario-sim/mrm-scen
 # to 0.15, and named the pre-rename `predicted_path_checker` package.
 # Mounting it over this image would have reverted three unrelated upstream
 # changes to install one stub. Do not restore it.
-Volume=/etc/containers/systemd/launch/control.launch.xml:/opt/autoware/share/tier4_control_launch/launch/control.launch.xml:ro,Z
-# MRM tuning carried forward from the retired awf-oak-system unit, at the
-# merged path. Verified present in the image at
-# /opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml,
-# and verified schema-compatible with this image's stock file: our copy
-# differs only in timeout_operation_mode_availability (0.5 -> 2.5, which the
-# bridged domain-2 round trip needs) and turning_hazard_on.emergency
-# (false -> true). Unlike the api component's default_adapi.param.yaml
-# override -- deleted with that unit because it declared parameters this
-# image's nodes do not have -- this one does not set anything undeclared.
-Volume=/etc/containers/systemd/mrm_handler.param.yaml:/opt/autoware/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro,Z
+Volume=/etc/containers/systemd/control.launch.xml:/opt/autoware/share/tier4_control_launch/launch/control.launch.xml:ro,Z
 # Exec= is safe on THIS image and unsafe on the other two in this set; the
 # three entrypoints have three different contracts and they must not be
 # generalised from one another:
@@ -190,5 +217,9 @@ Exec=ros2 launch autoware_launch planning_simulator.launch.xml \
 # section, never by grepping the file for the key: a section-blind grep
 # sees the [Container] copy and wrongly declares the unit fine.
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+# Restart=on-failure is a deviation from run.yml's `restart: "no"`, recorded
+# as such in awf-oak-x5h.env. StartLimitIntervalSec is what makes it safe:
+# see that note for the arithmetic.
 Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60

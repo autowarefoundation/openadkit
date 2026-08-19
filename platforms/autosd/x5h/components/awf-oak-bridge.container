@@ -67,5 +67,9 @@ Volume=/etc/containers/systemd/bridge-config.yaml:/autoware/bridge-config.yaml:r
 # Verify by parsing the generated [Service] section, not by grepping the
 # file for the key.
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+# Restart=on-failure is a deviation from run.yml's `restart: "no"`, recorded
+# as such in awf-oak-x5h.env. StartLimitIntervalSec is what makes it safe:
+# see that note for the arithmetic.
 Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=60

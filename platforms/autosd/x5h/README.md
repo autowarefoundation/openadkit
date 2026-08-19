@@ -74,7 +74,7 @@ answered before board time.
   them: the shared `awf-oak-x5h.env` every unit reads, the
   `cyclonedds-x5h.xml` that splits DDS domain 1 (Autoware, host network)
   from domain 2 (the CR52 safety island over `tap0`), the `launch/` control
-  stub and `mrm_handler.param.yaml` override the Autoware unit mounts,
+  stub the Autoware unit mounts over the image's own copy,
   `scenario/mrm-scenario.yaml` (the MRM test definition; its 39 MB map is
   staged to the board separately, not committed), `nodes/` (the relay and
   restamp sources, bind-mounted rather than baked), `images.txt` (the
@@ -82,8 +82,9 @@ answered before board time.
   onto the board), and `bridge/` — the `domain_bridge` container that joins
   the two domains, including its own build recipe. The unit set is a Quadlet
   translation of the working CES2026 demo of this topology; the
-  compose-service-to-unit mapping is recorded at the top of
-  `awf-oak-x5h.env`
+  compose-service-to-unit mapping, the exhaustive list of deviations from
+  it, and the repo-subdirectory-to-flat-board-path rule for every mounted
+  asset are all recorded at the top of `awf-oak-x5h.env`
 - `scripts/`: QEMU gate harness and board staging/smoke scripts
 - `rpmsg-eth/`: the IP-over-RPMsg TAP bridge daemon (source, Makefile, and
   its own pty-mock unit test) — see [rpmsg-dualboot.md](rpmsg-dualboot.md)

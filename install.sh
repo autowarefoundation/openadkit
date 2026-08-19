@@ -54,7 +54,8 @@ Usage:
   install.sh [OPTIONS]
   install.sh sample-data [DEPLOYMENT] [OPTIONS]
 
-Default behavior installs host dependencies (Docker and NVIDIA Container Toolkit).
+Default behavior installs host dependencies (Docker, NVIDIA Container Toolkit,
+and NVIDIA OpenGL/Vulkan libraries).
 
 Commands:
   sample-data            Download sample maps/rosbags only; defaults to all sample data
@@ -70,7 +71,7 @@ EOF
 Options:
   --help                  Display this help message
   -h                      Display this help message
-  --no-nvidia             Skip installation of NVIDIA container toolkit
+  --no-nvidia             Skip NVIDIA container toolkit and OpenGL/Vulkan libraries
   --download-artifacts    Also download Autoware artifacts after host setup
                            (unlike old setup.sh, this does NOT skip Docker/NVIDIA)
   --build-deps            Install tools needed to build images from source
@@ -258,6 +259,87 @@ install_nvidia_container_toolkit() {
     fi
 
     log_info "NVIDIA Container Toolkit configured successfully."
+}
+
+nvidia_gl_libraries_present() {
+    ldconfig -p 2>/dev/null | grep -q 'libGLX_nvidia\.so'
+}
+
+apt_package_has_candidate() {
+    local candidate
+    candidate="$(apt-cache policy "$1" 2>/dev/null | awk '$1 == "Candidate:" { print $2; exit }' || true)"
+    [ -n "$candidate" ] && [ "$candidate" != "(none)" ]
+}
+
+apt_madison_version() {
+    local pkg="$1"
+    local match="${2:-}"
+    apt-cache madison "$pkg" 2>/dev/null | awk -F'|' -v prefix="$match" '
+        {
+            version=$2
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", version)
+            if (version == "") next
+            if (prefix == "" || index(version, prefix) == 1) {
+                print version
+                exit
+            }
+        }' || true
+}
+
+install_nvidia_gl_libraries() {
+    if nvidia_gl_libraries_present; then
+        log_info "NVIDIA OpenGL/Vulkan libraries are already installed."
+        return 0
+    fi
+
+    if ! command -v nvidia-smi &>/dev/null; then
+        log_warn "nvidia-smi not found; skipping NVIDIA OpenGL/Vulkan libraries."
+        return 0
+    fi
+
+    local driver_version driver_branch pkg compute_pkg compute_ver gl_ver dep dep_ver
+    local -a install_pkgs
+
+    driver_version="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | tr -d '[:space:]')"
+    driver_branch="${driver_version%%.*}"
+    pkg="libnvidia-gl-${driver_branch}"
+    compute_pkg="libnvidia-compute-${driver_branch}"
+    compute_ver="$(dpkg-query -W -f='${Version}' "$compute_pkg" 2>/dev/null || true)"
+
+    log_info "Installing NVIDIA OpenGL/Vulkan libraries (${pkg}) for driver ${driver_version}..."
+    sudo apt-get update
+
+    if apt_package_has_candidate "$pkg"; then
+        sudo apt-get install -y --no-install-recommends "$pkg"
+    else
+        gl_ver="$compute_ver"
+        if [ -z "$gl_ver" ] || [ -z "$(apt_madison_version "$pkg" "$gl_ver")" ]; then
+            gl_ver="$(apt_madison_version "$pkg" "$driver_version")"
+        fi
+        if [ -z "$gl_ver" ]; then
+            gl_ver="$(apt_madison_version "$pkg")"
+        fi
+        if [ -z "$gl_ver" ]; then
+            log_error "Could not find ${pkg} for NVIDIA driver ${driver_version}."
+            return 1
+        fi
+
+        install_pkgs=("${pkg}=${gl_ver}")
+        for dep in libnvidia-egl-gbm1 libnvidia-egl-wayland1 libnvidia-egl-xcb1 libnvidia-egl-xlib1; do
+            dep_ver="$(apt_madison_version "$dep")"
+            if [ -n "$dep_ver" ]; then
+                install_pkgs+=("${dep}=${dep_ver}")
+            fi
+        done
+        sudo apt-get install -y --no-install-recommends "${install_pkgs[@]}"
+    fi
+
+    sudo ldconfig
+    if ! nvidia_gl_libraries_present; then
+        log_error "Installed ${pkg} but libGLX_nvidia is still missing."
+        return 1
+    fi
+    log_info "NVIDIA OpenGL/Vulkan libraries installed."
 }
 
 docker_compose_supports_repo_graph() {
@@ -872,6 +954,12 @@ verify_installation() {
 
     # Verify NVIDIA runtime if requested and GPU is available
     if [ "$INSTALL_NVIDIA" = true ] && command -v nvidia-smi &>/dev/null; then
+        if nvidia_gl_libraries_present; then
+            log_info "NVIDIA OpenGL/Vulkan libraries are present."
+        else
+            log_error "NVIDIA OpenGL/Vulkan libraries are missing (expected libnvidia-gl)."
+            return 1
+        fi
         log_info "Pulling NVIDIA CUDA test image for GPU verification..."
         if sudo docker pull nvidia/cuda:12.2.0-base-ubuntu22.04 &>/dev/null; then
             if sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi &>/dev/null; then
@@ -999,6 +1087,7 @@ install_docker
 
 if [ "$INSTALL_NVIDIA" = true ]; then
     install_nvidia_container_toolkit
+    install_nvidia_gl_libraries
 fi
 
 if [ "$INSTALL_BUILD_DEPS" = true ]; then

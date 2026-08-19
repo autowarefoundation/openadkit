@@ -3,7 +3,7 @@
 ## Requirements
 
 - Docker Engine
-- NVIDIA Container Toolkit (Optional but highly recommended for sensing and perception tasks)
+- NVIDIA Container Toolkit and OpenGL/Vulkan libraries (Optional but highly recommended for sensing, perception, and CARLA)
 - Autoware artifacts (Optional in general, but required for sensing and perception deployments such as Logging Simulation)
 
     > All the above requirements can be installed by running the **install.sh** script.
@@ -29,7 +29,7 @@
     newgrp docker
     ```
 
-    > You can use the `--no-nvidia` flag to skip the installation of the NVIDIA Container Toolkit if you don't have a **NVIDIA GPU**. Otherwise, it's **highly recommended** to install it to utilize CUDA for better performance for sensing and perception tasks.
+    > You can use the `--no-nvidia` flag to skip the NVIDIA Container Toolkit and OpenGL/Vulkan libraries if you don't have a **NVIDIA GPU**. Otherwise, it's **highly recommended** to install them for CUDA and GPU rendering.
 
 3. Download the Autoware artifacts by running the following command, requires sudo privileges:
 

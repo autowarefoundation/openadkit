@@ -85,9 +85,6 @@ content:
     - path: /etc/udev/rules.d
       parents: true
       exist_ok: true
-    - path: /etc/containers/systemd/launch
-      parents: true
-      exist_ok: true
     - path: /etc/tmpfiles.d
       parents: true
       exist_ok: true
@@ -102,6 +99,18 @@ content:
   #     image build) because the filesystem package owns them. This manifest
   #     declares no /usr directory for that reason.
   #
+  #   /etc/containers/systemd -- same reason, and it needs stating because
+  #     this manifest used to create it by accident. The retired
+  #     /etc/containers/systemd/launch entry carried parents: true, so the
+  #     Quadlet directory came into being as that entry's parent; flattening
+  #     the asset layout (see the add_files block) retired it. The directory
+  #     is package-owned: `rpm -qf /etc/containers/systemd` on the board
+  #     answers containers-common-6.0-2.el10.noarch, and it is present in
+  #     the built rootfs dated from the image build, not from any add_files
+  #     stage of ours. add_files does not create parents for an explicit
+  #     source_path -> path pair, so if that ever stops being true every
+  #     component entry below fails at once, loudly, in the copy stage.
+  #
   #   /usr/local/libexec, /usr/local/sbin -- REJECTED by aib outright:
   #     "Path '/usr/local/libexec' is not allowed for make_dirs. Files and
   #     directories must be under one of: /etc/, /var/, /usr/, but not under
@@ -113,13 +122,26 @@ content:
   #     first offending make_dirs, so the matching add_files entries were
   #     never even reached -- they would have failed the same way.
   #
-  #   /opt/tier4/kashiwanoha_map -- same wall for the same reason: /opt is a
-  #     symlink to var/opt on this rootfs, and /opt is not a permitted root
-  #     either. It is created at boot by /etc/tmpfiles.d/awf-oak-x5h.conf
-  #     instead (installed below). The mount path itself is UNCHANGED -- all
-  #     nine unit Volume= lines and the extractor script still say
-  #     /opt/tier4/kashiwanoha_map; only how the directory comes into being
-  #     moved.
+  #   /var/lib/awf, /var/lib/awf/scenario-sim and
+  #     /var/lib/awf/scenario-sim/map -- the scenario working directory
+  #     awf-oak-autoware and awf-oak-simulator both bind-mount, and the map
+  #     directory inside it. /var IS a permitted make_dirs root, so unlike
+  #     the two cases above these would not be rejected; they are declared
+  #     in /etc/tmpfiles.d/awf-oak-x5h.conf (installed below) anyway,
+  #     because /var on this ostree-structured rootfs is empty until first
+  #     boot and an image-build-time mkdir under it writes into a
+  #     filesystem that is then replaced. See that file for the full
+  #     argument and for why `d` and not `D` (a `D` line would delete the
+  #     staged 36 MB point cloud on every boot).
+  #
+  #   /opt/tier4/kashiwanoha_map -- gone entirely, not merely relocated. The
+  #     kashiwanoha map and its extractor unit were retired with the
+  #     componentized image set: the MRM scenario ships its own matched map,
+  #     whose absolute in-container paths are
+  #     /autoware/scenario-sim/map/{lanelet2_map.osm,pointcloud_map.pcd}.
+  #     /opt was rejected by aib for the same reason /usr/local is (a
+  #     symlink, here to var/opt), which is recorded because the next
+  #     profile to reach for /opt will hit the same wall.
   #
   # Note this diverges from platforms/autosd/planning-simulator, which has
   # make_dirs for /opt/tier4/kashiwanoha_map and /usr/local/libexec plus
@@ -173,46 +195,50 @@ content:
     # late), and for why this does NOT also unmask the fstab generator that
     # selfboot.md works around separately.
     #
-    # Eight of the nine `.container` units below carry `[Install] WantedBy=
+    # Four of the five `.container` units below carry `[Install] WantedBy=
     # default.target`, which Quadlet auto-enables at unit-generation time on
     # every boot regardless of what 80-x5h.preset says -- there is no preset
     # knob that keeps a Quadlet-generated unit present but dormant. The
-    # ninth, awf-oak-scenario.container, has no `[Install]` section at all
+    # fifth, awf-oak-simulator.container, has no `[Install]` section at all
     # (deliberate: starting a scenario on every reboot would be wrong), so
     # Quadlet never auto-enables it -- it only ever runs on demand, from the
-    # smoke script. All nine units set `Pull=never`, and
-    # awf-oak-x5h-extract-map.service (enabled by 80-x5h.preset below) runs
-    # `podman image exists "$image"` under `set -euo pipefail`, which is a
-    # hard failure, not a wait-and-retry, when the image has not been loaded
-    # onto the board yet.
+    # smoke script's `drive` mode. All five units set `Pull=never`.
     #
     # Consequence: a freshly built and flashed image, booted before any
     # container image has been staged onto it, WILL come up with as many as
-    # nine failed units -- the eight auto-enabled `.container` units plus
-    # the map extractor. This is expected on that specific boot, not a
-    # regression, and the human-ruled fix is to document the sequence
-    # below rather than to make those units succeed -- adding start
-    # conditions or dropping `[Install]` from any unit would change
-    # behavior the component units (Tasks 4/6, reviewed and frozen) already
-    # define.
+    # four failed units -- the auto-enabled awf-oak-{autoware,bridge,relay,
+    # restamp}. This is expected on that specific boot, not a regression,
+    # and the human-ruled fix is to document the sequence below rather than
+    # to make those units succeed -- adding start conditions or dropping
+    # `[Install]` from any unit would change behavior the unit files
+    # (reviewed and frozen) already define.
     #
     # `Pull=never` is not an exception to that ruling: it does not stop a
     # single one of those units from failing, and the count above is
-    # unchanged. It only changes the error text. Without it a `localhost/*`
-    # image reference that is not in the local store sends podman to a
-    # registry literally named `localhost` -- three HTTPS retries and a
-    # `dial tcp [::1]:443: connection refused`, which reads as a network
-    # fault rather than as an unstaged image. Observed on the board
-    # 2026-08-18 for awf-oak-bridge. See the *_IMAGE note in
-    # ../components/awf-oak-x5h.env.
+    # unchanged. It only changes the error text -- and with the two
+    # Autoware images now referenced by their real ghcr.io names (see
+    # ../components/images.txt), it matters more than it did: a store miss
+    # against a real registry reference would otherwise start a 5 GB or
+    # 7 GB pull from the board rather than failing fast. Without it a
+    # `localhost/*` reference that is not in the local store instead sends
+    # podman to a registry literally named `localhost` -- three HTTPS
+    # retries and a `dial tcp [::1]:443: connection refused`, which reads as
+    # a network fault rather than as an unstaged image. Observed on the
+    # board 2026-08-18 for awf-oak-bridge, which is still a `localhost/`
+    # reference because it is built on the board.
     # Required bring-up order:
     #   1. build and flash this image;
-    #   2. stage the container images onto the board:
+    #   2. stage the two Autoware container images onto the board:
     #      scripts/stage-container-images.sh --stage;
-    #   3. start the units (systemctl restart --all, or just reboot).
-    # Once step 2 has run, the units recover on their own restart policy (or
-    # on the reboot in step 3) with no further manifest change needed. The
-    # board's documented steady state -- `systemctl is-system-running` =
+    #   3. build the bridge image on the board (components/bridge/Dockerfile)
+    #      -- it has no registry ref, so step 2 cannot stage it;
+    #   4. stage the scenario map, 39 MB that is deliberately not committed
+    #      and not in either image:
+    #      scripts/stage-scenario-map.sh --stage;
+    #   5. start the units (systemctl restart --all, or just reboot).
+    # Once steps 2-4 have run, the units recover on their own restart policy
+    # (or on the reboot in step 5) with no further manifest change needed.
+    # The board's documented steady state -- `systemctl is-system-running` =
     # `degraded` with `ukiboot-set-success.service` as the only benign
     # failure -- describes a board that has already been through this
     # sequence; it does not describe the very first boot after flashing.
@@ -220,50 +246,49 @@ content:
     # Entries below are ordered alphabetically by target path (ignoring the
     # common /etc/containers/systemd/ prefix) so a new entry has exactly one
     # place to go: where its path sorts.
-    - source_path: ../components/awf-oak-api.container
-      path: /etc/containers/systemd/awf-oak-api.container
+    - source_path: ../components/awf-oak-autoware.container
+      path: /etc/containers/systemd/awf-oak-autoware.container
     - source_path: ../components/awf-oak-bridge.container
       path: /etc/containers/systemd/awf-oak-bridge.container
-    - source_path: ../components/awf-oak-control.container
-      path: /etc/containers/systemd/awf-oak-control.container
-    - source_path: ../components/awf-oak-map.container
-      path: /etc/containers/systemd/awf-oak-map.container
-    - source_path: ../components/awf-oak-planning.container
-      path: /etc/containers/systemd/awf-oak-planning.container
-    - source_path: ../components/awf-oak-scenario.container
-      path: /etc/containers/systemd/awf-oak-scenario.container
+    - source_path: ../components/awf-oak-relay.container
+      path: /etc/containers/systemd/awf-oak-relay.container
+    - source_path: ../components/awf-oak-restamp.container
+      path: /etc/containers/systemd/awf-oak-restamp.container
     - source_path: ../components/awf-oak-simulator.container
       path: /etc/containers/systemd/awf-oak-simulator.container
-    - source_path: ../components/awf-oak-system.container
-      path: /etc/containers/systemd/awf-oak-system.container
-    - source_path: ../components/awf-oak-vehicle.container
-      path: /etc/containers/systemd/awf-oak-vehicle.container
     - source_path: ../components/awf-oak-x5h.env
       path: /etc/containers/systemd/awf-oak-x5h.env
-    - source_path: ../components/awf-oak-x5h.pod
-      path: /etc/containers/systemd/awf-oak-x5h.pod
     - source_path: ../components/bridge/bridge-config.yaml
       path: /etc/containers/systemd/bridge-config.yaml
+    # EVERY mounted asset lands FLAT in /etc/containers/systemd/<basename>,
+    # whatever subdirectory the repository keeps it in: launch/, nodes/ and
+    # scenario/ group these files for human readers and have no meaning on
+    # the board. The rule is stated in ../components/awf-oak-x5h.env and the
+    # units' Volume= lines are written against it. Its practical consequence
+    # here is that no asset subdirectory needs creating, so the
+    # /etc/containers/systemd/launch make_dirs entry that the old
+    # launch/control.launch.xml target required is gone; adding a mounted
+    # asset now means adding exactly one add_files entry, in the one place
+    # its target path sorts.
+    - source_path: ../components/launch/control.launch.xml
+      path: /etc/containers/systemd/control.launch.xml
+    - source_path: ../components/nodes/control_restamp.py
+      path: /etc/containers/systemd/control_restamp.py
     - source_path: ../components/cyclonedds-x5h.xml
       path: /etc/containers/systemd/cyclonedds-x5h.xml
-    - source_path: ../components/default_adapi.param.yaml
-      path: /etc/containers/systemd/default_adapi.param.yaml
-    - source_path: ../components/launch/control.launch.xml
-      path: /etc/containers/systemd/launch/control.launch.xml
-    - source_path: ../components/mrm_handler.param.yaml
-      path: /etc/containers/systemd/mrm_handler.param.yaml
-    # /opt is not a permitted make_dirs root (and is a symlink to var/opt on
-    # this rootfs), so /opt/tier4/kashiwanoha_map -- the map directory all
-    # nine units mount -- is created at boot by systemd-tmpfiles instead.
-    # See config/awf-oak-x5h-tmpfiles.conf for the full reasoning and the
+    - source_path: ../components/scenario/mrm-scenario.yaml
+      path: /etc/containers/systemd/mrm-scenario.yaml
+    - source_path: ../components/nodes/traj_relay.py
+      path: /etc/containers/systemd/traj_relay.py
+    # /var/lib/awf/scenario-sim{,/map} -- the scenario working directory
+    # awf-oak-autoware and awf-oak-simulator mount, and the directory the
+    # map is staged into -- are created at boot by systemd-tmpfiles rather
+    # than at image-build time, because /var is empty until first boot. See
+    # config/awf-oak-x5h-tmpfiles.conf for the full reasoning and the
     # ordering argument. Target name drops the source's "-tmpfiles" infix:
     # everything in /etc/tmpfiles.d is a tmpfiles config already.
     - source_path: ../config/awf-oak-x5h-tmpfiles.conf
       path: /etc/tmpfiles.d/awf-oak-x5h.conf
-    - source_path: ../components/awf-oak-x5h-extract-map.service
-      path: /etc/systemd/system/awf-oak-x5h-extract-map.service
-    - source_path: ../components/awf-oak-x5h-extract-map.sh
-      path: /usr/libexec/awf-oak-x5h-extract-map.sh
     # rpmsg-eth: only the unit file and its ifup helper are installed by
     # this manifest. The daemon binary itself (ExecStart=/usr/local/bin/
     # rpmsg-eth) is a statically-linked binary built on a host with an
@@ -287,8 +312,12 @@ content:
     # systemd logs one line naming the missing path, skips the unit, and
     # reports the start job as successful, satisfying the bridge's
     # Requires= cleanly. This is also why rpmsg-eth.service is NOT one of
-    # the up-to-nine failed units described above: it is skipped, not
-    # failed, and it was never failed before either (it looped).
+    # the up-to-four failed units described above: it is skipped, not
+    # failed, and it was never failed before either (it looped). The same
+    # mechanism now guards the map: awf-oak-autoware and awf-oak-simulator
+    # carry ConditionPathExists= on the two staged map files, so a board
+    # whose map has not been staged skips those units with a journal line
+    # naming the missing path instead of hanging in INITIALIZING.
     - source_path: ../config/rpmsg-eth.service
       path: /etc/systemd/system/rpmsg-eth.service
     - source_path: ../scripts/rpmsg-eth-ifup.sh

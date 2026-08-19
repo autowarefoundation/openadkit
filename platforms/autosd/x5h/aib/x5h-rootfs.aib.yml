@@ -33,6 +33,23 @@ content:
     # therefore produce a false reason=ping_loss -- precisely the misleading
     # failure that parser was written to avoid.
     - iputils
+    # Same class of problem as `iputils` above, and it already bit us:
+    # x5h-stack-smoke.sh's decisive `stack` check -- the one that proves the
+    # CR52 is the source of /control/trajectory_follower/control_cmd, i.e.
+    # the one M7 turns on -- used to shell out to `tcpdump -ni tap0`. With
+    # tcpdump absent the capture yielded zero packets and the smoke reported
+    # reason=control_cmd_not_from_cr52 on a perfectly healthy stack,
+    # indistinguishable from a genuinely dead link. That check no longer
+    # needs tcpdump (it echoes the topic on domain 2 instead), but the
+    # package is installed anyway: the manual board-verification steps in
+    # rpmsg-dualboot.md and component-stack bring-up reach for a packet
+    # capture on tap0 whenever the link misbehaves, and the board has no
+    # `dnf` and no `rpm-ostree`, so a missing tool cannot be installed
+    # mid-session -- it can only be worked around or misread. Note a board
+    # flashed from an image built BEFORE this entry existed will not have
+    # tcpdump; check with `command -v tcpdump` before relying on it, rather
+    # than concluding from an empty capture that the link is dead.
+    - tcpdump
   # add_files (org.osbuild.copy) does not create parent directories, and
   # nothing else in the pipeline creates /etc/containers/containers.conf.d
   # (init_rootfs_dirs_stage creates /etc itself, but not this subtree).

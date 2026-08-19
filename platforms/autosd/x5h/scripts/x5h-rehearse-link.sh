@@ -61,6 +61,11 @@ case "${1:---measure}" in
     ;;
 --measure)
     [ -d "/sys/class/net/$HOST_IF" ] || fail "no_rig_run_setup_first"
+    # A zero or non-numeric window makes the division below abort before
+    # any marker is printed, which breaks the one-marker-per-run contract.
+    case "$DUR" in
+        ''|*[!0-9]*|0) fail "measure_seconds=$DUR" ;;
+    esac
     # Count only domain-2 traffic: everything on this interface is domain 2
     # by construction, so interface counters are the measurement.
     # tx_* on the host end == what domain 1 pushes toward the safety

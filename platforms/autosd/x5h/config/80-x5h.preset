@@ -1,2 +1,32 @@
+# systemd presets for the Open AD Kit X5H image (issue #120 M7).
+# Installed by aib/x5h-rootfs.aib.yml to /etc/systemd/system-preset/.
+#
+# This file enables exactly one unit, and the short list is deliberate.
+#
+# THE FIVE QUADLET UNITS ARE NOT LISTED, and adding them would be a no-op
+# that reads like a decision. Quadlet generates their .service units at
+# boot and writes the default.target.wants symlink itself for every
+# .container that carries an [Install] section -- that is what "enabled"
+# means for a generated unit, and no preset line adds to or subtracts from
+# it. So awf-oak-{autoware,bridge,relay,restamp} come up at boot because
+# their unit files say [Install] WantedBy=default.target, and
+# awf-oak-simulator does not because it deliberately has no [Install] at
+# all (a scenario must never run unbidden; see the note in that file). The
+# only lever over that set is the unit files, not this file.
+#
+# rpmsg-eth.service IS installed by the manifest and is deliberately NOT
+# enabled here -- a standing human ruling. Its daemon binary
+# (/usr/local/bin/rpmsg-eth) is hand-staged per rpmsg-dualboot.md and is
+# not in the image, so enabling it would put a unit in the boot path that
+# cannot run on a freshly flashed board. It is not left unreachable by the
+# omission: awf-oak-bridge.container carries Requires=rpmsg-eth.service, so
+# the link is pulled up at boot on any board where the bridge starts, and
+# the unit's own ConditionPathExists= makes an unstaged binary a skipped
+# unit with one journal line rather than a failure or a restart loop.
+#
+# awf-oak-x5h-extract-map.service was enabled here until the nine-unit set
+# was retired. Both the unit and the kashiwanoha map it extracted are gone
+# (the MRM scenario ships its own matched map, staged onto the board by
+# scripts/stage-scenario-map.sh), so the line was naming a unit that no
+# longer exists and had to go with it.
 enable sshd.service
-enable awf-oak-x5h-extract-map.service

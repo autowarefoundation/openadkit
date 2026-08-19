@@ -21,9 +21,8 @@ The default runtime uses the official CARLA Ubuntu 22 container image. It does n
   so `${MAP_PATH}` (which uses `$HOME`) interpolates to an empty mount and
   localization never initializes.
 - Access to `carlasim/carla:0.9.16`
-- A working host X display, usually `DISPLAY=:0`
-- Host X access for local Docker containers, for example `xhost +SI:localuser:root`
-- Host NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
+- An NVIDIA GPU visible to Docker (`--gpus all`). CARLA runs headless with
+  `-RenderOffScreen`; no host X display or Vulkan ICD file is required.
 - Large kernel UDP buffers for DDS (the start script raises them via `sudo sysctl`):
 
 ```bash
@@ -47,7 +46,7 @@ The helper will:
 
 - Use the CI-built `ghcr.io/autowarefoundation/openadkit:carla-interface` image.
 - Download the official CARLA Autoware Town01 map assets if missing.
-- Start `carlasim/carla:0.9.16` as `carla-e2e` on `DISPLAY=:0`.
+- Start `carlasim/carla:0.9.16` as `carla-e2e` with `-RenderOffScreen`.
 - Preload `Town01`.
 - Start modular OpenADKit map, system, CARLA interface, sensing, perception, localization, planning, vehicle, control, and API containers.
 - Start the browser RViz/noVNC visualizer.

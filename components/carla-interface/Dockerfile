@@ -11,7 +11,7 @@ RUN apt-get update \
     python3-pip \
     ros-${ROS_DISTRO}-compressed-image-transport \
     ros-${ROS_DISTRO}-topic-tools \
-  && python3 -m pip install --no-cache-dir \
+  && PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install --no-cache-dir \
     carla==${CARLA_PYTHON_VERSION} \
     transforms3d \
   && rm -rf /var/lib/apt/lists/*

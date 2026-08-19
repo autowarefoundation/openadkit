@@ -23,7 +23,9 @@ answered before board time.
 
 - [CR52 dual boot + RPMsg](rpmsg-dualboot.md) — run FreeRTOS on the
   realtime core under AutoSD; remoteproc `start` publishes RPMsg state to
-  a CR52 that is already executing, it does not load or release it.
+  a CR52 that is already executing, it does not load or release it. Also
+  covers `rpmsg-eth`, the IP-over-RPMsg TAP bridge daemon (`rpmsg-eth/`)
+  that gives the CR52 a normal Ethernet link to Linux.
 - [UFS self-boot](selfboot.md) — boot AutoSD unattended from the board's
   own storage, with both netboots kept as named rescue commands; also the
   reset semantics, including why a warm `reboot` restarts the CR52.
@@ -48,6 +50,9 @@ answered before board time.
   only permitted config delta is the `CONFIG_EXTRA_FIRMWARE` pair (see "One
   build, two images")
 - `scripts/`: QEMU gate harness and board staging/smoke scripts
+- `rpmsg-eth/`: the IP-over-RPMsg TAP bridge daemon (source, Makefile, and
+  its own pty-mock unit test) — see [rpmsg-dualboot.md](rpmsg-dualboot.md)
+  for cross-compile, staging, prerequisites and smoke
 - `uboot/`: `bootcmd_autosd` template (site values are filled at session
   time, not committed), and `selfboot-env.txt` — the `env import -t` payload
   defining the UFS self-boot plus both netboot rescue commands
@@ -337,6 +342,8 @@ reused — GATE6 and GATE7 are new, not GATE5's successor under a new name.
 | `GATE7_SELINUX_BOOLS_OK` | `selinux-bools.service` did not fail. It failed under the BSP/retired-mimic kernel's absent SELinux (see the Troubleshooting row) — with SELinux present it must now come up clean. | yes |
 | `GATE7_SELINUX_BOOLS_FAILED` | `selinux-bools.service` failed even with SELinux present — a real regression, not the benign BSP-kernel failure the Troubleshooting row documents. | no |
 | `GATE7_SELINUX_BOOLS_ABSENT` | `selinux-bools.service`'s `LoadState` reads `not-found` — the unit is missing from this image entirely. Disambiguates from `GATE7_SELINUX_BOOLS_OK`: `systemctl is-failed` alone exits nonzero both for "healthy" and for "does not exist", so without this check a dropped unit could otherwise print `_OK`. | no |
+| `GATE_RPMSG_ETH_UNIT_PASS` | GATE8: the `rpmsg-eth` TAP bridge daemon's own unit test (`rpmsg-eth/test-rpmsg-eth.sh`) passed inside its dedicated Fedora test container — real tap0 on the guest kernel under test, a mock endpoint (socat pty), `--network=none`. Requires both a zero `podman run` exit status and a literal `TEST_PASS` in its output (see `gate-guest.sh`'s GATE8 comment for why exit-status-alone is not sufficient). | yes |
+| `GATE_RPMSG_ETH_UNIT_FAIL` | The `rpmsg-eth` unit test failed — either the container/build step itself failed, or `test-rpmsg-eth.sh` ran and reported a `TEST_FAIL`. Not part of the pass path. | no |
 | `GATE_DONE` | `gate-guest.sh` reached the end of its run. | yes |
 
 `qemu-gate.exp` exits 0 only if every "Required: yes" marker above is present
@@ -481,7 +488,7 @@ disk, which is what `stage-nfs-rootfs.sh` consumes at board time.
 
 The replay needs three inputs: the rootfs tar, the rebuilt kernel's output
 directory (`Image-autosd`, `modules-6.1.102-autosd.tar` and
-`kernelrelease.txt` all come from it), and the two test-image tars. Build
+`kernelrelease.txt` all come from it), and the three test-image tars. Build
 them from source (below) or download a bundle CI already produced. **Neither
 route needs the NDA R-Car xOS SDK or any credential-gated download** — the
 rootfs resolves from public AutoSD 10 and EPEL 10 repos, the kernel builds
@@ -526,10 +533,11 @@ sudo bash ./auto-image-builder.sh build --tar \
 #    only (see "Board deployment" above), never to the gate.
 kernel/build-bsp-kernel.sh /tmp/x5h-kernel
 
-# 3. The two test images. make-test-images.sh also verifies the captest
+# 3. The three test images. make-test-images.sh also verifies the captest
 #    archive really carries a security.capability PAX record, so an xattr
 #    silently dropped at build time cannot reach the gate disguised as a
-#    GATE2 finding.
+#    GATE2 finding. The third, rpmsg-eth-docker.tar, carries the daemon
+#    source and its pty-mock unit test for GATE8 to run in-guest.
 scripts/make-test-images.sh /tmp/x5h-testimages
 ```
 
@@ -580,6 +588,7 @@ gh run download --repo youtalk/openadkit -n x5h-gate-bundle -D /tmp/x5h-bundle \
 #   Image-autosd  r8a78000-ironhide-uio-autosd.dtb  modules-6.1.102-autosd.tar
 #   kernelrelease.txt  config-autosd.txt  x5h-rootfs.tar  x5h-gate.log
 #   testimages/busybox-oci.tar  testimages/captest-docker.tar
+#   testimages/rpmsg-eth-docker.tar
 # There is no ext4 export in it: it is reproducible and large, so the replay
 # rebuilds it from the tar, the same way the CI workflow's own "Derive the
 # ext4 export from the tar" step does.
@@ -655,7 +664,7 @@ sudo umount "$mnt"
 rmdir "$mnt"
 
 # 2. Inject the test payload. Use the script, not a hand-copy: besides the
-#    two test tars and gate-guest.sh, it also neutralizes /etc/fstab
+#    three test tars and gate-guest.sh, it also neutralizes /etc/fstab
 #    (preserving the original as fstab.image) — skip that and the guest
 #    reboot-loops on the stock fstab's ESP entry (see Troubleshooting) —
 #    and now also extracts the rebuilt kernel's module tree from its third
@@ -718,7 +727,7 @@ board-safety invariants; do not reorder it.
 
 The two inputs come from wherever "Running locally" above got them — built from source, or
 unpacked from a CI bundle. The bundle is flat but not entirely flat: the tarball sits at the
-top level while the two test images sit one level down, under `testimages/`. Resolve both by
+top level while the three test images sit one level down, under `testimages/`. Resolve both by
 lookup rather than by assuming a fixed path:
 
 ```bash

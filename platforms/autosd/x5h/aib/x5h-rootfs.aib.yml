@@ -176,7 +176,7 @@ content:
     # ninth, awf-oak-scenario.container, has no `[Install]` section at all
     # (deliberate: starting a scenario on every reboot would be wrong), so
     # Quadlet never auto-enables it -- it only ever runs on demand, from the
-    # smoke script. None of the units set `Pull=`, and
+    # smoke script. All nine units set `Pull=never`, and
     # awf-oak-x5h-extract-map.service (enabled by 80-x5h.preset below) runs
     # `podman image exists "$image"` under `set -euo pipefail`, which is a
     # hard failure, not a wait-and-retry, when the image has not been loaded
@@ -187,9 +187,20 @@ content:
     # nine failed units -- the eight auto-enabled `.container` units plus
     # the map extractor. This is expected on that specific boot, not a
     # regression, and the human-ruled fix is to document the sequence
-    # below rather than to add `Pull=`, add start conditions, or drop
-    # `[Install]` from any unit -- those would change behavior the
-    # component units (Tasks 4/6, reviewed and frozen) already define.
+    # below rather than to make those units succeed -- adding start
+    # conditions or dropping `[Install]` from any unit would change
+    # behavior the component units (Tasks 4/6, reviewed and frozen) already
+    # define.
+    #
+    # `Pull=never` is not an exception to that ruling: it does not stop a
+    # single one of those units from failing, and the count above is
+    # unchanged. It only changes the error text. Without it a `localhost/*`
+    # image reference that is not in the local store sends podman to a
+    # registry literally named `localhost` -- three HTTPS retries and a
+    # `dial tcp [::1]:443: connection refused`, which reads as a network
+    # fault rather than as an unstaged image. Observed on the board
+    # 2026-08-18 for awf-oak-bridge. See the *_IMAGE note in
+    # ../components/awf-oak-x5h.env.
     # Required bring-up order:
     #   1. build and flash this image;
     #   2. stage the container images onto the board:

@@ -13,6 +13,14 @@ WantedBy=default.target
 Pod=awf-oak-x5h.pod
 ContainerName=awf-oak-api
 Image=${API_IMAGE}
+# Pull=never, on all nine units: every *_IMAGE in awf-oak-x5h.env is a
+# localhost/* ref, which podman reads as a registry named "localhost",
+# NOT as "use the local store only". A staged image hides that, because
+# the local store satisfies the reference first; a MISSING one does not,
+# and podman then retries HTTPS to localhost three times and reports a
+# TLS/registry error instead of saying the image is absent. See the
+# *_IMAGE note in awf-oak-x5h.env.
+Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z

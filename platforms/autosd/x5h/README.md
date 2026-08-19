@@ -76,7 +76,10 @@ answered before board time.
   from domain 2 (the CR52 safety island over `tap0`), the `launch/` control
   stub the Autoware unit mounts over the image's own copy,
   `scenario/mrm-scenario.yaml` (the MRM test definition; its 39 MB map is
-  staged to the board separately, not committed), `nodes/` (the relay and
+  staged to the board separately by `scripts/stage-scenario-map.sh`, not
+  committed — both map-consuming units carry `ConditionPathExists=` on the
+  two files, so a board without them skips those units rather than hanging
+  in `INITIALIZING`), `nodes/` (the relay and
   restamp sources, bind-mounted rather than baked), `images.txt` (the
   digest-pinned arm64 image set `scripts/stage-container-images.sh` stages
   onto the board), and `bridge/` — the `domain_bridge` container that joins

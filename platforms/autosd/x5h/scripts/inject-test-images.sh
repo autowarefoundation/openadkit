@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Copy test archives + gate-guest.sh into the ext4 export (aib add_files cannot
-# write under /var, and embedding containers would dodge the unpack path under test).
-# Usage: inject-test-images.sh <rootfs.ext4> <testimages-dir>
+# write under /var, and embedding containers would dodge the unpack path under
+# test), plus the rebuilt kernel's module tree and the nftables drop-in.
+# Usage: inject-test-images.sh <rootfs.ext4> <testimages-dir> <kernel-bundle-dir>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOTFS="$1"; IMAGES="$2"
+ROOTFS="$1"; IMAGES="$2"; BUNDLE="$3"
+KVER="$(cat "$BUNDLE/kernelrelease.txt")"
 MNT="$(mktemp -d)"
 sudo mount -o loop "$ROOTFS" "$MNT"
 # The umount must actually succeed before we claim success: a failed umount
@@ -49,3 +51,17 @@ if sudo test -f "$MNT/etc/fstab"; then
     sudo mv "$MNT/etc/fstab" "$MNT/etc/fstab.image"
     sudo truncate -s 0 "$MNT/etc/fstab"
 fi
+
+# The rebuilt kernel ships overlay/veth/bridge/btrfs/nf_tables as modules
+# (matching the BSP kernel's shape); without this tree gate-guest.sh's
+# modprobe prelude fails and every store/network gate fails confusingly.
+sudo tar -xf "$BUNDLE/modules-$KVER.tar" -C "$MNT"
+sudo test -d "$MNT/lib/modules/$KVER" \
+    || { echo "FATAL: module tree not at /lib/modules/$KVER after extract"; exit 1; }
+# depmod is arch-independent (it parses ELF metadata), so the amd64/arm64
+# host can index the aarch64 modules for the guest.
+sudo depmod -b "$MNT" "$KVER"
+sudo test -f "$MNT/lib/modules/$KVER/modules.dep" \
+    || { echo "FATAL: depmod produced no modules.dep"; exit 1; }
+sudo install -D -m 0644 "$HERE/../config/60-nftables.conf" \
+    "$MNT/etc/containers/containers.conf.d/60-nftables.conf"

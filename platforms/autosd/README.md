@@ -21,7 +21,7 @@ This folder contains a per use-case structure on how to deploy/run Open AD Kit i
 * automotive-image-builder files to build an AutoSD image(s)
 
 * [planning-simulator](./planning-simulator/README.md): Run planning and simulator services in containers (pre-built)
-* [x5h](./x5h/README.md): AutoSD on the R-Car X5H board (BSP kernel + AutoSD userspace), validated by a QEMU gate before board bring-up
+* [x5h](./x5h/README.md): AutoSD on the R-Car X5H board, on either the unmodified BSP kernel or a rebuilt AutoSD-aligned one, validated by a QEMU gate before board bring-up
 
 The General Instructions below build a bootable qcow2 disk image and are specific to
 [planning-simulator](./planning-simulator/README.md); they assume that folder's `aib/image.aib.yml`.

@@ -28,3 +28,17 @@ capture/
 
 # CodeChecker
 .codechecker/
+
+# R-Car X5H (Gen 5) vendor working directories -- NEVER commit anything from
+# these. They hold Renesas R-Car xOS SDK material (the mp_phy firmware blob and
+# any kernel image built to embed it), board serial-session logs, and
+# site-specific operator notes. The hard boundary for this platform is that no
+# vendor blob, and no kernel image embedding one, ever reaches this repository,
+# its CI, its CI logs or its CI artifacts -- see platforms/autosd/x5h/README.md,
+# "The firmware split". Ignoring these paths makes a reflexive `git add -A`
+# mid board session unable to stage a licensed binary, rather than leaving that
+# to operator discipline.
+/x5h/
+/x5h-work/
+/rcar-xos/
+/tmux-x5h-*.log

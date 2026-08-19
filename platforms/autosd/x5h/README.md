@@ -1,42 +1,98 @@
 # AutoSD on R-Car X5H (Strategy A: BSP kernel + AutoSD userspace)
 
 Non-ostree AutoSD 10 rootfs for the R-Car X5H (`r8a78000` / `ironhide`) board,
-booted with the unmodified Renesas BSP kernel 6.1.102 over the existing netboot
-path (TFTP kernel + NFS root). Validated off-board first by a QEMU gate that
-boots the rootfs under a **BSP-constraint-mimic kernel** — a 6.1.y LTS kernel
-carrying the same feature gaps as the BSP kernel (no SELinux, no ext4 security
-xattrs, no nftables, no erofs) — so every container-runtime question is
+netbooted (TFTP kernel + NFS root) under either of two kernels that share the
+same NFS root: the unmodified Renesas BSP kernel 6.1.102, or a rebuilt
+`6.1.102-autosd` kernel built from the same public BSP source with SELinux,
+`EXT4_FS_SECURITY`, nftables, EROFS and dm-verity compiled in (see "Rebuilt
+kernel (6.1.102-autosd)" below). Validated off-board first by a QEMU gate that
+boots the rootfs under the same-lineage kernel image the board netboots (one
+build, two images: the board's copy additionally embeds the mp_phy firmware —
+see "One build, two images" below) — so every container-runtime question is
 answered before board time.
 
 > **Where the gate runs.** The gate's CI workflow is not in this repository. It
-> needs an arm64 runner large enough to boot an aarch64 guest under TCG, which
-> this repository's runners do not provide, so it lives on the fork the platform
-> was developed on — `youtalk/openadkit`,
-> `.github/workflows/autosd-x5h-rootfs.yaml`. Everything the gate *runs* is
-> here, under `scripts/`, and replays on a dev host; the sections below that
-> refer to "CI" or pass `--repo youtalk/openadkit` mean that fork's runs. Board
-> bring-up is manual either way — no CI has the hardware.
+> needs an arm64 runner large enough to boot an aarch64 guest under TCG, and an
+> x64 runner large enough to compile the kernel, neither of which this
+> repository provides, so it lives on the fork the platform was developed on —
+> `youtalk/openadkit`, `.github/workflows/autosd-x5h-rootfs.yaml`. Everything
+> the gate *runs* is here, under `scripts/` and `kernel/`, and replays on a dev
+> host; the sections below that refer to "CI" or pass `--repo youtalk/openadkit`
+> mean that fork's runs. Board bring-up is manual either way — no CI has the
+> hardware.
 
 ## Folder Structure
 
 - `aib/`: automotive-image-builder manifest (distro `autosd10-sig`)
-- `config/`: containers.conf drop-in shipped into the image
-- `kernel/`: mimic-kernel config fragment + build script (QEMU gate only, never for the board)
+- `config/`: containers.conf drop-ins shipped into the image (base) or staged
+  alongside the rebuilt kernel (`60-nftables.conf`)
+- `kernel/`: rebuilt-kernel config fragments + build script, shared by the
+  QEMU gate and the board — one build, two images: both boot an
+  `Image-autosd` from the same source SHA, toolchain and fragments, and the
+  only permitted config delta is the `CONFIG_EXTRA_FIRMWARE` pair (see "One
+  build, two images")
 - `scripts/`: QEMU gate harness and board staging/smoke scripts
 - `uboot/`: `bootcmd_autosd` template (site values are filled at session time, not committed)
 
 ## QEMU gate semantics
 
-The gate boots the rootfs export under the BSP-constraint-mimic kernel in
-QEMU, logs in as root, runs `scripts/gate-guest.sh` inside the guest, and
-judges the run by grepping the session log for a fixed set of markers.
+The gate boots the rootfs export under the same-lineage kernel image the
+board netboots — `Image-autosd`, produced by `kernel/build-bsp-kernel.sh`
+(one build, two images: the board's copy additionally embeds the mp_phy
+firmware — see "One build, two images" in "Rebuilt kernel
+(6.1.102-autosd)" below) — logs in as root, runs `scripts/gate-guest.sh`
+inside the guest, and judges the run by grepping the session log for a
+fixed set of markers.
 `gate-guest.sh` emits the markers; `qemu-gate.exp` judges them by string
 match — the two must stay in exact sync.
 
 `gate-guest.sh` never exits nonzero mid-way: every assertion prints a marker
 and `GATE_DONE` always prints, no matter which gates failed. All judgement
 happens on the host side (`qemu-gate.exp`), by grepping the captured log for
-these markers.
+these markers. Gate numbers are stable identifiers, not a sequence: GATE5 is
+retired (see below) and deliberately not reused by the markers that replaced
+it.
+
+`GATE3_STORE_FS=tmpfs` and `GATE4_STORE_FS=btrfs` exist because GATE3/GATE4's
+mount step (`mount -t tmpfs …` / `mkfs.btrfs` + `mount /dev/vdb …`) checks no
+exit status and `gate-guest.sh` never aborts on a failed mount — without this
+check, a silently-failed mount would leave `/var/lib/containers` on whatever
+was mounted there before (typically the ext4 root), and the podman probe that
+follows would still validly pass or fail, just against the wrong filesystem,
+printing a `GATE3_TMPFS_OK` / `GATE4_BTRFS_OK` that didn't actually exercise
+tmpfs/btrfs at all.
+
+`qemu-gate.exp` exits 0 only once every required marker in the "Gate markers
+(rebuilt-kernel edition)" table below (in "Rebuilt kernel (6.1.102-autosd)")
+is present in the session log, and both `GATE1_MODPROBE_FAIL` and
+`GATE1_CCVER_FAIL` are absent from it.
+
+`qemu-gate.exp` waits for the guest-side run with an inactivity timeout (15
+minutes with no new `GATE<n>_…` marker line, re-armed on every marker) rather
+than one fixed budget for the whole run: the run's total length varies with
+TCG emulation speed and isn't a meaningful thing to cap as a single number,
+but a guest that goes genuinely silent, or dies outright, still fails fast
+with a clear diagnostic instead of a generic "gate did not finish". The
+15-minute figure is not arbitrary, and it is re-derived from the current
+gate's markers, not carried over from the retired GATE5 arithmetic: GATE6 is
+now the longest stretch with no re-arming marker output — its nftables
+published-port poll (30 iterations of `curl --max-time 5` + `sleep 2`) caps
+at 210s, and its outbound-SNAT poll (5 iterations of a busybox `podman run …
+wget -T 10` + `sleep 2`) caps at roughly 60s more — comfortably under the
+retired GATE5's two-loop worst case (~590s). See the
+comment at `qemu-gate.exp`'s `inactivity_timeout` declaration for the full
+arithmetic; the value itself (900s) is unchanged, only what it is derived
+from.
+
+### Gate markers (BSP-mimic edition, retired)
+
+What follows is the historical marker vocabulary for the retired
+BSP-constraint-mimic kernel gate — a 6.1.y LTS kernel carrying the same
+feature gaps as the BSP kernel (no SELinux, no ext4 security xattrs, no
+nftables, no erofs), boot-tested before the rebuilt kernel below replaced
+it. Kept as the record of what that gate proved, not as current behavior —
+see "Gate markers (rebuilt-kernel edition)" in "Rebuilt kernel
+(6.1.102-autosd)" below for the gate this repository actually runs today.
 
 Marker vocabulary (greppable, consumed by CI and quoted verbatim into each
 run's results record):
@@ -60,7 +116,8 @@ run's results record):
 | `GATE5_FAIL` | Neither the port-published attempt nor the none-fallback produced working networking. |
 | `GATE_DONE` | `gate-guest.sh` reached the end of its run. |
 
-Two markers are deliberately **either/or**, not single-verdict:
+Two markers were deliberately **either/or**, not single-verdict, on this
+retired edition:
 
 - **GATE2 accepts either verdict.** `GATE2_EXT4_FAIL_OK` confirms the xattr
   blocker the survey predicted; `GATE2_EXT4_UNEXPECTED_PASS` is a legitimate
@@ -85,35 +142,12 @@ Two markers are deliberately **either/or**, not single-verdict:
   silently shadow Task 2's `50-x5h.conf` for good; which path was taken is
   already on the record via the `GATE5_*` marker itself.
 
-`GATE3_STORE_FS=tmpfs` and `GATE4_STORE_FS=btrfs` exist because GATE3/GATE4's
-mount step (`mount -t tmpfs …` / `mkfs.btrfs` + `mount /dev/vdb …`) checks no
-exit status and `gate-guest.sh` never aborts on a failed mount — without this
-check, a silently-failed mount would leave `/var/lib/containers` on whatever
-was mounted there before (typically the ext4 root), and the podman probe that
-follows would still validly pass or fail, just against the wrong filesystem,
-printing a `GATE3_TMPFS_OK` / `GATE4_BTRFS_OK` that didn't actually exercise
-tmpfs/btrfs at all.
-
-The overall gate (`qemu-gate.exp`) exits 0 only if `GATE1_LOGIN_OK`,
+For this retired edition, `qemu-gate.exp` exited 0 only if `GATE1_LOGIN_OK`,
 `GATE3_TMPFS_OK`, `GATE3_STORE_FS=tmpfs`, `GATE4_BTRFS_OK`,
 `GATE4_STORE_FS=btrfs`, `GATE_DONE`, one of the GATE2 accepted markers, and
-one of the GATE5 accepted markers are all present in the session log.
+one of the GATE5 accepted markers were all present in the session log.
 
-`qemu-gate.exp` waits for the guest-side run with an inactivity timeout (15
-minutes with no new `GATE<n>_…` marker line, re-armed on every marker) rather
-than one fixed budget for the whole run: the run's total length varies with
-TCG emulation speed and isn't a meaningful thing to cap as a single number,
-but a guest that goes genuinely silent, or dies outright, still fails fast
-with a clear diagnostic instead of a generic "gate did not finish". The
-15-minute figure is not arbitrary: GATE5 is the longest stretch with no
-re-arming marker output (every command in it is output-suppressed), and its
-two 30-iteration poll loops alone cap at 210s each — 420s of pure
-network/sleep wall-clock — before accounting for podman process-spawn
-overhead on top. See the comment at `qemu-gate.exp`'s `inactivity_timeout`
-declaration for the full arithmetic; it is coupled to GATE5's poll bounds in
-`gate-guest.sh`, not an independent number.
-
-## Gate verdict: survey §7 answers
+## Gate verdict: survey §7 answers (BSP-mimic kernel edition, retired)
 
 The table below is the observed output of the first fully green QEMU gate run
 ([`30730519760`](https://github.com/youtalk/openadkit/actions/runs/30730519760),
@@ -147,6 +181,275 @@ arithmetic before any gate had ever run end to end; this is the first real
 timing signal for it, and it confirms the budget is sound — retiring that
 open risk.
 
+## Rebuilt kernel (6.1.102-autosd)
+
+The BSP kernel's source is public: `renesas-rcar/linux-bsp`, branch
+`v6.1.102/rcar-6.0.0.rc12`, which carries `r8a78000.dtsi` and the Ironhide
+DTS variants. `kernel/build-bsp-kernel.sh <outdir>` builds it at a pinned
+commit (the ref is a mutable branch, so the SHA hardcoded in the script is
+the source of truth, not the branch name) with config layers merged via
+`merge_config.sh`: `kernel/x5h-board.config` (the board's own
+IKCONFIG-extracted base config), `kernel/autosd.config` (SELinux,
+`EXT4_FS_SECURITY`, nftables, EROFS, dm-verity — each symbol commented with
+the AutoSD feature needing it), `kernel/virtio.config` (QEMU-gate hardware,
+deliberately compiled into the board image too), and — only under
+`--firmware <dir>` — `kernel/board-firmware.config` (embeds
+`rcar_gen5_mp_phy.bin`, see below). The script asserts every fragment
+declaration landed, that the built `kernelrelease` is exactly
+`6.1.102-autosd`, and that the compiler is exactly the pinned toolchain —
+each check failing is a FATAL build error, not a warning.
+
+The pinned toolchain is fetched and identity-asserted **before the first
+`make` target**, not just before the compile, so **every mode except
+`--toolchain-only` needs an x86_64 host — `--config-only` included**. That is
+not a convenience: Linux 6.1's `scripts/Kconfig.include` evaluates `$(CC)` and
+hard-errors when it is missing, so `olddefconfig` and `make -s kernelrelease`
+both need the cross compiler to exist. The upside is that
+`config-autosd.txt`'s `CONFIG_CC_VERSION_TEXT` genuinely names the compiler
+that builds the `Image` in every mode. Do not "fix" a missing compiler by
+installing a distro cross-gcc — that would make the emitted config depend on
+whatever compiler the host happens to have, which is exactly what the pin
+exists to prevent.
+
+**The compiler is pinned to ARM GNU 13.2.Rel1 (x86_64-hosted cross), on
+board evidence.** The 2026-08-05 debug session (18 boots, 14 binaries)
+root-caused a boot hang to a layout-sensitive platform bug: one random
+secondary CPU wedges with a corrupt PC within ~20–90 ms of SMP bringup, and
+functionally identical kernels differing only in byte layout (`Image-b1a`
+vs `Image-b1a1`) land on opposite sides. With the full CI config, GCC 13.2
+booted 3/3 distinct layouts; GCC 13.3 wedged 3/3. The pin is **empirical,
+not a guarantee** — which is why the compiler identity is asserted at
+build time and again at gate runtime (`GATE1_CCVER_OK`), and why **the
+board smoke remains the final arbiter for any kernel change: the QEMU gate
+is structurally blind to this defect class** (no real silicon, virtio-only
+I/O). ARM ships no aarch64-hosted 13.2.Rel1 toolchain, so CI cross-compiles
+in a dedicated x64 job (`build-kernel`) and hands the `x5h-kernel` artifact
+to the arm64 gate job.
+
+**One build, two images.** The old "one-image" invariant (the gate boots
+the byte-identical file the board netboots) could not survive the
+firmware finding: the board needs an NDA blob embedded, and CI must never
+see NDA material. Its replacement keeps what actually mattered — the gate
+boots the same kernel *lineage* the board runs: same pinned source SHA,
+same pinned toolchain, same reproducible-build env
+(`KBUILD_BUILD_TIMESTAMP/USER/HOST` are fixed, so identical inputs give
+byte-identical artifacts on any machine), same `kernelrelease`, same
+`Image-autosd` filename; the config delta between the two images is
+exactly `CONFIG_EXTRA_FIRMWARE`/`CONFIG_EXTRA_FIRMWARE_DIR`, carried by one
+in-repo fragment. Kinship is checked mechanically, not by convention:
+`provenance.txt` records the toolchain and artifact hashes, a local
+fw-less rebuild must sha256-match the CI artifact, `GATE1_CCVER` proves
+the gate booted a pinned-toolchain kernel, and `stage-rebuilt-kernel.sh`
+refuses (via the exported `extract-ikconfig`) to stage any Image that does
+not embed the firmware.
+
+Artifacts (also staged into the CI debugging bundle): `Image-autosd`,
+`r8a78000-ironhide-uio-autosd.dtb`, `modules-6.1.102-autosd.tar`,
+`kernelrelease.txt`, `config-autosd.txt`, `provenance.txt` (toolchain
+identity line, the `CONFIG_EXTRA_FIRMWARE*` values, and the sha256 of the
+first three — this is what a reproducibility or "which image is this?" check
+reads), and `extract-ikconfig` (the pinned tree's own script, exported so a
+staging host can read an `Image`'s embedded config with no kernel checkout;
+`stage-rebuilt-kernel.sh` uses it to refuse firmware-less images).
+
+`modules-6.1.102-autosd.tar` deliberately carries **no** depmod-generated
+index files (`modules.dep`, `modules.dep.bin`, `modules.alias`,
+`modules.alias.bin`, `modules.symbols`, `modules.symbols.bin`,
+`modules.softdep`, `modules.devname`, `modules.builtin.bin`,
+`modules.builtin.alias.bin`): `modules_install` builds them with the
+*building* machine's `depmod`, so their bytes track the host's kmod version
+rather than the kernel and would defeat byte-identity across machines. Both
+consumers regenerate them with `depmod -b <root> 6.1.102-autosd` right after
+extracting, and both then assert `modules.dep` exists — anything else that
+extracts this tar must do the same, or `modprobe` in the target will fail.
+The build-generated `modules.order`, `modules.builtin` and
+`modules.builtin.modinfo` **are** included: `depmod` reads them.
+
+**The firmware split.** The board's own kernel bakes in three Renesas
+blobs; they ship only in the NDA R-Car xOS SDK, so no from-source CI build
+can embed them. The gate image therefore carries
+`CONFIG_EXTRA_FIRMWARE=""` — but the 2026-08-05 board session proved this
+is **not** a difference without consequence: without `rcar_gen5_mp_phy.bin`
+the built-in MP-PHY driver fails probe, `renesas_eth_sw` defers forever,
+and the board has no TSN link and cannot NFS-netboot at all (the state
+commit 695106c unknowingly shipped). The board image is built locally with
+`--firmware <dir>` (a directory containing the SDK blob), which merges
+`kernel/board-firmware.config` to embed exactly that one blob. The two
+PCIe6 blobs (`rcar_gen5_pcie6_iccm.bin`, `rcar_gen5_pcie6_dccm.bin`) stay
+excluded from both images: nothing is attached to PCIe6 on this board, and
+the BSP kernel loads them only to report `Phy link never came up`. **NDA
+boundary:** the blobs, and any Image embedding them, exist only on the dev
+machine and the board LAN — never in the repo, CI, CI logs, or CI
+artifacts; the repo carries only the blob filename, which the public
+linux-bsp driver source already does.
+
+### Gate markers (rebuilt-kernel edition)
+
+This is the marker vocabulary `gate-guest.sh` and `qemu-gate.exp` actually
+implement today — see "Gate markers (BSP-mimic edition, retired)" above for
+the vocabulary this replaced. Gate numbers are stable identifiers, not a
+sequence: GATE5 (the retired `firewall_driver = "none"` path) is not
+reused — GATE6 and GATE7 are new, not GATE5's successor under a new name.
+
+| Marker | Meaning | Required |
+| --- | --- | --- |
+| `GATE1_LOGIN_OK` | Guest login succeeded. | yes |
+| `GATE1_KVER=<release>` | `uname -r` inside the guest. The runtime `kernelrelease` half of the one-build-two-images invariant (`GATE1_CCVER_OK` is the toolchain half) — `build-bsp-kernel.sh` asserts `kernelrelease` is exactly `6.1.102-autosd` at build time, but this is what proves the gate actually *booted* that release, the same one the board netboots. | yes, must equal `6.1.102-autosd` |
+| `GATE1_CCVER=<...>` | `/proc/version` of the booted kernel — records which compiler built it. | informational |
+| `GATE1_CCVER_OK` | `/proc/version` contains `Arm GNU Toolchain 13.2.rel1`: the gate booted a pinned-toolchain kernel. The wedge itself is invisible to QEMU, so this is the one pin-regression CI can catch. | yes |
+| `GATE1_CCVER_FAIL` | The booted kernel was built by some other compiler — the toolchain pin has been broken. | must be ABSENT |
+| `GATE1_SYSTEMD_STATE=<state>` | `systemctl is-system-running` output, informational — no expected value is asserted here; unlike the retired edition, no CI or board run of this gate has recorded one yet. | no |
+| `GATE1_MODPROBE_FAIL` | `modprobe -a overlay veth bridge br_netfilter btrfs nf_tables` failed against the injected/staged module tree — a staging bug, not a kernel one (the rebuilt kernel ships these as modules, exactly as the BSP kernel does). | must be ABSENT |
+| `GATE2_STORE_FS=<fstype>` | Filesystem podman's store sat on for the GATE2 probe (expected `ext4`, since GATE2 mounts nothing). | yes, must equal `ext4` |
+| `GATE2_EXT4_OK` | The ext4 store holds the `security.capability` xattr — `EXT4_FS_SECURITY=y` is the point of the rebuild. Confirmed by `podman load` **and** a follow-up `getcap` inside a running container, not just a `load` that happened to exit 0 (the cycle-5/6 lesson from the retired edition, carried forward so this cannot silently false-pass). | yes |
+| `GATE2_EXT4_FAIL` | The ext4-store xattr probe failed (load error, or `load` succeeded but `getcap` came up empty). Not part of the pass path. | no |
+| `GATE3_STORE_FS=<fstype>` | Filesystem podman's store sat on for the GATE3 probe. **Required to equal `tmpfs`** — otherwise a silently-failed tmpfs mount could fall through to the ext4 root underneath and still print `GATE3_TMPFS_OK` for the wrong reason. | yes, must equal `tmpfs` |
+| `GATE3_TMPFS_OK` | Podman container store on tmpfs works, including the capability xattr round-trip. Unchanged from the retired edition. | yes |
+| `GATE3_FAIL` | The tmpfs-store probe failed. Not part of the pass path. | no |
+| `GATE4_STORE_FS=<fstype>` | Filesystem podman's store sat on for the GATE4 probe. **Required to equal `btrfs`**, same reason as GATE3's. | yes, must equal `btrfs` |
+| `GATE4_BTRFS_OK` | Podman container store on a btrfs-formatted second disk works. Unchanged from the retired edition. | yes |
+| `GATE4_FAIL` | The btrfs-store probe failed. Not part of the pass path. | no |
+| `GATE6_NFT_PORT_OK` | netavark's nftables driver (`config/60-nftables.conf`, staged only alongside this kernel — see "Board deployment" below) publishes a container port. Polled: 30 iterations of `curl --max-time 5` + `sleep 2`. `GATE5_IPTABLES_OK`'s replacement for this kernel, now the expected outcome rather than an unlikely one. | yes |
+| `GATE6_NFT_PORT_FAIL` | The published-port probe failed after the full poll. On this kernel that is a real regression, not the structural no-op it was under the retired `firewall_driver = "none"` path. | no |
+| `GATE6_SNAT_OK` | Container→external is masqueraded: a fresh busybox container's `wget -T 10` reaches the slirp-mapped host listener at `10.0.2.2:8099`. Polled: 5 iterations of `podman run … wget -T 10` + `sleep 2` — the `-T 10` bounds each attempt so a missing masquerade rule (SYN black-holed) fails fast instead of eating the kernel's syn-retry ceiling. This is the first gate to exercise outbound container connectivity at all, closing the honest-networking gap the retired edition's survey answer 5 flagged. | yes |
+| `GATE6_SNAT_FAIL` | The outbound-SNAT probe failed after the full poll. | no |
+| `GATE7_SELINUX_PERMISSIVE_OK` | `/sys/fs/selinux/enforce` reads `0` — SELinux is compiled in and permissive (`enforcing=0` on the cmdline). Read directly from selinuxfs rather than via `getenforce`, so the marker cannot depend on which utility package made it into the image. | yes |
+| `GATE7_SELINUX_ENFORCE=<n>` | selinuxfs is present but `enforce` is not `0` — SELinux is enforcing when the cmdline asked for permissive. | no |
+| `GATE7_SELINUX_ABSENT` | No `/sys/fs/selinux/enforce` at all — SELinux isn't compiled into this boot. | no |
+| `GATE7_SELINUX_BOOLS_OK` | `selinux-bools.service` did not fail. It failed under the BSP/retired-mimic kernel's absent SELinux (see the Troubleshooting row) — with SELinux present it must now come up clean. | yes |
+| `GATE7_SELINUX_BOOLS_FAILED` | `selinux-bools.service` failed even with SELinux present — a real regression, not the benign BSP-kernel failure the Troubleshooting row documents. | no |
+| `GATE7_SELINUX_BOOLS_ABSENT` | `selinux-bools.service`'s `LoadState` reads `not-found` — the unit is missing from this image entirely. Disambiguates from `GATE7_SELINUX_BOOLS_OK`: `systemctl is-failed` alone exits nonzero both for "healthy" and for "does not exist", so without this check a dropped unit could otherwise print `_OK`. | no |
+| `GATE_DONE` | `gate-guest.sh` reached the end of its run. | yes |
+
+`qemu-gate.exp` exits 0 only if every "Required: yes" marker above is present
+in the session log (with the fstype-qualified ones matching exactly, e.g.
+`GATE2_STORE_FS=ext4`) and every "Required: must be ABSENT" marker
+(`GATE1_MODPROBE_FAIL`, `GATE1_CCVER_FAIL`) is absent from it.
+
+### Board deployment
+
+Deployment is two steps: build the board's own kernel bundle, then stage it
+onto the NFS root and TFTP directory with
+`scripts/stage-rebuilt-kernel.sh <staged-nfs-root> <kernel-bundle-dir> <tftp-dir>`.
+
+`<kernel-bundle-dir>` must come from a **`--firmware` build**. The CI
+artifact is the firmware-less *gate* image and cannot NFS-netboot at all (see
+"The firmware split" above), so build the board bundle locally first, from a
+directory holding the SDK blob — never in CI, never committed:
+
+```
+kernel/build-bsp-kernel.sh --firmware <blob-dir> <kernel-bundle-dir>
+```
+
+That is enforced, not merely expected: `stage-rebuilt-kernel.sh`
+`extract-ikconfig`s the candidate `Image-autosd` and **FATALs before anything
+reaches TFTP** unless the embedded config carries
+`CONFIG_EXTRA_FIRMWARE="rcar_gen5_mp_phy.bin"`. Handing it the CI artifact —
+or a local build where `--firmware` was omitted — fails there and costs a
+full 30–60 minute rebuild mid session, so confirm the bundle's
+`provenance.txt` names the blob before starting. (`build-bsp-kernel.sh`
+itself FATALs if `--firmware` is written *after* `<outdir>` instead of
+before it, so that particular mistake never reaches this guard. A second,
+separate FATAL here covers an `Image` from which no embedded config can be
+read at all — truncated or corrupt. That one is *not* the `--firmware`
+question and rebuilding with `--firmware` will not fix it.)
+
+With that bundle in hand, and after Board bring-up's step 1
+(`stage-nfs-rootfs.sh`, below) has staged the NFS root, add the rebuilt
+kernel on top of it — strictly additive, no BSP file touched — as root on the
+NFS server host:
+
+```
+scripts/stage-rebuilt-kernel.sh <staged-nfs-root> <kernel-bundle-dir> <tftp-dir>
+```
+
+This installs `Image-autosd` and `r8a78000-ironhide-uio-autosd.dtb` into
+`<tftp-dir>`, extracts and `depmod`s the module tree into `<staged-nfs-root>`,
+stages `config/60-nftables.conf` into
+`<staged-nfs-root>/etc/containers/containers.conf.d/`, and refreshes
+`<staged-nfs-root>/var/lib/autosd-test/board-podman-smoke.sh` from this
+branch's copy — after this, both kernels boot the same NFS root (Board
+bring-up, step 2, is the U-Boot side of the selection). The refresh matters
+because `stage-nfs-rootfs.sh` (Board bring-up, step 1) only ever copies
+`board-podman-smoke.sh` once, at initial staging, and refuses to re-run over
+an already-staged root — a board session reusing a root staged before this
+branch would otherwise run the old script (no `ext4loop` mode, no
+rebuilt-kernel detection) and silently prove far less than it looks like it
+does. Safe to overwrite: the refreshed script auto-detects BSP vs. rebuilt
+via `uname -r`, so its behaviour on a rollback boot is unchanged.
+
+Kernel selection is three U-Boot variables (`uboot/autosd-boot.env`'s header
+carries the full BSP/rebuilt value table); the script prints the exact
+`setenv` lines for both directions at the end of a successful run:
+
+```
+U-Boot (rebuilt): setenv kernel_file Image-autosd ; setenv dtb_file r8a78000-ironhide-uio-autosd.dtb ; setenv selinux_arg enforcing=0
+U-Boot (rollback): setenv kernel_file Image ; setenv dtb_file <bsp-dtb> ; setenv selinux_arg selinux=0
+  NOTE: selinux_arg expands at 'setenv bootargs_autosd' time, not at 'run' time -- after setenv'ing it, re-enter the bootargs_autosd line from uboot/autosd-boot.env before 'run bootcmd_autosd', or the old value stays baked in.
+```
+
+Rollback is **not** just those three variables set back to the BSP values.
+`stage-rebuilt-kernel.sh` also staged `60-nftables.conf` onto the shared NFS
+root, and the BSP kernel has no `CONFIG_NF_TABLES` — a U-Boot-only rollback
+would leave the BSP kernel booting with a firewall driver it cannot run.
+Complete rollback needs the drop-in removed too, exactly as the script
+prints it:
+
+```
+Rollback ALSO needs: rm -f <staged-nfs-root>/etc/containers/containers.conf.d/60-nftables.conf
+  (the drop-in selects the nftables driver, which the BSP kernel cannot run -- both kernels share this NFS root)
+```
+
+Fallback chain if the rebuilt kernel misbehaves, weakest change first:
+`enforcing=0` (default, permissive) → `selinux_arg=selinux=0` (SELinux out
+of the equation entirely, still the rebuilt kernel and nftables) → the full
+rollback above (BSP kernel, BSP U-Boot values, drop-in removed). The middle
+rung is not just `setenv selinux_arg selinux=0`: `selinux_arg` expands at
+`setenv bootargs_autosd` time (see `uboot/autosd-boot.env`'s header), so
+that variable alone changes nothing already baked into `bootargs_autosd` —
+re-enter the `setenv bootargs_autosd "..."` line with the new value before
+`run bootcmd_autosd`, or the boot proceeds with the old, already-expanded
+value and no error.
+
+Smoke order on the rebuilt kernel (Board bring-up, step 3): `tmpfs` →
+`ext4loop` (a zero-mutation `EXT4_FS_SECURITY` proof on a `/run`-backed loop
+file — no persistent device is touched) → `btrfs <dev>` (same
+tmpfs-must-pass-first interlock as before, unaffected by `ext4loop`'s
+addition). `ext4loop` is expected to **fail** on the image as it currently
+ships, with `SMOKE_ext4loop_MKFS_FAIL`: it needs `mkfs.ext4` and the aib
+manifest installs no `e2fsprogs` (see Board bring-up step 3). The interlock
+only gates `btrfs` on `tmpfs`, so that failure does not block the rest of
+the sequence. Before running the smoke sequence, start the outbound-SNAT
+listener on the host PC: `python3 -m http.server 8099 --bind 192.168.0.1` —
+`board-podman-smoke.sh`'s `SMOKE_EXT_URL` env var overrides the target if
+the site's addressing differs, and `SMOKE_EXT_URL=skip` skips the probe
+entirely instead of failing it.
+
+GATE7 proves SELinux loads and is permissive on an **ext4** root, where
+every file carries the `security.selinux` xattr baked in by the image. The
+board's root is **NFSv3, which carries no xattrs at all** — every object
+gets a single `genfscon` context instead. Permissive mode means it still
+works either way, but the labelling state the board actually runs under is
+not the one GATE7 measured: the gate proves SELinux loads and is
+permissive, not that the board's per-file labelling is correct. This
+matters at the console, not just in principle — permissive-mode AVC
+denials print at `KERN_WARNING`, and enough of them can make a slow serial
+console unusable. Run `dmesg -n 1` right after logging in on the rebuilt
+kernel to keep denial spam off the console before it becomes a problem.
+`selinux_arg=selinux=0` (see the re-`setenv bootargs_autosd` caveat above)
+is the escape hatch if AVC output floods it anyway.
+
+### Survey §7 addendum
+
+With the rebuilt kernel, the networking rows the retired edition could only
+flag as open gaps are now answered honestly: published ports and
+container→external SNAT are exercised by GATE6 (and on the board by
+`SMOKE_*_NET_PORT_*`/`SMOKE_*_SNAT_*`), closing the final-review I5 gap
+recorded in the retired edition's survey answer 5. ext4 becomes a viable
+container store (GATE2/`GATE2_EXT4_OK`, answer 2's finding reversed), so
+btrfs is now a choice for the board's persistent store rather than the only
+option ext4's `EXT4_FS_SECURITY` gap left.
+
 ## Running locally
 
 The same gate CI ran replays on an x86 dev host. Two reasons this is worth
@@ -158,15 +461,18 @@ replay is corroborating evidence for the board staging path, not just a
 debugging convenience. It also leaves a local copy of `x5h-rootfs.tar` on
 disk, which is what `stage-nfs-rootfs.sh` consumes at board time.
 
-The replay needs three inputs: the rootfs tar, the mimic kernel `Image`, and
-the two test-image tars. Build them from source (below) or download a bundle
-CI already produced. **Neither route needs the Renesas BSP or any
-credential-gated download** — the rootfs resolves from public AutoSD 10 and
-EPEL 10 repos, the mimic kernel is a stock 6.1.y LTS from kernel.org (it is
-deliberately *not* the BSP kernel; see `kernel/bsp-mimic.config`), and the
-test images come from `public.ecr.aws` and `quay.io`. The one BSP-derived
-input this platform has is `<bsp-rootfs-dir>` under "Board bring-up" below,
-which the replay never touches.
+The replay needs three inputs: the rootfs tar, the rebuilt kernel's output
+directory (`Image-autosd`, `modules-6.1.102-autosd.tar` and
+`kernelrelease.txt` all come from it), and the two test-image tars. Build
+them from source (below) or download a bundle CI already produced. **Neither
+route needs the NDA R-Car xOS SDK or any credential-gated download** — the
+rootfs resolves from public AutoSD 10 and EPEL 10 repos, the kernel builds
+from the public `renesas-rcar/linux-bsp` git source at the SHA pinned in
+`kernel/build-bsp-kernel.sh`, and the test images come from `public.ecr.aws`
+and `quay.io`. The two NDA-gated inputs this platform does have —
+`<bsp-rootfs-dir>` under "Board bring-up" below, and the `--firmware <dir>`
+blob that only the board image embeds — sit outside the replay, which
+touches neither.
 
 ### Building the inputs from source
 
@@ -191,13 +497,16 @@ sudo bash ./auto-image-builder.sh build --tar \
   --define-file aib/vars.yml \
   aib/x5h-rootfs.aib.yml aib/x5h-rootfs.tar
 
-# 2. The BSP-constraint-mimic kernel. The script pins the newest 6.1.y
-#    longterm release from kernel.org's releases.json, merges
-#    kernel/bsp-mimic.config over arm64 defconfig, then *asserts* the whole
-#    constraint set actually landed — a defconfig that quietly re-enabled
-#    e.g. EXT4_FS_SECURITY fails the build here rather than producing a
-#    kernel that lets GATE2 sail past the blocker it exists to probe.
-kernel/build-mimic-kernel.sh /tmp/x5h-mimic
+# 2. The rebuilt BSP kernel bundle. build-bsp-kernel.sh checks out
+#    renesas-rcar/linux-bsp at the SHA pinned in the script, merges
+#    kernel/x5h-board.config, kernel/autosd.config and kernel/virtio.config
+#    with merge_config.sh, and then *asserts* — fatally, not as warnings —
+#    that every fragment declaration landed, that `kernelrelease` is
+#    exactly 6.1.102-autosd, and that the compiler is the pinned ARM GNU
+#    13.2.Rel1 toolchain it fetched itself. Deliberately no `--firmware`
+#    here: that mode embeds the NDA blob and belongs to the board image
+#    only (see "Board deployment" above), never to the gate.
+kernel/build-bsp-kernel.sh /tmp/x5h-kernel
 
 # 3. The two test images. make-test-images.sh also verifies the captest
 #    archive really carries a security.capability PAX record, so an xattr
@@ -206,21 +515,29 @@ kernel/build-mimic-kernel.sh /tmp/x5h-mimic
 scripts/make-test-images.sh /tmp/x5h-testimages
 ```
 
-Two things to know before running these on an x86_64 host, because CI
-exercises neither — CI is native arm64 (`ubicloud-standard-16-arm`):
+Three things to know before running these, because CI runs no single host
+through all of them — the kernel builds in an x64 `build-kernel` job and
+everything else on native arm64 (`ubicloud-standard-16-arm`):
 
-- **Every output is aarch64.** Steps 1 and 3 run aarch64 containers, so they
-  need `qemu-user-static` binfmt registered (`sudo apt install
-  qemu-user-static binfmt-support`, or `docker run --privileged --rm
-  tonistiigi/binfmt --install arm64`). Step 2 cross-compiles instead and
-  needs `gcc-aarch64-linux-gnu`; `build-mimic-kernel.sh` selects the cross
-  prefix itself from `uname -m`.
-- **Budget generously, but don't trust a figure.** CI builds all three
-  natively on arm64 in about 25 minutes end to end, QEMU gate included (run
-  30842769817, 18:46:46 → 19:12:20). There is no verified x86 number: the aib
-  build and the two container builds run under binfmt there, so expect
-  materially longer and budget accordingly rather than planning against a
-  number nobody has measured.
+- **Step 2 requires an x86_64 host, and brings its own compiler.** ARM ships
+  no aarch64-hosted 13.2.Rel1 toolchain, so `build-bsp-kernel.sh`
+  cross-compiles from x86_64 in every mode except `--toolchain-only` —
+  `--config-only` included, because Linux 6.1's `scripts/Kconfig.include`
+  evaluates `$(CC)` even for config targets. Do **not** work around a
+  missing compiler by installing a distro `gcc-aarch64-linux-gnu`: the pin
+  is empirical (13.2 booted 3/3 layouts, 13.3 wedged 3/3 — see "Rebuilt
+  kernel" above) and substituting whatever compiler the host happens to
+  have is exactly the path by which the SMP-bringup wedge returns.
+- **Steps 1 and 3 emit aarch64 containers.** On an x86_64 host they need
+  `qemu-user-static` binfmt registered (`sudo apt install qemu-user-static
+  binfmt-support`, or `docker run --privileged --rm tonistiigi/binfmt
+  --install arm64`). CI runs them natively on arm64 instead.
+- **Budget generously, but don't trust a figure.** There is no verified
+  end-to-end number for this rebuilt-kernel edition: the ~25 minute figure
+  the retired BSP-mimic edition recorded predates both the kernel rebuild
+  and the x64/arm64 job split, and on an x86 host the aib and container
+  builds run under binfmt besides. Budget accordingly rather than planning
+  against a number nobody has measured for this pipeline.
 
 `AIB_PODMAN_OPTIONS="-v /run/containers:/run/containers"`, which CI passes to
 both `auto-image-builder.sh` invocations, is a workaround for that runner's
@@ -237,12 +554,14 @@ at `gh run download`, not at the lookup.
 ```bash
 gh run download --repo youtalk/openadkit -n x5h-gate-bundle -D /tmp/x5h-bundle \
   "$(gh run list --repo youtalk/openadkit --workflow autosd-x5h-rootfs.yaml \
-       --branch feat/autosd-x5h-rootfs --status success --limit 1 \
+       --branch feat/autosd-x5h-kernel --status success --limit 1 \
        --json databaseId --jq '.[0].databaseId')"
 
 # The workflow stages a flat bundle before upload — one `testimages/`
 # subdirectory, everything else at the top level:
-#   Image  x5h-rootfs.tar  x5h-gate.log  testimages/busybox-oci.tar  testimages/captest-docker.tar
+#   Image-autosd  r8a78000-ironhide-uio-autosd.dtb  modules-6.1.102-autosd.tar
+#   kernelrelease.txt  config-autosd.txt  x5h-rootfs.tar  x5h-gate.log
+#   testimages/busybox-oci.tar  testimages/captest-docker.tar
 # There is no ext4 export in it: it is reproducible and large, so the replay
 # rebuilds it from the tar, the same way the CI workflow's own "Derive the
 # ext4 export from the tar" step does.
@@ -255,15 +574,19 @@ Host tools: `qemu-system-aarch64` and `qemu-img` (Debian/Ubuntu: packages
 `qemu-system-arm` and `qemu-utils` — `qemu-img` is what `run-qemu-gate.sh`
 shells out to when `/tmp/x5h-blank.img` doesn't already exist, so it's a
 runtime dependency of this replay, not a build-only one), `expect` (the
-`qemu-gate.exp` interpreter), and `e2fsprogs` for `mkfs.ext4`; plus `gh`
-(authenticated) if you took the download route. CI's "Install host tools"
-step installs `podman`, `skopeo`, `qemu-system-arm`, `qemu-utils`, `expect`,
-`flex`, `bison`, `libssl-dev`, `libelf-dev`, and `bc` — `e2fsprogs` and `gh`
-are not in that list because GitHub-hosted runners ship both preinstalled
-already; the `flex`/`bison`/`libssl-dev`/`libelf-dev`/`bc` portion is the
-aib/kernel/container-build toolchain from "Building the inputs" above.
+`qemu-gate.exp` interpreter), `e2fsprogs` for `mkfs.ext4`, and `python3`
+for the SNAT listener step 3 starts; plus `gh` (authenticated) if you took
+the download route. The arm64 `build-and-gate`
+job's "Install host tools" step installs exactly `podman`, `skopeo`,
+`qemu-system-arm`, `qemu-utils` and `expect` — nothing else, because the
+kernel compile no longer happens there: `flex`, `bison`, `libssl-dev`,
+`libelf-dev`, `bc` and `xz-utils` moved to the x64 `build-kernel` job along
+with it. `e2fsprogs` and `gh` are in neither list because the runners ship
+both preinstalled. None of the kernel-build packages are needed here: this
+replay consumes a kernel bundle that "Building the inputs" above produced,
+or one it downloads pre-built.
 
-First point these three at whichever route you took. They are the only
+First point these four variables at whichever route you took. They are the only
 difference between the two:
 
 ```bash
@@ -271,19 +594,22 @@ cd platforms/autosd/x5h   # the relative paths below, and ./scripts/... later, n
 
 # Built from source:
 TAR=aib/x5h-rootfs.tar
-KERNEL=/tmp/x5h-mimic/Image
+KERNELDIR=/tmp/x5h-kernel
+KERNEL="$KERNELDIR/Image-autosd"
 TESTIMAGES=/tmp/x5h-testimages
 
 # ...or from a downloaded bundle. `find` rather than fixed paths, because
 # the lookups have to be depth-agnostic — and note TESTIMAGES resolves to
-# the bundle's `testimages/` subdirectory, not the bundle root.
+# the bundle's `testimages/` subdirectory, while KERNELDIR is the bundle
+# root, which is where kernelrelease.txt and the module tar sit.
 TAR="$(find /tmp/x5h-bundle -name x5h-rootfs.tar)"
-KERNEL="$(find /tmp/x5h-bundle -name Image)"
+KERNEL="$(find /tmp/x5h-bundle -name Image-autosd)"
+KERNELDIR="$(dirname "$KERNEL")"
 TESTIMAGES="$(dirname "$(find /tmp/x5h-bundle -name busybox-oci.tar)")"
 ```
 
 Everything to this point runs as your own user. Loop-mounting the ext4 export
-(step 1's `mount`/`tar`/`umount`) and running `qemu-gate.exp` (step 3) need
+(step 1's `mount`/`tar`/`umount`) and running `qemu-gate.exp` (step 4) need
 root, so those commands are prefixed `sudo`. Step 2's
 `inject-test-images.sh` also needs root for its own loop mount, but sudoes
 internally rather than needing its own invocation prefixed — its `sudo
@@ -298,10 +624,14 @@ mkfs.ext4 -q /tmp/x5h-replay.ext4
 mnt="$(mktemp -d)"
 sudo mount -o loop /tmp/x5h-replay.ext4 "$mnt"
 # --xattrs: mirrors the CI step exactly. A plain `tar xf` silently drops
-# extended attributes on extract (exit 0, no warning), which would make
-# GATE2 fail for the wrong reason (the archive never carried
-# security.capability into the export) instead of the real one
-# (EXT4_FS_SECURITY missing in the mimic kernel).
+# extended attributes on extract (exit 0, no warning) even when the
+# archive carries them, so security.capability on e.g. ping would
+# otherwise vanish here regardless of kernel. The rebuilt kernel this
+# export boots under has EXT4_FS_SECURITY=y, so GATE2 now asserts the
+# restored capability survives rather than that it fails on a
+# constrained kernel — but either way, without --xattrs the export
+# itself would never have carried the capability to test in the first
+# place.
 sudo tar --xattrs --xattrs-include='*.*' -xf "$TAR" -C "$mnt"
 sudo umount "$mnt"
 rmdir "$mnt"
@@ -309,37 +639,57 @@ rmdir "$mnt"
 # 2. Inject the test payload. Use the script, not a hand-copy: besides the
 #    two test tars and gate-guest.sh, it also neutralizes /etc/fstab
 #    (preserving the original as fstab.image) — skip that and the guest
-#    reboot-loops on the stock fstab's ESP entry (see Troubleshooting).
-./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES"
+#    reboot-loops on the stock fstab's ESP entry (see Troubleshooting) —
+#    and now also extracts the rebuilt kernel's module tree from its third
+#    argument (depmod'ing it for the guest) and installs the in-tree
+#    `config/60-nftables.conf` drop-in, required by GATE1's modprobe
+#    prelude and GATE6's nftables driver respectively.
+./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR"
 
-# 3. Run the gate. /tmp/x5h-blank.img is deliberately not pre-created here:
+# 3. Start the host listener GATE6_SNAT_OK probes. The guest reaches it as
+#    http://10.0.2.2:8099/, which slirp maps onto the host's
+#    127.0.0.1:8099. The CI workflow runs this listener itself, so it is
+#    easy to miss here — and GATE6_SNAT_OK is a *required* marker, so a
+#    replay without it fails the gate with GATE6_SNAT_FAIL for a reason
+#    that has nothing to do with the kernel under test. Bind to loopback,
+#    not 0.0.0.0: slirp only ever needs 127.0.0.1, and this serves the
+#    current directory to whoever can reach it.
+python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 &
+listener=$!
+
+# 4. Run the gate. /tmp/x5h-blank.img is deliberately not pre-created here:
 #    run-qemu-gate.sh makes it itself (`qemu-img create -f raw ... 8G`) when
 #    the path doesn't exist yet, the same fallback CI relies on rather than
 #    pre-creating it — which is why qemu-img (qemu-utils) is a listed
 #    prerequisite above, not an optional one.
 #    On an x86 host, run-qemu-gate.sh's aarch64+/dev/kvm check is always
 #    false, so this is cross-arch TCG — materially slower than CI's
-#    same-arch TCG (~430 s of guest time in run 30730519760, per "Gate
-#    verdict" above). There is no verified local number for cross-arch TCG;
-#    expect it to run considerably longer and budget accordingly rather than
-#    trusting a specific figure. qemu-gate.exp's inactivity timeout re-arms
-#    on every marker, so a slow-but-progressing run will not be killed
-#    early.
+#    same-arch TCG. There is no verified guest-time figure yet for this
+#    rebuilt-kernel edition (that lands with the first green CI run on
+#    this branch); the ~430 s figure in "Gate verdict" above is from the
+#    retired BSP-mimic edition and is not a reliable stand-in for it — a
+#    from-source kernel doing real module loading and SELinux policy load
+#    is not expected to match that number either way. Budget accordingly
+#    rather than trusting a specific figure. qemu-gate.exp's inactivity
+#    timeout re-arms on every marker, so a slow-but-progressing run will
+#    not be killed early.
 sudo ./scripts/qemu-gate.exp ./scripts/run-qemu-gate.sh \
   "$KERNEL" /tmp/x5h-replay.ext4 \
   /tmp/x5h-blank.img /tmp/x5h-local-gate.log
 
-# 4. Read the result the same way CI's "Show gate markers" step does.
+# 5. Stop the listener — it outlives the gate otherwise.
+kill "$listener"
+
+# 6. Read the result the same way CI's "Show gate markers" step does.
 grep -E 'GATE[0-9_]+' /tmp/x5h-local-gate.log
 ```
 
 `qemu-gate.exp` itself exits 0 only once every required marker from the
-vocabulary table above is present in the log (`GATE1_LOGIN_OK`, both
-`GATE3`/`GATE4` `_STORE_FS=`/`_OK` pairs, `GATE_DONE`, one of the two
-accepted GATE2 verdicts, one of the two accepted GATE5 verdicts) — check
-`echo $?` after it returns, or just compare the `grep` output above against
-the marker table and the "Gate verdict" table for the expected line-for-line
-match.
+"Gate markers (rebuilt-kernel edition)" table (in "Rebuilt kernel
+(6.1.102-autosd)" above) is present in the log, and `GATE1_MODPROBE_FAIL`
+and `GATE1_CCVER_FAIL` are both absent — check `echo $?` after it returns,
+or just compare the `grep`
+output above against that table for the expected line-for-line match.
 
 ## Board bring-up
 
@@ -392,21 +742,34 @@ The template's `${...}` placeholders are of three kinds. `serverip` is already d
 this board's U-Boot environment. `kernel_addr_r` and `fdt_addr_r` **may not be** — this
 board's own default `bootcmd` loads to literal addresses rather than through those
 variables, and an undefined `${kernel_addr_r}` expands to nothing, silently demoting
-`tftp ${kernel_addr_r} Image` to a load at `${loadaddr}`: a wrong-address load that still
-looks like a working command. Run `printenv kernel_addr_r fdt_addr_r` first and, if either
-is "not defined", `setenv` it to the matching literal address read out of the `printenv`
-backup taken at the start of the session (never a guessed address). The rest
-(`autosd_export_path`, `bootargs_bsp`, `board_ip_config`, `dtb_file`) are operator-supplied
-from `x5h-work/HANDOFF.md` (not committed to this repo) and must all be `setenv` at the
-prompt **before the first line of the template**, not merely before `bootargs_autosd` —
-`autosd_export_path` is consumed by the *first* line (`autosd_nfsroot`), which is unquoted
-and therefore expands immediately, exactly like the double-quoted `bootargs_autosd` line
-that follows it. Setting `autosd_export_path` only after `autosd_nfsroot` has already run
-still bakes an empty export path into it (`nfsroot=<ip>:,nfsvers=3`), and that string is
-plausible enough to pass a casual glance. After entering all three lines, read back
-`printenv autosd_nfsroot bootargs_autosd` and check that the export path and the `ip=`
-config are actually present in the output — not just that the strings "look complete" —
-then boot the AutoSD NFS root with:
+`tftp ${kernel_addr_r} ${kernel_file}` to a load at `${loadaddr}`: a wrong-address load that
+still looks like a working command. Run `printenv kernel_addr_r fdt_addr_r` first and, if
+either is "not defined", `setenv` it to the matching literal address read out of the
+`printenv` backup taken at the start of the session (never a guessed address). The rest —
+six variables, all `setenv` at the prompt **before the first line of the template**, not
+merely before `bootargs_autosd` — split into two groups: `autosd_export_path`,
+`bootargs_bsp`, and `board_ip_config` are genuinely site values, operator-supplied from
+`x5h-work/HANDOFF.md` (not committed to this repo); `dtb_file`, `kernel_file`, and
+`selinux_arg` select which kernel boots and take one of exactly two documented value pairs —
+BSP or rebuilt, see `uboot/autosd-boot.env`'s header for the full table, or "Rebuilt kernel
+(6.1.102-autosd)" above for the rebuilt pair specifically. `autosd_export_path` is consumed
+by the *first* line (`autosd_nfsroot`), which is unquoted and therefore expands immediately,
+exactly like the double-quoted `bootargs_autosd` line that follows it. Setting
+`autosd_export_path` only after `autosd_nfsroot` has already run still bakes an empty export
+path into it (`nfsroot=<ip>:,nfsvers=3`), and that string is plausible enough to pass a
+casual glance. After entering all three lines, read back `printenv autosd_nfsroot
+bootargs_autosd` and check that the export path and the `ip=` config are actually present in
+the output — not just that the strings "look complete".
+
+The board's saved U-Boot environment may already hold a `bootcmd_autosd` from a previous
+session, with the kernel filename hardcoded instead of `${kernel_file}` — `setenv` replaces a
+variable outright, but only when re-entered, so skipping straight to `run bootcmd_autosd` on a
+board that already has one saved runs *that* stale command, hardcoded filename and all,
+ignoring whatever `kernel_file`/`dtb_file`/`selinux_arg` were just `setenv`'d. Always re-enter
+all three `setenv` lines above first. Then read back `printenv bootcmd_autosd` — not
+`bootargs_autosd`, which a stale `bootcmd_autosd` can still produce a plausible-looking value
+for — and confirm `${kernel_file}` appears **unexpanded** in the output. Only then boot the
+AutoSD NFS root with:
 
 ```
 run bootcmd_autosd
@@ -421,11 +784,16 @@ address. For the same reason the `nfsroot=` options are just `nfsvers=3` — the
 string the BSP netboot is proven to mount with on this hardware (`proto=tcp` is already the
 kernel default here, as `findmnt` on the running BSP shows).
 
-Once logged in, `systemctl is-system-running` reporting `degraded` is expected, not a fault
-— the QEMU gate reproduces the identical state from exactly two known-benign failed units
-(`selinux-bools.service`: no SELinux in this kernel; `ukiboot-set-success.service`: no
-ukibootctl partition, since this image ships `use_efipart: false` — see the Troubleshooting
-table below for both). Neither should be chased as a live problem.
+Once logged in on the **BSP kernel**, `systemctl is-system-running` reporting `degraded` is
+expected, not a fault — the retired BSP-mimic QEMU gate reproduced the identical state from
+exactly two known-benign failed units (`selinux-bools.service`: no SELinux in this kernel;
+`ukiboot-set-success.service`: no ukibootctl partition, since this image ships
+`use_efipart: false` — see the Troubleshooting table below for both). Neither should be
+chased as a live problem. Booting the **rebuilt kernel** instead is different: SELinux is
+compiled in and `enforcing=0` by default, so `selinux-bools.service` must now come up clean
+— a failed `selinux-bools.service` there is `GATE7_SELINUX_BOOLS_FAILED`'s live equivalent,
+a real regression, not the benign BSP-kernel finding above (see "Gate markers
+(rebuilt-kernel edition)" in "Rebuilt kernel (6.1.102-autosd)" above).
 
 At the end of the session, re-verify the unmodified BSP boot path still works (power cycle,
 default `bootcmd`, BSP NFS root) before releasing the board.
@@ -434,9 +802,19 @@ default `bootcmd`, BSP NFS root) before releasing the board.
 
 `scripts/board-podman-smoke.sh` is staged onto the NFS root under `/var/lib/autosd-test/`
 by step 1 — **not** on `PATH`, so invoke it by absolute path (a `command not found` at a
-1.8 Mbps serial prompt costs real time). It runs in two phases, and the order is an enforced
-invariant, not just a documented one: `btrfs` refuses to run unless a `tmpfs` run has already
-passed on this boot.
+1.8 Mbps serial prompt costs real time). Phase order is an enforced invariant, not just a
+documented one: `btrfs` refuses to run unless a `tmpfs` run has already passed on this boot.
+On the BSP kernel there are two phases (`tmpfs`, `btrfs`); on the **rebuilt kernel** a third,
+`ext4loop` (also zero board mutation — a `/run`-backed loop file, not a real device), runs
+between them — see "Rebuilt kernel (6.1.102-autosd)" above for the full three-phase sequence
+and the outbound-SNAT listener it needs. **`ext4loop` cannot pass on the image as shipped**:
+it calls `mkfs.ext4`, and `aib/x5h-rootfs.aib.yml` installs no `e2fsprogs`, so the phase ends
+in `SMOKE_ext4loop_MKFS_FAIL`. That is a packaging gap, not a kernel finding — the rebuilt
+kernel's `EXT4_FS_SECURITY` is already proven by GATE2 — and closing it needs a rootfs rebuild,
+which is deliberately out of scope here. Expect that one red marker in a board session and
+carry on to `btrfs`. The walkthrough below
+covers the `tmpfs`/`btrfs` pair common to both kernels; invoke `ext4loop` the same way, with
+no extra argument, between them.
 
 ```bash
 /var/lib/autosd-test/board-podman-smoke.sh tmpfs      # zero board mutation, run this first
@@ -476,36 +854,54 @@ deliberately need to run `btrfs` alone — e.g. after a reboot cleared the stamp
 already know `tmpfs` is fine — either re-run `tmpfs` again (it costs nothing) or
 `touch /run/x5h-smoke-tmpfs-passed` by hand to override.
 
-The networking check inside each phase is two-stage, mirroring `gate-guest.sh`'s GATE5, and
-only the second stage is decisive: a port-published attempt (`curl http://127.0.0.1:8080/`)
-runs first and is **informational only** — it prints `SMOKE_<mode>_NET_PORT_OK` if it
-unexpectedly succeeds, but its failure never sets the script's fail state. It is expected to
-fail every time under the currently-shipped `firewall_driver = "none"`: netavark's `none`
-driver never installs a DNAT rule, so a published port is unreachable by construction, proven
-in the gate's own green run (the port-published attempt polled ~78 s with zero successful
-curls before the fallback below succeeded). The check that actually decides `SMOKE_<mode>_NET_OK`
-vs. `SMOKE_<mode>_NET_FAIL` is the direct-container-IP path — `podman inspect`'s
-`.NetworkSettings.Networks` range form, the same one the QEMU gate's own fallback uses — run
-automatically, not left for the operator to trigger by hand. If `SMOKE_<mode>_NET_FAIL` still
-prints, both paths already failed automatically; look at `podman0`/`veth0` state and `podman`
-logs next, not at the firewall driver — `50-x5h.conf` already ships the only value this
-netavark accepts.
+The networking check inside each phase auto-detects which kernel is running (`uname -r`'s
+`-autosd` suffix) and branches accordingly — it no longer has one fixed shape:
+
+- **On the BSP kernel**, it is the same two-stage, informational-then-decisive shape the
+  retired GATE5 used: a port-published attempt (`curl http://127.0.0.1:8080/`) runs first
+  and is **informational only** — it prints `SMOKE_<mode>_NET_PORT_OK` if it unexpectedly
+  succeeds, but its failure never sets the script's fail state. It is expected to fail every
+  time under the currently-shipped `firewall_driver = "none"`: netavark's `none` driver never
+  installs a DNAT rule, so a published port is unreachable by construction. The check that
+  actually decides `SMOKE_<mode>_NET_OK` vs. `SMOKE_<mode>_NET_FAIL` is the
+  direct-container-IP path — `podman inspect`'s `.NetworkSettings.Networks` range form — run
+  automatically, not left for the operator to trigger by hand.
+- **On the rebuilt kernel**, the port-published attempt is decisive instead:
+  `60-nftables.conf`'s nftables driver does install the DNAT rule, so a dead published port
+  there is a real regression, and `SMOKE_<mode>_NET_PORT_FAIL` sets the fail state — the live
+  equivalent of `GATE6_NFT_PORT_FAIL`. The direct-container-IP path still runs afterward as a
+  second, independent confirmation and can also fail. A third check then runs, rebuilt kernel
+  only: a busybox container's `wget -T 10` against a host-PC listener across the board LAN
+  (`SMOKE_EXT_URL`, default `http://192.168.0.1:8099/`; `SMOKE_EXT_URL=skip` records
+  `SMOKE_<mode>_SNAT_SKIPPED` instead of running it), proving container→external is
+  masqueraded — `SMOKE_<mode>_SNAT_OK`/`SMOKE_<mode>_SNAT_FAIL`, the live equivalent of
+  `GATE6_SNAT_OK`/`GATE6_SNAT_FAIL`.
+
+If `SMOKE_<mode>_NET_FAIL` prints on the BSP kernel, both of its paths already failed
+automatically; look at `podman0`/`veth0` state and `podman` logs next, not at the firewall
+driver — `50-x5h.conf` already ships the only value the BSP kernel's netavark accepts.
 
 Each phase prints `SMOKE_<mode>_STORE_FS=<fstype>` right after its mount succeeds (mirroring
-`gate-guest.sh`'s `GATE3_STORE_FS`/`GATE4_STORE_FS`) — check it reads `tmpfs` / `btrfs`
-respectively, not whatever was mounted underneath, before trusting a later `_PASS`. `btrfs`
-additionally asserts this itself, machine-enforced rather than left to the operator's eyes
-(mirroring how `qemu-gate.exp` itself requires `GATE4_STORE_FS=btrfs`): a `$DEV` that mounts
-successfully but isn't actually btrfs (e.g. a typo onto a device carrying a real filesystem)
-fails loudly as `SMOKE_<mode>_STORE_FS_FAIL`, before any `podman load` gets a chance to write
-to it. Every run ends in one of: `SMOKE_<mode>_PASS`; `SMOKE_<mode>_FAIL` (a podman or network
-check failed); `SMOKE_<mode>_MODPROBE_FAIL`; `SMOKE_<mode>_MOUNT_FAIL`; or, `btrfs` only,
-`SMOKE_<mode>_DEV_FAIL` (bad block device), `SMOKE_<mode>_TMPFS_GATE_FAIL` (no prior `tmpfs`
-pass), or `SMOKE_<mode>_STORE_FS_FAIL` (mounted, but not actually btrfs) — except an invalid
-or missing mode argument, which prints a plain `usage: ...` line and exits 2 with **no**
-`SMOKE_` marker at all, since the script hasn't chosen a `$MODE` to prefix one with yet. Grep
-for the full set; if you see none of them, the run stopped before producing anything
-trustworthy — treat that the same as a failure, not as a pass.
+`gate-guest.sh`'s `GATE2_STORE_FS`/`GATE3_STORE_FS`/`GATE4_STORE_FS`) — check it reads
+`tmpfs` / `ext4` / `btrfs` for the `tmpfs` / `ext4loop` / `btrfs` modes respectively (yes,
+`ext4loop`'s own store fstype reads `ext4` — the mode name describes how the store is backed,
+not the filesystem on it), not whatever was mounted underneath, before trusting a later
+`_PASS`. `ext4loop` and `btrfs` both additionally assert this themselves, machine-enforced
+rather than left to the operator's eyes (mirroring how `qemu-gate.exp` itself requires
+`GATE4_STORE_FS=btrfs`): a mount that succeeds but isn't actually the expected filesystem
+(e.g. a `btrfs` `$DEV` typo onto a device carrying a real filesystem) fails loudly as
+`SMOKE_<mode>_STORE_FS_FAIL`, before any `podman load` gets a chance to write to it. Every
+run ends in one of: `SMOKE_<mode>_PASS`; `SMOKE_<mode>_FAIL` (a podman or network check
+failed); `SMOKE_<mode>_MODPROBE_FAIL`; `SMOKE_<mode>_MOUNT_FAIL`; or, mode-specific,
+`SMOKE_<mode>_DEV_FAIL` (`btrfs` only, bad block device), `SMOKE_<mode>_TMPFS_GATE_FAIL`
+(`btrfs` only, no prior `tmpfs` pass), `SMOKE_<mode>_IMG_FAIL`/`SMOKE_<mode>_MKFS_FAIL`
+(`ext4loop` only, backing-file `truncate`/`mkfs.ext4` failed — `MKFS_FAIL` is *expected* on
+the current image, which ships no `e2fsprogs`; see Board bring-up step 3), or `SMOKE_<mode>_STORE_FS_FAIL`
+(`ext4loop`/`btrfs`, mounted but the wrong filesystem) — except an invalid or missing mode
+argument, which prints a plain `usage: ...` line and exits 2 with **no** `SMOKE_` marker at
+all, since the script hasn't chosen a `$MODE` to prefix one with yet. Grep for the full set;
+if you see none of them, the run stopped before producing anything trustworthy — treat that
+the same as a failure, not as a pass.
 
 Site values — server IP, export paths, the `ip=` kernel argument, and the DTB filename —
 live in `x5h-work/HANDOFF.md` on the operator's machine and are never committed to this

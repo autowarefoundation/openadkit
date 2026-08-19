@@ -74,22 +74,25 @@ send "sh /var/lib/autosd-test/gate-guest.sh\r"
 # that's merely slow keeps proceeding while a run that goes truly silent (or
 # whose guest dies) still fails fast and with a clear diagnostic.
 #
-# GATE5 is the longest silent stretch: every command between the last
-# GATE4_* marker and the eventual GATE5_* verdict is output-suppressed, so
-# nothing re-arms the timer for the whole block. That stretch is bounded
-# arithmetically, not by a TCG-speed guess: two 30-iteration poll loops
-# (curl --max-time 5 + sleep 2 each) cap at 210s apiece = 420s of pure
-# network/sleep wall-clock alone (this is a hard ceiling: curl's --max-time
-# and sleep are wall-clock, not CPU-bound, so TCG slowness doesn't shrink
-# it), plus a busybox podman load, two "podman run -d", up to 30 "podman
-# inspect" calls and two "podman rm -f" -- all process-spawn overhead that
-# does scale with TCG speed. Budgeting that at up to ~30-60s per operation
-# (image load, each run/rm) and ~2s per inspect adds roughly another 170s,
-# for a padded worst-case estimate around 590s. inactivity_timeout is set
-# well above that combined estimate; if a future change makes the GATE5
-# loops longer (more iterations, a longer --max-time, more polled
-# operations), raise this number to match -- it is coupled to those bounds,
-# not an independent knob.
+# GATE6 is now the longest silent stretch: every command between the last
+# GATE4_* marker and the eventual GATE6_* verdicts is output-suppressed, so
+# nothing re-arms the timer for that whole block. That stretch is bounded
+# arithmetically, not by a TCG-speed guess: the nftables port-publish poll
+# is 30 iterations of (curl --max-time 5 + sleep 2) = 210s, and the
+# outbound-SNAT poll is 5 iterations of (podman run ... wget -T 10 + sleep
+# 2) = 60s. wget's -T 10 is what makes that second bound real, not just
+# asserted: an unanswered SYN -- the exact failure this probe exists to
+# catch -- would otherwise block for the kernel's syn-retry ceiling
+# (~127s), not 10s (both loops are wall-clock, not CPU-bound, so TCG
+# slowness doesn't shrink them), plus a busybox podman load, two "podman
+# run" invocations (the web server and the wget probe), and a
+# "podman rm -f" in between -- process-spawn overhead that does scale with
+# TCG speed, budgeted at up to ~30-60s per operation. That totals well
+# under the retired GATE5's two-loop worst case (~590s), so
+# inactivity_timeout stays at 900; if a future change makes the GATE6
+# polls longer (more iterations, a longer --max-time/attempt budget),
+# raise this number to match -- it is coupled to those bounds, not an
+# independent knob.
 set inactivity_timeout 900
 set timeout $inactivity_timeout
 expect {
@@ -127,13 +130,20 @@ if {$guest_alive} {
 # Judge the markers from the captured log.
 set fh [open $logf r]; set log [read $fh]; close $fh
 set fail 0
-foreach must {GATE1_LOGIN_OK GATE3_TMPFS_OK GATE3_STORE_FS=tmpfs GATE4_BTRFS_OK GATE4_STORE_FS=btrfs GATE_DONE} {
+foreach must {GATE1_LOGIN_OK GATE1_KVER=6.1.102-autosd GATE1_CCVER_OK GATE2_STORE_FS=ext4 GATE2_EXT4_OK GATE3_TMPFS_OK GATE3_STORE_FS=tmpfs GATE4_BTRFS_OK GATE4_STORE_FS=btrfs GATE6_NFT_PORT_OK GATE6_SNAT_OK GATE7_SELINUX_PERMISSIVE_OK GATE7_SELINUX_BOOLS_OK GATE_DONE} {
     if {![string match "*$must*" $log]} { puts "MISSING: $must"; set fail 1 }
 }
-if {![string match "*GATE2_EXT4_FAIL_OK*" $log] && ![string match "*GATE2_EXT4_UNEXPECTED_PASS*" $log]} {
-    puts "MISSING: GATE2 verdict (got neither FAIL_OK nor UNEXPECTED_PASS)"; set fail 1
+# Module staging failure poisons every verdict above; fail loudly on it even
+# if the markers happened to come out right.
+if {[string match "*GATE1_MODPROBE_FAIL*" $log]} {
+    puts "FOUND: GATE1_MODPROBE_FAIL (module tree staging broken)"; set fail 1
 }
-if {![string match "*GATE5_IPTABLES_OK*" $log] && ![string match "*GATE5_NONE_OK*" $log]} {
-    puts "MISSING: GATE5 (neither iptables nor none-fallback passed)"; set fail 1
+# The toolchain pin is a correctness condition, not a preference (see
+# kernel/build-bsp-kernel.sh's header): a kernel built by any other compiler
+# must not pass. GATE1_CCVER_OK's absence would already fail the run above,
+# but naming the cause explicitly is what the README documents as "must be
+# ABSENT", and it beats leaving the operator a bare MISSING line.
+if {[string match "*GATE1_CCVER_FAIL*" $log]} {
+    puts "FOUND: GATE1_CCVER_FAIL (booted kernel was not built by the pinned toolchain)"; set fail 1
 }
 exit $fail

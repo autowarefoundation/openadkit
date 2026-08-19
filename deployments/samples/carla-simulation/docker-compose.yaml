@@ -306,6 +306,8 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
       - RVIZ_GPU=auto

@@ -32,6 +32,12 @@ on:
         required: false
         type: boolean
         default: false
+      upstream_tag:
+        description: >-
+          Override the upstream Autoware base image tag (e.g. 1.9.0). Leave
+          empty to derive it from the Autoware ref being built.
+        required: false
+        default: ''
 
 concurrency:
   group: build-all-images-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
@@ -53,6 +59,7 @@ jobs:
       autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
       autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      upstream_tag: ${{ steps.prepare.outputs.upstream_tag }}
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       scan_requested: ${{ steps.prepare.outputs.scan_requested }}
@@ -68,6 +75,7 @@ jobs:
         env:
           AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || 'main' }}
           RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
+          UPSTREAM_TAG_INPUT: ${{ inputs.upstream_tag || '' }}
         run: |
           set -euo pipefail
 
@@ -105,11 +113,20 @@ jobs:
           )
           [ -n "${autoware_base_version}" ] || (echo "Could not infer Autoware base version from ${autoware_input_ref}" && exit 1)
 
+          # The upstream base images are tagged by Autoware release, and the
+          # sources compiled on top of them come from that same ref. Derive the
+          # tag from the ref so the two cannot drift: a hand-maintained pin goes
+          # stale on every release and then fails as an unrelated-looking
+          # compile error deep inside colcon.
+          upstream_tag="${UPSTREAM_TAG_INPUT:-}"
+          [ -n "${upstream_tag}" ] || upstream_tag="${autoware_base_version}"
+
           {
             echo "autoware_input_ref=${autoware_input_ref}"
             echo "autoware_ref_type=${autoware_ref_type}"
             echo "autoware_ref=${autoware_ref}"
             echo "autoware_base_version=${autoware_base_version}"
+            echo "upstream_tag=${upstream_tag}"
             echo "build_tag=${build_tag}"
             echo "scan_requested=${scan_requested}"
           } >> "$GITHUB_OUTPUT"
@@ -301,7 +318,7 @@ jobs:
       - name: Ensure upstream Autoware base images exist
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
         run: |
           set -euo pipefail
           # universe-common surfaces core/core-devel; sensing-perception-cuda
@@ -365,7 +382,7 @@ jobs:
         uses: docker/bake-action@v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -521,7 +538,7 @@ jobs:
         uses: docker/bake-action@v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ vars.UPSTREAM_TAG }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
         with:
           files: |
             ${{ env.BAKE_FILE }}

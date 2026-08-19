@@ -24,9 +24,16 @@ Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 Volume=/opt/tier4/kashiwanoha_map:/autoware_map:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# raw_vehicle_cmd_converter_param_path targets the ISOLATED colcon
+# install layout (/opt/autoware/<pkg>/share/<pkg>/...), not a merged
+# one -- matches the isolated-install reasoning on the Volume= lines
+# above and the sibling fix/component-images-autoware-launch branch's
+# docker-compose.yaml. autoware_launch is not yet in any staged image
+# (a separate branch adds it), so this is derived, not measured; the
+# other branch landing the same form is corroborating, not proof.
 Exec=ros2 launch tier4_vehicle_launch vehicle.launch.xml \
   launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE} \
-  raw_vehicle_cmd_converter_param_path:=/opt/autoware/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml \
+  raw_vehicle_cmd_converter_param_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml \
   sensor_model:=${SENSOR_MODEL} use_sim_time:=${USE_SIM_TIME} \
   vehicle_id:=${VEHICLE_ID} vehicle_model:=${VEHICLE_MODEL}
 

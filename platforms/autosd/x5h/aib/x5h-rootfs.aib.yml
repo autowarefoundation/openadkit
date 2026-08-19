@@ -156,6 +156,19 @@ content:
     - source_path: ../config/80-x5h.preset
       path: /etc/systemd/system-preset/80-x5h.preset
     # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
+    #
+    # None of this works unless aib/vars.yml keeps `pregenerate_quadlets:
+    # false`. With aib's default (true, because `aib build` pins
+    # image_mode=bootc and pregenerate_quadlets follows use_ostree), the
+    # image ships /etc/systemd/system-generators/podman-system-generator as a
+    # symlink to /dev/null and every file installed below generates NO unit
+    # at all at runtime -- no error, no journal line, `systemctl
+    # list-unit-files "awf-oak*"` simply empty. That was measured on the
+    # board and cost a whole Stage 1 session. See the long note on
+    # `pregenerate_quadlets` in aib/vars.yml for why the fix lives there and
+    # not in this file (an add_symlinks unmask at that same path aborts the
+    # build; a tmpfiles.d `L` line lands one boot too late).
+    #
     # Eight of the nine `.container` units below carry `[Install] WantedBy=
     # default.target`, which Quadlet auto-enables at unit-generation time on
     # every boot regardless of what 80-x5h.preset says -- there is no preset

@@ -119,4 +119,3 @@ naming scheme.
 - [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
 - [Roadmap](../roadmap.md) — Release ladder and focus areas
 - [Supported Platforms](../platforms/index.md) — Where to deploy
-

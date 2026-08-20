@@ -1,0 +1,288 @@
+header:
+  stamp:
+    sec: 300
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 8.0
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 301
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 7.2
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 6.4
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 302
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 12.85
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 4.9
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 303
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 17.05
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 3.5
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 304
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 19.9
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 2.2
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 305
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 21.55
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 1.1
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 306
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 22.3
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 0.4
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 307
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 22.525
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 0.05
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---
+header:
+  stamp:
+    sec: 308
+    nanosec: 0
+  frame_id: map
+child_frame_id: base_link
+pose:
+  pose:
+    position:
+      x: 22.55
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  covariance:
+  - 0.0
+twist:
+  twist:
+    linear:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    angular:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  covariance:
+  - 0.0
+---

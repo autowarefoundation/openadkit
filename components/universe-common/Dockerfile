@@ -96,6 +96,8 @@ ARG ROS_DISTRO
 
 USER root
 ENV AUTOWARE_RUNTIME=1
+# ${BASE_IMAGE} has no /opt/autoware. Copy the tree into place; cp -a src/. dest/
+# would require dest to exist, and if dest later appears this must not nest.
 RUN --mount=from=universe-common-devel,source=/opt/acados,target=/mnt/acados \
     --mount=from=universe-common-devel,source=/opt/autoware,target=/mnt/autoware \
     --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \

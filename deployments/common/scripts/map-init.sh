@@ -38,7 +38,21 @@ if [ "$needs_extract" = true ]; then
   fi
 
   echo "Extracting kashiwanoha map from $image..."
-  source /opt/ros/humble/setup.bash
+  ros_setup="/opt/ros/${ROS_DISTRO:-}/setup.bash"
+  if [ ! -f "$ros_setup" ]; then
+    if [ -f /opt/ros/jazzy/setup.bash ]; then
+      ros_setup=/opt/ros/jazzy/setup.bash
+    elif [ -f /opt/ros/humble/setup.bash ]; then
+      ros_setup=/opt/ros/humble/setup.bash
+    else
+      echo "ERROR: No ROS setup.bash found in $image." >&2
+      exit 1
+    fi
+  fi
+  # shellcheck disable=SC1090
+  set +u
+  source "$ros_setup"
+  set -u
   map_dir="$(ros2 pkg prefix --share kashiwanoha_map)/map"
   if [ ! -d "$map_dir" ]; then
     echo "ERROR: Kashiwanoha map not found in $image; check that the image contains the kashiwanoha_map package." >&2

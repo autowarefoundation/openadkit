@@ -45,33 +45,35 @@ Open AD Kit images are built with `docker buildx bake` using
 The build graph is:
 
 ```
-upstream autoware:core-devel / core / base-cuda-{devel,runtime}
+upstream autoware:core-devel / base / base-cuda-{devel,runtime}
         │
         ▼
 universe-common  (openadkit-owned thin intermediate)
         │
         ▼
-seven non-CUDA component images (sensing-perception,
-localization-mapping, planning-control, vehicle-system,
-api, visualizer, simulator)
+component images (sensing-perception, localization-mapping,
+planning-control, vehicle-system, api, visualizer, simulator,
+carla-interface)
 ```
+
+Devel stages start from upstream `core-devel`. The `universe-common`
+runtime starts from lean upstream `base` and copies the compiled
+core/common tree from devel so final layers do not keep core's
+development files.
 
 `sensing-perception-cuda` is a parallel CUDA branch: it inherits from
 upstream `base-cuda-{devel,runtime}` and additionally grafts in the
 `universe-common` install tree (so it has both CUDA toolkit access and the
 universe-common compiled packages).
 
-The `universe-common` layer compiles only the universe-common slice of
-Autoware on top of upstream `core-devel`/`core`; everything below
-`universe-common` (base OS, ROS, core) is owned and built by upstream.
-
 ### Bake groups
 
 | Group | Targets |
 |-------|---------|
 | `default` | everything: `universe-common` + `component` |
+| `planning` | `universe-common` plus localization, planning-control, vehicle-system, api, visualizer, simulator |
 | `universe-common` | `universe-common-devel`, `universe-common` |
-| `component` | the seven non-CUDA component images plus `sensing-perception-cuda` |
+| `component` | the eight non-CUDA component images plus `sensing-perception-cuda` |
 
 ### Upstream pin
 

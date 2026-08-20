@@ -1,19 +1,23 @@
-# Autoware Tools - Visualizer
+# Visualizer
 
-Opens a remote RViz display for Autoware.
-
-## Standalone Run
+The visualizer provides browser-accessible RViz2 through noVNC. Image
+architecture lives in the
+[component documentation](https://autowarefoundation.github.io/openadkit/components/).
 
 ```bash
-docker run --rm --name visualizer -p 6080:6080 ghcr.io/autowarefoundation/autoware-tools:visualizer
+docker run --rm --name visualizer --network host \
+  -e REMOTE_PASSWORD=yourpassword \
+  ghcr.io/autowarefoundation/openadkit:visualizer
 ```
 
-## Settings
+Open `https://localhost:6080/vnc.html`. The self-signed certificate causes an
+expected browser warning on first access.
 
-The following environment variables can be configured with `-e` while launching the visualizer container:
-
-| Variable          | Default Value                  | Possible Values                       | Description                                                                                                                                    |
-| ----------------- | ------------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RVIZ_CONFIG`     | `/autoware/rviz/autoware.rviz` | Any valid path                        | The full path to the RViz configuration file inside the container                                                                              |
-| `REMOTE_DISPLAY`  | `true`                         | `true`, `false`                       | **(Recommended)** Lightweight and browser-based RViz display, accessible from any device. Set this to `false` to launch a local rviz2 display. |
-| `REMOTE_PASSWORD` | `openadkit`                    | Any string without special characters | Password for remote display (only used when `REMOTE_DISPLAY=true`)                                                                             |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `REMOTE_PASSWORD` | (required) | noVNC password. The container exits if unset. |
+| `REMOTE_DISPLAY` | `true` | `true` starts noVNC/VNC. `false` runs local RViz2. |
+| `WEBSOCKIFY_BIND` | `127.0.0.1` | noVNC bind address. Use `0.0.0.0` only behind a reverse proxy or Docker port publish. |
+| `RVIZ_CONFIG` | `/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz` | RViz config path inside the container. |
+| `RVIZ_GPU` | `auto` | `auto` uses VirtualGL when an NVIDIA GPU is present. `on` forces it. `off` disables it. |
+| `USE_SIM_TIME` | `false` | Forwarded to RViz as `use_sim_time`. |

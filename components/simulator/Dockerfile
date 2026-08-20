@@ -32,11 +32,26 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     colcon build \
       --base-paths \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_simulator_launch \
+        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description \
+        /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_launch \
+        /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/universe/autoware_universe/simulator \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_shape_estimation \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_multi_object_tracker \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_crosswalk_traffic_light_estimator \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_elevation_map_loader \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_detected_object_feature_remover \
+        /tmp/autoware/src/universe/autoware_universe/perception/perception_utils \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_arbiter \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_category_merger \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_classifier \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_fine_detector \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_multi_camera_fusion \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_selector \
+        /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_visualization \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_common \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_probabilistic_occupancy_grid_map \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_map_based_prediction \
@@ -66,17 +81,20 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-COPY --from=simulator-devel /opt/autoware /opt/autoware
-RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
+RUN --mount=from=simulator-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    cp -a /mnt/autoware/. /opt/autoware/ && \
+    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
+    bash /tmp/runtime-cleanup.sh opt
 
-COPY --parents --chown=${USERNAME}:${USERNAME} \
-    autoware/src/**/package.xml \
-    /tmp/
-
-RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/*
+    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
+    rosdep install -y --from-paths /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-cleanup.sh

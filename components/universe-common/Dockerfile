@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=skip=InvalidDefaultArgInFrom,UndefinedVar
 ARG CORE_DEVEL_IMAGE
-ARG CORE_IMAGE
+ARG BASE_IMAGE
 
 # =============================================================================
 # Stage: universe-common-devel
@@ -21,6 +21,8 @@ COPY --parents --chown=${USERNAME}:${USERNAME} \
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
+    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs || true)" && \
+    if [ -n "${security_packages}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages}; fi && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     . /opt/autoware/setup.sh && \
     rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
@@ -68,6 +70,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/external/pointcloud_to_laserscan \
         /tmp/autoware/src/universe/external/rtklib_ros_bridge \
         /tmp/autoware/src/universe/external/tier4_autoware_msgs \
+        /tmp/autoware/src/launcher/autoware_launch/autoware_launch \
         /tmp/autoware/src/middleware/external \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
@@ -85,29 +88,42 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 # =============================================================================
 # Stage: universe-common
-# Runtime variant: exec deps + the compiled tree, on top of core.
+# Runtime variant: exec deps + the compiled tree, on top of the lean base.
 # =============================================================================
-FROM ${CORE_IMAGE} AS universe-common
+FROM ${BASE_IMAGE} AS universe-common
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-COPY --from=universe-common-devel /opt/acados /opt/acados
-COPY --from=universe-common-devel /opt/autoware /opt/autoware
-RUN find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} +
+ENV AUTOWARE_RUNTIME=1
+# ${BASE_IMAGE} has no /opt/autoware. Copy the tree into place; cp -a src/. dest/
+# would require dest to exist, and if dest later appears this must not nest.
+RUN --mount=from=universe-common-devel,source=/opt/acados,target=/mnt/acados \
+    --mount=from=universe-common-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    cp -a /mnt/acados /opt/acados && \
+    cp -a /mnt/autoware /opt/autoware && \
+    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
+    bash /tmp/runtime-cleanup.sh opt
 
 ENV CMAKE_PREFIX_PATH="/opt/acados${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 ENV ACADOS_SOURCE_DIR="/opt/acados"
 ENV LD_LIBRARY_PATH="/opt/acados/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-COPY --parents --chown=${USERNAME}:${USERNAME} \
-    autoware/src/**/package.xml \
-    /tmp/
-
-RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
+    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs || true)" && \
+    if [ -n "${security_packages}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages}; fi && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      geographiclib-tools \
+      "ros-${ROS_DISTRO}-topic-tools" && \
+    geographiclib-get-geoids egm2008-1 && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    rosdep install -y --from-paths /tmp /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" && \
-    rm -rf /tmp/*
+    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
+    rosdep install -y --from-paths /opt/autoware/*/share \
+      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-cleanup.sh

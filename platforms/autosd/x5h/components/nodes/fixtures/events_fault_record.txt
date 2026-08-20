@@ -1,0 +1,7 @@
+stamp:
+  sec: 1785573136
+  nanosec: 845681675
+fault_injection_events:
+- level: 2
+  name: cpu_temperature_is_high
+---

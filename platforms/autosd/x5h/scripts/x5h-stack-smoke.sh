@@ -154,12 +154,18 @@
 #             mrm_no_stop_metrics   the MRM chain completed but the stop
 #                                   distance could not be computed: the
 #                                   kinematic_state capture or the staged
-#                                   x5h-stop-metrics.awk is missing, or no
-#                                   stamped fault record could anchor t=0.
-#                                   The chain result still stands; the run
-#                                   is failed because the before/after demo
-#                                   grades on this number and a PASS
-#                                   without it would be unusable there.
+#                                   x5h-stop-metrics.awk is missing, no
+#                                   stamped fault record could anchor t=0,
+#                                   OR the ego never came to rest within the
+#                                   capture window (x5h-stop-metrics.awk's
+#                                   own never_rested case -- this script
+#                                   does not distinguish it from the other
+#                                   causes above; all collapse to this one
+#                                   reason). The chain result still stands;
+#                                   the run is failed because the
+#                                   before/after demo grades on this number
+#                                   and a PASS without it would be unusable
+#                                   there.
 #
 # No `set -e`: every failure must reach exactly one marker rather than
 # exiting silently mid-check.
@@ -479,7 +485,7 @@ drive)
     [ "$ready" -eq 1 ] || fail "autoware_not_ready" "DRIVE"
 
     # THE MRM-CHAIN CAPTURES, started before the scenario so the whole chain
-    # is observed. All four topics live on domain 1 (nothing about the MRM is
+    # is observed. All five topics live on domain 1 (nothing about the MRM is
     # bridged), so ros1 sees everything. PYTHONUNBUFFERED because these are
     # stopped by pkill after the run rather than by their own timeout, and a
     # block-buffered tail would lose exactly the samples the oracle needs.

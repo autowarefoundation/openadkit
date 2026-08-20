@@ -24,7 +24,7 @@ AWK = Path(__file__).resolve().parents[2] / "scripts" / "x5h-stop-metrics.awk"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
-def odom_record(sec, x, vx):
+def odom_record(sec, x, vx, y=0.0):
     return f"""header:
   stamp:
     sec: {sec}
@@ -35,7 +35,7 @@ pose:
   pose:
     position:
       x: {x}
-      y: 0.0
+      y: {y}
       z: 0.0
     orientation:
       x: 0.0
@@ -106,6 +106,31 @@ def test_samples_before_t0_are_excluded(tmp_path):
     assert r.stdout.startswith("stop_distance_m=8.00")
 
 
+def test_curved_stop_uses_path_length_not_displacement(tmp_path):
+    # A right-angle turn: the ego runs along +x, then turns and runs along
+    # +y, coming to rest after the turn. Path length is the sum of the two
+    # legs (6 + 6 + 3 = 15.00 m); the straight-line chord from the t0 sample
+    # to rest is sqrt(6**2 + 9**2) = 10.82 m. The two numbers must differ,
+    # or this test isn't exercising anything -- this is exactly the
+    # scenario the awk's header comment cites as the reason path length
+    # (not displacement) was chosen: "a stop that begins in a curve
+    # compares fairly across runs." A regression that summed displacement
+    # instead of per-segment path length would report 10.82, not 15.00.
+    text = "".join(
+        odom_record(s, x, v, y=y)
+        for s, x, y, v in [
+            (200, 0.0, 0.0, 8.0),
+            (201, 6.0, 0.0, 6.0),
+            (202, 6.0, 6.0, 3.0),
+            (203, 6.0, 9.0, 0.01),
+            (204, 6.0, 9.0, 0.0),
+        ]
+    )
+    r = run_metrics(text, 200, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.strip() == "stop_distance_m=15.00 rest_x=6.00 rest_y=9.00"
+
+
 def test_never_rested(tmp_path):
     text = "".join(odom_record(100 + i, 8.0 * i, 8.0) for i in range(4))
     r = run_metrics(text, 100, tmp_path)
@@ -136,15 +161,33 @@ def test_t0_mode_no_match_fails(tmp_path):
 
 
 def test_synthetic_kinematic_excerpt_parses(tmp_path):
-    # Synthetic excerpt (see module docstring): the parser must extract
-    # >= 2 samples and produce a metric line (values asserted loosely --
-    # this fixture is not yet pinned to a real board capture).
+    # Synthetic excerpt (see module docstring): every value in this fixture
+    # was authored by hand (a 9-point trapezoidal-integration deceleration
+    # profile), so unlike a real, unmeasured capture the exact expected
+    # output was known at fixture-authoring time -- assert it exactly
+    # rather than just checking for a metric line.
+    #
+    # NOTE: this exact value is tied to the synthetic fixture. When Task 8
+    # re-pins fixtures/kinematic_state_synthetic_excerpt.txt against a real
+    # board capture, this asserted number will change.
     text = (FIXTURES / "kinematic_state_synthetic_excerpt.txt").read_text()
     first_sec = int(
         [l for l in text.splitlines() if l.startswith("    sec: ")][0].split()[1]
     )
     r = run_metrics(text, first_sec, tmp_path)
-    assert "stop_distance_m=" in r.stdout or "never_rested" in r.stdout
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.strip() == "stop_distance_m=22.55 rest_x=22.55 rest_y=0.00"
+
+    # The fixture deliberately includes a sample at vx == 0.05, exactly
+    # REST_V, to pin the awk's rest test at its boundary (`V[k] >= REST_V`
+    # means this sample must still count as moving, not at rest). Confirm
+    # that boundary sample is still present in the fixture, and that rest
+    # landed on the record *after* it (the final, fully-stopped record at
+    # x=22.55) rather than on the boundary record itself (which sits at
+    # x=22.525, i.e. would round to rest_x=22.52 or 22.53 if the boundary
+    # sample had been misclassified as already at rest).
+    assert text.count("\n      x: 0.05\n") == 1
+    assert r.stdout.strip().split()[1] == "rest_x=22.55"
 
 
 def test_real_events_record_yields_t0(tmp_path):

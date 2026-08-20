@@ -277,3 +277,86 @@ def test_run_flash_aborts_before_scp_when_payload_exceeds_extent(tmp_path):
     assert "X5H_DEMO_FAIL reason=demo_flash_failed:before:payload_exceeds_extent" in r.stdout
     # The gate must have failed before any ssh/scp stub ran.
     assert "stub: network access blocked" not in r.stderr
+
+
+def make_recording_bin_dir(tmp_path, log_path):
+    """Stub ssh/scp on PATH that record every argument they were called
+    with to log_path, in call order, and then succeed (exit 0) -- unlike
+    make_stub_bin_dir()'s always-fail stubs, this lets a `run` invocation
+    walk past the flash and the reboot so the reboot_and_wait() commands
+    can be inspected. Neither stub actually talks to anything; there is no
+    real remote shell on the other end, so a multi-line remote command
+    string is recorded verbatim as a single argument, not executed."""
+    bin_dir = tmp_path / "recordingbin"
+    bin_dir.mkdir()
+    for tool in ("ssh", "scp"):
+        stub = bin_dir / tool
+        stub.write_text(
+            "#!/bin/sh\n"
+            "{\n"
+            "    echo '== call =='\n"
+            "    for a in \"$@\"; do printf '%s\\n' \"$a\"; done\n"
+            f"}} >> \"{log_path}\"\n"
+            "exit 0\n"
+        )
+        stub.chmod(0o755)
+    return bin_dir
+
+
+def test_run_reboot_and_wait_starts_the_awf_oak_units_after_reboot(tmp_path):
+    """Regression test for the hardware-observed defect: reboot_and_wait()
+    used to only ever WAIT for the awf-oak-* units, never start them, so on
+    a board where the Quadlet generator's output was discarded (systemd
+    generator timeout) the units stayed unknown to systemd forever and
+    drive's precondition failed every single time. reboot_and_wait() must
+    now issue a `systemctl start` for all four awf-oak-* units, and it must
+    do so AFTER the reboot, not before.
+
+    ssh/scp are the recording stubs (make_recording_bin_dir), not the
+    always-fail ones, so the run proceeds past the flash and the reboot.
+    X5H_BOOT_SETTLE=0 skips the fixed settle sleep and a very small
+    X5H_UNITS_TIMEOUT keeps the wait-for-active loop from ever blocking --
+    the recording ssh stub always exits 0, so that loop's own poll
+    succeeds immediately anyway, but the fast timeout also protects this
+    test if that assumption regresses.
+
+    The run is expected to end with X5H_DEMO_FAIL
+    reason=demo_drive_failed:after:no_marker -- the stub smoke script
+    produces no marker because there is no real remote shell to run it.
+    That failure is expected and is NOT what this test asserts on; it
+    asserts on the recorded ssh command log instead.
+    """
+    site_conf = make_site_conf(tmp_path)
+    with open(site_conf, "a") as f:
+        f.write("X5H_BOOT_SETTLE=0\nX5H_UNITS_TIMEOUT=1\n")
+    good_after = payload(tmp_path, "after", name="after.bin")
+
+    log_path = tmp_path / "ssh-calls.log"
+    bin_dir = make_recording_bin_dir(tmp_path, log_path)
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "X5H_DEMO_SITE_CONF": str(site_conf),
+    }
+
+    r = subprocess.run(
+        [
+            "bash", str(DEMO), "run",
+            "--after", str(good_after),
+            "--only", "after",
+        ],
+        capture_output=True, text=True, env=env,
+        timeout=15,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=demo_drive_failed:after:no_marker" in r.stdout
+
+    log = log_path.read_text()
+    reboot_at = log.find("\nreboot\n")
+    assert reboot_at != -1, log
+    start_units_at = log.find(
+        "systemctl start awf-oak-bridge.service awf-oak-autoware.service "
+        "awf-oak-relay.service awf-oak-restamp.service"
+    )
+    assert start_units_at != -1, log
+    assert reboot_at < start_units_at, log

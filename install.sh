@@ -513,7 +513,7 @@ install_build_dependencies() {
 
     # Install vcs2l via pipx as the target user (not root), because pipx
     # drops packages into the user's home directory.
-    sudo -u "$TARGET_USER" pipx install --force vcs2l
+    sudo -u "$TARGET_USER" env HOME="$USER_HOME" pipx install --force vcs2l
 
     # Ensure pipx binaries are on PATH in this shell invocation
     ensure_pipx_on_path

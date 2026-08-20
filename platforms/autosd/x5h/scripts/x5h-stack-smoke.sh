@@ -21,21 +21,38 @@
 #   X5H_AUTOWARE_FAIL reason=<...>
 #   X5H_STACK_PASS cr52_control_cmd=1 cr52_packets=<n>
 #   X5H_STACK_FAIL reason=<...>
-#   X5H_DRIVE_PASS junit=<path> tests=<n> failures=<n> errors=<n>
+#   X5H_DRIVE_PASS junit=<path> tests=<n> failures=<n> errors=<n> \
+#                  mrm=succeeded stop_velocity=<v>
 #   X5H_DRIVE_FAIL reason=<...>
 #
-# WHAT X5H_DRIVE_PASS DOES AND DOES NOT ASSERT. It asserts that the stack was
-# cycled, the scenario ran to completion, and a parseable junit result was
-# produced -- nothing about its contents. The counts are printed on the
-# marker line so a human can read the verdict; the script does not grade it.
-# This is deliberate and it is not a gap to be closed casually: the reference
-# demo's own recorded result for this scenario is errors="1" (an engage
-# request refused because Autoware was still INITIALIZING), its run_after.sh
-# never inspects the junit at all, and whether a green result is even
-# reachable on this hardware is an open question. A pass/fail oracle invented
-# here would either fail every healthy run or be tuned until it passed, and
-# both are worse than reporting the number. When the human settles what a
-# passing verdict looks like, that rule goes here.
+# WHAT X5H_DRIVE_PASS ASSERTS. It asserts that the stack was cycled, the
+# scenario ran to completion, a parseable junit result was produced, AND the
+# MRM chain executed end to end:
+#
+#   fault injected -> operation-mode availability drops autonomous
+#                  -> mrm_state reaches MRM_OPERATING with COMFORTABLE_STOP
+#                  -> mrm_state reaches MRM_SUCCEEDED
+#                  -> the gate's final commanded velocity is zero
+#
+# It deliberately does NOT grade the junit verdict, and that is now a
+# measured decision rather than a deferred one (settled by the human
+# 2026-08-19, with the board evidence in /var/log/awf/probe/). The junit
+# CANNOT be green for this scenario by construction: the route is 156.8 m,
+# the fault trigger sits ~81 m in, and a comfortable stop from 8.33 m/s
+# consumes ~50 m, so the ego rests 25.5 m short of a goal whose
+# ReachPositionCondition tolerance is 1 m. fault_injection latches the ERROR,
+# availability never recovers, the MRM never cancels, and the scenario's own
+# 180 s condition fires -- failures="1" at sim time 180.033, reproduced 4/4
+# runs to 12 decimals. So failures="1" is the EXPECTED count on a healthy
+# board, and the chain above is what "passing" means here. (The reference
+# demo never got this far: its recorded junit is errors="1", an engage
+# refused while Autoware was still INITIALIZING, and its run_after.sh never
+# inspects the junit at all.)
+#
+# The chain is measured on domain 1 during the run (raw captures are left in
+# $OUTPUT_DIRECTORY/drive-probe for the operator). The known-good stamps, for
+# calibration: availability.autonomous false at fault+0.07 s, MRM_OPERATING/
+# COMFORTABLE_STOP at +0.08 s, MRM_SUCCEEDED at +11.28 s.
 #
 # reason= vocabulary, per mode -- what an operator reads mid-session, so it
 # is enumerated here rather than left to be reverse-engineered from the
@@ -93,6 +110,33 @@
 #                                   awf-oak-x5h.env's GLOBAL_TIMEOUT note.
 #             junit_unparsable      a junit file exists but its top-level
 #                                   counts could not be read
+#             mrm_no_fault_event    /simulation/events never carried the
+#                                   scenario's cpu_temperature_is_high ERROR:
+#                                   the ego never reached the trigger point
+#                                   (lane 3238) or the interpreter never fired
+#                                   the FaultInjectionAction
+#             mrm_availability_never_dropped
+#                                   the fault fired but
+#                                   /system/operation_mode/availability never
+#                                   showed autonomous: false -- the diagnostic
+#                                   is not reaching the aggregator. NOTE the
+#                                   wiring is a demo customization in this
+#                                   image's diagnostics/perception.yaml (the
+#                                   diag is named cpu_temperature_is_high, NOT
+#                                   ": CPU Temperature"); check membership
+#                                   with /diagnostics_graph/struct, never by
+#                                   grepping yaml
+#             mrm_no_comfortable_stop
+#                                   availability dropped but mrm_state never
+#                                   showed MRM_OPERATING with COMFORTABLE_STOP
+#                                   (state 2, behavior 3)
+#             mrm_never_succeeded   the MRM operated but never reached
+#                                   MRM_SUCCEEDED with COMFORTABLE_STOP
+#                                   (state 3, behavior 3) -- the stop did not
+#                                   complete within the run
+#             mrm_nonzero_final_velocity=<v>
+#                                   the chain completed but the gate's last
+#                                   commanded velocity was not zero
 #
 # No `set -e`: every failure must reach exactly one marker rather than
 # exiting silently mid-check.
@@ -400,6 +444,23 @@ drive)
     done
     [ "$ready" -eq 1 ] || fail "autoware_not_ready" "DRIVE"
 
+    # THE MRM-CHAIN CAPTURES, started before the scenario so the whole chain
+    # is observed. All four topics live on domain 1 (nothing about the MRM is
+    # bridged), so ros1 sees everything. PYTHONUNBUFFERED because these are
+    # stopped by pkill after the run rather than by their own timeout, and a
+    # block-buffered tail would lose exactly the samples the oracle needs.
+    # The inner timeout is a backstop for a run that never ends.
+    PROBE="${OUTPUT_DIRECTORY}/drive-probe"
+    mkdir -p "$PROBE"
+    ros1 "PYTHONUNBUFFERED=1 timeout $((${GLOBAL_TIMEOUT:-240} + 60)) ros2 topic echo /simulation/events" \
+        > "$PROBE/events.txt" &
+    ros1 "PYTHONUNBUFFERED=1 timeout $((${GLOBAL_TIMEOUT:-240} + 60)) ros2 topic echo /system/operation_mode/availability" \
+        > "$PROBE/availability.txt" &
+    ros1 "PYTHONUNBUFFERED=1 timeout $((${GLOBAL_TIMEOUT:-240} + 60)) ros2 topic echo /system/fail_safe/mrm_state" \
+        > "$PROBE/mrm_state.txt" &
+    ros1 "PYTHONUNBUFFERED=1 timeout $((${GLOBAL_TIMEOUT:-240} + 60)) ros2 topic echo /control/command/control_cmd --field longitudinal" \
+        > "$PROBE/gate_cmd.txt" &
+
     # `restart`, not `start`, even though the stop above already left this
     # unit inactive: RemainAfterExit=yes means a `start` on an
     # already-active unit returns immediately WITHOUT re-running ExecStart,
@@ -415,14 +476,38 @@ drive)
     tests=$(grep -o 'tests="[0-9]*"' "$junit" | head -1 | tr -dc '0-9')
     fails=$(grep -o 'failures="[0-9]*"' "$junit" | head -1 | tr -dc '0-9')
     errs=$(grep -o 'errors="[0-9]*"' "$junit" | head -1 | tr -dc '0-9')
-    # Reported, NOT graded -- see the header. The only failure mode left is
-    # a junit whose top-level counts cannot be read at all, which means the
-    # file is not the result document it is supposed to be and the numbers
-    # below would be a fiction.
+    # Counts reported, not graded -- see the header for why failures="1" is
+    # the expected value. A junit whose top-level counts cannot be read at
+    # all is still a failure: the file is not the result document it is
+    # supposed to be and the numbers below would be a fiction.
     for v in "$tests" "$fails" "$errs"; do
         case "$v" in ''|*[!0-9]*) fail "junit_unparsable" "DRIVE" ;; esac
     done
-    echo "X5H_DRIVE_PASS junit=$junit tests=$tests failures=$fails errors=$errs"
+
+    # End the captures. Everything the oracle needs happened before the
+    # oneshot exited (MRM_SUCCEEDED lands ~11 s after the fault, the run ends
+    # at 180 s), and PYTHONUNBUFFERED above means the files are already
+    # current -- so kill rather than wait out the backstop timeout.
+    podman exec awf-oak-autoware pkill -f "ros2 topic echo" >/dev/null 2>&1
+    wait
+
+    # THE MRM-CHAIN ORACLE, graded in causal order so the reason names the
+    # EARLIEST break. Record-aware matching (RS="---") where two fields must
+    # hold in the SAME sample: state 3 also occurs with behavior 2 during
+    # post-run teardown, and a line-level grep would accept that.
+    grep -q 'name: cpu_temperature_is_high' "$PROBE/events.txt" \
+        || fail "mrm_no_fault_event" "DRIVE"
+    grep -q '^autonomous: false' "$PROBE/availability.txt" \
+        || fail "mrm_availability_never_dropped" "DRIVE"
+    awk 'BEGIN{RS="---"} $0 ~ /(^|\n)state: 2(\n|$)/ && $0 ~ /(^|\n)behavior: 3(\n|$)/ {f=1} END{exit !f}' \
+        "$PROBE/mrm_state.txt" || fail "mrm_no_comfortable_stop" "DRIVE"
+    awk 'BEGIN{RS="---"} $0 ~ /(^|\n)state: 3(\n|$)/ && $0 ~ /(^|\n)behavior: 3(\n|$)/ {f=1} END{exit !f}' \
+        "$PROBE/mrm_state.txt" || fail "mrm_never_succeeded" "DRIVE"
+    stopv=$(grep '^velocity:' "$PROBE/gate_cmd.txt" | tail -1 | awk '{v=$2; print (v<0)?-v:v}')
+    [ -n "$stopv" ] || fail "mrm_nonzero_final_velocity=none" "DRIVE"
+    awk "BEGIN{exit !($stopv < 0.05)}" || fail "mrm_nonzero_final_velocity=$stopv" "DRIVE"
+
+    echo "X5H_DRIVE_PASS junit=$junit tests=$tests failures=$fails errors=$errs mrm=succeeded stop_velocity=$stopv"
     ;;
 *)
     fail "usage" "STACK"

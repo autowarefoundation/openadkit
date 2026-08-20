@@ -67,9 +67,8 @@ the `/localization/kinematic_state` capture by
 `scripts/x5h-stop-metrics.awk` — path length, not straight-line
 displacement, so a stop that begins in a curve compares fairly. The awk's
 `nav_msgs/Odometry` parsing is pinned by `test_stop_metrics.py` against a
-hand-authored synthetic fixture, not yet against a real board capture of
-`/localization/kinematic_state` — see that test file's module docstring for
-the fixture provenance. The junit
+real board capture of `/localization/kinematic_state` — see that test
+file's module docstring for the fixture provenance. The junit
 verdict stays reported-not-graded, exactly as in
 [component-stack.md](component-stack.md): the scenario cannot go green
 with the MRM acting, and a *before* run that stops long enough to roll

@@ -1,20 +1,21 @@
 """Unit tests for scripts/x5h-stop-metrics.awk (stop-distance metric).
 
-Runs plain awk via subprocess -- no ROS. The synthetic records below follow
-the exact YAML layout `ros2 topic echo` prints for nav_msgs/Odometry; the
-fixtures/ excerpts captured on the board pin the parser against the real
-thing.
+Runs plain awk via subprocess -- no ROS. The inline records built by
+odom_record() below follow the exact YAML layout `ros2 topic echo` prints
+for nav_msgs/Odometry; the fixtures/ excerpts captured on the board pin the
+parser against the real thing.
 
 Fixture provenance:
-  fixtures/events_fault_record.txt is REAL board material, copied verbatim
-  from a probe capture of /simulation/events.
-  fixtures/kinematic_state_synthetic_excerpt.txt is SYNTHETIC. The board's
-  existing kinematic-state log on disk is a `--field` projection (x:/y:/z:
-  only, no stamp, no velocity) and cannot pin the nav_msgs/Odometry parser,
-  and the board's stack was not brought up to capture a fresh one for this
-  task. This fixture must be re-pinned against a real board capture the
-  first time the stack is brought up to record one -- the first hardware
-  session that captures a real `/localization/kinematic_state` run.
+  fixtures/events_fault_record.txt and fixtures/kinematic_state_board_
+  excerpt.txt are both REAL board material, cut verbatim from the SAME
+  `x5h-stack-smoke.sh drive` run: events_fault_record.txt is that run's
+  fault-injection record from /simulation/events, and kinematic_state_
+  board_excerpt.txt is a 9-record excerpt of that run's full
+  /localization/kinematic_state capture (3 records at the fault, 3
+  mid-deceleration, 3 spanning the actual rest transition). Being a
+  matched pair from one run lets test_stop_metrics_chain_from_real_
+  fixtures below chain t0 extraction into the metric computation exactly
+  as x5h-stack-smoke.sh's drive mode does.
 
 Run from this directory with `python3 -m pytest test_stop_metrics.py`.
 """
@@ -161,35 +162,35 @@ def test_t0_mode_no_match_fails(tmp_path):
     assert r.stdout.strip() == ""
 
 
-def test_synthetic_kinematic_excerpt_parses(tmp_path):
-    # Synthetic excerpt (see module docstring): every value in this fixture
-    # was authored by hand (a 9-point trapezoidal-integration deceleration
-    # profile), so unlike a real, unmeasured capture the exact expected
-    # output was known at fixture-authoring time -- assert it exactly
+def test_board_kinematic_excerpt_parses(tmp_path):
+    # Real board excerpt (see module docstring): 9 records cut verbatim
+    # from a full 9062-record /localization/kinematic_state capture taken
+    # during the same drive run as fixtures/events_fault_record.txt. The
+    # 9-record excerpt reproduces the full capture's metric exactly, to
+    # both decimals, including the same rest point -- the ego stops nearly
+    # straight, so the chord sum across these sparse samples matches the
+    # dense path length. Assert the real, board-measured output exactly
     # rather than just checking for a metric line.
-    #
-    # NOTE: this exact value is tied to the synthetic fixture. When
-    # fixtures/kinematic_state_synthetic_excerpt.txt is re-pinned against a
-    # real board capture (see the module docstring), this asserted number
-    # will change.
-    text = (FIXTURES / "kinematic_state_synthetic_excerpt.txt").read_text()
+    text = (FIXTURES / "kinematic_state_board_excerpt.txt").read_text()
     first_sec = int(
         [l for l in text.splitlines() if l.startswith("    sec: ")][0].split()[1]
     )
     r = run_metrics(text, first_sec, tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert r.stdout.strip() == "stop_distance_m=22.55 rest_x=22.55 rest_y=0.00"
+    assert r.stdout.strip() == "stop_distance_m=39.55 rest_x=59084.83 rest_y=42971.53"
 
-    # The fixture deliberately includes a sample at vx == 0.05, exactly
-    # REST_V, to pin the awk's rest test at its boundary (`V[k] >= REST_V`
-    # means this sample must still count as moving, not at rest). Confirm
-    # that boundary sample is still present in the fixture, and that rest
-    # landed on the record *after* it (the final, fully-stopped record at
-    # x=22.55) rather than on the boundary record itself (which sits at
-    # x=22.525, i.e. would round to rest_x=22.52 or 22.53 if the boundary
-    # sample had been misclassified as already at rest).
-    assert text.count("\n      x: 0.05\n") == 1
-    assert r.stdout.strip().split()[1] == "rest_x=22.55"
+    # The fixture genuinely crosses the REST_V boundary (0.05, not a
+    # synthetic round number): one real sample at vx=0.05357195454674935
+    # (>= REST_V, still counts as moving) is immediately followed by one
+    # at vx=0.043572340309790035 (< REST_V, at rest). Confirm both boundary
+    # samples are present, in that order, and that rest landed on the
+    # record *after* the >= REST_V sample (rest_x=59084.83, matching the
+    # second sample's position) rather than being misclassified onto the
+    # boundary record itself.
+    assert text.count("\n      x: 0.05357195454674935\n") == 1
+    assert text.count("\n      x: 0.043572340309790035\n") == 1
+    assert text.index("0.05357195454674935") < text.index("0.043572340309790035")
+    assert r.stdout.strip().split()[1] == "rest_x=59084.83"
 
 
 def test_real_events_record_yields_t0(tmp_path):
@@ -197,6 +198,27 @@ def test_real_events_record_yields_t0(tmp_path):
     r = run_t0(text, "name: cpu_temperature_is_high", tmp_path)
     assert r.returncode == 0
     # This fixture is real board material with a known stamp
-    # (sec=1785573136, nanosec=845681675); pin the round-trip exactly
-    # rather than just checking positivity.
-    assert abs(float(r.stdout) - 1785573136.845681675) < 1e-3
+    # (sec=1785631510, nanosec=435408440); pin the round-trip exactly
+    # rather than just checking positivity. The tolerance (rather than an
+    # exact match) accounts for the double-precision rounding awk performs
+    # when it sums sec + nanosec/1e9: it prints 1785631510.435408354, not
+    # ...440.
+    assert abs(float(r.stdout) - 1785631510.435408440) < 1e-3
+
+
+def test_stop_metrics_chain_from_real_fixtures(tmp_path):
+    # The end-to-end chain x5h-stack-smoke.sh's drive mode actually runs:
+    # derive t0 from the real fault-injection record, then feed that t0
+    # into the metric computation against the real kinematic excerpt from
+    # the same run. Both fixtures come from one board session, so this is
+    # the first test that exercises the real fault-anchor and the real
+    # Odometry parse together.
+    events_text = (FIXTURES / "events_fault_record.txt").read_text()
+    t0_result = run_t0(events_text, "name: cpu_temperature_is_high", tmp_path)
+    assert t0_result.returncode == 0
+    t0 = t0_result.stdout.strip()
+
+    kinematic_text = (FIXTURES / "kinematic_state_board_excerpt.txt").read_text()
+    r = run_metrics(kinematic_text, t0, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.strip() == "stop_distance_m=39.55 rest_x=59084.83 rest_y=42971.53"

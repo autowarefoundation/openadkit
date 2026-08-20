@@ -1,6 +1,6 @@
 stamp:
-  sec: 1785573136
-  nanosec: 845681675
+  sec: 1785631510
+  nanosec: 435408440
 fault_injection_events:
 - level: 2
   name: cpu_temperature_is_high

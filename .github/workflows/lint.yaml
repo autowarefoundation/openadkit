@@ -184,7 +184,7 @@ jobs:
   #
   # Gated here rather than deleted. The file sat in the tree for a while with
   # nothing running it, which is the worst of both worlds -- it reads as
-  # coverage while proving nothing, and it rots silently. 43 tests, all
+  # coverage while proving nothing, and it rots silently. 44 tests, all
   # passing at the time this comment was last updated -- see `pytest -q`'s
   # own count for the current total, which this comment will again drift
   # from as tests are added.

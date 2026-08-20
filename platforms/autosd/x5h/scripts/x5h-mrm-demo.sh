@@ -53,6 +53,9 @@
 #   X5H_BOARD (default root@192.168.0.20)
 #   X5H_SMOKE (default /usr/local/sbin/x5h-stack-smoke.sh)
 #   X5H_BOOT_TIMEOUT (default 600 s), X5H_UNITS_TIMEOUT (default 300 s)
+#   X5H_BOOT_SETTLE (default 20 s): fixed sleep right after issuing the
+#     reboot, before the first ssh reachability poll, to let the board
+#     drop off the network before we start checking for it to come back
 #   X5H_DEMO_LOGDIR (default ~/x5h-demo-logs; each run gets its own
 #     timestamped subdirectory under this)
 #
@@ -101,6 +104,7 @@ X5H_BOARD="root@192.168.0.20"
 X5H_SMOKE="/usr/local/sbin/x5h-stack-smoke.sh"
 X5H_BOOT_TIMEOUT=600
 X5H_UNITS_TIMEOUT=300
+X5H_BOOT_SETTLE=20
 X5H_SLOT_DEV=""
 X5H_SLOT_SKIP=""
 X5H_SLOT_EXTENT_SECTORS=""
@@ -152,13 +156,46 @@ reboot_and_wait() { # profile
     local profile="$1"
     bssh reboot || true   # the connection dropping mid-command is expected
     local deadline=$(($(date +%s) + X5H_BOOT_TIMEOUT))
-    sleep 20
+    sleep "$X5H_BOOT_SETTLE"
     until bssh true 2>/dev/null; do
         [ "$(date +%s)" -lt "$deadline" ] \
             || demo_fail "demo_board_no_boot:${profile}" \
                          "board did not return within ${X5H_BOOT_TIMEOUT}s of the reboot"
         sleep 10
     done
+    # Bring the awf-oak-* stack up before we start waiting for it. drive's
+    # own precondition in x5h-stack-smoke.sh hard-requires the four
+    # awf-oak-* units active, and NOTHING on the board starts them on its
+    # own -- the wait-for-active loop below only waits, it does not start
+    # anything, so without this step the loop can only time out and hand
+    # drive a guaranteed demo_drive_failed:*:unit_inactive. Do not mistake
+    # this for redundant belt-and-braces next to that loop and delete it.
+    # It is worse than "not started yet": on this board the four units can
+    # be entirely UNKNOWN to systemd after a reboot. They are Quadlet units
+    # generated from /etc/containers/systemd/*.container by the podman
+    # system generator, which takes 30+ seconds to run; systemd caps how
+    # long a generator may run and discards its output on timeout, so
+    # /run/systemd/generator can come up empty with zero unit files in it.
+    # Regenerating by hand and copying the result into /run/systemd/system
+    # (a normal unit search path that, unlike /run/systemd/generator, a
+    # later generator run does NOT clear) recovers from that. This whole
+    # step is best-effort: on a board whose generator output DID land, or
+    # whose units are already active, both branches below are a no-op, and
+    # either way it is the existing wait-for-active loop -- and ultimately
+    # drive's own reason= -- that reports failure, per the "let drive name
+    # the culprit" design this function already had.
+    bssh "if ! systemctl cat awf-oak-autoware.service >/dev/null 2>&1; then
+    gen=/usr/lib/systemd/system-generators/podman-system-generator
+    if [ -x \"\$gen\" ]; then
+        gendir=\$(mktemp -d)
+        \"\$gen\" \"\$gendir\" \"\$gendir\" \"\$gendir\" >/dev/null 2>&1
+        cp \"\$gendir\"/*.service /run/systemd/system/ 2>/dev/null
+        rm -rf \"\$gendir\"
+        systemctl daemon-reload
+    fi
+fi
+systemctl start awf-oak-bridge.service awf-oak-autoware.service awf-oak-relay.service awf-oak-restamp.service" \
+        >/dev/null 2>&1 || true
     # Wait for the stack units the drive precondition checks; drive itself
     # fails fast on an inactive unit, so give the boot time to finish.
     deadline=$(($(date +%s) + X5H_UNITS_TIMEOUT))

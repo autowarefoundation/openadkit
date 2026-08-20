@@ -12,11 +12,15 @@ INSTALLER = ROOT / "install.sh"
 PLANNING_SUM = "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9"
 
 
-def planning_zip(path, *, complete=True, traversal=False):
+def planning_zip(path, *, omit=None, traversal=False):
+    files = {
+        "lanelet2_map.osm": "lanelet",
+        "pointcloud_map.pcd": "pointcloud",
+    }
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("sample-map-planning/lanelet2_map.osm", "lanelet")
-        if complete:
-            archive.writestr("sample-map-planning/pointcloud_map.pcd", "pointcloud")
+        for name, payload in files.items():
+            if name != omit:
+                archive.writestr(f"sample-map-planning/{name}", payload)
         if traversal:
             archive.writestr("sample-map-planning/../escaped", "unsafe")
 
@@ -104,10 +108,17 @@ def test_sample_install_makes_files_world_readable(tmp_path):
     assert mode & 0o044, oct(mode)
 
 
-@pytest.mark.parametrize(("complete", "traversal"), [(False, False), (True, True)])
-def test_invalid_archive_preserves_existing_data(tmp_path, complete, traversal):
+@pytest.mark.parametrize(
+    ("omit", "traversal"),
+    [
+        ("pointcloud_map.pcd", False),
+        ("lanelet2_map.osm", False),
+        (None, True),
+    ],
+)
+def test_invalid_archive_preserves_existing_data(tmp_path, omit, traversal):
     fixture = tmp_path / "sample.zip"
-    planning_zip(fixture, complete=complete, traversal=traversal)
+    planning_zip(fixture, omit=omit, traversal=traversal)
     target = existing_target(tmp_path)
     result, _ = run_install(tmp_path, fixture, force=True, checksum_mode="always-ok")
     assert result.returncode != 0

@@ -106,6 +106,11 @@ load_site_conf() {
     for v in X5H_SLOT_DEV X5H_SLOT_SKIP X5H_SLOT_EXTENT_SECTORS X5H_SLOT_BASELINE; do
         [ -n "$(eval echo "\${$v}")" ] || demo_fail "site_conf_incomplete"
     done
+    for v in X5H_SLOT_SKIP X5H_SLOT_EXTENT_SECTORS; do
+        case "$(eval echo "\${$v}")" in
+            ''|*[!0-9]*) demo_fail "site_conf_incomplete" ;;
+        esac
+    done
     [ -r "$X5H_SLOT_BASELINE" ] || demo_fail "site_conf_incomplete"
 }
 
@@ -211,8 +216,8 @@ run)
     ONLY=""
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --before) BEFORE="${2:-}"; shift 2 ;;
-            --after)  AFTER="${2:-}";  shift 2 ;;
+            --before) [ "$#" -ge 2 ] || demo_fail "usage"; BEFORE="$2"; shift 2 ;;
+            --after)  [ "$#" -ge 2 ] || demo_fail "usage"; AFTER="$2";  shift 2 ;;
             --only)
                 case "${2:-}" in before|after) ONLY="$2" ;; *) demo_fail "usage" ;; esac
                 shift 2 ;;

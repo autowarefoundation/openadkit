@@ -13,13 +13,25 @@
 #     rest -- the first sample after which speed stays below REST_V for the
 #     remainder of the capture. Prints
 #       stop_distance_m=<d> rest_x=<x> rest_y=<y>
-#     and exits 0, or prints no_stop_metrics / never_rested and exits 1.
+#     and exits 0. On failure it exits 1 printing one of two distinct
+#     strings -- no_stop_metrics (fewer than two in-window samples) or
+#     never_rested (the ego's speed never stayed below REST_V through the
+#     end of the capture) -- but the distinction does not reach an operator:
+#     x5h-stack-smoke.sh's caller only matches the stop_distance_m=* success
+#     line and maps every other output, both of these included, to its own
+#     single reason=mrm_no_stop_metrics.
 #
 # Path length, not straight-line displacement, so a stop that begins in a
 # curve compares fairly across runs. The parser is indentation-anchored to
 # the YAML `ros2 topic echo` prints for nav_msgs/Odometry and is pinned by
-# components/nodes/test_stop_metrics.py against captured samples; if a ROS
-# release changes the echo layout, the fixtures fail first.
+# components/nodes/test_stop_metrics.py against captured samples -- but that
+# claim only fully holds for the t0 (events) side: fixtures/events_fault_
+# record.txt is real board material, copied verbatim from a probe capture.
+# The Odometry side's fixture is hand-authored, not captured, and even
+# simplifies the real message's 36-element covariance blocks down to a
+# single element each; a real-layout change confined to those blocks would
+# not be caught by it. See test_stop_metrics.py's module docstring for the
+# full fixture provenance.
 BEGIN {
     RS = "---"
     REST_V = 0.05

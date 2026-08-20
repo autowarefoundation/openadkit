@@ -162,7 +162,8 @@ jobs:
           bash .github/scripts/tests/test_report_manifests.sh
 
   # This job runs every unit test suite under components/nodes: traj_relay's
-  # arithmetic and the stop-distance metric awk.
+  # arithmetic, the stop-distance metric awk, and the before/after demo
+  # orchestrator's local gates.
   #
   # traj_relay.py downsamples the Autoware trajectory to fit domain 2's
   # MTU 462. That arithmetic is load-bearing -- an off-by-one in the point
@@ -176,10 +177,17 @@ jobs:
   # demo's stop-distance measurement) against fixture captures via
   # subprocess, also with no ROS required.
   #
+  # test_mrm_demo_gates.py exercises scripts/x5h-mrm-demo.sh's `check`
+  # subcommand and its board-free `run` gates (payload validation, argument
+  # ordering, the payload_exceeds_extent size check) with ssh/scp stubbed
+  # onto PATH so no test can reach the board.
+  #
   # Gated here rather than deleted. The file sat in the tree for a while with
   # nothing running it, which is the worst of both worlds -- it reads as
-  # coverage while proving nothing, and it rots silently. 21 tests, all
-  # passing at the time this job was added.
+  # coverage while proving nothing, and it rots silently. 43 tests, all
+  # passing at the time this comment was last updated -- see `pytest -q`'s
+  # own count for the current total, which this comment will again drift
+  # from as tests are added.
   x5h-node-tests:
     runs-on: ubuntu-latest
     steps:

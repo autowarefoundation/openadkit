@@ -49,7 +49,24 @@ systemctl --failed --no-legend 2>/dev/null | head -20
 # tree + host-side depmod make modprobe work here; a failure is a staging
 # bug and every later gate would fail confusingly without this loud marker
 # (the judge fails the run on it).
-if ! modprobe -a overlay veth bridge br_netfilter btrfs nf_tables; then
+#
+# The nft_* expression modules are named here EXPLICITLY rather than left to
+# the kernel's request_module() autoload, and that is the whole point of
+# listing them. netavark applies its ruleset atomically: one `table inet
+# netavark` carrying nat-type chains, a masquerade statement and ct-state
+# matches. If an expression it uses is not already resident, the apply is
+# rejected whole, with a single opaque line naming neither rule nor module:
+#
+#   internal:0:0-0: Error: Could not process rule: Operation not supported
+#
+# That failure is not confined to GATE6. captest_cap_ok() below has to
+# `podman run` a container, so a netavark that cannot build a network takes
+# GATE2, GATE3 and GATE4 down with it and makes three working container
+# stores look like broken ones. The kernel config is not the problem:
+# NF_TABLES_INET is built in and every module named below ships in the
+# injected tree -- only their residency when nft runs is.
+if ! modprobe -a overlay veth bridge br_netfilter btrfs nf_tables \
+        nf_conntrack nf_nat nft_chain_nat nft_nat nft_masq nft_ct; then
     echo GATE1_MODPROBE_FAIL
 fi
 

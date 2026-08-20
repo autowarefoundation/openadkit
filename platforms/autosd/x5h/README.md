@@ -42,6 +42,10 @@ answered before board time.
   ONNX Runtime Renesas execution provider: what the runtime needs, which
   steps need no flash write, and which two writes would break the CR52
   round trip and the self-boot partitions.
+- [Component stack](component-stack.md) — the Open AD Kit MRM demo as five
+  Quadlet units, with the trajectory follower on the CR52 (issue #120 M7):
+  staging, unit ordering, the three smoke modes and the MRM-chain oracle,
+  and why the scenario's junit is red on a healthy board.
 
 ## Folder Structure
 

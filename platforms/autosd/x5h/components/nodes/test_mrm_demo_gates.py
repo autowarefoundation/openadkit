@@ -223,3 +223,57 @@ def test_run_fails_with_marker_on_non_numeric_extent_sectors(tmp_path):
     )
     assert r.returncode == 1, r.stdout + r.stderr
     assert "X5H_DEMO_FAIL reason=site_conf_incomplete" in r.stdout
+
+
+def test_run_reports_usage_before_loading_site_conf(tmp_path):
+    """The header's stated rule is 'earliest break names the reason', and
+    a bad invocation is earlier than a missing site config. `run` with no
+    payloads at all, on a HOME with no site.conf anywhere under it, must
+    report reason=usage, not reason=no_site_conf -- this is exactly the
+    ordering load_site_conf vs. the payload-presence checks controls.
+    Regression coverage for load_site_conf having been called before those
+    checks."""
+    bin_dir = make_stub_bin_dir(tmp_path)
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        # Deliberately no X5H_DEMO_SITE_CONF override and no
+        # ~/.config/x5h-demo/site.conf under this HOME: load_site_conf
+        # would fail with no_site_conf if it ran before the usage check.
+    }
+    r = subprocess.run(
+        ["bash", str(DEMO), "run"],
+        capture_output=True, text=True, env=env, timeout=10,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=usage" in r.stdout
+    assert "no_site_conf" not in r.stdout
+    assert "stub: network access blocked" not in r.stderr
+
+
+def test_run_flash_aborts_before_scp_when_payload_exceeds_extent(tmp_path):
+    """flash_payload's payload_exceeds_extent gate (checked before the scp
+    that stages the payload onto the board) must fire on a payload larger
+    than the configured slot extent, and must do so before any board
+    contact -- same discipline as the pre-flight double gate tests above.
+    A 1-sector (4096-byte) extent with a payload just over that size is
+    the smallest reliable trigger."""
+    site_conf = make_site_conf(tmp_path, extent_sectors="1")
+    oversized_before = payload(tmp_path, "before", name="before.bin")
+    with open(oversized_before, "ab") as f:
+        f.write(b"\x00" * 4096)  # push the file past the 4096-byte extent
+    good_after = payload(tmp_path, "after", name="after.bin")
+
+    r = subprocess.run(
+        [
+            "bash", str(DEMO), "run",
+            "--before", str(oversized_before),
+            "--after", str(good_after),
+        ],
+        capture_output=True, text=True, env=run_env(tmp_path, site_conf),
+        timeout=10,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=demo_flash_failed:before:payload_exceeds_extent" in r.stdout
+    # The gate must have failed before any ssh/scp stub ran.
+    assert "stub: network access blocked" not in r.stderr

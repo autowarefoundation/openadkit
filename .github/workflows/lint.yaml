@@ -34,6 +34,7 @@ on:
       - 'components/**/*.hcl'
       - '.hadolint.yaml'
       - '.markdownlint.yaml'
+      - '.markdownlintignore'
       - '.yamllint.yaml'
       - 'mkdocs.yaml'
       - 'docs/Makefile'
@@ -93,7 +94,7 @@ jobs:
             docs/
 
       - name: Run markdownlint
-        run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'
+        run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**' '!platforms/autosd/x5h/**'
 
       - name: Install Docker Compose v5.2+
         # The ubuntu-latest runner ships an older compose plugin that rejects

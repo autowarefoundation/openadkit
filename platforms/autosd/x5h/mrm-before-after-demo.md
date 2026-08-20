@@ -70,5 +70,13 @@ also `run` mode only, since `check` never loads the site config);
 `demo_board_no_boot:<p>` (reboot watchdog); `demo_drive_failed:<p>:<r>`
 (the smoke script's own reason, forwarded); `demo_no_contrast` (both
 drives passed but before did not stop longer than after). On any failure
-the orchestrator stops, recovers nothing automatically, and prints the
-board's state plus the restore commands.
+the orchestrator stops and recovers nothing automatically, but whether it
+also prints the board's state and the restore commands depends on how far
+the leg got: `usage`, `no_site_conf`, `site_conf_incomplete`,
+`demo_wrong_profile:<p>`, and the pre-write
+`demo_flash_failed:<p>:payload_unreadable` / `:payload_empty` /
+`:payload_exceeds_extent` / `:scp` gate failures print only the `reason=`
+line, because nothing has touched the board's slot yet and there is
+nothing to restore. From `demo_flash_failed:<p>:write_verify` onward — a
+slot write has actually been attempted — the orchestrator also prints the
+board's state and the restore commands.

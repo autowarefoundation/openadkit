@@ -28,8 +28,14 @@
 #   demo_wrong_profile:<p>                 payload lacks the profile string
 #   demo_flash_failed:<p>[:detail]         gate or slot write/verify failed
 #   demo_board_no_boot:<p>                 board did not return after reboot
-#   demo_drive_failed:<p>:<reason>         drive failed; <reason> is the
-#                                          smoke script's own reason= value
+#   demo_drive_failed:<p>:<reason>         drive failed; <reason> is either
+#                                          the smoke script's own reason=
+#                                          value, or one of this
+#                                          orchestrator's own two: no_marker
+#                                          (no X5H_DRIVE_PASS/FAIL line seen
+#                                          at all) or no_stop_distance (a
+#                                          PASS marker with no
+#                                          stop_distance_m= field)
 #   demo_no_contrast                       before stop was not longer than
 #                                          after stop
 #
@@ -47,6 +53,8 @@
 #   X5H_BOARD (default root@192.168.0.20)
 #   X5H_SMOKE (default /usr/local/sbin/x5h-stack-smoke.sh)
 #   X5H_BOOT_TIMEOUT (default 600 s), X5H_UNITS_TIMEOUT (default 300 s)
+#   X5H_DEMO_LOGDIR (default ~/x5h-demo-logs; each run gets its own
+#     timestamped subdirectory under this)
 #
 # Payloads are the flat slot binaries prepared from the CI-built ELFs per
 # the site flash runbook (the ELF->payload step also stays outside this
@@ -224,20 +232,29 @@ run)
             *) demo_fail "usage" ;;
         esac
     done
+    # Payload-presence validation BEFORE load_site_conf: a bad invocation
+    # must report usage even on a host with no site.conf at all, per the
+    # header's stated rule that the earliest break names the reason.
+    # load_site_conf itself must still run before anything that touches the
+    # board or creates a log directory, so it follows immediately after.
+    ONLY_PAYLOAD=""
+    if [ "$ONLY" = "before" ] || [ "$ONLY" = "after" ]; then
+        ONLY_PAYLOAD="$BEFORE"
+        [ "$ONLY" = "after" ] && ONLY_PAYLOAD="$AFTER"
+        [ -n "$ONLY_PAYLOAD" ] || demo_fail "usage"
+    else
+        [ -n "$BEFORE" ] && [ -n "$AFTER" ] || demo_fail "usage"
+    fi
     load_site_conf
     LOGDIR="${X5H_DEMO_LOGDIR:-$HOME/x5h-demo-logs}/$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$LOGDIR"
     log "logs: $LOGDIR"
     LEG_STOP_M=""
     if [ "$ONLY" = "before" ] || [ "$ONLY" = "after" ]; then
-        payload="$BEFORE"
-        [ "$ONLY" = "after" ] && payload="$AFTER"
-        [ -n "$payload" ] || demo_fail "usage"
-        run_leg "$ONLY" "$payload"
+        run_leg "$ONLY" "$ONLY_PAYLOAD"
         echo "X5H_DEMO_LEG profile=${ONLY} stop_distance_m=${LEG_STOP_M}"
         exit 0
     fi
-    [ -n "$BEFORE" ] && [ -n "$AFTER" ] || demo_fail "usage"
     # Gate BOTH payloads before writing ANYTHING: a demo that flashes
     # "before" and then discovers the "after" payload is unusable would
     # strand the board on the untuned firmware.

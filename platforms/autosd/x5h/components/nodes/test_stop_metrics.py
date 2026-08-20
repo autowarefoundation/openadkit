@@ -12,8 +12,9 @@ Fixture provenance:
   existing kinematic-state log on disk is a `--field` projection (x:/y:/z:
   only, no stamp, no velocity) and cannot pin the nav_msgs/Odometry parser,
   and the board's stack was not brought up to capture a fresh one for this
-  task. This fixture must be re-pinned against a real board capture in the
-  Task 8 board session.
+  task. This fixture must be re-pinned against a real board capture the
+  first time the stack is brought up to record one -- the first hardware
+  session that captures a real `/localization/kinematic_state` run.
 
 Run from this directory with `python3 -m pytest test_stop_metrics.py`.
 """
@@ -167,9 +168,10 @@ def test_synthetic_kinematic_excerpt_parses(tmp_path):
     # output was known at fixture-authoring time -- assert it exactly
     # rather than just checking for a metric line.
     #
-    # NOTE: this exact value is tied to the synthetic fixture. When Task 8
-    # re-pins fixtures/kinematic_state_synthetic_excerpt.txt against a real
-    # board capture, this asserted number will change.
+    # NOTE: this exact value is tied to the synthetic fixture. When
+    # fixtures/kinematic_state_synthetic_excerpt.txt is re-pinned against a
+    # real board capture (see the module docstring), this asserted number
+    # will change.
     text = (FIXTURES / "kinematic_state_synthetic_excerpt.txt").read_text()
     first_sec = int(
         [l for l in text.splitlines() if l.startswith("    sec: ")][0].split()[1]

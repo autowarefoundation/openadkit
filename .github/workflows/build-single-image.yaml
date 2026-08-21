@@ -230,6 +230,7 @@ jobs:
         env:
           ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
           UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
+          LOCAL_IMAGE: ""
         with:
           files: |
             ${{ env.BAKE_FILE }}

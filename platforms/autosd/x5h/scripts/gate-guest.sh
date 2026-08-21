@@ -116,6 +116,76 @@ else
     echo GATE4_FAIL; tail -5 /tmp/g4.log
 fi
 
+# Bisect what nftables actually refuses, so a GATE6 failure names the
+# missing capability instead of only quoting netavark.
+#
+# netavark applies its whole ruleset in one atomic transaction, and nft
+# reports a rejection as a single opaque line that identifies neither the
+# rule nor the expression:
+#
+#   internal:0:0-0: Error: Could not process rule: Operation not supported
+#
+# That message is unactionable on its own -- it has already cost one CI
+# cycle spent on a wrong guess. This applies the pieces of a netavark-shaped
+# ruleset one at a time, each in its own throwaway table, and prints a
+# marker per step. The first FAIL names the capability the kernel is
+# missing. Every step is torn down again, so this observes and changes
+# nothing.
+nft_probe() {
+    _p_try() { # label ruleset
+        if printf '%s\n' "$2" | nft -f - 2>/dev/null; then
+            echo "GATE6_NFTPROBE_$1=ok"
+        else
+            echo "GATE6_NFTPROBE_$1=FAIL"
+        fi
+        nft delete table inet nftprobe 2>/dev/null
+    }
+    _p_try TABLE_INET 'table inet nftprobe {
+}'
+    _p_try CHAIN_FILTER 'table inet nftprobe {
+  chain c {
+    type filter hook forward priority filter; policy accept;
+  }
+}'
+    _p_try CHAIN_NAT 'table inet nftprobe {
+  chain c {
+    type nat hook postrouting priority srcnat; policy accept;
+  }
+}'
+    _p_try EXPR_COUNTER 'table inet nftprobe {
+  chain c {
+    counter
+  }
+}'
+    _p_try EXPR_CT 'table inet nftprobe {
+  chain c {
+    ct state established,related accept
+  }
+}'
+    _p_try EXPR_MASQ 'table inet nftprobe {
+  chain c {
+    type nat hook postrouting priority srcnat; policy accept;
+    masquerade
+  }
+}'
+    _p_try EXPR_DNAT 'table inet nftprobe {
+  chain c {
+    type nat hook prerouting priority dstnat; policy accept;
+    tcp dport 8080 dnat ip to 10.88.0.2:80
+  }
+}'
+    _p_try EXPR_JUMP 'table inet nftprobe {
+  chain t {
+  }
+  chain c {
+    type filter hook forward priority filter; policy accept;
+    jump t
+  }
+}'
+    echo "GATE6_NFTPROBE_MODULES=$(lsmod 2>/dev/null \
+        | awk '/^(nf_|nft_)/ {printf "%s ", $1}')"
+}
+
 # --- GATE6: netavark nftables — published port AND outbound SNAT (store
 # stays btrfs from GATE4). 60-nftables.conf overrides 50-x5h.conf's
 # firewall_driver="none", so podman/netavark run the nftables driver here;
@@ -142,6 +212,7 @@ else
     echo GATE6_NFT_PORT_FAIL
     tail -5 /tmp/g6.log
     nft list ruleset 2>&1 | head -30
+    nft_probe
 fi
 # Outbound SNAT: the CI workflow runs an HTTP listener on the runner's
 # 127.0.0.1:8099; slirp maps guest-side 10.0.2.2:8099 onto it. busybox wget

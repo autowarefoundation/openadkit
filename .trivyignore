@@ -3,3 +3,8 @@
 CVE-2022-40897
 CVE-2024-6345
 CVE-2025-47273
+
+# msgpack 1.1.2 (python) shipped via the upstream Autoware/ROS base images;
+# fixed in 1.2.1 but not yet present in the distro/ROS packages used here.
+# Tracked for a base-image bump; ignored so PR checks stay actionable.
+GHSA-6v7p-g79w-8964

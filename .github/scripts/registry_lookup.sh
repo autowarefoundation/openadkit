@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # Classify registry manifest lookups without treating every failure as absence.
+#
+# registry_inspect_json      - retries transient failures and prints the full
+#                              `imagetools inspect --format '{{json .}}'`
+#                              document on success. Exit codes: 0 success,
+#                              1 the ref is definitively absent (404/unknown),
+#                              2 any other failure (auth, transient-after-
+#                              retries, unclassified).
+# registry_manifest_digest   - prints the sha256 manifest digest for a ref;
+#                              exit codes as above, plus 2 for invalid metadata.
 
-registry_manifest_digest() {
+registry_inspect_json() {
   local ref="$1"
   local max_attempts="${REGISTRY_LOOKUP_MAX_ATTEMPTS:-3}"
   local timeout_seconds="${REGISTRY_LOOKUP_TIMEOUT_SECONDS:-30}"
   local retry_delay="${REGISTRY_LOOKUP_RETRY_DELAY_SECONDS:-1}"
-  local attempt status stdout_file stderr_file output error digest
+  local attempt status stdout_file stderr_file output error
 
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     stdout_file=$(mktemp)
@@ -20,14 +29,8 @@ registry_manifest_digest() {
     rm -f "${stdout_file}" "${stderr_file}"
 
     if [ "${status}" -eq 0 ]; then
-      if digest=$(jq -er \
-        '.manifest.digest | strings | select(test("^sha256:[0-9a-f]{64}$"))' \
-        <<<"${output}"); then
-        printf '%s\n' "${digest}"
-        return 0
-      fi
-      echo "Registry returned invalid manifest metadata for ${ref}" >&2
-      return 2
+      printf '%s\n' "${output}"
+      return 0
     fi
 
     if printf '%s\n' "${error}" | grep -Eiq \
@@ -52,6 +55,7 @@ registry_manifest_digest() {
     if printf '%s\n' "${error}" | grep -Eiq \
       '404[[:space:]]+Not Found|MANIFEST_UNKNOWN|manifest unknown|NAME_UNKNOWN|name unknown' \
       || [ "${error}" = "ERROR: ${ref}: not found" ]; then
+      printf 'Registry image not found: %s (%s)\n' "${ref}" "${error}" >&2
       return 1
     fi
 
@@ -59,4 +63,18 @@ registry_manifest_digest() {
       "${ref}" "${status}" "${error}" >&2
     return 2
   done
+}
+
+registry_manifest_digest() {
+  local ref="$1" output digest
+
+  output=$(registry_inspect_json "${ref}") || return $?
+  if digest=$(jq -er \
+    '.manifest.digest | strings | select(test("^sha256:[0-9a-f]{64}$"))' \
+    <<<"${output}"); then
+    printf '%s\n' "${digest}"
+    return 0
+  fi
+  echo "Registry returned invalid manifest metadata for ${ref}" >&2
+  return 2
 }

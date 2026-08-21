@@ -6,7 +6,7 @@ Zenoh inside one Compose project. Checkout assets live under
 
 ## Security
 
-- noVNC is loopback-bound; set `REMOTE_PASSWORD` in `.env` (required).
+- noVNC is loopback-bound; set `REMOTE_PASSWORD` in `config.env` (required).
 - Zenoh TCP 7448 stays on the internal Compose network and is not published to
   the host.
 - Control topics (engage, emergency, teleop cmd) are on the allow-list — treat
@@ -16,8 +16,7 @@ Zenoh inside one Compose project. Checkout assets live under
 
 ```bash
 cd deployments/zenoh-bridge
-cp .env.example .env
-# set REMOTE_PASSWORD=
+# set REMOTE_PASSWORD in config.env
 ../../install.sh sample-data zenoh-bridge
 ```
 

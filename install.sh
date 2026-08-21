@@ -718,14 +718,14 @@ download_sample_data() {
         local name="$1" candidate="$2" db3 found_db3=false
         case "$name" in
             sample-map-planning|sample-map-rosbag)
-                require_sample_file "$candidate/lanelet2_map.osm"
-                require_sample_file "$candidate/pointcloud_map.pcd"
+                require_sample_file "$candidate/lanelet2_map.osm" || return 1
+                require_sample_file "$candidate/pointcloud_map.pcd" || return 1
                 ;;
             sample-rosbag)
-                require_sample_file "$candidate/metadata.yaml"
+                require_sample_file "$candidate/metadata.yaml" || return 1
                 for db3 in "$candidate"/*.db3; do
                     [ -e "$db3" ] || continue
-                    require_sample_file "$db3"
+                    require_sample_file "$db3" || return 1
                     found_db3=true
                 done
                 if [ "$found_db3" != true ]; then
@@ -734,11 +734,11 @@ download_sample_data() {
                 fi
                 ;;
             kashiwanoha_map)
-                require_sample_file "$candidate/lanelet2_map.osm"
-                require_sample_file "$candidate/pointcloud_map.pcd"
-                require_sample_file "$candidate/global_map_center.pcd.yaml"
-                require_sample_file "$candidate/lanelet2_map_provider.osm.yaml"
-                require_sample_file "$candidate/map.map_publisher.yaml"
+                require_sample_file "$candidate/lanelet2_map.osm" || return 1
+                require_sample_file "$candidate/pointcloud_map.pcd" || return 1
+                require_sample_file "$candidate/global_map_center.pcd.yaml" || return 1
+                require_sample_file "$candidate/lanelet2_map_provider.osm.yaml" || return 1
+                require_sample_file "$candidate/map.map_publisher.yaml" || return 1
                 ;;
             *)
                 log_error "Unknown sample dataset contract: $name"
@@ -801,7 +801,7 @@ PY
 
     publish_sample_dataset() {
         local candidate="$1" target="$2" stage="$3"
-        validate_sample_target_path "$target"
+        validate_sample_target_path "$target" || return 1
         if [ -d "$target" ]; then
             if [ "$force" != true ]; then
                 log_error "Sample target appeared during installation; rerun with --force: $target"

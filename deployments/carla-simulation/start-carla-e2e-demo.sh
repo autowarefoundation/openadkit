@@ -14,6 +14,7 @@ PYTHON_HELPER=$SCRIPT_DIR/carla_e2e_helper.py
 DRY_RUN=false
 BUILD_IMAGE=false
 SKIP_VERIFY=false
+STOP_STACK=false
 START_VISUALIZER_OVERRIDE=
 AUTO_DRIVE_OVERRIDE=
 TEMP_FILES=()
@@ -32,6 +33,7 @@ Options:
   --no-visualizer       Do not start the browser RViz/noVNC visualizer container
   --drive               Set a forward route and engage autonomous mode
   --no-drive            Start the stack without setting a route or engaging
+  --down                Stop and remove the Compose stack
   --dry-run             Print planned commands without running them
   -h, --help            Show this help text
 EOF
@@ -56,6 +58,9 @@ while (($#)); do
       ;;
     --no-drive)
       AUTO_DRIVE_OVERRIDE=false
+      ;;
+    --down)
+      STOP_STACK=true
       ;;
     --dry-run)
       DRY_RUN=true
@@ -396,6 +401,10 @@ autonomous_drive() {
 main() {
   cd "$SCRIPT_DIR"
   select_layout
+  if [[ "$STOP_STACK" == true ]]; then
+    run_compose down
+    return 0
+  fi
   load_env
   require_host_prerequisites
   require_udp_buffers

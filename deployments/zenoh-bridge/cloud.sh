@@ -85,7 +85,6 @@ if [ "$CMD" == "up" ] || [ "$CMD" == "dry-run" ]; then
     if [[ "$TARGET_SERVICES" == *"teleop"* ]]; then
         echo -e "\n       ${CYAN}[Teleop Control]${NC}"
         echo -e "       To control the vehicle manually:"
-        echo -e "       $ docker compose --env-file config.env exec teleop bash"
-        echo -e "       $ ros2 run autoware_manual_control keyboard_control"
+        echo -e "       $ ./run_teleop.sh"
     fi
 fi

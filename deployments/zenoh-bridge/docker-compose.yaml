@@ -28,7 +28,12 @@ services:
     networks:
       - edge_net
     volumes:
-      - ${MAP_PATH}:/autoware_map:ro
+      - type: bind
+        source: ${MAP_PATH}
+        target: /autoware_map
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DISTRO=${ROS_DISTRO:-humble}

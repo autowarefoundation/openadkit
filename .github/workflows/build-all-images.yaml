@@ -398,6 +398,7 @@ jobs:
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
         env:
           ROS_DISTRO: ${{ matrix.ros-distro }}
+          LOCAL_IMAGE: ""
         with:
           files: |
             ${{ env.BAKE_FILE }}
@@ -410,6 +411,8 @@ jobs:
             *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             carla-interface.contexts.simulator=docker-image://${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}

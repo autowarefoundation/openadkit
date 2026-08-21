@@ -162,6 +162,25 @@ nft_probe() {
     ct state established,related accept
   }
 }'
+    # ct mark, separately from ct state: this is the one that was actually
+    # missing (NF_CONNTRACK_MARK, a bool inside nf_conntrack, shipped off in
+    # the board's base config). ct state is available either way, so testing
+    # only that hides the failure -- which is exactly what happened.
+    _p_try EXPR_CT_MARK 'table inet nftprobe {
+  chain c {
+    ct mark 0x00000001 accept
+  }
+}'
+    _p_try EXPR_CT_MARK_SET 'table inet nftprobe {
+  chain c {
+    ct mark set 0x00000001
+  }
+}'
+    _p_try EXPR_META_MARK_SET 'table inet nftprobe {
+  chain c {
+    meta mark set 0x00000001
+  }
+}'
     _p_try EXPR_MASQ 'table inet nftprobe {
   chain c {
     type nat hook postrouting priority srcnat; policy accept;

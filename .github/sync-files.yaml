@@ -23,7 +23,8 @@
     - source: .pre-commit-config.yaml
     - source: .prettierignore
     - source: .prettierrc.yaml
-    - source: .yamllint.yaml
+    # .yamllint.yaml is Open AD Kit–specific (long workflow expressions, GitHub's
+    # `on:` key). Do not sync it from the generic Autoware template.
     - source: CODE_OF_CONDUCT.md
     # CONTRIBUTING.md is Open AD Kit–specific (deployments, bake, compose).
     # Do not sync it from the generic Autoware template.

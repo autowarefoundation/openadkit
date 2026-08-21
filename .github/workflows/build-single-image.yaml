@@ -91,8 +91,10 @@ jobs:
           AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
         run: |
           set -euo pipefail
-          if [ "${AUTOWARE_REF_TYPE}" != tag ] || [ "${AUTOWARE_INPUT_REF}" != "${AUTOWARE_BASE_VERSION}" ]; then
-            echo "build-single-image requires vars.UPSTREAM_TAG to name an exact Autoware release tag" >&2
+          normalized_input_ref="${AUTOWARE_INPUT_REF#v}"
+          if [ "${AUTOWARE_REF_TYPE}" != tag ] || [ "${normalized_input_ref}" != "${AUTOWARE_BASE_VERSION}" ]; then
+            echo "build-single-image requires vars.UPSTREAM_TAG to name an exact Autoware release tag (e.g. 1.8.0)" >&2
+            echo "resolved ref: ${AUTOWARE_INPUT_REF} (${AUTOWARE_REF_TYPE}), base version: ${AUTOWARE_BASE_VERSION}" >&2
             exit 1
           fi
         shell: bash
@@ -199,7 +201,7 @@ jobs:
 
       - name: Extract metadata for ${{ matrix.target }}
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ startsWith(matrix.target, 'universe-common') && env.IMAGE_PREFIX_COMMON || env.IMAGE_PREFIX_COMPONENT }}
           bake-target: docker-metadata-action-${{ matrix.target }}
@@ -242,14 +244,18 @@ jobs:
             ${{ needs.prepare.outputs.runtime_context != '' && format('*.contexts.universe-common={0}', needs.prepare.outputs.runtime_context) || '' }}
             ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
+            ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
+        # Reporting-only: findings are surfaced in the step log, but the hard
+        # gate is the scan-images workflow (scan.yaml) that feeds releases.
         if: github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ steps.meta.outputs.tags }}
           format: table
-          exit-code: '1'
+          exit-code: '0'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           scanners: vuln

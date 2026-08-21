@@ -116,7 +116,6 @@ jobs:
           exit-code: '1'
           severity: CRITICAL,HIGH
           limit-severities-for-sarif: true
-          trivyignores: .trivyignore
 
       - name: Upload scan results to GitHub Security
         if: always()

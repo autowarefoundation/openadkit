@@ -15,7 +15,6 @@ containers and `autoware_carla_interface`. Checkout assets live under
 - Docker with NVIDIA runtime (`nvidia-ctk runtime configure --runtime=docker`)
 - Run as a user in the `docker` group (**not** `sudo` — `sudo` resets `HOME` and
   breaks `MAP_PATH`)
-- NVIDIA Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
 - Large kernel UDP buffers for DDS:
 
 ```bash
@@ -23,7 +22,7 @@ sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
   net.core.rmem_default=134217728 net.core.wmem_default=134217728
 ```
 
-Tested on Ubuntu 22.04; other hosts may work if Docker/NVIDIA/Vulkan are present.
+Tested on Ubuntu 22.04; other hosts may work if Docker and the NVIDIA runtime are present.
 
 ## Start
 

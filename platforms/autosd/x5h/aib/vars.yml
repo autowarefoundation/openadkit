@@ -142,6 +142,28 @@ use_efipart: false
 # hand-copied into /etc/containers/systemd inert, which is the live-directory
 # problem above, hit from the runtime side.
 #
+# REMEDIATING A BOARD THAT ALREADY RUNS SUCH AN IMAGE, without a reflash. The
+# /run symlink that session installed is volatile, and on 2026-08-21 a cold
+# power cycle duly lost it: the generator did not run, no awf-oak unit existed,
+# and the component stack did not come back -- which reads as a regression in
+# the stack rather than as the mask it actually is. systemd logs the cause only
+# at debug level ("File '/usr/lib/systemd/system-generators/
+# podman-system-generator' is masked by previous entry"), so
+# `systemd-analyze log-level debug; systemctl daemon-reload` and grepping the
+# journal for "generator" is how to see it without rebooting.
+#
+# The durable fix on such a board is to point the /etc entry at the real
+# generator instead of at /dev/null:
+#
+#   ln -sf /usr/libexec/podman/quadlet \
+#     /etc/systemd/system-generators/podman-system-generator
+#
+# which is this manifest's decision applied by hand, and is revertible by
+# pointing it back at /dev/null. Verified on the board 2026-08-21: five units
+# generated at boot with no daemon-reload, all four component services active
+# and their containers up after a reboot. A board flashed with an image built
+# from this manifest needs none of it.
+#
 # WHAT SETTING IT FALSE DOES: podman-system-generator drops out of
 # image_masked_generators and the quadlet_preprocess stage drops out of the
 # build, so the stock generator at

@@ -236,6 +236,7 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
+            *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
 
@@ -343,6 +344,7 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
+            *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
 
@@ -359,6 +361,12 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     needs: [prepare, build-common, build-components]
+    # build-components remains an ordering dependency, but unrelated matrix
+    # failures must not suppress CARLA when its simulator image was published.
+    if: >-
+      !cancelled() &&
+      needs.prepare.result == 'success' &&
+      needs.build-common.result == 'success'
     permissions:
       contents: read
       packages: write
@@ -420,6 +428,7 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
+            *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
 
   # =============================================================================
   # Stage 3: Create multi-arch manifests

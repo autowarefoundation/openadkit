@@ -10,9 +10,12 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / ".github/scripts/resolve_registry_contexts.sh"
 AUTOWARE_REF = "5b27e88e84683deb4afaf0aa917f80082a608871"
 DIGEST = f"sha256:{'a' * 64}"
+LOCK_SHA256 = "b" * 64
 
 
-def registry_metadata(openadkit_sha, *, matches=True, plain_labels=False):
+def registry_metadata(
+    openadkit_sha, *, matches=True, plain_labels=False, lock_sha256=LOCK_SHA256
+):
     if matches == "same-commit-branch":
         input_ref = "main"
         ref_type = "branch"
@@ -42,6 +45,7 @@ def registry_metadata(openadkit_sha, *, matches=True, plain_labels=False):
                         label("org.opencontainers.image.autoware-ref-type"): ref_type,
                         label("org.opencontainers.image.autoware-ref"): image_autoware_ref,
                         label("org.opencontainers.image.autoware-base-version"): "1.8.0",
+                        label("org.opencontainers.image.autoware-lock-sha256"): lock_sha256,
                         label("org.opencontainers.image.openadkit-sha"): openadkit_sha,
                     }
                 }
@@ -100,6 +104,8 @@ def resolver_env(
     simulator_matches=True,
     changed_source=None,
     plain_labels=False,
+    common_lock_sha256=LOCK_SHA256,
+    simulator_lock_sha256=LOCK_SHA256,
     docker_fail_ref=None,
     docker_fail_mode="notfound",
 ):
@@ -131,10 +137,16 @@ fi
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
         "DOCKER_LOG": str(docker_log),
         "COMMON_METADATA": registry_metadata(
-            openadkit_sha, matches=common_matches, plain_labels=plain_labels
+            openadkit_sha,
+            matches=common_matches,
+            plain_labels=plain_labels,
+            lock_sha256=common_lock_sha256,
         ),
         "SIMULATOR_METADATA": registry_metadata(
-            openadkit_sha, matches=simulator_matches, plain_labels=plain_labels
+            openadkit_sha,
+            matches=simulator_matches,
+            plain_labels=plain_labels,
+            lock_sha256=simulator_lock_sha256,
         ),
         "GITHUB_OUTPUT": str(output),
         "TARGETS_JSON": json.dumps(targets),
@@ -144,6 +156,7 @@ fi
         "AUTOWARE_REF_TYPE": "tag",
         "AUTOWARE_REF": AUTOWARE_REF,
         "AUTOWARE_BASE_VERSION": "1.8.0",
+        "AUTOWARE_LOCK_SHA256": LOCK_SHA256,
         "USE_LOCAL_COMMON": "false",
         "USE_LOCAL_SIMULATOR": "false",
         "ROS_DISTRO": "humble",
@@ -162,6 +175,8 @@ def run_resolver(
     simulator_matches=True,
     changed_source=None,
     plain_labels=False,
+    common_lock_sha256=LOCK_SHA256,
+    simulator_lock_sha256=LOCK_SHA256,
 ):
     repo, env, output, docker_log = resolver_env(
         tmp_path,
@@ -170,6 +185,8 @@ def run_resolver(
         simulator_matches=simulator_matches,
         changed_source=changed_source,
         plain_labels=plain_labels,
+        common_lock_sha256=common_lock_sha256,
+        simulator_lock_sha256=simulator_lock_sha256,
     )
     subprocess.run(["bash", str(SCRIPT)], cwd=repo, env=env, check=True)
     outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
@@ -235,6 +252,18 @@ def test_common_mismatch_selects_local_common_build(tmp_path):
     assert len(inspected) == 1
 
 
+@pytest.mark.parametrize("lock_sha256", ["", "c" * 64])
+def test_common_lock_mismatch_selects_local_common_build(tmp_path, lock_sha256):
+    outputs, inspected = run_resolver(
+        tmp_path, ["api"], common_lock_sha256=lock_sha256
+    )
+    assert outputs == {
+        "use_local_common": "true",
+        "use_local_simulator": "false",
+    }
+    assert len(inspected) == 1
+
+
 def test_carla_only_uses_simulator_without_common_contexts(tmp_path):
     outputs, inspected = run_resolver(tmp_path, ["carla-interface"])
     assert outputs["simulator_context"].endswith(f"@{DIGEST}")
@@ -242,6 +271,17 @@ def test_carla_only_uses_simulator_without_common_contexts(tmp_path):
     assert not {"devel_context", "runtime_context"} & outputs.keys()
     assert len(inspected) == 1
     assert ":simulator-" in inspected[0]
+
+
+def test_simulator_lock_mismatch_falls_back_to_local_simulator(tmp_path):
+    outputs, inspected = run_resolver(
+        tmp_path, ["carla-interface"], simulator_lock_sha256="c" * 64
+    )
+    assert outputs["use_local_simulator"] == "true"
+    assert outputs["use_local_common"] == "false"
+    assert outputs["devel_context"].endswith(f"@{DIGEST}")
+    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
+    assert len(inspected) == 3
 
 
 def test_simulator_mismatch_falls_back_then_resolves_common(tmp_path):

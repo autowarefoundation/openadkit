@@ -17,6 +17,8 @@ INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
 ALL_IMAGES_WORKFLOW = (ROOT / ".github/workflows/build-all-images.yaml").read_text()
 SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
+LINT_WORKFLOW = (ROOT / ".github/workflows/lint.yaml").read_text()
+DOCS_WORKFLOW = (ROOT / ".github/workflows/deploy-docs.yaml").read_text()
 REGISTRY_CONTEXT_RESOLVER = (
     ROOT / ".github/scripts/resolve_registry_contexts.sh"
 ).read_text()
@@ -105,6 +107,7 @@ def test_shared_build_inputs_select_all_targets():
     for changed in (
         ".github/scripts/registry_lookup.sh",
         ".github/scripts/resolve_registry_contexts.sh",
+        ".github/scripts/resolve_upstream_images.sh",
         ".github/actions/inject-ccache/action.yaml",
         ".trivyignore",
     ):
@@ -194,6 +197,66 @@ def test_local_common_build_is_shared_without_persistent_pr_cache():
     assert "!cancelled()" not in cleanup
     assert "actions: write" in cleanup
     assert 'gh cache delete --all --ref "${PR_REF}"' in cleanup
+
+
+def test_single_image_build_pins_all_upstream_autoware_contexts():
+    assert "UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}" in (
+        SINGLE_IMAGE_WORKFLOW
+    )
+    for output, context in (
+        ("upstream_core_devel", "*.contexts.autoware-core-devel={0}"),
+        ("upstream_base", "*.contexts.autoware-base={0}"),
+        (
+            "upstream_cuda_runtime",
+            "sensing-perception-cuda.contexts.autoware-base-cuda-runtime={0}",
+        ),
+        (
+            "upstream_cuda_devel",
+            "sensing-perception-cuda.contexts.autoware-base-cuda-devel={0}",
+        ),
+    ):
+        assert f"{output}: ${{{{ steps.upstream.outputs." in SINGLE_IMAGE_WORKFLOW
+        assert context in SINGLE_IMAGE_WORKFLOW
+        assert f"needs.prepare.outputs.{output}" in SINGLE_IMAGE_WORKFLOW
+    assert 'export UPSTREAM_IMAGE_NAMES="${names[*]}"' in SINGLE_IMAGE_WORKFLOW
+    assert "@sha256:" not in SINGLE_IMAGE_WORKFLOW
+
+
+def test_carla_runs_after_unrelated_component_failure():
+    carla = ALL_IMAGES_WORKFLOW.split("  build-carla-interface:\n", 1)[1].split(
+        "\n  # =============================================================================\n"
+        "  # Stage 3:",
+        1,
+    )[0]
+    assert "needs: [prepare, build-common, build-components]" in carla
+    assert "!cancelled()" in carla
+    assert "needs.prepare.result == 'success'" in carla
+    assert "needs.build-common.result == 'success'" in carla
+    assert "needs.build-components.result == 'success'" not in carla
+
+
+def test_yaml_and_docs_navigation_inputs_trigger_validation():
+    for path in (
+        ".github/ISSUE_TEMPLATE/**",
+        ".github/DISCUSSION_TEMPLATE/**",
+        ".github/dependabot.yaml",
+        ".github/stale.yml",
+        ".github/sync-files.yaml",
+        "deployments/**/*.yaml",
+        "platforms/**/*.yml",
+    ):
+        assert path in LINT_WORKFLOW
+    assert '"docs/.pages"' in DOCS_WORKFLOW
+    assert '"docs/**/.pages"' in DOCS_WORKFLOW
+
+
+def test_published_images_include_autoware_lock_provenance():
+    label = 'labels."org.opencontainers.image.autoware-lock-sha256"'
+    assert ALL_IMAGES_WORKFLOW.count(label) == 3
+    assert "AUTOWARE_LOCK_SHA256: ${{ steps.lock.outputs.autoware_lock_sha256 }}" in (
+        SINGLE_IMAGE_WORKFLOW
+    )
+    assert "AUTOWARE_LOCK_SHA256" in REGISTRY_CONTEXT_RESOLVER
 
 
 def test_carla_registry_simulator_provenance_is_validated():

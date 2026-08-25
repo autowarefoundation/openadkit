@@ -91,6 +91,7 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
         ".github/scripts/resolve_image_matrices.py",
         ".github/scripts/resolve_build_inputs.sh",
         ".github/scripts/resolve_registry_contexts.sh",
+        ".github/scripts/resolve_upstream_images.sh",
         ".github/scripts/registry_lookup.sh",
         ".github/actions/free-disk-space/*",
         ".github/actions/inject-ccache/*",

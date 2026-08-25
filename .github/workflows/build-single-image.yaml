@@ -24,6 +24,7 @@ on:
       - ".github/scripts/resolve_image_matrices.py"
       - ".github/scripts/resolve_build_inputs.sh"
       - ".github/scripts/resolve_registry_contexts.sh"
+      - ".github/scripts/resolve_upstream_images.sh"
       - ".github/scripts/registry_lookup.sh"
       - ".github/actions/free-disk-space/**"
       - ".github/actions/inject-ccache/**"
@@ -62,6 +63,11 @@ jobs:
       autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
       autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
+      upstream_core_devel: ${{ steps.upstream.outputs.core_devel }}
+      upstream_base: ${{ steps.upstream.outputs.base }}
+      upstream_cuda_runtime: ${{ steps.upstream.outputs.cuda_runtime }}
+      upstream_cuda_devel: ${{ steps.upstream.outputs.cuda_devel }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       targets_json: ${{ steps.detect.outputs.targets_json }}
       setup_autoware: ${{ steps.detect.outputs.setup_autoware }}
@@ -110,6 +116,8 @@ jobs:
           python3 .github/scripts/export_autoware_lock.py \
             autoware-metadata/repositories/autoware.repos \
             autoware-lock/autoware-lock.repos
+          autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
+          echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "${GITHUB_OUTPUT}"
         shell: bash
 
       - name: Upload Autoware dependency lockfile
@@ -165,7 +173,36 @@ jobs:
           AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
           AUTOWARE_REF: ${{ steps.prepare.outputs.autoware_ref }}
           AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          AUTOWARE_LOCK_SHA256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
         run: bash .github/scripts/resolve_registry_contexts.sh
+        shell: bash
+
+      - name: Resolve required immutable upstream Autoware images
+        if: steps.detect.outputs.targets_json != '[]'
+        id: upstream
+        env:
+          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
+          UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          USE_LOCAL_COMMON: ${{ steps.contexts.outputs.use_local_common }}
+        run: |
+          set -euo pipefail
+          names=()
+          if [ "${USE_LOCAL_COMMON}" = true ] \
+            || jq -e 'index("universe-common-devel") != null or index("universe-common") != null' <<<"${TARGETS_JSON}" >/dev/null; then
+            names+=(core-devel base)
+          fi
+          if jq -e 'index("sensing-perception-cuda") != null' <<<"${TARGETS_JSON}" >/dev/null; then
+            names+=(base-cuda-runtime base-cuda-devel)
+          fi
+          export UPSTREAM_IMAGE_NAMES="${names[*]}"
+          bash .github/scripts/resolve_upstream_images.sh
+          {
+            echo "core_devel=$(jq -r 'map(select(.name == "core-devel"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "base=$(jq -r 'map(select(.name == "base"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "cuda_runtime=$(jq -r 'map(select(.name == "base-cuda-runtime"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "cuda_devel=$(jq -r 'map(select(.name == "base-cuda-devel"))[0].uri // empty' upstream-images/upstream-images.json)"
+          } >> "${GITHUB_OUTPUT}"
         shell: bash
 
   build-local-common:
@@ -235,6 +272,8 @@ jobs:
           set: |
             *.platform=linux/amd64
             *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
+            ${{ needs.prepare.outputs.upstream_core_devel != '' && format('*.contexts.autoware-core-devel={0}', needs.prepare.outputs.upstream_core_devel) || '' }}
+            ${{ needs.prepare.outputs.upstream_base != '' && format('*.contexts.autoware-base={0}', needs.prepare.outputs.upstream_base) || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-amd64-${{ inputs.ros-distro || 'humble' }}-main
             universe-common-devel.cache-to=type=gha,scope=pr-common-devel-${{ github.run_id }},mode=min
             universe-common.cache-to=type=gha,scope=pr-common-runtime-${{ github.run_id }},mode=min
@@ -318,6 +357,10 @@ jobs:
           set: |
             *.platform=linux/amd64
             *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
+            ${{ needs.prepare.outputs.upstream_core_devel != '' && format('*.contexts.autoware-core-devel={0}', needs.prepare.outputs.upstream_core_devel) || '' }}
+            ${{ needs.prepare.outputs.upstream_base != '' && format('*.contexts.autoware-base={0}', needs.prepare.outputs.upstream_base) || '' }}
+            ${{ needs.prepare.outputs.upstream_cuda_runtime != '' && format('sensing-perception-cuda.contexts.autoware-base-cuda-runtime={0}', needs.prepare.outputs.upstream_cuda_runtime) || '' }}
+            ${{ needs.prepare.outputs.upstream_cuda_devel != '' && format('sensing-perception-cuda.contexts.autoware-base-cuda-devel={0}', needs.prepare.outputs.upstream_cuda_devel) || '' }}
             ${{ needs.prepare.outputs.devel_context != '' && format('*.contexts.universe-common-devel={0}', needs.prepare.outputs.devel_context) || '' }}
             ${{ needs.prepare.outputs.runtime_context != '' && format('*.contexts.universe-common={0}', needs.prepare.outputs.runtime_context) || '' }}
             ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}

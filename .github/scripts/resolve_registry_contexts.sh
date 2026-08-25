@@ -67,9 +67,12 @@ use_local_simulator="${USE_LOCAL_SIMULATOR:-false}"
 if jq -e 'index("carla-interface") != null' <<<"${TARGETS_JSON}" >/dev/null \
   && [ "${use_local_simulator}" != true ]; then
   simulator_ref="${IMAGE_PREFIX_COMPONENT}:simulator-amd64-${distro}"
+  # export_autoware_lock.py resolves the dependency SHAs that vcs import bakes
+  # into the base, so a change to it must invalidate cached registry contexts.
   if simulator_context=$(resolve_registry_context "${simulator_ref}" \
     components/docker-bake.hcl components/runtime-cleanup.sh \
-    components/universe-common components/simulator); then
+    components/universe-common components/simulator \
+    .github/scripts/export_autoware_lock.py); then
     echo "simulator_context=${simulator_context}" >> "${GITHUB_OUTPUT}"
   else
     rc=$?
@@ -92,10 +95,12 @@ if [ "${common_required}" = true ] && [ "${use_local_common}" != true ]; then
   runtime_ref="${IMAGE_PREFIX_COMMON}:universe-common-amd64-${distro}"
   if devel_context=$(resolve_registry_context "${devel_ref}" \
     components/docker-bake.hcl components/runtime-cleanup.sh \
-    components/universe-common) \
+    components/universe-common \
+    .github/scripts/export_autoware_lock.py) \
     && runtime_context=$(resolve_registry_context "${runtime_ref}" \
       components/docker-bake.hcl components/runtime-cleanup.sh \
-      components/universe-common); then
+      components/universe-common \
+      .github/scripts/export_autoware_lock.py); then
     echo "devel_context=${devel_context}" >> "${GITHUB_OUTPUT}"
     echo "runtime_context=${runtime_context}" >> "${GITHUB_OUTPUT}"
   else

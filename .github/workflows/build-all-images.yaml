@@ -428,7 +428,10 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     needs: [prepare, build-common, build-components, build-carla-interface]
-    if: success()
+    # Run even if one build leg failed so multi-arch manifests for the legs
+    # that did complete are still published, instead of suppressing the whole
+    # image set on a single flaky platform build.
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
       packages: write

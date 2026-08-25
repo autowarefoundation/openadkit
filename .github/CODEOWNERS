@@ -1,3 +1,7 @@
+# Fallback so top-level files (README, CONTRIBUTING, LICENSE, lint configs,
+# openadkit entry point, etc.) are never left without a reviewer.
+* @mitsudome-r @oguzkaganozt
+
 docs/** @mitsudome-r @oguzkaganozt
 components/** @mitsudome-r @oguzkaganozt
 deployments/** @mitsudome-r @oguzkaganozt

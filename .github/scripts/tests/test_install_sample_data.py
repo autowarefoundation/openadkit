@@ -1,6 +1,7 @@
 import hashlib
 import os
 from pathlib import Path
+import re
 import subprocess
 import zipfile
 
@@ -10,6 +11,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 INSTALLER = ROOT / "install.sh"
 PLANNING_SUM = "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9"
+KASHIWANOHA_FILES = (
+    "lanelet2_map.osm",
+    "pointcloud_map.pcd",
+    "global_map_center.pcd.yaml",
+    "lanelet2_map_provider.osm.yaml",
+    "map.map_publisher.yaml",
+)
 
 
 def planning_zip(path, *, omit=None, traversal=False):
@@ -25,7 +33,16 @@ def planning_zip(path, *, omit=None, traversal=False):
             archive.writestr("sample-map-planning/../escaped", "unsafe")
 
 
-def run_install(tmp_path, fixture, *, force=False, map_root=None, checksum_mode="real"):
+def run_install(
+    tmp_path,
+    fixture,
+    *,
+    force=False,
+    map_root=None,
+    checksum_mode="real",
+    deployment="planning-simulation",
+    installer=None,
+):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log = tmp_path / "curl-calls"
@@ -66,7 +83,7 @@ def run_install(tmp_path, fixture, *, force=False, map_root=None, checksum_mode=
         "FIXTURE_ZIP": str(fixture),
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
     }
-    command = ["bash", str(INSTALLER), "sample-data", "planning-simulation"]
+    command = ["bash", str(installer or INSTALLER), "sample-data", deployment]
     if force:
         command.append("--force")
     return subprocess.run(command, env=env, text=True, capture_output=True), log
@@ -200,3 +217,25 @@ def test_carla_sample_data_is_unsupported(tmp_path):
     assert result.returncode != 0
     assert "deployments/carla-simulation/start-carla-e2e-demo.sh" in result.stdout
     assert not (tmp_path / "maps").exists()
+
+
+@pytest.mark.parametrize("deployment", ["scenario-simulation", "zenoh-bridge"])
+def test_kashiwanoha_deployments_fetch_shared_map(tmp_path, deployment):
+    """Both deployments map to fetch_kashiwanoha and install the same target."""
+    fixture = tmp_path / "map-file"
+    fixture.write_bytes(b"kashiwanoha map file\n")
+    digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
+
+    patched = tmp_path / "install.sh"
+    patched_text, replacements = re.subn(r"(?<=:)[0-9a-f]{64}", digest, INSTALLER.read_text())
+    assert replacements == len(KASHIWANOHA_FILES)
+    patched.write_text(patched_text)
+    patched.chmod(0o755)
+
+    result, _ = run_install(tmp_path, fixture, deployment=deployment, installer=patched)
+    assert result.returncode == 0, result.stderr + result.stdout
+    target = tmp_path / "maps/kashiwanoha_map"
+    for name in KASHIWANOHA_FILES:
+        assert (target / name).read_bytes() == fixture.read_bytes()
+    assert not (tmp_path / "maps/sample-map-planning").exists()
+    assert (tmp_path / "maps").exists()

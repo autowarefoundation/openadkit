@@ -42,7 +42,7 @@ services:
     environment:
       - RVIZ_CONFIG=${RVIZ_CONFIG}
       - USE_SIM_TIME=${USE_SIM_TIME}
-      - REMOTE_DISPLAY=true
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
       - REMOTE_PASSWORD=${REMOTE_PASSWORD}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display

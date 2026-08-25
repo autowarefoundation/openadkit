@@ -70,6 +70,17 @@ if [ "$CMD" == "down" ]; then
     TARGET_SERVICES="visualizer cloud_zenoh_bridge cloud_zenoh_ready teleop"
 fi
 
+# The visualizer requires a noVNC password. Fail with a clear message instead of
+# starting a passwordless viewer; read_dotenv_value honours an exported
+# REMOTE_PASSWORD before config.env, matching Docker Compose interpolation.
+if [ "$CMD" == "up" ] || [ "$CMD" == "dry-run" ]; then
+    if [[ -z "$(read_dotenv_value REMOTE_PASSWORD)" ]]; then
+        echo -e "${RED}[Error]${NC} REMOTE_PASSWORD is required for the visualizer."
+        echo -e "       Set it in config.env or export it, e.g.: REMOTE_PASSWORD=secret ./cloud.sh up"
+        exit 1
+    fi
+fi
+
 # Run Compose
 run_compose "Cloud" "$TARGET_SERVICES" "$CMD" "${ARGS[@]}"
 

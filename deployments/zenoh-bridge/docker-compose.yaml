@@ -113,9 +113,12 @@ services:
       - sh
       - -ec
       - |
+        # Only the local edge bridge must be up for Autoware to start. The cloud
+        # side comes up independently and the tunnel links once both bridges are
+        # running, so starting edge before cloud is tolerated.
         deadline=$$(($$(date +%s) + ZENOH_READY_TIMEOUT))
-        until nc -z -w 1 edge_zenoh_bridge 7447 && nc -z -w 1 cloud_zenoh_bridge 7448; do
-          [ "$$(date +%s)" -lt "$$deadline" ] || { echo "Zenoh edge tunnel readiness timed out" >&2; exit 1; }
+        until nc -z -w 1 edge_zenoh_bridge 7447; do
+          [ "$$(date +%s)" -lt "$$deadline" ] || { echo "Zenoh edge bridge readiness timed out" >&2; exit 1; }
           sleep 2
         done
     restart: "no"
@@ -132,7 +135,10 @@ services:
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=1
-      - REMOTE_PASSWORD=${REMOTE_PASSWORD:?Set REMOTE_PASSWORD in config.env before starting the visualizer}
+      # Enforced by cloud.sh before `up`; the `:-` default keeps edge-only and
+      # `config`/`down` from failing interpolation on a fresh checkout where
+      # config.env ships REMOTE_PASSWORD empty.
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD:-}
       # The edge scenario and Autoware use wall time; /clock is not routed.
       - USE_SIM_TIME=false
       - WEBSOCKIFY_BIND=0.0.0.0

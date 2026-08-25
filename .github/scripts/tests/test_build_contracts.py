@@ -161,6 +161,41 @@ def test_long_pr_build_leaves_time_for_vulnerability_scan():
     )
 
 
+def test_local_common_build_is_shared_without_persistent_pr_cache():
+    assert "github.event_name == 'workflow_dispatch' && github.run_id || github.ref" in (
+        SINGLE_IMAGE_WORKFLOW
+    )
+    assert "cancel-in-progress: true" in SINGLE_IMAGE_WORKFLOW
+
+    producer = SINGLE_IMAGE_WORKFLOW.split("  build-local-common:\n", 1)[1].split(
+        "\n  build:\n", 1
+    )[0]
+    build = SINGLE_IMAGE_WORKFLOW.split("\n  build:\n", 1)[1].split(
+        "\n  cleanup-pr-caches:\n", 1
+    )[0]
+    cleanup = SINGLE_IMAGE_WORKFLOW.split("\n  cleanup-pr-caches:\n", 1)[1]
+
+    assert "github.event_name == 'pull_request'" in producer
+    assert "head.repo.full_name == github.repository" in producer
+    assert "actions: write" in producer
+    assert "targets: universe-common" in producer
+    assert "scope=pr-common-devel-${{ github.run_id }},mode=min" in producer
+    assert "scope=pr-common-runtime-${{ github.run_id }},mode=min" in producer
+    assert 'gh cache delete --all --ref "${PR_REF}"' in producer
+
+    assert "needs: [prepare, build-local-common]" in build
+    assert "always() &&\n      !cancelled()" in build
+    assert "needs.build-local-common.result == 'skipped'" in build
+    assert "*.cache-from+=type=gha,scope=pr-common-devel-" in build
+    assert "*.cache-from+=type=gha,scope=pr-common-runtime-" in build
+
+    assert "needs: [prepare, build-local-common, build]" in cleanup
+    assert "always() &&" in cleanup
+    assert "!cancelled()" not in cleanup
+    assert "actions: write" in cleanup
+    assert 'gh cache delete --all --ref "${PR_REF}"' in cleanup
+
+
 def test_carla_registry_simulator_provenance_is_validated():
     assert 'resolve_registry_context "${simulator_ref}"' in REGISTRY_CONTEXT_RESOLVER
 

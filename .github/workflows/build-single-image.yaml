@@ -8,7 +8,7 @@ permissions:
 # Triggers:
 #   - pull_request: when component or shared build-graph inputs change.
 #     Builds affected targets with --load, then scans them (no push), amd64 only.
-#     Fork-safe: uses GITHUB_TOKEN (read-only for public GHCR pulls).
+#     Fork-safe: elevated cache cleanup runs only for same-repository PRs.
 #   - workflow_dispatch: manual single-target or multi-target validation build.
 #
 # This workflow does NOT replace build-all-images.yaml for releases.
@@ -168,9 +168,86 @@ jobs:
         run: bash .github/scripts/resolve_registry_contexts.sh
         shell: bash
 
-  build:
+  build-local-common:
     needs: prepare
-    if: needs.prepare.outputs.targets_json != '[]'
+    # The shared cache is about 4 GB. Limit it to PRs where this workflow can
+    # remove the cache after the matrix completes; forks keep the old fallback.
+    if: >-
+      needs.prepare.outputs.use_local_common == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      actions: write
+      contents: read
+      packages: read
+    steps:
+      - name: Remove stale caches for this pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: gh cache delete --all --ref "${PR_REF}" --succeed-on-no-caches
+        shell: bash
+
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up build environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          build-tag: ${{ needs.prepare.outputs.build_tag }}
+          registry: ${{ env.REGISTRY }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          free-disk: true
+          setup-autoware: true
+          with-middleware: true
+
+      - name: Restore universe-common BuildKit cache mounts
+        id: cache-restore
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: cache-mounts
+          key: buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-${{ github.sha }}
+          restore-keys: |
+            buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-
+
+      - name: Inject universe-common BuildKit cache mounts
+        uses: ./.github/actions/inject-ccache
+        with:
+          ros-distro: ${{ inputs.ros-distro || 'humble' }}
+          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
+
+      - name: Build shared universe-common images
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        env:
+          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
+          LOCAL_IMAGE: ""
+        with:
+          files: ${{ env.BAKE_FILE }}
+          targets: universe-common
+          push: false
+          set: |
+            *.platform=linux/amd64
+            *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-amd64-${{ inputs.ros-distro || 'humble' }}-main
+            universe-common-devel.cache-to=type=gha,scope=pr-common-devel-${{ github.run_id }},mode=min
+            universe-common.cache-to=type=gha,scope=pr-common-runtime-${{ github.run_id }},mode=min
+
+  build:
+    needs: [prepare, build-local-common]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.prepare.result == 'success' &&
+      needs.prepare.outputs.targets_json != '[]' &&
+      (needs.build-local-common.result == 'success' ||
+      needs.build-local-common.result == 'skipped')
     runs-on: ubuntu-22.04
     # planning-control can take nearly two hours before the bounded Trivy scan.
     timeout-minutes: 180
@@ -246,6 +323,8 @@ jobs:
             ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
             ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-devel-{0}', github.run_id) || '' }}
+            ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-runtime-{0}', github.run_id) || '' }}
             ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
@@ -262,3 +341,26 @@ jobs:
           scanners: vuln
           timeout: 15m
           trivyignores: .trivyignore
+
+  cleanup-pr-caches:
+    needs: [prepare, build-local-common, build]
+    # Keep cleanup cancellation-resistant. Workflow-level concurrency holds a
+    # replacement run until this run finishes, so ref-wide deletion cannot
+    # remove caches created by the replacement.
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.prepare.outputs.use_local_common == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Remove temporary pull request caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: gh cache delete --all --ref "${PR_REF}" --succeed-on-no-caches
+        shell: bash

@@ -58,7 +58,7 @@ cd deployments/carla-simulation
 
 ## Notes
 
-- Default render is offscreen (`CARLA_RENDER_ARGS=-RenderOffScreen`). For an
-  on-screen window, clear that flag and set `CARLA_DISPLAY` + X11 access.
+- Render is offscreen (`CARLA_RENDER_ARGS=-RenderOffScreen`). No host X display
+  is required.
 - `carla-map-loader` is force-recreated whenever CARLA is recreated so Town01
   preload cannot be skipped on relaunch.

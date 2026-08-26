@@ -137,7 +137,6 @@ load_env() {
     MAP_PATH
     POINTCLOUD_MAP_FILE
     LANELET2_MAP_FILE
-    ROS_DISTRO
   )
 
   if ! output=$("${COMPOSE_CMD[@]}" config --environment); then
@@ -159,6 +158,21 @@ load_env() {
     printf -v "$name" '%s' "${values[$name]}"
     export "${name?}"
   done
+
+  ROS_DISTRO=""
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    if [[ "$line" =~ ^[[:space:]]*ROS_DISTRO[[:space:]]*=(.*)$ ]]; then
+      ROS_DISTRO="${BASH_REMATCH[1]}"
+      ROS_DISTRO="${ROS_DISTRO#"${ROS_DISTRO%%[![:space:]]*}"}"
+      ROS_DISTRO="${ROS_DISTRO%"${ROS_DISTRO##*[![:space:]]}"}"
+    fi
+  done < "$ENV_FILE"
+  if [[ -z "$ROS_DISTRO" ]]; then
+    printf 'Required environment variable ROS_DISTRO is missing\n' >&2
+    return 1
+  fi
+  export ROS_DISTRO
 
   AUTOWARE_E2E_START_VISUALIZER=${START_VISUALIZER_OVERRIDE:-$AUTOWARE_E2E_START_VISUALIZER}
   AUTOWARE_E2E_AUTO_DRIVE=${AUTO_DRIVE_OVERRIDE:-$AUTOWARE_E2E_AUTO_DRIVE}

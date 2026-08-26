@@ -21,6 +21,7 @@ readonly SAMPLE_DATA_CONFIGS=(
     "planning-simulation|Download the planning simulation map|true|fetch_planning_simulation"
     "logging-simulation|Download the logging simulation map and rosbag|true|fetch_logging_simulation"
     "scenario-simulation|Download the Kashiwanoha scenario map|false|fetch_kashiwanoha"
+    "zenoh-bridge|Download the Kashiwanoha scenario map|false|fetch_kashiwanoha"
     "all|Download all non-CARLA sample data (default)|true|fetch_planning_simulation fetch_logging_simulation fetch_kashiwanoha"
 )
 
@@ -589,7 +590,7 @@ preflight_sample_data_dependencies() {
     if ! config="$(sample_data_config "$deployment")"; then
         if [ "$deployment" = "carla-simulation" ]; then
             log_error "sample-data does not support carla-simulation."
-            log_info "Use deployments/samples/carla-simulation/start-carla-e2e-demo.sh instead."
+            log_info "Use deployments/carla-simulation/start-carla-e2e-demo.sh instead."
         else
             log_error "Unknown deployment for sample-data: $deployment"
         fi

@@ -1,0 +1,12 @@
+# Open the cmem devices to a non-root runtime.
+#
+# cmemdrv registers a class of its own rather than sitting on a bus, so the
+# match is the class name and not a subsystem in the usual sense. Its nodes
+# arrive 0600 root:root like any other class device.
+#
+# Two families appear, and they are sized by different mechanisms: cmem0..N
+# are carved out of the default CMA and sized by the driver's bsize parameter,
+# while cmem_other0..N come one per phandle in the /cmem node's memory-region
+# list and inherit each region's address and extent. npu-bringup.md explains
+# why that distinction matters when a device comes out the wrong size.
+SUBSYSTEM=="cmem", MODE="0666"

@@ -15,6 +15,11 @@ set -euo pipefail
 : "${GITHUB_RUN_ID:?GITHUB_RUN_ID is required}"
 : "${GITHUB_RUN_ATTEMPT:?GITHUB_RUN_ATTEMPT is required}"
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=.github/scripts/registry_lookup.sh
+# shellcheck disable=SC1091
+source "${script_dir}/registry_lookup.sh"
+
 mkdir -p build-metadata
 autoware_lock_sha256=$(sha256sum build-metadata/autoware-lock.repos | cut -d ' ' -f1)
 [ "${autoware_lock_sha256}" = "${PREPARED_LOCK_SHA256}" ] || {
@@ -33,8 +38,15 @@ add_image() {
   local ref="${repo}:${target}-${distro}-${BUILD_TAG}"
   local inspect_json digest platforms tmp
 
-  inspect_json=$(docker buildx imagetools inspect "${ref}" --format '{{json .}}')
-  digest=$(printf '%s' "${inspect_json}" | jq -r '.manifest.digest')
+  if ! inspect_json=$(registry_inspect_json "${ref}"); then
+    echo "Failed to inspect ${ref}" >&2
+    exit 1
+  fi
+  if ! digest=$(printf '%s' "${inspect_json}" | jq -er \
+    '.manifest.digest | strings | select(test("^sha256:[0-9a-f]{64}$"))'); then
+    echo "Registry returned invalid manifest digest for ${ref}" >&2
+    exit 1
+  fi
   platforms=$(
     printf '%s' "${inspect_json}" \
       | jq -c '[.manifest.manifests[] | select(.platform.os != "unknown") | "\(.platform.os)/\(.platform.architecture)"] | unique'

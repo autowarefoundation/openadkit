@@ -256,6 +256,9 @@ jobs:
     runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
     timeout-minutes: 120
     needs: [prepare, build-common]
+    # A single common matrix failure must not skip cells whose common image
+    # was already published. Missing contexts fail at pull.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
     permissions:
       actions: write
       contents: read
@@ -439,8 +442,9 @@ jobs:
     needs: [prepare, build-common, build-components, build-carla-interface]
     # Run even if one build leg failed so multi-arch manifests for the legs
     # that did complete are still published, instead of suppressing the whole
-    # image set on a single flaky platform build.
-    if: ${{ !cancelled() }}
+    # image set on a single flaky platform build. Prepare must have succeeded
+    # or fromJson(manifest_matrix) evaluates an empty output.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -469,7 +473,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     needs: [prepare, create-manifests]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
     permissions:
       contents: read
       packages: read

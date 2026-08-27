@@ -149,6 +149,9 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
                 use_local_common |= component == "universe-common"
                 use_local_simulator |= component == "simulator"
 
+    if use_local_simulator and "carla-interface" in targets:
+        targets.discard("simulator")
+
     unknown_targets = targets - all_targets
     if unknown_targets:
         raise ValueError(f"Unknown Bake target: {sorted(unknown_targets)[0]}")

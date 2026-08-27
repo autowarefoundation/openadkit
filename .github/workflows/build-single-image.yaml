@@ -365,10 +365,10 @@ jobs:
             ${{ needs.prepare.outputs.runtime_context != '' && format('*.contexts.universe-common={0}', needs.prepare.outputs.runtime_context) || '' }}
             ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
-            ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
             ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-devel-{0}', github.run_id) || '' }}
             ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-runtime-{0}', github.run_id) || '' }}
-            ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
         # Reporting-only: findings are surfaced in the step log, but the hard
@@ -387,11 +387,11 @@ jobs:
 
   cleanup-pr-caches:
     needs: [prepare, build-local-common, build]
-    # Keep cleanup cancellation-resistant. Workflow-level concurrency holds a
-    # replacement run until this run finishes, so ref-wide deletion cannot
-    # remove caches created by the replacement.
+    # Skip on cancel so a replacement run's pr-common-* caches are not deleted.
+    # The next run already clears leftovers at the start of build-local-common.
     if: >-
       always() &&
+      !cancelled() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.prepare.outputs.use_local_common == 'true'
@@ -405,5 +405,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
-        run: gh cache delete --all --ref "${PR_REF}" --succeed-on-no-caches
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh cache list --ref "${PR_REF}" --json id,key --limit 100 \
+            | jq -r --arg run "${RUN_ID}" \
+              '.[] | select(.key | test("pr-common-(devel|runtime)-" + $run)) | .id' \
+            | while read -r id; do
+                [ -n "${id}" ] || continue
+                gh cache delete "${id}" || true
+              done
         shell: bash

@@ -22,6 +22,7 @@ DOCS_WORKFLOW = (ROOT / ".github/workflows/deploy-docs.yaml").read_text()
 REGISTRY_CONTEXT_RESOLVER = (
     ROOT / ".github/scripts/resolve_registry_contexts.sh"
 ).read_text()
+CAPTURE_METADATA = (ROOT / ".github/scripts/capture_build_metadata.sh").read_text()
 INSTALLER = (ROOT / "install.sh").read_text()
 ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
@@ -86,7 +87,7 @@ def test_carla_builds_after_simulator():
         ("components/api/Dockerfile", {"api"}, {}),
         (
             "components/simulator/Dockerfile",
-            {"simulator", "carla-interface"},
+            {"carla-interface"},
             {"use_local_simulator": True},
         ),
         (
@@ -121,6 +122,8 @@ def test_docker_bake_change_uses_all_local_images():
     )
     assert plan["use_local_common"] is True
     assert plan["use_local_simulator"] is True
+    assert "carla-interface" in plan["targets_json"]
+    assert "simulator" not in plan["targets_json"]
 
 
 def test_manual_targets_are_validated_sorted_and_deduplicated():
@@ -194,9 +197,12 @@ def test_local_common_build_is_shared_without_persistent_pr_cache():
 
     assert "needs: [prepare, build-local-common, build]" in cleanup
     assert "always() &&" in cleanup
-    assert "!cancelled()" not in cleanup
+    assert "!cancelled()" in cleanup
     assert "actions: write" in cleanup
-    assert 'gh cache delete --all --ref "${PR_REF}"' in cleanup
+    assert 'gh cache delete --all --ref "${PR_REF}"' not in cleanup
+    assert 'test("pr-common-(devel|runtime)-" + $run)' in cleanup
+    assert "*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common" in build
+    assert "*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator" in build
 
 
 def test_single_image_build_pins_all_upstream_autoware_contexts():
@@ -235,6 +241,25 @@ def test_carla_runs_after_unrelated_component_failure():
     assert "needs.build-components.result == 'success'" not in carla
 
 
+def test_common_matrix_failure_does_not_skip_component_cells():
+    components = ALL_IMAGES_WORKFLOW.split("  build-components:\n", 1)[1].split(
+        "\n  build-carla-interface:\n", 1
+    )[0]
+    assert "!cancelled() && needs.prepare.result == 'success'" in components
+    assert "needs.build-common.result == 'success'" not in components
+
+
+def test_manifest_jobs_require_prepare_success():
+    manifests = ALL_IMAGES_WORKFLOW.split("  create-manifests:\n", 1)[1].split(
+        "\n  manifest-report:\n", 1
+    )[0]
+    report = ALL_IMAGES_WORKFLOW.split("  manifest-report:\n", 1)[1].split(
+        "\n  capture-metadata:\n", 1
+    )[0]
+    assert "!cancelled() && needs.prepare.result == 'success'" in manifests
+    assert "!cancelled() && needs.prepare.result == 'success'" in report
+
+
 def test_yaml_and_docs_navigation_inputs_trigger_validation():
     for path in (
         ".github/ISSUE_TEMPLATE/**",
@@ -248,6 +273,12 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
         assert path in LINT_WORKFLOW
     assert '"docs/.pages"' in DOCS_WORKFLOW
     assert '"docs/**/.pages"' in DOCS_WORKFLOW
+
+
+def test_capture_metadata_uses_retrying_registry_lookup():
+    assert "source \"${script_dir}/registry_lookup.sh\"" in CAPTURE_METADATA
+    assert "registry_inspect_json" in CAPTURE_METADATA
+    assert 'select(test("^sha256:[0-9a-f]{64}$"))' in CAPTURE_METADATA
 
 
 def test_published_images_include_autoware_lock_provenance():

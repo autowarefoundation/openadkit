@@ -115,11 +115,22 @@
 #                                   the ego never reached the trigger point
 #                                   (lane 3238) or the interpreter never fired
 #                                   the FaultInjectionAction
-#             mrm_availability_never_dropped
-#                                   the fault fired but
+#             mrm_availability_never_true
 #                                   /system/operation_mode/availability never
-#                                   showed autonomous: false -- the diagnostic
-#                                   is not reaching the aggregator. NOTE the
+#                                   showed autonomous: true, so the ego was
+#                                   never available in the first place and
+#                                   there was no drop to grade. Read this as
+#                                   "the run never got as far as the MRM",
+#                                   not as an MRM fault
+#             mrm_availability_never_dropped
+#                                   the fault fired and availability HAD been
+#                                   true, but /system/operation_mode/
+#                                   availability never went false after that
+#                                   -- the diagnostic is not reaching the
+#                                   aggregator. Graded as a transition, not as
+#                                   the presence of a false sample: the
+#                                   pre-engagement records are false too.
+#                                   NOTE the
 #                                   wiring is a demo customization in this
 #                                   image's diagnostics/perception.yaml (the
 #                                   diag is named cpu_temperature_is_high, NOT
@@ -339,7 +350,18 @@ stack)
     # --no-block is required, not stylistic: the scenario unit is
     # Type=oneshot, so a plain `systemctl start` blocks until the whole run
     # finishes and there would be no live window left to observe.
-    systemctl start --no-block "${SCENARIO_UNIT}.service" \
+    #
+    # `restart`, not `start`, for the reason spelled out at the equivalent
+    # call in `drive` below: the unit is Type=oneshot with
+    # RemainAfterExit=yes, so a `start` on a unit that is already
+    # `active (exited)` returns success WITHOUT re-running ExecStart. That
+    # is not a hypothetical state -- `drive` ends by leaving the unit in
+    # exactly it -- so `drive` followed by `stack` used to start no ego at
+    # all, wait out CR52_TIMEOUT against a stack that was never given
+    # anything to follow, and report no_cr52_control_cmd: a board fault
+    # name for a script artefact. `restart` re-runs ExecStart whatever the
+    # prior state, and combined with --no-block still returns immediately.
+    systemctl restart --no-block "${SCENARIO_UNIT}.service" \
         || fail "scenario_start" "STACK"
 
     rx0=$(cat /sys/class/net/tap0/statistics/rx_packets 2>/dev/null)
@@ -497,8 +519,33 @@ drive)
     # post-run teardown, and a line-level grep would accept that.
     grep -q 'name: cpu_temperature_is_high' "$PROBE/events.txt" \
         || fail "mrm_no_fault_event" "DRIVE"
-    grep -q '^autonomous: false' "$PROBE/availability.txt" \
-        || fail "mrm_availability_never_dropped" "DRIVE"
+    # A DROP, not the presence of a `false`. The chain this oracle grades
+    # says availability *drops* autonomous when the fault fires, and
+    # `grep -q '^autonomous: false'` asserted something weaker that a
+    # healthy run satisfies before the fault is ever injected: the capture
+    # opens while the stack is still coming up and the ego is not yet
+    # engaged, and that pre-engagement state publishes autonomous: false
+    # too (board-measured: the first such record sits 22 s BEFORE the
+    # fault). So the old form could not fail on any run that got far
+    # enough to produce a capture at all, which made
+    # mrm_availability_never_dropped unreachable and left the link between
+    # the fault and the MRM ungraded.
+    #
+    # Record-aware (RS="---"), like the mrm_state assertions below: require
+    # a record carrying autonomous: true and, strictly after it, one
+    # carrying autonomous: false. That is the transition, and the
+    # engaged->unavailable ordering is what the fault causes. The two
+    # halves are named separately because they fail for different reasons
+    # and the operator reads the reason, not the code: never true at all
+    # means the ego never became available (nothing to drop), and it is a
+    # different board investigation from a drop that never happened.
+    awk 'BEGIN{RS="---"} $0 ~ /(^|\n)autonomous: true(\n|$)/ {f=1} END{exit !f}' \
+        "$PROBE/availability.txt" || fail "mrm_availability_never_true" "DRIVE"
+    awk 'BEGIN{RS="---"}
+         $0 ~ /(^|\n)autonomous: true(\n|$)/  {up=1}
+         up && $0 ~ /(^|\n)autonomous: false(\n|$)/ {f=1}
+         END{exit !f}' \
+        "$PROBE/availability.txt" || fail "mrm_availability_never_dropped" "DRIVE"
     awk 'BEGIN{RS="---"} $0 ~ /(^|\n)state: 2(\n|$)/ && $0 ~ /(^|\n)behavior: 3(\n|$)/ {f=1} END{exit !f}' \
         "$PROBE/mrm_state.txt" || fail "mrm_no_comfortable_stop" "DRIVE"
     awk 'BEGIN{RS="---"} $0 ~ /(^|\n)state: 3(\n|$)/ && $0 ~ /(^|\n)behavior: 3(\n|$)/ {f=1} END{exit !f}' \

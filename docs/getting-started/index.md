@@ -114,8 +114,8 @@ If something goes wrong, see [Troubleshooting](troubleshooting.md).
 ## Next Steps
 
 **[Explore the other deployments](../deployment/index.md)** - curated scenario
-testing and rosbag replay, plus standalone source-checkout workflows for CARLA
-and distributed cloud-edge operation with Zenoh.
+testing, rosbag replay, and CARLA, plus a standalone source-checkout workflow
+for distributed cloud-edge operation with Zenoh.
 
 - [Components](../components/index.md) - The architecture behind what you just ran
 - [Container Images & Versioning](container-images.md) - Tag schema and pinning guidance

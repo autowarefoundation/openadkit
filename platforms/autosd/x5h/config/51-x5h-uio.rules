@@ -1,0 +1,18 @@
+# Give the board's UIO devices their device-tree names in /dev.
+#
+# uio_pdrv_genirq names each device from its node's linux,uio-name, but that
+# name only ever reaches /sys/class/uio/uioN/name. The device node itself stays
+# /dev/uioN -- numbered by probe order, and 0600 root:root. So a runtime that
+# opens /dev/npuc0 fails with ENOENT on a board where the device tree, the
+# module binding and the sysfs name are all correct; nothing in the failure
+# points at the missing rule.
+#
+# One rule covers every device in uio.md's table at once. The mode line is
+# deliberately narrower than the vendor's reference rootfs, which relaxes all
+# 177 of them: only the NPU cluster is opened to a non-root process. If the
+# runtime turns out to need another block, widen that match rather than
+# dropping to a blanket 0666.
+#
+# See uio.md; the binding itself comes from x5h-uio.conf.
+SUBSYSTEM=="uio", SYMLINK+="$attr{name}"
+SUBSYSTEM=="uio", ATTR{name}=="npuc*", MODE="0666"

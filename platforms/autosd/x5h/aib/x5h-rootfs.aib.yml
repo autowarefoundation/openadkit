@@ -64,6 +64,9 @@ content:
     - path: /etc/modprobe.d
       parents: true
       exist_ok: true
+    - path: /etc/udev/rules.d
+      parents: true
+      exist_ok: true
   add_files:
     # add_files only permits /etc and /usr destinations (rehearsal finding).
     - source_path: ../config/50-x5h.conf
@@ -82,6 +85,15 @@ content:
       path: /etc/resolv.conf
     - source_path: ../config/x5h-rpmsg-diag.conf
       path: /etc/modprobe.d/x5h-rpmsg-diag.conf
+    # Without of_id, uio_pdrv_genirq loads but binds nothing -- see uio.md.
+    - source_path: ../config/x5h-uio.conf
+      path: /etc/modprobe.d/x5h-uio.conf
+    # Binding the UIO devices names them in sysfs only; these turn the names
+    # into /dev paths a runtime can open (uio.md, npu-bringup.md).
+    - source_path: ../config/51-x5h-uio.rules
+      path: /etc/udev/rules.d/51-x5h-uio.rules
+    - source_path: ../config/52-x5h-cmem.rules
+      path: /etc/udev/rules.d/52-x5h-cmem.rules
     - source_path: ../config/80-x5h.preset
       path: /etc/systemd/system-preset/80-x5h.preset
 

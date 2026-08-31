@@ -23,6 +23,7 @@ import subprocess
 from pathlib import Path
 
 AWK = Path(__file__).resolve().parents[2] / "scripts" / "x5h-stop-metrics.awk"
+SMOKE = Path(__file__).resolve().parents[2] / "scripts" / "x5h-stack-smoke.sh"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
@@ -222,3 +223,36 @@ def test_stop_metrics_chain_from_real_fixtures(tmp_path):
     r = run_metrics(kinematic_text, t0, tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
     assert r.stdout.strip() == "stop_distance_m=39.55 rest_x=59084.83 rest_y=42971.53"
+
+
+def smoke_awk_invocations():
+    """Every line of x5h-stack-smoke.sh that runs the metric awk."""
+    return [ln.strip() for ln in SMOKE.read_text().splitlines()
+            if "$STOP_AWK" in ln and ln.strip().startswith(("t0=", "metrics=",
+                                                            "awk "))]
+
+
+def test_drive_takes_t0_from_the_events_capture():
+    """The caller's t0 contract, which the tests above cannot see: they
+    exercise the awk, which computes whatever t0 it is handed.
+
+    t0 must come from the events capture, anchored on the injected fault.
+    The alternative anchor is right there in the same directory and looks
+    plausible -- the availability capture's first `autonomous: false` --
+    and it is wrong by 22 s on real board material, because that record is
+    a pre-engagement startup sample rather than the post-fault drop.
+    Anchoring there would integrate the entire autonomous drive into
+    "stop distance" and report a large, plausible-looking, wrong number
+    for the one quantity the before/after demo grades on. The script says
+    so at length; this pins it."""
+    t0_lines = [ln for ln in smoke_awk_invocations() if "mode=t0" in ln]
+    assert len(t0_lines) == 1, t0_lines
+    t0_line = t0_lines[0]
+    assert "pat='name: cpu_temperature_is_high'" in t0_line
+    assert '"$PROBE/events.txt"' in t0_line
+
+
+def test_drive_never_derives_stop_metrics_from_availability():
+    """No fallback anchor, now or later: no invocation of the metric awk
+    may read the availability capture."""
+    assert all("availability" not in ln for ln in smoke_awk_invocations())

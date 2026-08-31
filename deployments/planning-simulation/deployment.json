@@ -9,9 +9,7 @@
     "profiles": [],
     "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer"],
     "resetServices": ["map-check"],
-    "waitTimeout": 300,
-    "groups": {},
-    "features": {}
+    "waitTimeout": 300
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],
@@ -28,6 +26,5 @@
       "sha256": "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9",
       "requiredFiles": ["lanelet2_map.osm", "pointcloud_map.pcd"]
     }
-  ],
-  "hooks": {}
+  ]
 }

@@ -147,12 +147,14 @@ def extract_zip(archive: Path, stage: Path, expected_root: str) -> Path:
 def selected_resources(
     deployment: Deployment,
     selection: Selection,
+    *,
+    include_gpu: bool | None = None,
 ) -> list[dict[str, Any]]:
+    want_gpu = selection.gpu if include_gpu is None else include_gpu
     return [
         resource
         for resource in deployment.data
-        if (not resource.get("gpu", False) or selection.gpu)
-        and (not resource["groups"] or selection.group in resource["groups"])
+        if want_gpu or not resource.get("gpu", False)
     ]
 
 
@@ -172,8 +174,15 @@ def resolve_destination(resource: dict[str, Any], selection: Selection) -> Path:
     return destination
 
 
-def validate_destinations(deployment: Deployment, selection: Selection) -> None:
-    for resource in selected_resources(deployment, selection):
+def validate_destinations(
+    deployment: Deployment,
+    selection: Selection,
+    *,
+    include_gpu: bool | None = None,
+) -> None:
+    for resource in selected_resources(
+        deployment, selection, include_gpu=include_gpu
+    ):
         resolve_destination(resource, selection)
 
 
@@ -181,9 +190,13 @@ def validate_install_targets(
     deployment: Deployment,
     selection: Selection,
     force: bool,
+    *,
+    include_gpu: bool | None = None,
 ) -> None:
     destinations: set[Path] = set()
-    for resource in selected_resources(deployment, selection):
+    for resource in selected_resources(
+        deployment, selection, include_gpu=include_gpu
+    ):
         target = resolve_destination(resource, selection)
         if target in destinations:
             raise OpenADKitError(f"multiple data resources target the same path: {target}")
@@ -255,7 +268,13 @@ def install_data(
     deployment: Deployment,
     selection: Selection,
     force: bool,
+    *,
+    include_gpu: bool | None = None,
 ) -> None:
-    validate_install_targets(deployment, selection, force)
-    for resource in selected_resources(deployment, selection):
+    validate_install_targets(
+        deployment, selection, force, include_gpu=include_gpu
+    )
+    for resource in selected_resources(
+        deployment, selection, include_gpu=include_gpu
+    ):
         install_resource(resource, selection, force)

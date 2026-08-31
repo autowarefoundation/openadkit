@@ -9,9 +9,7 @@
     "profiles": ["rosbag"],
     "services": ["map", "system", "sensing", "perception", "localization", "rosbag", "visualizer"],
     "resetServices": ["map-check", "rosbag"],
-    "waitTimeout": 300,
-    "groups": {},
-    "features": {}
+    "waitTimeout": 300
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],
@@ -80,6 +78,5 @@
         "detection_class_remapper.param.yaml"
       ]
     }
-  ],
-  "hooks": {}
+  ]
 }

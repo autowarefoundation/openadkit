@@ -9,12 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from manifest import (
-    Deployment,
-    OpenADKitError,
-    Selection,
-    ensure_safe_existing,
-)
+from manifest import Deployment, OpenADKitError, Selection
 
 
 COMPOSE_CONTROL_ENV = {
@@ -138,7 +133,7 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
         compose_capture(deployment, selection, ["config", "--services"])
         .stdout.splitlines()
     )
-    declared = set(selection.services) | set(selection.verification_services)
+    declared = set(selection.services)
     declared.update(deployment.compose["resetServices"])
     unknown = sorted(declared - configured)
     if unknown:
@@ -171,45 +166,6 @@ def check_daemon(selection: Selection) -> None:
         raise OpenADKitError(
             "NVIDIA Container Toolkit is unavailable for the selected GPU mode"
         )
-
-
-def hook_environment(
-    deployment: Deployment,
-    selection: Selection,
-) -> dict[str, str]:
-    environment = dict(selection.environment)
-    for name in COMPOSE_CONTROL_ENV:
-        environment.pop(name, None)
-    environment.update(
-        {
-            "OPENADKIT_ROOT": str(deployment.root),
-            "OPENADKIT_DEPLOYMENT": deployment.name,
-            "OPENADKIT_DEPLOYMENT_DIR": str(deployment.directory),
-            "OPENADKIT_PROJECT": deployment.project,
-            "OPENADKIT_GPU": "true" if selection.gpu else "false",
-            "OPENADKIT_GROUP": selection.group or "",
-            "OPENADKIT_FEATURES": ",".join(selection.features),
-        }
-    )
-    return environment
-
-
-def run_hook(
-    deployment: Deployment,
-    phase: str,
-    selection: Selection,
-) -> None:
-    relative = deployment.hooks.get(phase)
-    if not relative:
-        return
-    hook = ensure_safe_existing(
-        deployment.directory, relative, f"{phase} hook", executable=True
-    )
-    run_process(
-        [str(hook)],
-        cwd=deployment.directory,
-        env=hook_environment(deployment, selection),
-    )
 
 
 def start(
@@ -255,28 +211,6 @@ def start(
     )
 
 
-def verify(deployment: Deployment, selection: Selection) -> None:
-    running = compose_capture(
-        deployment,
-        selection,
-        ["ps", "--status", "running", "--services"],
-        check=False,
-    )
-    if running.returncode != 0:
-        raise OpenADKitError("could not inspect running Compose services")
-    actual = set(running.stdout.splitlines())
-    missing = [
-        service
-        for service in selection.verification_services
-        if service not in actual
-    ]
-    if missing:
-        raise OpenADKitError(
-            f"required service(s) are not running: {', '.join(missing)}"
-        )
-    run_hook(deployment, "verify", selection)
-
-
 def status(deployment: Deployment, selection: Selection) -> None:
     compose_run(deployment, selection, ["ps"])
 
@@ -289,8 +223,4 @@ def logs(deployment: Deployment, selection: Selection, follow: bool) -> None:
 
 
 def stop(deployment: Deployment, selection: Selection) -> None:
-    compose_run(deployment, selection, ["stop"])
-
-
-def down(deployment: Deployment, selection: Selection) -> None:
     compose_run(deployment, selection, ["down", "--remove-orphans"])

@@ -14,16 +14,17 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 ENTRYPOINT = ROOT / "openadkit"
-COMPONENT_TARGETS = (
-    "localization-mapping",
-    "planning-control",
-    "vehicle-system",
-    "api",
-    "visualizer",
-    "simulator",
-    "sensing-perception",
-    "sensing-perception-cuda",
-)
+COMPONENT_IMAGES = {
+    "LOCALIZATION_MAPPING_IMAGE": "localization-mapping",
+    "PLANNING_CONTROL_IMAGE": "planning-control",
+    "VEHICLE_SYSTEM_IMAGE": "vehicle-system",
+    "API_IMAGE": "api",
+    "VISUALIZER_IMAGE": "visualizer",
+    "SIMULATOR_IMAGE": "simulator",
+    "SENSING_PERCEPTION_IMAGE": "sensing-perception",
+    "SENSING_PERCEPTION_GPU_IMAGE": "sensing-perception-cuda",
+}
+COMPONENT_TARGETS = tuple(COMPONENT_IMAGES.values())
 
 
 def executable(path, content):
@@ -32,9 +33,7 @@ def executable(path, content):
     path.chmod(0o755)
 
 
-def minimal_manifest(
-    name="example", *, hooks=None, data=None, groups=None, features=None
-):
+def minimal_manifest(name="example", *, data=None):
     return {
         "schemaVersion": 1,
         "name": name,
@@ -44,11 +43,8 @@ def minimal_manifest(
             "gpuFiles": [],
             "profiles": [],
             "services": ["app"],
-            "verifyServices": ["app"],
             "resetServices": [],
             "waitTimeout": 30,
-            "groups": groups or {},
-            "features": features or {},
         },
         "requirements": {
             "architectures": ["amd64", "arm64"],
@@ -56,8 +52,42 @@ def minimal_manifest(
             "gpu": "none",
         },
         "data": data or [],
-        "hooks": hooks or {},
     }
+
+
+def kit_document(root, *, release=False, manifest=None, extra_deployments=None):
+    deployments = {
+        "example": {"path": "deployments/example"},
+    }
+    shared = {}
+    if extra_deployments:
+        deployments.update(extra_deployments)
+    if release:
+        deployments["example"]["checksum"] = deployment_checksum(
+            root / "deployments/example"
+        )
+        for shared_name in (manifest or {}).get("shared", []):
+            shared[shared_name] = deployment_checksum(root / "deployments" / shared_name)
+    document = {
+        "schemaVersion": 1,
+        "kind": "release" if release else "repository",
+        "defaultRosDistro": "humble",
+        "componentImages": COMPONENT_IMAGES,
+        "deployments": deployments,
+    }
+    if release:
+        document["version"] = "v1.2.3"
+        document["images"] = {
+            distro: {
+                target: f"registry.example/{target}:{distro}@sha256:{'1' * 64}"
+                for target in COMPONENT_TARGETS
+            }
+            for distro in ("humble", "jazzy")
+        }
+        document["shared"] = shared
+    else:
+        document["imagePrefixComponent"] = "ghcr.io/autowarefoundation/openadkit"
+    return document
 
 
 def runtime_tree(tmp_path, *, release=False, manifest=None):
@@ -68,7 +98,7 @@ def runtime_tree(tmp_path, *, release=False, manifest=None):
     deployment = root / "deployments/example"
     deployment.mkdir(parents=True)
     manifest = manifest or minimal_manifest()
-    (deployment / "openadkit.json").write_text(json.dumps(manifest))
+    (deployment / "deployment.json").write_text(json.dumps(manifest))
     (deployment / "config.env").write_text(
         "MAP_PATH=$HOME/data/example\nREMOTE_PASSWORD=default\n"
     )
@@ -79,33 +109,13 @@ def runtime_tree(tmp_path, *, release=False, manifest=None):
         (deployment / gpu_file).write_text(
             "services:\n  app:\n    environment:\n      GPU: 'true'\n"
         )
-    shared_hashes = {}
     for shared_name in manifest.get("shared", []):
         shared = root / "deployments" / shared_name
         shared.mkdir()
         (shared / "runtime.env").write_text("ROS_DOMAIN_ID=1\n")
-        shared_hashes[shared_name] = deployment_checksum(shared)
-    if release:
-        checksum = deployment_checksum(deployment)
-        (root / "openadkit.d/context.json").write_text(
-            json.dumps(
-                {
-                    "schemaVersion": 1,
-                    "kind": "release",
-                    "version": "v1.2.3",
-                    "defaultRosDistro": "humble",
-                    "images": {
-                        distro: {
-                            target: f"registry.example/{target}:{distro}@sha256:{'1' * 64}"
-                            for target in COMPONENT_TARGETS
-                        }
-                        for distro in ("humble", "jazzy")
-                    },
-                    "deployments": {"example": checksum},
-                    "shared": shared_hashes,
-                }
-            )
-        )
+    (root / "openadkit.json").write_text(
+        json.dumps(kit_document(root, release=release, manifest=manifest))
+    )
     return root, deployment
 
 
@@ -137,7 +147,6 @@ def deployment_checksum(directory):
 def fake_docker(
     tmp_path,
     *,
-    running="app",
     configured="app\n",
     daemon_returncode=0,
     config_returncode=0,
@@ -150,9 +159,9 @@ def fake_docker(
         bin_dir / "docker",
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        f'printf "%s|%s|%s|%s|%s|%s|%s\\n" "${{SCENARIO_SIMULATION:-}}" '
-        '"${ROS_DISTRO:-}" "${DISTRO_VALUE:-}" "${FEATURE_VALUE:-}" '
-        '"${API_IMAGE:-}" "${LOCALIZATION_MAPPING_IMAGE:-}" '
+        f'printf "%s|%s|%s|%s|%s|%s\\n" '
+        '"${ROS_DISTRO:-}" "${DISTRO_VALUE:-}" "${API_IMAGE:-}" '
+        '"${LOCALIZATION_MAPPING_IMAGE:-}" "${SENSING_PERCEPTION_GPU_IMAGE:-}" '
         f'"$*" >> {json.dumps(str(calls))}\n'
         'if [[ "$*" == "info" ]]; then '
         f"exit {daemon_returncode}; fi\n"
@@ -162,8 +171,6 @@ def fake_docker(
         f"printf '%b' {json.dumps(configured)}; fi\n"
         'if [[ "$*" == *"config --quiet"* ]]; then '
         f"exit {config_returncode}; fi\n"
-        'if [[ "$*" == *"ps --status running --services"* ]]; then '
-        f"printf '%s\\n' {json.dumps(running)}; fi\n"
         "exit 0\n",
     )
     return bin_dir, calls
@@ -191,17 +198,19 @@ def test_command_surface_is_exact():
         "list",
         "version",
         "validate",
-        "data",
+        "fetch",
         "run",
-        "verify",
         "status",
         "logs",
         "stop",
-        "down",
     ):
         assert command in result.stdout
-    assert "install" not in result.stdout
-    assert "build" not in result.stdout
+    for command in ("verify", "down", "install", "build"):
+        assert f"  {command} " not in result.stdout
+    unknown = subprocess.run(
+        [str(ENTRYPOINT), "data"], text=True, capture_output=True
+    )
+    assert unknown.returncode != 0
 
 
 def test_repo_and_release_use_the_same_entrypoint(tmp_path):
@@ -212,45 +221,70 @@ def test_repo_and_release_use_the_same_entrypoint(tmp_path):
     assert run_cli(release, ["version"]).stdout.startswith("Open AD Kit v1.2.3")
 
 
-def test_list_marks_release_inventory_and_custom_deployment(tmp_path):
+def test_list_uses_bundle_inventory_and_ignores_unlisted_deployments(tmp_path):
     root, _ = runtime_tree(tmp_path, release=True)
     custom = root / "deployments/custom"
     custom.mkdir()
-    (custom / "openadkit.json").write_text(json.dumps(minimal_manifest("custom")))
+    (custom / "deployment.json").write_text(json.dumps(minimal_manifest("custom")))
     (custom / "config.env").write_text("MAP_PATH=$HOME/custom\n")
     (custom / "docker-compose.yaml").write_text(
         "services:\n  app:\n    image: busybox:1.36.1\n"
     )
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tverified" in result.stdout
-    assert "custom\tcustom/unverified" in result.stdout
+    assert "example\tintact" in result.stdout
+    assert "custom" not in result.stdout
 
 
-def test_release_deployment_change_is_marked_unverified(tmp_path):
+def test_unknown_deployment_is_rejected(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["run", "custom"])
+    assert result.returncode != 0
+    assert "unknown deployment: custom" in result.stderr
+
+
+def test_release_deployment_change_is_marked_modified(tmp_path):
     root, deployment = runtime_tree(tmp_path, release=True)
     (deployment / "docker-compose.yaml").write_text(
         "services:\n  app:\n    image: busybox:1.36.2\n"
     )
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tcustom/unverified" in result.stdout
+    assert "example\tmodified" in result.stdout
 
 
-def test_release_shared_asset_change_is_marked_unverified(tmp_path):
+def test_release_shared_asset_change_is_marked_modified(tmp_path):
     manifest = minimal_manifest()
     manifest["shared"] = ["base"]
     root, _ = runtime_tree(tmp_path, release=True, manifest=manifest)
     (root / "deployments/base/runtime.env").write_text("ROS_DOMAIN_ID=2\n")
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tcustom/unverified" in result.stdout
+    assert "example\tmodified" in result.stdout
+
+
+def test_modified_release_warns_but_still_runs(tmp_path):
+    root, deployment = runtime_tree(tmp_path, release=True)
+    (deployment / "docker-compose.yaml").write_text(
+        "services:\n  app:\n    image: busybox:1.36.2\n"
+    )
+    bin_dir, _ = fake_docker(tmp_path)
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "has been modified from this release" in result.stderr
+    assert "running: example" in result.stdout
 
 
 def test_duplicate_json_keys_are_rejected(tmp_path):
     root, deployment = runtime_tree(tmp_path)
     text = json.dumps(minimal_manifest())
-    (deployment / "openadkit.json").write_text(text.replace('"name": "example"', '"name": "example", "name": "other"'))
+    (deployment / "deployment.json").write_text(
+        text.replace('"name": "example"', '"name": "example", "name": "other"')
+    )
     result = run_cli(root, ["list"])
     assert "duplicate JSON key" in result.stdout
 
@@ -277,14 +311,8 @@ def test_config_local_env_is_applied_last(tmp_path):
     assert call.index("config.env") < call.index("config.local.env")
 
 
-def test_run_orders_pull_up_and_verify_hook(tmp_path):
-    manifest = minimal_manifest(hooks={"verify": "hooks/verify"})
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    hook_log = tmp_path / "hook-log"
-    executable(
-        deployment / "hooks/verify",
-        f"#!/usr/bin/env bash\nprintf 'verify\\n' >> {json.dumps(str(hook_log))}\n",
-    )
+def test_run_orders_render_daemon_pull_and_up(tmp_path):
+    root, _ = runtime_tree(tmp_path)
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
@@ -293,9 +321,9 @@ def test_run_orders_pull_up_and_verify_hook(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     text = calls.read_text()
-    assert text.index("config --quiet") < text.index("pull --policy missing")
+    assert text.index("config --quiet") < text.index("|info")
+    assert text.index("|info") < text.index("pull --policy missing")
     assert text.index("pull --policy missing") < text.index("up --detach --wait")
-    assert hook_log.read_text() == "verify\n"
 
 
 @pytest.mark.parametrize(
@@ -307,7 +335,7 @@ def test_run_pull_policy_is_explicit_for_up(tmp_path, policy, expects_pull):
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
-        ["run", "example", "--pull", policy, "--skip-verify"],
+        ["run", "example", "--pull", policy],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
@@ -326,129 +354,19 @@ def test_run_resets_declared_one_shot_services(tmp_path):
     bin_dir, calls = fake_docker(tmp_path, configured="app\nmap-check\n")
     result = run_cli(
         root,
-        ["run", "example", "--pull", "never", "--skip-verify"],
+        ["run", "example", "--pull", "never"],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
     assert "rm --stop --force map-check" in calls.read_text()
 
 
-def test_group_selection_reconciles_services_and_applies_feature_environment(
-    tmp_path,
-):
-    groups = {"small": {"services": ["app"]}}
-    features = {
-        "no-sim": {
-            "services": [],
-            "excludeServices": ["simulator"],
-            "environment": {"SCENARIO_SIMULATION": "false"},
-        }
-    }
-    manifest = minimal_manifest(groups=groups, features=features)
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    (deployment / "docker-compose.yaml").write_text(
-        "services:\n  app:\n    image: busybox:1.36.1\n"
-        "  simulator:\n    image: busybox:1.36.1\n"
-    )
-    bin_dir, calls = fake_docker(tmp_path, configured="app\nsimulator\n")
-    result = run_cli(
-        root,
-        [
-            "run",
-            "example",
-            "--group",
-            "small",
-            "--enable",
-            "no-sim",
-            "--pull",
-            "never",
-            "--skip-verify",
-        ],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode == 0, result.stderr
-    text = calls.read_text()
-    assert "false|" in text
-    assert "stop simulator" in text
-    assert "rm --force simulator" in text
-
-
-def test_group_verify_requires_persistent_services(tmp_path):
-    groups = {"small": {"services": ["app"], "verifyServices": ["app"]}}
-    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(groups=groups))
-    bin_dir, _ = fake_docker(tmp_path, running="")
-    result = run_cli(
-        root,
-        ["verify", "example", "--group", "small"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode != 0
-    assert "required service(s) are not running: app" in result.stderr
-
-
-def test_cloud_group_skips_edge_only_data(tmp_path):
-    groups = {
-        "cloud": {"services": ["app"]},
-        "edge": {"services": ["app"]},
-    }
-    data = [
-        {
-            "name": "edge-data",
-            "kind": "files",
-            "destinationEnv": "MAP_PATH",
-            "files": [
-                {
-                    "path": "required.txt",
-                    "url": "http://127.0.0.1:1/unreachable",
-                    "sha256": "0" * 64,
-                }
-            ],
-            "requiredFiles": ["required.txt"],
-            "groups": ["edge"],
-        }
-    ]
-    root, _ = runtime_tree(
-        tmp_path, manifest=minimal_manifest(groups=groups, data=data)
-    )
-    bin_dir, _ = fake_docker(tmp_path, configured="app\n")
-    result = run_cli(
-        root,
-        [
-            "run",
-            "example",
-            "--group",
-            "cloud",
-            "--pull",
-            "never",
-            "--skip-verify",
-        ],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode == 0, result.stderr
-    assert not (tmp_path / "home/data/example").exists()
-
-
-def test_verify_failure_leaves_stack_running(tmp_path):
-    manifest = minimal_manifest(hooks={"verify": "hooks/verify"})
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    executable(deployment / "hooks/verify", "#!/usr/bin/env bash\nexit 9\n")
-    bin_dir, calls = fake_docker(tmp_path)
-    result = run_cli(
-        root,
-        ["run", "example"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode != 0
-    assert " down " not in f" {calls.read_text()} "
-    assert " stop " not in f" {calls.read_text()} "
-
-
-def test_down_removes_project_but_not_volumes(tmp_path):
+def test_stop_removes_project_but_not_volumes(tmp_path):
     root, _ = runtime_tree(tmp_path)
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
-        ["down", "example"],
+        ["stop", "example"],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
@@ -456,23 +374,11 @@ def test_down_removes_project_but_not_volumes(tmp_path):
     assert "--volumes" not in calls.read_text()
 
 
-def test_setup_development_is_rejected_in_release_before_sudo(tmp_path):
-    root, _ = runtime_tree(tmp_path, release=True)
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    sudo_log = tmp_path / "sudo-log"
-    executable(
-        bin_dir / "sudo",
-        f"#!/usr/bin/env bash\nprintf called > {json.dumps(str(sudo_log))}\n",
-    )
-    result = run_cli(
-        root,
-        ["setup", "--development"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
+def test_setup_rejects_unknown_development_option(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["setup", "--development"])
     assert result.returncode != 0
-    assert "requires a Git source checkout" in result.stderr
-    assert not sudo_log.exists()
+    assert "unknown setup option: --development" in result.stderr
 
 
 def test_forced_docker_install_is_restricted_to_ci(tmp_path):
@@ -498,14 +404,6 @@ def test_forced_docker_install_is_restricted_to_ci(tmp_path):
     assert not sudo_log.exists()
 
 
-def test_hook_with_sudo_is_rejected(tmp_path):
-    manifest = minimal_manifest(hooks={"preflight": "hooks/preflight"})
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    executable(deployment / "hooks/preflight", "#!/usr/bin/env bash\nsudo true\n")
-    result = run_cli(root, ["list"])
-    assert "must not invoke sudo" in result.stdout
-
-
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *_args):
         pass
@@ -528,7 +426,7 @@ def http_files(tmp_path):
         thread.join()
 
 
-def test_data_zip_is_checksum_verified_and_published_atomically(tmp_path, http_files):
+def test_fetch_zip_is_checksum_verified_and_published_atomically(tmp_path, http_files):
     directory, base_url = http_files
     archive = directory / "data.zip"
     with zipfile.ZipFile(archive, "w") as output:
@@ -546,12 +444,12 @@ def test_data_zip_is_checksum_verified_and_published_atomically(tmp_path, http_f
         }
     ]
     root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=data))
-    result = run_cli(root, ["data", "example"])
+    result = run_cli(root, ["fetch", "example"])
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "home/data/example/required.txt").read_text() == "ok"
 
 
-def test_data_checksum_failure_preserves_existing_data(tmp_path, http_files):
+def test_fetch_checksum_failure_preserves_existing_data(tmp_path, http_files):
     directory, base_url = http_files
     archive = directory / "data.zip"
     with zipfile.ZipFile(archive, "w") as output:
@@ -571,7 +469,7 @@ def test_data_checksum_failure_preserves_existing_data(tmp_path, http_files):
     target = tmp_path / "home/data/example"
     target.mkdir(parents=True)
     (target / "required.txt").write_text("original")
-    result = run_cli(root, ["data", "example", "--force"])
+    result = run_cli(root, ["fetch", "example", "--force"])
     assert result.returncode != 0
     assert (target / "required.txt").read_text() == "original"
 
@@ -594,17 +492,14 @@ def test_unsafe_zip_member_is_rejected(tmp_path, http_files):
         }
     ]
     root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=data))
-    result = run_cli(root, ["data", "example"])
+    result = run_cli(root, ["fetch", "example"])
     assert result.returncode != 0
     assert "unsafe ZIP member" in result.stderr
     assert not (tmp_path / "home/data/example").exists()
 
 
-@pytest.mark.parametrize(
-    "command",
-    ("validate", "data", "run", "verify", "status", "logs", "stop", "down"),
-)
-def test_runtime_commands_accept_ros_distro(command):
+@pytest.mark.parametrize("command", ("validate", "fetch", "run"))
+def test_selected_commands_accept_ros_distro(command):
     result = subprocess.run(
         [str(ENTRYPOINT), command, "--help"],
         text=True,
@@ -614,44 +509,43 @@ def test_runtime_commands_accept_ros_distro(command):
     assert "--ros-distro" in result.stdout
 
 
-def test_repository_injects_selected_distro_feature_and_component_environment(
-    tmp_path,
-):
-    features = {
-        "tuned": {
-            "services": [],
-            "excludeServices": [],
-            "verifyServices": [],
-            "environment": {"FEATURE_VALUE": "feature-value"},
-            "requiredEnv": ["FEATURE_VALUE"],
-        }
-    }
-    manifest = minimal_manifest(features=features)
+@pytest.mark.parametrize("command", ("status", "logs", "stop"))
+def test_operational_commands_do_not_take_selection_flags(command):
+    result = subprocess.run(
+        [str(ENTRYPOINT), command, "--help"],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "--ros-distro" not in result.stdout
+    assert "--gpu" not in result.stdout
+
+
+def test_repository_injects_selected_distro_and_component_environment(tmp_path):
+    manifest = minimal_manifest()
     manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
-    manifest["distroEnvironment"] = {
-        "jazzy": {"DISTRO_VALUE": "jazzy-value"}
-    }
+    manifest["distroEnvironment"] = {"jazzy": {"DISTRO_VALUE": "jazzy-value"}}
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
-        ["validate", "example", "--ros-distro", "jazzy", "--enable", "tuned"],
+        ["validate", "example", "--ros-distro", "jazzy"],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
     assert (
-        "|jazzy|jazzy-value|feature-value|"
+        "jazzy|jazzy-value|"
         "ghcr.io/autowarefoundation/openadkit:api-jazzy|"
         "ghcr.io/autowarefoundation/openadkit:localization-mapping-jazzy|"
         in calls.read_text()
     )
 
 
-def test_context_default_ros_distro_is_used(tmp_path):
+def test_kit_default_ros_distro_is_used(tmp_path):
     root, _ = runtime_tree(tmp_path)
-    context = json.loads((root / "openadkit.d/context.json").read_text())
-    context["defaultRosDistro"] = "jazzy"
-    (root / "openadkit.d/context.json").write_text(json.dumps(context))
+    kit = json.loads((root / "openadkit.json").read_text())
+    kit["defaultRosDistro"] = "jazzy"
+    (root / "openadkit.json").write_text(json.dumps(kit))
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
@@ -659,18 +553,18 @@ def test_context_default_ros_distro_is_used(tmp_path):
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
-    assert "|jazzy|" in calls.read_text()
+    assert calls.read_text().startswith("jazzy|")
 
 
 def test_release_injects_exact_component_references(tmp_path):
     manifest = minimal_manifest()
     manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     root, _ = runtime_tree(tmp_path, release=True, manifest=manifest)
-    context_path = root / "openadkit.d/context.json"
-    current = json.loads(context_path.read_text())
+    kit_path = root / "openadkit.json"
+    current = json.loads(kit_path.read_text())
     exact = f"registry.example/api@sha256:{'a' * 64}"
     current["images"]["humble"]["api"] = exact
-    context_path.write_text(json.dumps(current))
+    kit_path.write_text(json.dumps(current))
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
@@ -678,16 +572,16 @@ def test_release_injects_exact_component_references(tmp_path):
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
-    fields = calls.read_text().split("|", 6)
-    assert fields[4] == exact
+    fields = calls.read_text().split("|", 5)
+    assert fields[2] == exact
 
 
 def test_release_rejects_mutable_component_reference(tmp_path):
     root, _ = runtime_tree(tmp_path, release=True)
-    context_path = root / "openadkit.d/context.json"
-    current = json.loads(context_path.read_text())
+    kit_path = root / "openadkit.json"
+    current = json.loads(kit_path.read_text())
     current["images"]["humble"]["api"] = "registry.example/api:humble"
-    context_path.write_text(json.dumps(current))
+    kit_path.write_text(json.dumps(current))
     result = run_cli(root, ["list"])
     assert result.returncode != 0
     assert "digest-pinned image references" in result.stderr
@@ -696,10 +590,10 @@ def test_release_rejects_mutable_component_reference(tmp_path):
 def test_missing_required_release_target_fails_before_compose(tmp_path):
     manifest = minimal_manifest()
     root, _ = runtime_tree(tmp_path, release=True, manifest=manifest)
-    context_path = root / "openadkit.d/context.json"
-    current = json.loads(context_path.read_text())
+    kit_path = root / "openadkit.json"
+    current = json.loads(kit_path.read_text())
     current["images"] = {"humble": {}}
-    context_path.write_text(json.dumps(current))
+    kit_path.write_text(json.dumps(current))
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
@@ -724,7 +618,7 @@ def test_repository_component_image_override_is_preserved(tmp_path):
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
-    assert calls.read_text().split("|", 6)[4] == exact
+    assert calls.read_text().split("|", 5)[2] == exact
 
 
 def test_validate_renders_without_accessing_docker_daemon(tmp_path):
@@ -740,29 +634,7 @@ def test_validate_renders_without_accessing_docker_daemon(tmp_path):
     assert "|info\n" not in calls.read_text()
 
 
-def test_run_checks_daemon_before_preflight_and_mutation(tmp_path):
-    manifest = minimal_manifest(hooks={"preflight": "hooks/preflight"})
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    bin_dir, calls = fake_docker(tmp_path)
-    snapshot = tmp_path / "preflight-snapshot"
-    executable(
-        deployment / "hooks/preflight",
-        "#!/usr/bin/env bash\n"
-        f"/bin/cp -- {json.dumps(str(calls))} {json.dumps(str(snapshot))}\n",
-    )
-    result = run_cli(
-        root,
-        ["run", "example", "--pull", "never", "--skip-verify"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode == 0, result.stderr
-    preflight_calls = snapshot.read_text()
-    assert preflight_calls.index("config --quiet") < preflight_calls.index("|info")
-    assert " pull " not in f" {preflight_calls} "
-    assert " up " not in f" {preflight_calls} "
-
-
-def test_daemon_failure_prevents_preflight_data_and_container_commands(tmp_path):
+def test_daemon_failure_prevents_data_and_container_commands(tmp_path):
     data_resources = [
         {
             "name": "dataset",
@@ -778,15 +650,7 @@ def test_daemon_failure_prevents_preflight_data_and_container_commands(tmp_path)
             "requiredFiles": ["required.txt"],
         }
     ]
-    manifest = minimal_manifest(
-        hooks={"preflight": "hooks/preflight"}, data=data_resources
-    )
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    hook_log = tmp_path / "hook-log"
-    executable(
-        deployment / "hooks/preflight",
-        f"#!/usr/bin/env bash\nprintf called > {json.dumps(str(hook_log))}\n",
-    )
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=data_resources))
     bin_dir, calls = fake_docker(tmp_path, daemon_returncode=1)
     result = run_cli(
         root,
@@ -795,13 +659,10 @@ def test_daemon_failure_prevents_preflight_data_and_container_commands(tmp_path)
     )
     assert result.returncode != 0
     assert "could not access the Docker daemon" in result.stderr
-    assert not hook_log.exists()
     assert not (tmp_path / "home/data").exists()
     text = calls.read_text()
     assert " pull " not in f" {text} "
     assert " up " not in f" {text} "
-    assert " stop " not in f" {text} "
-    assert " rm " not in f" {text} "
 
 
 def test_missing_gpu_runtime_prevents_data_and_container_commands(tmp_path):
@@ -836,40 +697,6 @@ def test_missing_gpu_runtime_prevents_data_and_container_commands(tmp_path):
     assert result.returncode != 0
     assert "NVIDIA Container Toolkit is unavailable" in result.stderr
     assert not (tmp_path / "home/data/gpu").exists()
-    text = calls.read_text()
-    assert " pull " not in f" {text} "
-    assert " up " not in f" {text} "
-
-
-def test_preflight_failure_prevents_data_and_container_commands(tmp_path):
-    data_resources = [
-        {
-            "name": "dataset",
-            "kind": "files",
-            "destinationEnv": "MAP_PATH",
-            "files": [
-                {
-                    "path": "required.txt",
-                    "url": "http://127.0.0.1:1/unreachable",
-                    "sha256": "0" * 64,
-                }
-            ],
-            "requiredFiles": ["required.txt"],
-        }
-    ]
-    manifest = minimal_manifest(
-        hooks={"preflight": "hooks/preflight"}, data=data_resources
-    )
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    executable(deployment / "hooks/preflight", "#!/usr/bin/env bash\nexit 8\n")
-    bin_dir, calls = fake_docker(tmp_path)
-    result = run_cli(
-        root,
-        ["run", "example"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode != 0
-    assert not (tmp_path / "home/data").exists()
     text = calls.read_text()
     assert " pull " not in f" {text} "
     assert " up " not in f" {text} "
@@ -910,45 +737,13 @@ def test_all_data_targets_are_checked_before_first_download(tmp_path):
     )
     incomplete = tmp_path / "home/data/second"
     incomplete.mkdir(parents=True)
-    result = run_cli(root, ["data", "example"])
+    result = run_cli(root, ["fetch", "example"])
     assert result.returncode != 0
     assert "incomplete data" in result.stderr
     assert not (tmp_path / "home/data/first").exists()
 
 
-def test_data_needs_no_docker_and_skips_gpu_only_resources(tmp_path):
-    resources = [
-        {
-            "name": "gpu-dataset",
-            "kind": "files",
-            "destinationEnv": "MAP_PATH",
-            "files": [
-                {
-                    "path": "required.txt",
-                    "url": "http://127.0.0.1:1/unreachable",
-                    "sha256": "0" * 64,
-                }
-            ],
-            "requiredFiles": ["required.txt"],
-            "gpu": True,
-        }
-    ]
-    manifest = minimal_manifest(data=resources)
-    manifest["requirements"]["gpu"] = "optional"
-    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
-    bin_dir, calls = fake_docker(tmp_path, config_returncode=99)
-    result = run_cli(
-        root,
-        ["data", "example", "--ros-distro", "jazzy"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode == 0, result.stderr
-    assert not calls.exists()
-    assert not (tmp_path / "home/data").exists()
-
-
-def test_gpu_data_is_selected_with_gpu_without_docker(tmp_path, http_files):
+def test_fetch_includes_gpu_data_without_docker(tmp_path, http_files):
     directory, base_url = http_files
     payload = directory / "required.txt"
     payload.write_text("gpu data")
@@ -977,12 +772,43 @@ def test_gpu_data_is_selected_with_gpu_without_docker(tmp_path, http_files):
     bin_dir, calls = fake_docker(tmp_path, config_returncode=99)
     result = run_cli(
         root,
-        ["data", "example", "--gpu"],
+        ["fetch", "example"],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "home/data/gpu/required.txt").read_text() == "gpu data"
     assert not calls.exists()
+
+
+def test_run_without_gpu_skips_gpu_only_data(tmp_path):
+    resources = [
+        {
+            "name": "gpu-dataset",
+            "kind": "files",
+            "destinationEnv": "MAP_PATH",
+            "files": [
+                {
+                    "path": "required.txt",
+                    "url": "http://127.0.0.1:1/unreachable",
+                    "sha256": "0" * 64,
+                }
+            ],
+            "requiredFiles": ["required.txt"],
+            "gpu": True,
+        }
+    ]
+    manifest = minimal_manifest(data=resources)
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    bin_dir, _ = fake_docker(tmp_path)
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / "home/data").exists()
 
 
 def test_relative_data_destination_is_rejected_before_download(tmp_path):
@@ -1005,7 +831,7 @@ def test_relative_data_destination_is_rejected_before_download(tmp_path):
         tmp_path, manifest=minimal_manifest(data=resources)
     )
     (deployment / "config.env").write_text("MAP_PATH=relative/data\n")
-    result = run_cli(root, ["data", "example"])
+    result = run_cli(root, ["fetch", "example"])
     assert result.returncode != 0
     assert "must be absolute after HOME expansion" in result.stderr
     assert not (root / "relative").exists()
@@ -1042,35 +868,6 @@ def test_validate_rejects_active_relative_data_destination_before_compose(tmp_pa
     assert not calls.exists()
 
 
-def test_verification_defaults_to_all_selected_services(tmp_path):
-    manifest = minimal_manifest()
-    manifest["compose"].pop("verifyServices")
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
-    bin_dir, _ = fake_docker(tmp_path, running="")
-    result = run_cli(
-        root,
-        ["verify", "example"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode != 0
-    assert "required service(s) are not running: app" in result.stderr
-
-
-def test_explicit_verification_must_be_subset_before_compose(tmp_path):
-    manifest = minimal_manifest()
-    manifest["compose"]["verifyServices"] = ["other"]
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
-    bin_dir, calls = fake_docker(tmp_path)
-    result = run_cli(
-        root,
-        ["validate", "example"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode != 0
-    assert "verification service(s) are not selected: other" in result.stderr
-    assert not calls.exists()
-
-
 def test_unknown_manifest_service_fails_before_data_pull_or_up(tmp_path):
     resources = [
         {
@@ -1089,7 +886,6 @@ def test_unknown_manifest_service_fails_before_data_pull_or_up(tmp_path):
     ]
     manifest = minimal_manifest(data=resources)
     manifest["compose"]["services"] = ["typo"]
-    manifest["compose"]["verifyServices"] = ["typo"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path, configured="app\n")
     result = run_cli(
@@ -1105,37 +901,14 @@ def test_unknown_manifest_service_fails_before_data_pull_or_up(tmp_path):
     assert " up " not in f" {text} "
 
 
-@pytest.mark.parametrize("scope", ("deployment", "group", "feature"))
-def test_ros_distro_constraints_fail_before_compose(tmp_path, scope):
-    groups = None
-    features = None
-    arguments = ["validate", "example", "--ros-distro", "jazzy"]
+def test_ros_distro_constraints_fail_before_compose(tmp_path):
     manifest = minimal_manifest()
-    if scope == "deployment":
-        manifest["requirements"]["rosDistros"] = ["humble"]
-    elif scope == "group":
-        groups = {
-            "small": {"services": ["app"], "rosDistros": ["humble"]}
-        }
-        manifest = minimal_manifest(groups=groups)
-        arguments.extend(("--group", "small"))
-    else:
-        features = {
-            "humble-only": {
-                "services": [],
-                "excludeServices": [],
-                "verifyServices": [],
-                "environment": {},
-                "rosDistros": ["humble"],
-            }
-        }
-        manifest = minimal_manifest(features=features)
-        arguments.extend(("--enable", "humble-only"))
+    manifest["requirements"]["rosDistros"] = ["humble"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
-        arguments,
+        ["validate", "example", "--ros-distro", "jazzy"],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode != 0
@@ -1188,41 +961,27 @@ def test_gpu_architecture_constraint_fails_before_compose(tmp_path):
     assert not calls.exists()
 
 
-@pytest.mark.parametrize(
-    "groups,services,error",
-    (
-        ({}, [], "compose.services must not be empty"),
-        ({"small": {"services": []}}, ["app"], "group small.services must not be empty"),
-    ),
-)
-def test_service_definitions_must_be_nonempty(tmp_path, groups, services, error):
-    manifest = minimal_manifest(groups=groups)
-    manifest["compose"]["groups"] = groups
-    manifest["compose"]["services"] = services
+def test_empty_services_are_rejected(tmp_path):
+    manifest = minimal_manifest()
+    manifest["compose"]["services"] = []
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     result = run_cli(root, ["list"])
     assert result.returncode == 0
-    assert error in result.stdout
+    assert "compose.services must not be empty" in result.stdout
 
 
-def test_before_run_hook_is_rejected(tmp_path):
-    manifest = minimal_manifest(hooks={"beforeRun": "hooks/before-run"})
-    root, deployment = runtime_tree(tmp_path, manifest=manifest)
-    executable(deployment / "hooks/before-run", "#!/usr/bin/env bash\ntrue\n")
-    result = run_cli(root, ["list"])
-    assert result.returncode == 0
-    assert "unknown hooks field(s): beforeRun" in result.stdout
-
-
-def test_status_uses_selected_ros_distro_without_requiring_group(tmp_path):
-    groups = {"small": {"services": ["app"]}}
-    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(groups=groups))
+def test_status_includes_gpu_overlay_without_flags(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
         root,
-        ["status", "example", "--ros-distro", "jazzy"],
+        ["status", "example"],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
-    assert "|jazzy|" in calls.read_text()
-    assert calls.read_text().rstrip().endswith(" ps")
+    text = calls.read_text()
+    assert "docker-compose.gpu.yaml" in text
+    assert text.rstrip().endswith(" ps")

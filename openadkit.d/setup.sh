@@ -2,7 +2,6 @@
 set -euo pipefail
 
 INSTALL_GPU=false
-INSTALL_DEVELOPMENT=false
 RUN_VERIFY=false
 TARGET_USER=${SUDO_USER:-$(id -un)}
 FORCE_DOCKER_INSTALL=${OPENADKIT_CI_FORCE_DOCKER_INSTALL:-false}
@@ -17,14 +16,12 @@ shift
 while (($#)); do
   case "$1" in
     --gpu) INSTALL_GPU=true ;;
-    --development) INSTALL_DEVELOPMENT=true ;;
     --verify) RUN_VERIFY=true ;;
     -h|--help)
       cat <<'EOF'
-Usage: ./openadkit setup [--gpu] [--development] [--verify]
+Usage: ./openadkit setup [--gpu] [--verify]
 
-Installs the Ubuntu host dependencies needed to run Open AD Kit. Development
-dependencies are available only from a source checkout.
+Installs the Ubuntu host dependencies needed to run Open AD Kit.
 EOF
       exit 0
       ;;
@@ -36,6 +33,9 @@ done
 if [[ $EUID -eq 0 ]]; then
   fail "run ./openadkit setup as your normal user; it requests sudo when needed"
 fi
+if [[ $FORCE_DOCKER_INSTALL == true && ${CI:-false} != true ]]; then
+  fail "OPENADKIT_CI_FORCE_DOCKER_INSTALL is restricted to disposable CI hosts"
+fi
 [[ -r /etc/os-release ]] || fail "only Ubuntu hosts are supported"
 # shellcheck disable=SC1091
 source /etc/os-release
@@ -44,14 +44,6 @@ case "$(uname -m)" in
   x86_64|amd64|aarch64|arm64) ;;
   *) fail "unsupported architecture: $(uname -m)" ;;
 esac
-if [[ $FORCE_DOCKER_INSTALL == true && ${CI:-false} != true ]]; then
-  fail "OPENADKIT_CI_FORCE_DOCKER_INSTALL is restricted to disposable CI hosts"
-fi
-
-ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
-if [[ $INSTALL_DEVELOPMENT == true && ! -f "$ROOT/components/docker-bake.hcl" ]]; then
-  fail "--development requires a Git source checkout"
-fi
 
 sudo -v
 
@@ -234,12 +226,6 @@ log "installing Open AD Kit runtime dependencies"
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends ca-certificates curl git gzip python3 python3-venv tar unzip
 install_docker
-
-if [[ $INSTALL_DEVELOPMENT == true ]]; then
-  sudo apt-get install -y --no-install-recommends jq pipx python3-yaml
-  sudo -u "$TARGET_USER" env HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)" \
-    pipx install --force vcs2l
-fi
 
 if [[ $INSTALL_GPU == true ]]; then
   install_gpu

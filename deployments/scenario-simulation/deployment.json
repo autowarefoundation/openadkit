@@ -9,9 +9,7 @@
     "profiles": [],
     "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer", "scenario_simulator"],
     "resetServices": ["map-check", "scenario_simulator"],
-    "waitTimeout": 420,
-    "groups": {},
-    "features": {}
+    "waitTimeout": 420
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],
@@ -58,9 +56,7 @@
           "sha256": "68df5e92c9bb174178b018f5e10561b6c9019e14decdd2a02a9aebd784b181ab"
         }
       ],
-      "generatedFiles": {},
       "requiredFiles": ["lanelet2_map.osm", "pointcloud_map.pcd", "global_map_center.pcd.yaml", "lanelet2_map_provider.osm.yaml", "map.map_publisher.yaml"]
     }
-  ],
-  "hooks": {}
+  ]
 }

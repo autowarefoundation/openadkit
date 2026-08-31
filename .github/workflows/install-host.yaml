@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'openadkit'
+      - 'openadkit.json'
       - 'openadkit.d/**'
       - 'deployments/**'
       - '.github/scripts/tests/test_openadkit_cli.py'

@@ -1,6 +1,0 @@
-{
-  "schemaVersion": 1,
-  "kind": "repository",
-  "defaultRosDistro": "humble",
-  "imagePrefixComponent": "ghcr.io/autowarefoundation/openadkit"
-}

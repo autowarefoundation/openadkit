@@ -35,7 +35,7 @@ services:
           fi
         done
         if [[ "$${missing}" -ne 0 ]]; then
-          echo "map-check: fetch sample data with ./openadkit data <deployment>" >&2
+          echo "map-check: fetch sample data with ./openadkit fetch <deployment>" >&2
           exit 1
         fi
         echo "map-check: ok (${LANELET2_MAP_FILE}, ${POINTCLOUD_MAP_FILE})"

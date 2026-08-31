@@ -48,8 +48,7 @@ A source checkout also contains `components/`, CI, tests, and development tools.
 ```
 
 Run setup as your normal user. It requests `sudo` only for host changes. CPU is
-the default; add `--gpu` for NVIDIA deployments or `--development` in a source
-checkout that will build images locally. `--gpu` also installs NVIDIA
+the default; add `--gpu` for NVIDIA deployments. `--gpu` also installs NVIDIA
 OpenGL/Vulkan libraries needed for CARLA.
 
 --8<-- "includes/docker-group-activation.md"
@@ -99,7 +98,6 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 ./openadkit status planning-simulation
 ./openadkit logs planning-simulation --follow
 ./openadkit stop planning-simulation
-./openadkit down planning-simulation
 ```
 
 Use `deployments/<name>/config.local.env` for host-specific settings. Source

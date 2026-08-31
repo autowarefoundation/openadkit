@@ -53,10 +53,10 @@ Initialization takes about 90 seconds. The runner waits up to
 ## Stop and Recover
 
 ```bash
-./openadkit down scenario-simulation
+./openadkit stop scenario-simulation
 ```
 
 Parameter overrides live in `config/mrm_handler.param.yaml` and
 `config/default_adapi.param.yaml`. To replace missing map data, run
-`./openadkit data scenario-simulation --force`. For common issues, see
+`./openadkit fetch scenario-simulation --force`. For common issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

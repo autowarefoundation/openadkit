@@ -985,3 +985,59 @@ def test_status_includes_gpu_overlay_without_flags(tmp_path):
     text = calls.read_text()
     assert "docker-compose.gpu.yaml" in text
     assert text.rstrip().endswith(" ps")
+
+
+def _host_architecture():
+    machine = platform.machine().lower()
+    if machine in ("x86_64", "amd64"):
+        return "amd64"
+    if machine in ("aarch64", "arm64"):
+        return "arm64"
+    return machine
+
+
+def test_repository_inventory_includes_carla_and_excludes_zenoh():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "list"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "planning-simulation\tsource" in result.stdout
+    assert "logging-simulation\tsource" in result.stdout
+    assert "scenario-simulation\tsource" in result.stdout
+    assert "carla-simulation\tsource" in result.stdout
+    assert "zenoh" not in result.stdout
+
+
+def test_carla_requires_gpu():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "validate", "carla-simulation"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    if _host_architecture() == "amd64":
+        assert "requires --gpu" in result.stderr
+
+
+def test_carla_is_humble_only():
+    if _host_architecture() != "amd64":
+        pytest.skip("carla-simulation is amd64-only")
+    result = subprocess.run(
+        [
+            str(ENTRYPOINT),
+            "validate",
+            "carla-simulation",
+            "--gpu",
+            "--ros-distro",
+            "jazzy",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "does not support ROS distro jazzy" in result.stderr

@@ -65,8 +65,18 @@ systemctl --failed --no-legend 2>/dev/null | head -20
 # stores look like broken ones. The kernel config is not the problem:
 # NF_TABLES_INET is built in and every module named below ships in the
 # injected tree -- only their residency when nft runs is.
+# nft_fib_* belongs in this list for the same reason as the rest, and its
+# absence here was an inconsistency with kernel/autosd.config, which states
+# the requirement outright: netavark builds its port-forwarding entry points
+# as `fib daddr type local jump NETAVARK-HOSTPORT-DNAT` in both prerouting
+# and output, so without the fib expression resident the same atomic apply
+# is rejected whole -- and that reads as GATE2/3/4 failing too, because
+# their capability probe has to start a container. inet is the family
+# netavark's table lives in; it resolves fib through the two address-family
+# backends, so all three are loaded.
 if ! modprobe -a overlay veth bridge br_netfilter btrfs nf_tables \
-        nf_conntrack nf_nat nft_chain_nat nft_nat nft_masq nft_ct; then
+        nf_conntrack nf_nat nft_chain_nat nft_nat nft_masq nft_ct \
+        nft_fib_ipv4 nft_fib_ipv6 nft_fib_inet; then
     echo GATE1_MODPROBE_FAIL
 fi
 
@@ -179,6 +189,18 @@ nft_probe() {
     _p_try EXPR_META_MARK_SET 'table inet nftprobe {
   chain c {
     meta mark set 0x00000001
+  }
+}'
+    # fib, in the exact shape netavark writes it (see the modprobe list at
+    # GATE1). Probing masquerade and dnat without this one would leave the
+    # single most fragile expression in netavark's ruleset untested: it is
+    # the only one that needs a module the container tooling never names,
+    # and a missing fib module presents as three broken container stores
+    # rather than as a firewall fault.
+    _p_try EXPR_FIB 'table inet nftprobe {
+  chain c {
+    type nat hook prerouting priority dstnat; policy accept;
+    fib daddr type local accept
   }
 }'
     _p_try EXPR_MASQ 'table inet nftprobe {

@@ -22,6 +22,9 @@
     },
     "scenario-simulation": {
       "path": "deployments/scenario-simulation"
+    },
+    "carla-simulation": {
+      "path": "deployments/carla-simulation"
     }
   }
 }

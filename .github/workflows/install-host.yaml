@@ -53,3 +53,4 @@ jobs:
             ./openadkit validate logging-simulation \
               --ros-distro "${ros_distro}" --gpu
           done
+          ./openadkit validate carla-simulation --gpu --ros-distro humble

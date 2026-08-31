@@ -103,6 +103,7 @@ jobs:
             ./openadkit validate logging-simulation \
               --ros-distro "${ros_distro}" --gpu
           done
+          ./openadkit validate carla-simulation --gpu --ros-distro humble
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3

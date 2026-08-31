@@ -26,7 +26,7 @@ filters and namespaces in `config/zenoh-bridge-ros2dds.json5`.
 
 ```bash
 ./openadkit setup --verify
-./openadkit data scenario-simulation
+./openadkit fetch scenario-simulation
 cd deployments/zenoh-bridge
 export REMOTE_PASSWORD=replace-me
 ```
@@ -109,7 +109,7 @@ then use the movement keys.
 If a bridge is not ready, inspect the helper logs. Host port **6081** must be
 free; Zenoh ports **7447** and **7448** stay inside the Compose networks.
 Re-fetch the map from the repository root with
-`./openadkit data scenario-simulation --force`.
+`./openadkit fetch scenario-simulation --force`.
 
 The `autoware` service uses the digest-pinned upstream image declared directly
 in `docker-compose.yaml`.

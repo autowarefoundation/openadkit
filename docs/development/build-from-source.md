@@ -55,7 +55,7 @@ git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 
 # 2. Install host dependencies
-./openadkit setup --development --verify
+./openadkit setup --verify
 ```
 
 --8<-- "includes/docker-group-activation.md"

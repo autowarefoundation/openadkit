@@ -10,8 +10,9 @@ and supported platforms.
 ## Base + Overlay Pattern
 
 Create `deployments/<your-deployment>/` with a Compose file, complete
-`config.env`, and an `openadkit.json` manifest. Base-backed deployments
-`include` `deployments/base/docker-compose.yaml` and declare the shared assets:
+`config.env`, and a `deployment.json` manifest. Then add it to the root
+`openadkit.json` inventory. Base-backed deployments `include`
+`deployments/base/docker-compose.yaml` and declare the shared assets:
 
 ```json
 {
@@ -24,26 +25,22 @@ Create `deployments/<your-deployment>/` with a Compose file, complete
     "gpuFiles": [],
     "profiles": [],
     "services": ["map", "planning", "visualizer"],
-    "verifyServices": ["map", "planning", "visualizer"],
     "resetServices": [],
-    "waitTimeout": 300,
-    "groups": {},
-    "features": {}
+    "waitTimeout": 300
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],
     "rosDistros": ["humble", "jazzy"],
     "gpu": "none"
   },
-  "data": [],
-  "hooks": {}
+  "data": []
 }
 ```
 
-`./openadkit list` discovers valid manifests dynamically and marks additions as
-`custom/unverified`. The base's `runtime.env` is loaded inside containers and
-should contain only ROS/DDS runtime values. See [Deployments](index.md) for the
-operator model.
+Without an inventory entry, `./openadkit run your-deployment` fails with
+`unknown deployment`. Direct Compose remains available. The base's
+`runtime.env` is loaded inside containers and should contain only ROS/DDS
+runtime values. See [Deployments](index.md) for the operator model.
 
 ## Core Patterns
 
@@ -103,7 +100,7 @@ From the source checkout or release bundle root:
 ./openadkit run your-deployment
 ./openadkit status your-deployment
 ./openadkit logs your-deployment --follow
-./openadkit down your-deployment
+./openadkit stop your-deployment
 ```
 
 See [Logging Simulation](logging-simulation/index.md) for a GPU overlay and

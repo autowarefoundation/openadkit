@@ -34,11 +34,11 @@ for the RViz workflow.
 ./openadkit status planning-simulation
 ./openadkit logs planning-simulation --follow
 ./openadkit stop planning-simulation
-./openadkit down planning-simulation
+./openadkit stop planning-simulation
 ```
 
 Put local overrides in
 `deployments/planning-simulation/config.local.env`. To replace missing or
-incomplete map data, run `./openadkit data planning-simulation --force`. For
+incomplete map data, run `./openadkit fetch planning-simulation --force`. For
 common Docker and visualizer issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

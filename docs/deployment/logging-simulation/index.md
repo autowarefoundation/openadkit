@@ -54,11 +54,11 @@ before starting.
 ```bash
 ./openadkit status logging-simulation
 ./openadkit logs logging-simulation --follow
-./openadkit down logging-simulation
+./openadkit stop logging-simulation
 ```
 
 The rosbag service uses a digest-pinned upstream `autoware:universe` image in a
 release. Put local overrides in
 `deployments/logging-simulation/config.local.env`. To replace missing sample
-data, run `./openadkit data logging-simulation --force`. For common issues, see
+data, run `./openadkit fetch logging-simulation --force`. For common issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

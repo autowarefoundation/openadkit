@@ -11,6 +11,8 @@ on:
       - "**/*.svg"
       - "**/*.png"
       - "**/*.jpg"
+      - "docs/.pages"
+      - "docs/**/.pages"
       - "docs/assets/**"
   workflow_dispatch:
 

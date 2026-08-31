@@ -3,13 +3,13 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question
-    url: https://github.com/autowarefoundation/autoware/discussions/new?category=q-a
+    url: https://github.com/autowarefoundation/openadkit/discussions/new?category=q-a
     about: Ask a question
 
   - name: Feature request
-    url: https://github.com/autowarefoundation/autoware/discussions/new?category=feature-requests
+    url: https://github.com/autowarefoundation/openadkit/discussions/new?category=feature-requests
     about: Send a feature request
 
   - name: Idea
-    url: https://github.com/autowarefoundation/autoware/discussions/new?category=ideas
+    url: https://github.com/autowarefoundation/openadkit/discussions/new?category=ideas
     about: Post an idea

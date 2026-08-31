@@ -1,0 +1,12 @@
+# yamllint config, used by the yamllint job in .github/workflows/lint.yaml.
+# Defaults apply except for style rules that conflict with this repo's
+# conventions (long workflow expressions, GitHub's `on:` key).
+extends: default
+
+rules:
+  line-length: disable
+  document-start: disable
+  truthy:
+    check-keys: false # GitHub workflows use `on:` as a mapping key
+  comments:
+    min-spaces-from-content: 1

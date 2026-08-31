@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "${TEST_DIR}/.." && pwd)"
 SUT="${SCRIPT_DIR}/report_manifests.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "${work}"' EXIT

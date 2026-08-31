@@ -1,6 +1,11 @@
-* ryohsuke.mitsudome@tier4.jp oguzkaganozt@gmail.com
+# Fallback so top-level files (README, CONTRIBUTING, LICENSE, lint configs,
+# openadkit entry point, etc.) are never left without a reviewer.
+* @mitsudome-r @oguzkaganozt
 
-.devcontainer/** oguzkaganozt@gmail.com yutaka.kondo@tier4.jp
-.github/** oguzkaganozt@gmail.com yutaka.kondo@tier4.jp
-ansible/** oguzkaganozt@gmail.com yutaka.kondo@tier4.jp
-docker/** oguzkaganozt@gmail.com yutaka.kondo@tier4.jp
+docs/** @mitsudome-r @oguzkaganozt
+components/** @mitsudome-r @oguzkaganozt
+deployments/** @mitsudome-r @oguzkaganozt
+platforms/** @mitsudome-r @oguzkaganozt
+
+.github/** @oguzkaganozt @youtalk
+/mkdocs.yaml @mitsudome-r @oguzkaganozt

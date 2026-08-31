@@ -1,0 +1,416 @@
+name: build-single-image
+
+permissions:
+  contents: read
+
+# Lightweight single-image build for PR checks and manual debugging.
+#
+# Triggers:
+#   - pull_request: when component or shared build-graph inputs change.
+#     Builds affected targets with --load, then scans them (no push), amd64 only.
+#     Fork-safe: elevated cache cleanup runs only for same-repository PRs.
+#   - workflow_dispatch: manual single-target or multi-target validation build.
+#
+# This workflow does NOT replace build-all-images.yaml for releases.
+# It validates that affected build inputs produce buildable images
+# without running the full 32+ job pipeline.
+
+on:
+  pull_request:
+    paths:
+      - "components/**"
+      - ".github/image-inventory.json"
+      - ".github/scripts/export_autoware_lock.py"
+      - ".github/scripts/resolve_image_matrices.py"
+      - ".github/scripts/resolve_build_inputs.sh"
+      - ".github/scripts/resolve_registry_contexts.sh"
+      - ".github/scripts/resolve_upstream_images.sh"
+      - ".github/scripts/registry_lookup.sh"
+      - ".github/actions/free-disk-space/**"
+      - ".github/actions/inject-ccache/**"
+      - ".github/actions/setup-build-env/**"
+      - ".github/workflows/build-single-image.yaml"
+      - ".trivyignore"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Space-separated Bake targets (e.g. visualizer sensing-perception). Empty = auto-detect relevant changes."
+        required: false
+        default: ""
+      ros-distro:
+        description: "ROS distribution (humble or jazzy)"
+        required: false
+        default: humble
+
+concurrency:
+  group: build-single-image-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
+  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+  BAKE_FILE: components/docker-bake.hcl
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      autoware_input_ref: ${{ steps.prepare.outputs.autoware_input_ref }}
+      autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
+      autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
+      autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
+      upstream_core_devel: ${{ steps.upstream.outputs.core_devel }}
+      upstream_base: ${{ steps.upstream.outputs.base }}
+      upstream_cuda_runtime: ${{ steps.upstream.outputs.cuda_runtime }}
+      upstream_cuda_devel: ${{ steps.upstream.outputs.cuda_devel }}
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      targets_json: ${{ steps.detect.outputs.targets_json }}
+      setup_autoware: ${{ steps.detect.outputs.setup_autoware }}
+      with_middleware: ${{ steps.detect.outputs.with_middleware }}
+      use_local_common: ${{ steps.contexts.outputs.use_local_common }}
+      use_local_simulator: ${{ steps.contexts.outputs.use_local_simulator }}
+      devel_context: ${{ steps.contexts.outputs.devel_context }}
+      runtime_context: ${{ steps.contexts.outputs.runtime_context }}
+      simulator_context: ${{ steps.contexts.outputs.simulator_context }}
+    steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve shared build inputs
+        id: prepare
+        env:
+          AUTOWARE_REF_INPUT: ${{ vars.UPSTREAM_TAG || 'main' }}
+        run: bash .github/scripts/resolve_build_inputs.sh
+        shell: bash
+
+      - name: Require one Autoware release revision
+        env:
+          AUTOWARE_INPUT_REF: ${{ steps.prepare.outputs.autoware_input_ref }}
+          AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
+          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+        run: |
+          set -euo pipefail
+          normalized_input_ref="${AUTOWARE_INPUT_REF#v}"
+          if [ "${AUTOWARE_REF_TYPE}" != tag ] || [ "${normalized_input_ref}" != "${AUTOWARE_BASE_VERSION}" ]; then
+            echo "build-single-image requires vars.UPSTREAM_TAG to name an exact Autoware release tag (e.g. 1.8.0)" >&2
+            echo "resolved ref: ${AUTOWARE_INPUT_REF} (${AUTOWARE_REF_TYPE}), base version: ${AUTOWARE_BASE_VERSION}" >&2
+            exit 1
+          fi
+        shell: bash
+
+      - name: Install YAML parser
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+        shell: bash
+
+      - name: Export Autoware dependency lockfile
+        id: lock
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/export_autoware_lock.py \
+            autoware-metadata/repositories/autoware.repos \
+            autoware-lock/autoware-lock.repos
+          autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
+          echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "${GITHUB_OUTPUT}"
+        shell: bash
+
+      - name: Upload Autoware dependency lockfile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autoware-lock-${{ steps.prepare.outputs.build_tag }}
+          path: autoware-lock/autoware-lock.repos
+          retention-days: 7
+
+      - name: Detect changed targets
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          TARGET_INPUT: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+
+          changed_files=""
+          if [ -z "${TARGET_INPUT}" ]; then
+            if [ "${EVENT_NAME}" = "pull_request" ]; then
+              if [ -z "${BASE_SHA}" ]; then
+                echo "Pull request base SHA is unavailable" >&2
+                exit 1
+              fi
+              diff_base="${BASE_SHA}"
+            else
+              diff_base=$(git rev-parse HEAD^)
+            fi
+
+            changed_files=$(git diff --name-only "${diff_base}...HEAD")
+            echo "Changed files:" >&2
+            printf '%s\n' "${changed_files}" >&2
+          fi
+
+          python3 .github/scripts/resolve_image_matrices.py \
+            single-image "${ROS_DISTRO:-humble}" "${TARGET_INPUT}" \
+            <<< "${changed_files}" >> "${GITHUB_OUTPUT}"
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Resolve registry contexts
+        id: contexts
+        env:
+          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
+          USE_LOCAL_COMMON: ${{ steps.detect.outputs.use_local_common }}
+          USE_LOCAL_SIMULATOR: ${{ steps.detect.outputs.use_local_simulator }}
+          AUTOWARE_INPUT_REF: ${{ steps.prepare.outputs.autoware_input_ref }}
+          AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
+          AUTOWARE_REF: ${{ steps.prepare.outputs.autoware_ref }}
+          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          AUTOWARE_LOCK_SHA256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
+        run: bash .github/scripts/resolve_registry_contexts.sh
+        shell: bash
+
+      - name: Resolve required immutable upstream Autoware images
+        if: steps.detect.outputs.targets_json != '[]'
+        id: upstream
+        env:
+          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
+          UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          USE_LOCAL_COMMON: ${{ steps.contexts.outputs.use_local_common }}
+        run: |
+          set -euo pipefail
+          names=()
+          if [ "${USE_LOCAL_COMMON}" = true ] \
+            || jq -e 'index("universe-common-devel") != null or index("universe-common") != null' <<<"${TARGETS_JSON}" >/dev/null; then
+            names+=(core-devel base)
+          fi
+          if jq -e 'index("sensing-perception-cuda") != null' <<<"${TARGETS_JSON}" >/dev/null; then
+            names+=(base-cuda-runtime base-cuda-devel)
+          fi
+          export UPSTREAM_IMAGE_NAMES="${names[*]}"
+          bash .github/scripts/resolve_upstream_images.sh
+          {
+            echo "core_devel=$(jq -r 'map(select(.name == "core-devel"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "base=$(jq -r 'map(select(.name == "base"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "cuda_runtime=$(jq -r 'map(select(.name == "base-cuda-runtime"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "cuda_devel=$(jq -r 'map(select(.name == "base-cuda-devel"))[0].uri // empty' upstream-images/upstream-images.json)"
+          } >> "${GITHUB_OUTPUT}"
+        shell: bash
+
+  build-local-common:
+    needs: prepare
+    # The shared cache is about 4 GB. Limit it to PRs where this workflow can
+    # remove the cache after the matrix completes; forks keep the old fallback.
+    if: >-
+      needs.prepare.outputs.use_local_common == 'true' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      actions: write
+      contents: read
+      packages: read
+    steps:
+      - name: Remove stale caches for this pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: gh cache delete --all --ref "${PR_REF}" --succeed-on-no-caches
+        shell: bash
+
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up build environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          build-tag: ${{ needs.prepare.outputs.build_tag }}
+          registry: ${{ env.REGISTRY }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          free-disk: true
+          setup-autoware: true
+          with-middleware: true
+
+      - name: Restore universe-common BuildKit cache mounts
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: cache-mounts
+          key: buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-${{ github.sha }}
+          restore-keys: |
+            buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-
+
+      - name: Inject universe-common BuildKit cache mounts
+        uses: ./.github/actions/inject-ccache
+        with:
+          ros-distro: ${{ inputs.ros-distro || 'humble' }}
+          skip-extraction: "true"
+
+      - name: Build shared universe-common images
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        env:
+          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
+          LOCAL_IMAGE: ""
+        with:
+          files: ${{ env.BAKE_FILE }}
+          targets: universe-common
+          push: false
+          set: |
+            *.platform=linux/amd64
+            *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
+            ${{ needs.prepare.outputs.upstream_core_devel != '' && format('*.contexts.autoware-core-devel={0}', needs.prepare.outputs.upstream_core_devel) || '' }}
+            ${{ needs.prepare.outputs.upstream_base != '' && format('*.contexts.autoware-base={0}', needs.prepare.outputs.upstream_base) || '' }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-amd64-${{ inputs.ros-distro || 'humble' }}-main
+            universe-common-devel.cache-to=type=gha,scope=pr-common-devel-${{ github.run_id }},mode=min
+            universe-common.cache-to=type=gha,scope=pr-common-runtime-${{ github.run_id }},mode=min
+
+  build:
+    needs: [prepare, build-local-common]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.prepare.result == 'success' &&
+      needs.prepare.outputs.targets_json != '[]' &&
+      (needs.build-local-common.result == 'success' ||
+      needs.build-local-common.result == 'skipped')
+    runs-on: ubuntu-22.04
+    # planning-control can take nearly two hours before the bounded Trivy scan.
+    timeout-minutes: 180
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        target: ${{ fromJson(needs.prepare.outputs.targets_json) }}
+    steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up build environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          build-tag: ${{ needs.prepare.outputs.build_tag }}
+          registry: ${{ env.REGISTRY }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' || needs.prepare.outputs.use_local_simulator == 'true' }}
+          setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' || needs.prepare.outputs.use_local_simulator == 'true' }}
+          with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
+
+      - name: Extract metadata for ${{ matrix.target }}
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ startsWith(matrix.target, 'universe-common') && env.IMAGE_PREFIX_COMMON || env.IMAGE_PREFIX_COMPONENT }}
+          bake-target: docker-metadata-action-${{ matrix.target }}
+          tags: |
+            type=raw,value=${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-pr${{ github.event.pull_request.number || github.run_id }}
+          flavor: |
+            latest=false
+
+      - name: Restore BuildKit cache mounts
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: cache-mounts
+          key: buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-${{ github.sha }}
+          restore-keys: |
+            buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-
+
+      - name: Inject BuildKit cache mounts
+        uses: ./.github/actions/inject-ccache
+        with:
+          ros-distro: ${{ inputs.ros-distro || 'humble' }}
+          skip-extraction: "true"
+
+      - name: Build ${{ matrix.target }}
+        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
+        env:
+          ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
+          LOCAL_IMAGE: ""
+        with:
+          files: |
+            ${{ env.BAKE_FILE }}
+            ${{ steps.meta.outputs.bake-file }}
+          targets: ${{ matrix.target }}
+          push: false
+          load: true
+          set: |
+            *.platform=linux/amd64
+            *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
+            ${{ needs.prepare.outputs.upstream_core_devel != '' && format('*.contexts.autoware-core-devel={0}', needs.prepare.outputs.upstream_core_devel) || '' }}
+            ${{ needs.prepare.outputs.upstream_base != '' && format('*.contexts.autoware-base={0}', needs.prepare.outputs.upstream_base) || '' }}
+            ${{ needs.prepare.outputs.upstream_cuda_runtime != '' && format('sensing-perception-cuda.contexts.autoware-base-cuda-runtime={0}', needs.prepare.outputs.upstream_cuda_runtime) || '' }}
+            ${{ needs.prepare.outputs.upstream_cuda_devel != '' && format('sensing-perception-cuda.contexts.autoware-base-cuda-devel={0}', needs.prepare.outputs.upstream_cuda_devel) || '' }}
+            ${{ needs.prepare.outputs.devel_context != '' && format('*.contexts.universe-common-devel={0}', needs.prepare.outputs.devel_context) || '' }}
+            ${{ needs.prepare.outputs.runtime_context != '' && format('*.contexts.universe-common={0}', needs.prepare.outputs.runtime_context) || '' }}
+            ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
+            ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-devel-{0}', github.run_id) || '' }}
+            ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-runtime-{0}', github.run_id) || '' }}
+            ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+
+      - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
+        # Reporting-only: findings are surfaced in the step log, but the hard
+        # gate is the scan-images workflow (scan.yaml) that feeds releases.
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.meta.outputs.tags }}
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          scanners: vuln
+          timeout: 15m
+          trivyignores: .trivyignore
+
+  cleanup-pr-caches:
+    needs: [prepare, build-local-common, build]
+    # Skip on cancel so a replacement run's pr-common-* caches are not deleted.
+    # The next run already clears leftovers at the start of build-local-common.
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.prepare.outputs.use_local_common == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Remove temporary pull request caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh cache list --ref "${PR_REF}" --json id,key --limit 100 \
+            | jq -r --arg run "${RUN_ID}" \
+              '.[] | select(.key | test("pr-common-(devel|runtime)-" + $run)) | .id' \
+            | while read -r id; do
+                [ -n "${id}" ] || continue
+                gh cache delete "${id}" || true
+              done
+        shell: bash

@@ -21,8 +21,9 @@ asset="dist/${root_name}.tar.gz"
 rm -rf dist staging
 mkdir -p dist "${bundle_root}/deployments"
 cp -a "${source_dir}/openadkit" "${bundle_root}/openadkit"
+cp -a "${source_dir}/openadkit.json" "${bundle_root}/openadkit.json"
 cp -a "${source_dir}/openadkit.d" "${bundle_root}/openadkit.d"
-for name in base logging-simulation planning-simulation scenario-simulation; do
+for name in base carla-simulation logging-simulation planning-simulation scenario-simulation; do
   cp -a "${source_dir}/deployments/${name}" "${bundle_root}/deployments/${name}"
 done
 
@@ -43,15 +44,15 @@ python3 "${planner}" \
   --stable-release "${STABLE_RELEASE}" \
   --publish-latest-aliases "${PUBLISH_LATEST_ALIASES}" \
   --output release-plan.json \
-  --context-output "${bundle_root}/openadkit.d/context.json"
+  --context-output "${bundle_root}/openadkit.json"
 
 list_output=$(cd "${bundle_root}" && ./openadkit list)
 printf '%s\n' "${list_output}"
-for deployment in logging-simulation planning-simulation scenario-simulation; do
+for deployment in carla-simulation logging-simulation planning-simulation scenario-simulation; do
   if ! awk -F '\t' -v name="${deployment}" \
-    '$1 == name && $2 == "verified" { found=1 } END { exit !found }' \
+    '$1 == name && $2 == "intact" { found=1 } END { exit !found }' \
     <<<"${list_output}"; then
-    echo "Packaged deployment is not verified: ${deployment}" >&2
+    echo "Packaged deployment is not intact: ${deployment}" >&2
     exit 1
   fi
 done
@@ -63,6 +64,7 @@ for ros_distro in humble jazzy; do
   (cd "${bundle_root}" && ./openadkit validate logging-simulation \
     --ros-distro "${ros_distro}" --gpu)
 done
+(cd "${bundle_root}" && ./openadkit validate carla-simulation --gpu --ros-distro humble)
 
 if cache=$(find "${bundle_root}" \( -type d -name __pycache__ -o -type f -name '*.pyc' \) -print -quit) \
   && [ -n "${cache}" ]; then

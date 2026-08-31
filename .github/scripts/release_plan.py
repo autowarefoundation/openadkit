@@ -14,6 +14,7 @@ from typing import Any
 
 
 CURATED_DEPLOYMENTS = (
+    "carla-simulation",
     "logging-simulation",
     "planning-simulation",
     "scenario-simulation",
@@ -129,7 +130,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             fail(f"duplicate target/distro image across repositories: {target}-{distro}")
         indexed[runtime_key] = row
 
-    runtime_targets = sorted(set(runtime.COMPONENT_IMAGE_TARGETS.values()))
+    kit = runtime.load_kit(source_root)
+    runtime_targets = sorted(set(kit.component_images.values()))
     context_images: dict[str, dict[str, str]] = {}
     for distro in ROS_DISTROS:
         distro_images: dict[str, str] = {}
@@ -140,17 +142,19 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             distro_images[target] = row["releaseExactRef"]
         context_images[distro] = distro_images
 
-    discovered = runtime.discover(source_root)
-    if set(discovered) != set(CURATED_DEPLOYMENTS):
+    if set(kit.deployments) != set(CURATED_DEPLOYMENTS):
         fail(
             "release source must contain exactly the curated deployments: "
             + ", ".join(CURATED_DEPLOYMENTS)
         )
-    deployments: dict[str, str] = {}
+    deployments: dict[str, dict[str, str]] = {}
     shared_names: set[str] = set()
     for name in CURATED_DEPLOYMENTS:
-        deployment = runtime.validate_manifest(source_root, discovered[name])
-        deployments[name] = runtime.deployment_checksum(deployment.directory)
+        deployment = runtime.get_deployment(source_root, kit, name)
+        deployments[name] = {
+            "path": kit.deployments[name].path,
+            "checksum": runtime.deployment_checksum(deployment.directory),
+        }
         shared_names.update(deployment.shared)
     if shared_names != {"base"}:
         fail("curated deployments must use exactly the shared base assets")
@@ -162,6 +166,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
     release_context = {
+        "componentImages": dict(kit.component_images),
         "defaultRosDistro": args.default_ros_distro,
         "deployments": deployments,
         "images": context_images,

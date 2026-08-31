@@ -334,6 +334,12 @@ content:
     # things the units mount.
     - source_path: ../scripts/x5h-stack-smoke.sh
       path: /usr/sbin/x5h-stack-smoke.sh
+    # Same directory as the smoke, and that is a requirement rather than
+    # tidiness: `drive` locates this file as $(dirname "$0")/x5h-stop-
+    # metrics.awk, so the pair has to be installed together or the metric
+    # fails as mrm_no_stop_metrics on a board that looks fully staged.
+    - source_path: ../scripts/x5h-stop-metrics.awk
+      path: /usr/sbin/x5h-stop-metrics.awk
 
 auth:
   # root password "autosd" — dev/bench image only, never a board deliverable.

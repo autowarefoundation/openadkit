@@ -51,7 +51,9 @@
 #   X5H_SLOT_BASELINE=<path on THIS host to the pristine slot-orig.bin>
 # and may override:
 #   X5H_BOARD (default root@192.168.0.20)
-#   X5H_SMOKE (default /usr/local/sbin/x5h-stack-smoke.sh)
+#   X5H_SMOKE (default /usr/sbin/x5h-stack-smoke.sh -- where the image
+#     manifest installs it; a copy staged by hand somewhere else is the
+#     stale-checker trap, not the supported path)
 #   X5H_BOOT_TIMEOUT (default 600 s), X5H_UNITS_TIMEOUT (default 300 s)
 #   X5H_BOOT_SETTLE (default 20 s): fixed sleep right after issuing the
 #     reboot, before the first ssh poll, to let an in-flight shutdown start
@@ -134,7 +136,7 @@ gate_payload() { # profile payload -> sets GATE_SHA, GATE_BYTES
 # ---- site config -----------------------------------------------------------
 
 X5H_BOARD="root@192.168.0.20"
-X5H_SMOKE="/usr/local/sbin/x5h-stack-smoke.sh"
+X5H_SMOKE="/usr/sbin/x5h-stack-smoke.sh"
 X5H_BOOT_TIMEOUT=600
 X5H_UNITS_TIMEOUT=300
 X5H_BOOT_SETTLE=20

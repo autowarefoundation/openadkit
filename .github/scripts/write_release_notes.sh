@@ -12,7 +12,7 @@ jq -e '
   (.bundle.root | type == "string") and
   (.releaseContext.images.humble | length == 8) and
   (.releaseContext.images.jazzy | length == 8) and
-  (.releaseContext.deployments | length == 3) and
+  (.releaseContext.deployments | length == 4) and
   (.releaseContext.shared | length == 1)
 ' "${plan_file}" >/dev/null
 
@@ -37,7 +37,7 @@ fi
 
 temporary=$(mktemp -d)
 trap 'rm -rf "${temporary}"' EXIT
-tar -xOf "${bundle}" "${bundle_root}/openadkit.d/context.json" \
+tar -xOf "${bundle}" "${bundle_root}/openadkit.json" \
   | jq -S . >"${temporary}/bundle-context.json"
 jq -S '.releaseContext' "${plan_file}" >"${temporary}/plan-context.json"
 cmp "${temporary}/plan-context.json" "${temporary}/bundle-context.json"

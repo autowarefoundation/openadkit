@@ -54,8 +54,10 @@
 #   X5H_SMOKE (default /usr/local/sbin/x5h-stack-smoke.sh)
 #   X5H_BOOT_TIMEOUT (default 600 s), X5H_UNITS_TIMEOUT (default 300 s)
 #   X5H_BOOT_SETTLE (default 20 s): fixed sleep right after issuing the
-#     reboot, before the first ssh reachability poll, to let the board
-#     drop off the network before we start checking for it to come back
+#     reboot, before the first ssh poll, to let an in-flight shutdown start
+#   X5H_DOWN_TIMEOUT (default 120 s): how long the board is given to stop
+#     answering ssh after the reboot. Exceeding it is demo_board_no_boot:
+#     the reboot did not happen, so nothing below it means anything
 #   X5H_DEMO_LOGDIR (default ~/x5h-demo-logs; each run gets its own
 #     timestamped subdirectory under this)
 #
@@ -73,10 +75,22 @@ MODE="${1:-}"
 
 log() { echo "x5h-mrm-demo: $*" >&2; }
 
+# Set by flash_payload the moment the slot stops holding the baseline, and
+# never cleared: from that point on the board is on a demo payload and EVERY
+# failure needs the restore text, whether or not the failing call site had a
+# board-state sentence to pass. It used to depend on that second argument
+# alone, so a `:scp` failure on the after leg -- with the slot already
+# carrying the untuned before firmware -- printed no restore at all.
+BOARD_DIRTY=""
+
 demo_fail() {
     echo "X5H_DEMO_FAIL reason=$1"
-    if [ -n "${2:-}" ]; then
-        log "board state: $2"
+    state="${2:-}"
+    if [ -z "$state" ] && [ -n "$BOARD_DIRTY" ]; then
+        state="board is on the ${BOARD_DIRTY} payload; it is NOT the baseline"
+    fi
+    if [ -n "$state" ]; then
+        log "board state: $state"
         log "restore: re-run a single after leg (x5h-mrm-demo.sh run --after <after.bin> --only after)"
         log "         or write back \$X5H_SLOT_BASELINE per cr52-slot-update.md"
     fi
@@ -87,6 +101,10 @@ demo_fail() {
 
 GATE_SHA=""
 GATE_BYTES=""
+# Declared here, above gate_payload, because the gate reads it and the site
+# config below is what fills it in. Empty means "geometry not loaded", which
+# is a real state (`check` never loads a site config) and not a bug.
+X5H_SLOT_EXTENT_SECTORS=""
 
 gate_payload() { # profile payload -> sets GATE_SHA, GATE_BYTES
     local profile="$1" payload="$2"
@@ -95,6 +113,21 @@ gate_payload() { # profile payload -> sets GATE_SHA, GATE_BYTES
     [ "$GATE_BYTES" -gt 0 ] || demo_fail "demo_flash_failed:${profile}:payload_empty"
     grep -aq "actuation_param_profile=${profile}" "$payload" \
         || demo_fail "demo_wrong_profile:${profile}"
+    # Size against the slot extent HERE rather than in flash_payload, so
+    # that `run`'s pre-flight -- which gates both payloads before writing
+    # anything -- actually covers it. While this lived at flash time the
+    # gate checked identity only, so an oversized `after` that still
+    # carried its profile string passed pre-flight and was rejected only
+    # after `before` had been flashed, rebooted and driven: precisely the
+    # stranding the pre-flight exists to prevent. The check is skipped when
+    # the geometry is unknown, which is the `check` subcommand's case by
+    # design: it runs with no site config at all, and its contract is the
+    # payload's identity, not a slot it has no coordinates for.
+    if [ -n "${X5H_SLOT_EXTENT_SECTORS}" ]; then
+        local extent_bytes=$((X5H_SLOT_EXTENT_SECTORS * 4096))
+        [ "$GATE_BYTES" -le "$extent_bytes" ] \
+            || demo_fail "demo_flash_failed:${profile}:payload_exceeds_extent"
+    fi
     GATE_SHA=$(sha256sum "$payload" | awk '{print $1}')
 }
 
@@ -105,9 +138,9 @@ X5H_SMOKE="/usr/local/sbin/x5h-stack-smoke.sh"
 X5H_BOOT_TIMEOUT=600
 X5H_UNITS_TIMEOUT=300
 X5H_BOOT_SETTLE=20
+X5H_DOWN_TIMEOUT=120
 X5H_SLOT_DEV=""
 X5H_SLOT_SKIP=""
-X5H_SLOT_EXTENT_SECTORS=""
 X5H_SLOT_BASELINE=""
 
 load_site_conf() {
@@ -132,11 +165,12 @@ bssh() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$X5H_BOARD" "$@"; }
 
 flash_payload() { # profile payload bytes
     local profile="$1" payload="$2" bytes="$3"
-    local extent_bytes=$((X5H_SLOT_EXTENT_SECTORS * 4096))
-    [ "$bytes" -le "$extent_bytes" ] \
-        || demo_fail "demo_flash_failed:${profile}:payload_exceeds_extent"
     scp -o BatchMode=yes "$payload" "$X5H_BOARD:/var/tmp/x5h-demo-${profile}.bin" \
         || demo_fail "demo_flash_failed:${profile}:scp"
+    # Before the write, not after it: the erase below is the point of no
+    # return, and a failure part way through it leaves the slot holding
+    # neither the baseline nor a whole payload.
+    BOARD_DIRTY="$profile"
     # cr52-slot-update.md's procedure verbatim: erase the extent first (no
     # tail of the previous image may survive inside the region the boot
     # firmware loads), buffered write with fsync (O_DIRECT rejects the
@@ -155,8 +189,25 @@ flash_payload() { # profile payload bytes
 reboot_and_wait() { # profile
     local profile="$1"
     bssh reboot || true   # the connection dropping mid-command is expected
-    local deadline=$(($(date +%s) + X5H_BOOT_TIMEOUT))
     sleep "$X5H_BOOT_SETTLE"
+    # WAIT FOR THE BOARD TO GO DOWN FIRST. Without this the function only
+    # ever waited for an ssh that answers, and an ssh that answers is not
+    # evidence of a reboot: a `reboot` that was never delivered (the
+    # command lost, the request refused, a board that ignored it) leaves
+    # the PRE-reboot sshd -- and the pre-reboot CR52 image -- answering
+    # immediately, so the drive that follows grades the payload the board
+    # was already running rather than the one just flashed. Both legs
+    # would then measure the same firmware and the demo would report a
+    # contrast that does not exist. A reboot that is never observed is a
+    # failed reboot, named as such.
+    local down_deadline=$(($(date +%s) + X5H_DOWN_TIMEOUT))
+    until ! bssh true 2>/dev/null; do
+        [ "$(date +%s)" -lt "$down_deadline" ] \
+            || demo_fail "demo_board_no_boot:${profile}" \
+                         "board never went down within ${X5H_DOWN_TIMEOUT}s of the reboot; it is still running the PRE-reboot image"
+        sleep 2
+    done
+    local deadline=$(($(date +%s) + X5H_BOOT_TIMEOUT))
     until bssh true 2>/dev/null; do
         [ "$(date +%s)" -lt "$deadline" ] \
             || demo_fail "demo_board_no_boot:${profile}" \

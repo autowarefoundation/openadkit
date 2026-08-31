@@ -279,16 +279,42 @@ def test_run_flash_aborts_before_scp_when_payload_exceeds_extent(tmp_path):
     assert "stub: network access blocked" not in r.stderr
 
 
-def make_recording_bin_dir(tmp_path, log_path):
+def make_recording_bin_dir(tmp_path, log_path, down_calls=1,
+                           stop_distances=(), fail_scp_profile=None):
     """Stub ssh/scp on PATH that record every argument they were called
-    with to log_path, in call order, and then succeed (exit 0) -- unlike
+    with to log_path, in call order, and then behave like a board -- unlike
     make_stub_bin_dir()'s always-fail stubs, this lets a `run` invocation
-    walk past the flash and the reboot so the reboot_and_wait() commands
-    can be inspected. Neither stub actually talks to anything; there is no
-    real remote shell on the other end, so a multi-line remote command
-    string is recorded verbatim as a single argument, not executed."""
+    walk past the flash and the reboot so what it does next can be
+    inspected. Neither stub talks to anything; there is no real remote
+    shell, so a multi-line remote command string is recorded verbatim as a
+    single argument rather than executed.
+
+    Three behaviours make it a board rather than a yes-man, each needed by
+    a test below:
+
+    down_calls -- how many ssh probes fail after a `reboot` before the
+      board answers again. reboot_and_wait() waits for the board to go
+      DOWN before waiting for it to come back, so a stub that always
+      succeeds is a board that never rebooted; down_calls=0 simulates
+      exactly that (a reboot that was not delivered) and any positive
+      value simulates a real one.
+
+    stop_distances -- the stop_distance_m values a `drive` invocation
+      reports, consumed one per call, so a two-leg run can be given a
+      before and an after and the contrast grading downstream of them can
+      actually run. With none given, `drive` produces no marker at all,
+      which is the no_marker case.
+
+    fail_scp_profile -- makes the scp of one leg's payload fail, to reach
+      a failure AFTER an earlier leg has already written the slot.
+    """
     bin_dir = tmp_path / "recordingbin"
     bin_dir.mkdir()
+    state = tmp_path / "stubstate"
+    state.mkdir()
+    if stop_distances:
+        (state / "stops").write_text(
+            "".join(f"{d}\n" for d in stop_distances))
     for tool in ("ssh", "scp"):
         stub = bin_dir / tool
         stub.write_text(
@@ -297,6 +323,41 @@ def make_recording_bin_dir(tmp_path, log_path):
             "    echo '== call =='\n"
             "    for a in \"$@\"; do printf '%s\\n' \"$a\"; done\n"
             f"}} >> \"{log_path}\"\n"
+            f"STATE=\"{state}\"\n"
+            + (
+                'if [ "$(basename "$0")" = scp ]; then\n'
+                f'    case "$*" in *x5h-demo-{fail_scp_profile}.bin) exit 1 ;; esac\n'
+                "fi\n" if fail_scp_profile else ""
+            ) +
+            # The REMOTE COMMAND only -- bssh's last argument -- decides
+            # what this call is. Matching "$*" would also see the local
+            # paths, and pytest's own tmp_path for this module contains
+            # the word "reboot": an scp of the payload was then taken for
+            # a reboot, and the flash that followed it failed as
+            # write_verify against a board the stub thought was down.
+            'for _last; do :; done\n'
+            'case "$_last" in\n'
+            "    reboot) : > \"$STATE/down\"; exit 0 ;;\n"
+            "esac\n"
+            'if [ -f "$STATE/down" ]; then\n'
+            '    n=$(cat "$STATE/downcount" 2>/dev/null || echo 0)\n'
+            "    n=$((n + 1))\n"
+            '    echo "$n" > "$STATE/downcount"\n'
+            f"    if [ \"$n\" -le {down_calls} ]; then exit 255; fi\n"
+            '    rm -f "$STATE/down" "$STATE/downcount"\n'
+            "fi\n"
+            'case "$_last" in\n'
+            "    *x5h-stack-smoke.sh\\ drive)\n"
+            '        v=$(head -1 "$STATE/stops" 2>/dev/null || true)\n'
+            '        if [ -n "$v" ]; then\n'
+            '            sed -i 1d "$STATE/stops"\n'
+            '            echo "X5H_DRIVE_STOP stop_distance_m=$v rest_x=0 rest_y=0"\n'
+            '            printf "X5H_DRIVE_PASS junit=/tmp/r.junit.xml tests=1 "\n'
+            '            printf "failures=1 errors=0 mrm=succeeded "\n'
+            '            printf "stop_velocity=0.001 stop_distance_m=%s\\n" "$v"\n'
+            "        fi\n"
+            "        exit 0 ;;\n"
+            "esac\n"
             "exit 0\n"
         )
         stub.chmod(0o755)
@@ -360,3 +421,164 @@ def test_run_reboot_and_wait_starts_the_awf_oak_units_after_reboot(tmp_path):
     )
     assert start_units_at != -1, log
     assert reboot_at < start_units_at, log
+
+
+def test_run_aborts_before_board_contact_on_oversized_after_payload(tmp_path):
+    """The pre-flight gate has to cover SIZE, not just identity. An
+    oversized --after that still carries its profile string used to pass
+    the pre-flight double gate -- which only checked identity -- and was
+    rejected by flash_payload on the after leg, i.e. after the before
+    payload had already been flashed, rebooted and driven. That is exactly
+    the stranding the pre-flight exists to prevent, and it is the after
+    payload that has to be size-checked to prevent it: the before-payload
+    case (test_run_flash_aborts_before_scp_when_payload_exceeds_extent
+    above) would fail on the very first gate either way."""
+    site_conf = make_site_conf(tmp_path, extent_sectors="1")
+    good_before = payload(tmp_path, "before", name="before.bin")
+    oversized_after = payload(tmp_path, "after", name="after.bin")
+    with open(oversized_after, "ab") as f:
+        f.write(b"\x00" * 4096)  # push the file past the 4096-byte extent
+
+    r = subprocess.run(
+        [
+            "bash", str(DEMO), "run",
+            "--before", str(good_before),
+            "--after", str(oversized_after),
+        ],
+        capture_output=True, text=True, env=run_env(tmp_path, site_conf),
+        timeout=10,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=demo_flash_failed:after:payload_exceeds_extent" \
+        in r.stdout
+    # Nothing may have reached the board: the before payload must NOT have
+    # been flashed on the way to discovering this.
+    assert "stub: network access blocked" not in r.stderr
+
+
+def test_run_fails_when_the_board_never_goes_down(tmp_path):
+    """A reboot that was not delivered leaves the PRE-reboot sshd -- and
+    the pre-reboot CR52 image -- answering. reboot_and_wait() used to poll
+    only for an ssh that answers, so it accepted that immediately and
+    drove the payload the board was already running. Waiting for the board
+    to go down first is what makes the reboot observed rather than
+    assumed; a stub that never stops answering (down_calls=0) is that
+    board, and it must fail as demo_board_no_boot before the smoke is ever
+    invoked."""
+    site_conf = make_site_conf(tmp_path)
+    with open(site_conf, "a") as f:
+        f.write("X5H_BOOT_SETTLE=0\nX5H_DOWN_TIMEOUT=3\nX5H_UNITS_TIMEOUT=1\n")
+    good_after = payload(tmp_path, "after", name="after.bin")
+
+    log_path = tmp_path / "ssh-calls.log"
+    bin_dir = make_recording_bin_dir(tmp_path, log_path, down_calls=0)
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "X5H_DEMO_SITE_CONF": str(site_conf),
+    }
+    r = subprocess.run(
+        ["bash", str(DEMO), "run", "--after", str(good_after),
+         "--only", "after"],
+        capture_output=True, text=True, env=env, timeout=30,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=demo_board_no_boot:after" in r.stdout
+    assert "still running the PRE-reboot image" in r.stderr
+    assert "x5h-stack-smoke.sh drive" not in log_path.read_text()
+
+
+def test_failure_after_the_before_leg_prints_the_restore_hint(tmp_path):
+    """Once a leg has written the slot the board is no longer on the
+    baseline, so EVERY later failure needs the restore text -- not only
+    the ones whose call site happens to pass a board-state sentence.
+    An after-leg scp failure is the case that used to print nothing: one
+    argument to demo_fail, so no restore, while the slot already held the
+    untuned before firmware."""
+    site_conf = make_site_conf(tmp_path)
+    with open(site_conf, "a") as f:
+        f.write("X5H_BOOT_SETTLE=0\nX5H_UNITS_TIMEOUT=1\n")
+    good_before = payload(tmp_path, "before", name="before.bin")
+    good_after = payload(tmp_path, "after", name="after.bin")
+
+    log_path = tmp_path / "ssh-calls.log"
+    bin_dir = make_recording_bin_dir(
+        tmp_path, log_path, stop_distances=(41.2,), fail_scp_profile="after")
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "X5H_DEMO_SITE_CONF": str(site_conf),
+    }
+    r = subprocess.run(
+        ["bash", str(DEMO), "run",
+         "--before", str(good_before), "--after", str(good_after)],
+        capture_output=True, text=True, env=env, timeout=30,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=demo_flash_failed:after:scp" in r.stdout
+    assert "board is on the before payload" in r.stderr
+    assert "restore:" in r.stderr
+
+
+def test_run_grades_the_contrast_between_the_two_legs(tmp_path):
+    """The load-bearing grade -- before_stop > after_stop -> X5H_DEMO_PASS
+    -- was unreachable in test: the recording stub never produced a
+    X5H_DRIVE_PASS marker, so every full run ended at no_marker and
+    neither this branch nor demo_no_contrast below was ever executed. With
+    the stub reporting one stop distance per leg, the tuned (after) firmware
+    stopping shorter is the passing demo."""
+    site_conf = make_site_conf(tmp_path)
+    with open(site_conf, "a") as f:
+        f.write("X5H_BOOT_SETTLE=0\nX5H_UNITS_TIMEOUT=1\n")
+    good_before = payload(tmp_path, "before", name="before.bin")
+    good_after = payload(tmp_path, "after", name="after.bin")
+
+    log_path = tmp_path / "ssh-calls.log"
+    bin_dir = make_recording_bin_dir(
+        tmp_path, log_path, stop_distances=(41.2, 22.5))
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "X5H_DEMO_SITE_CONF": str(site_conf),
+    }
+    r = subprocess.run(
+        ["bash", str(DEMO), "run",
+         "--before", str(good_before), "--after", str(good_after)],
+        capture_output=True, text=True, env=env, timeout=30,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "X5H_DEMO_PASS before_stop_m=41.2 after_stop_m=22.5 delta_m=18.70" \
+        in r.stdout
+    # Both legs really ran: two flashes, two reboots, two drives.
+    log = log_path.read_text()
+    assert log.count("x5h-stack-smoke.sh drive") == 2
+    assert log.count("\nreboot\n") == 2
+
+
+def test_run_reports_no_contrast_when_after_does_not_stop_shorter(tmp_path):
+    """The other side of the same grade. An after payload that stops no
+    shorter than before is not a demo failure of the board's making, so it
+    gets its own reason and a board-state line saying the board is left on
+    the after payload."""
+    site_conf = make_site_conf(tmp_path)
+    with open(site_conf, "a") as f:
+        f.write("X5H_BOOT_SETTLE=0\nX5H_UNITS_TIMEOUT=1\n")
+    good_before = payload(tmp_path, "before", name="before.bin")
+    good_after = payload(tmp_path, "after", name="after.bin")
+
+    log_path = tmp_path / "ssh-calls.log"
+    bin_dir = make_recording_bin_dir(
+        tmp_path, log_path, stop_distances=(20.0, 30.0))
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "X5H_DEMO_SITE_CONF": str(site_conf),
+    }
+    r = subprocess.run(
+        ["bash", str(DEMO), "run",
+         "--before", str(good_before), "--after", str(good_after)],
+        capture_output=True, text=True, env=env, timeout=30,
+    )
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "X5H_DEMO_FAIL reason=demo_no_contrast" in r.stdout
+    assert "board is on the after payload" in r.stderr

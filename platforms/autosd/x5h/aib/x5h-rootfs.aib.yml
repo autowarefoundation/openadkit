@@ -322,6 +322,18 @@ content:
       path: /etc/systemd/system/rpmsg-eth.service
     - source_path: ../scripts/rpmsg-eth-ifup.sh
       path: /usr/sbin/rpmsg-eth-ifup.sh
+    # The board smoke, installed BY THE IMAGE rather than copied onto the
+    # board by hand. component-stack.md calls this manifest the source of
+    # truth for every file on the board and says the mapping installs the
+    # smoke script; until this entry existed that sentence was simply
+    # false, and the gap is the one that actually bites: a hand-copied
+    # checker in /var/tmp goes stale the moment the repository moves, and
+    # then grades a board against a contract that no longer exists. It
+    # sits in /usr/sbin beside rpmsg-eth-ifup.sh -- an operator-run,
+    # root-only tool -- not in /etc/containers/systemd, which is for
+    # things the units mount.
+    - source_path: ../scripts/x5h-stack-smoke.sh
+      path: /usr/sbin/x5h-stack-smoke.sh
 
 auth:
   # root password "autosd" — dev/bench image only, never a board deliverable.

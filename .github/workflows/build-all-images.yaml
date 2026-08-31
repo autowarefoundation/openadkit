@@ -143,6 +143,7 @@ jobs:
     env:
       CACHE_KEY_PREFIX: buildkit-mounts-universe-common-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
       IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      SAVE_CCACHE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -196,8 +197,8 @@ jobs:
           restore-keys: |
             ${{ env.CACHE_KEY_PREFIX }}
 
-      - name: Arm post-step save of BuildKit cache mounts (main only)
-        if: env.IS_MAIN_PUSH == 'true'
+      - name: Arm post-step save of BuildKit cache mounts
+        if: env.SAVE_CCACHE == 'true'
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
@@ -240,8 +241,8 @@ jobs:
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
 
-      - name: Prune BuildKit cache mount lineage (main only)
-        if: env.IS_MAIN_PUSH == 'true'
+      - name: Prune BuildKit cache mount lineage
+        if: env.SAVE_CCACHE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CACHE_KEY_PREFIX: ${{ env.CACHE_KEY_PREFIX }}
@@ -266,6 +267,7 @@ jobs:
     env:
       CACHE_KEY_PREFIX: buildkit-mounts-${{ matrix.target }}-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
       IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      SAVE_CCACHE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -307,8 +309,8 @@ jobs:
           restore-keys: |
             ${{ env.CACHE_KEY_PREFIX }}
 
-      - name: Arm post-step save of BuildKit cache mounts (main only)
-        if: env.IS_MAIN_PUSH == 'true'
+      - name: Arm post-step save of BuildKit cache mounts
+        if: env.SAVE_CCACHE == 'true'
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
@@ -351,8 +353,8 @@ jobs:
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
 
-      - name: Prune BuildKit cache mount lineage (main only)
-        if: env.IS_MAIN_PUSH == 'true'
+      - name: Prune BuildKit cache mount lineage
+        if: env.SAVE_CCACHE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CACHE_KEY_PREFIX: ${{ env.CACHE_KEY_PREFIX }}

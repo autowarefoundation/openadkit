@@ -245,7 +245,6 @@ jobs:
           with-middleware: true
 
       - name: Restore universe-common BuildKit cache mounts
-        id: cache-restore
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
@@ -257,7 +256,7 @@ jobs:
         uses: ./.github/actions/inject-ccache
         with:
           ros-distro: ${{ inputs.ros-distro || 'humble' }}
-          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
+          skip-extraction: "true"
 
       - name: Build shared universe-common images
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
@@ -327,7 +326,6 @@ jobs:
             latest=false
 
       - name: Restore BuildKit cache mounts
-        id: cache-restore
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
@@ -339,7 +337,7 @@ jobs:
         uses: ./.github/actions/inject-ccache
         with:
           ros-distro: ${{ inputs.ros-distro || 'humble' }}
-          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
+          skip-extraction: "true"
 
       - name: Build ${{ matrix.target }}
         uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5

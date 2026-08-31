@@ -167,6 +167,31 @@ def test_long_pr_build_leaves_time_for_vulnerability_scan():
     )
 
 
+def test_single_image_skips_ccache_extraction():
+    assert SINGLE_IMAGE_WORKFLOW.count('skip-extraction: "true"') == 2
+    assert "steps.cache-restore.outputs.cache-hit" not in SINGLE_IMAGE_WORKFLOW
+    assert "lookup-only: true" not in SINGLE_IMAGE_WORKFLOW
+
+
+def test_scheduled_main_builds_refresh_ccache_lineages():
+    save_ccache = (
+        "github.ref == 'refs/heads/main' && "
+        "(github.event_name == 'push' || github.event_name == 'schedule')"
+    )
+    assert save_ccache in ALL_IMAGES_WORKFLOW
+    common = ALL_IMAGES_WORKFLOW.split("  build-common:\n", 1)[1].split(
+        "  build-components:\n", 1
+    )[0]
+    components = ALL_IMAGES_WORKFLOW.split("  build-components:\n", 1)[1].split(
+        "\n  build-carla-interface:\n", 1
+    )[0]
+    for job in (common, components):
+        assert save_ccache in job
+        assert job.count("if: env.SAVE_CCACHE == 'true'") == 2
+        assert "if: env.IS_MAIN_PUSH == 'true'" not in job
+        assert "enable=${{ env.IS_MAIN_PUSH }}" in job
+
+
 def test_local_common_build_is_shared_without_persistent_pr_cache():
     assert "github.event_name == 'workflow_dispatch' && github.run_id || github.ref" in (
         SINGLE_IMAGE_WORKFLOW

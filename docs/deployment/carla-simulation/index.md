@@ -25,39 +25,38 @@ Install Docker and the NVIDIA toolkit once:
 
 --8<-- "includes/docker-group-activation.md"
 
-This standalone deployment requires a source checkout and is not included in
-the unified release bundle or manifest-driven CLI. Setup configures the
-required DDS UDP buffers; the launcher downloads the Town01 map.
+CARLA is a curated CLI deployment in both source checkouts and the release
+bundle. It is Humble-only and requires `--gpu`. Setup configures NVIDIA and the
+DDS UDP buffers; `run` downloads the Town01 map.
 
 ## Run
 
 ```bash
-cd deployments/carla-simulation
-./start-carla-e2e-demo.sh
+./openadkit run carla-simulation --gpu
 ```
 
-The entry point verifies Docker, NVIDIA, Vulkan, and UDP settings; downloads and
-checksum-validates the Town01 assets; starts CARLA and the modular stack; and
-checks localization, LiDAR, and the ego actor. If startup fails after containers
-are created, use the stop command below to release their GPU and host resources.
+`run` checksum-validates the Town01 assets, starts CARLA and the modular stack,
+and waits for Compose readiness. If startup fails after containers are created,
+use the stop command below to release their GPU and host resources.
 
 `sensor_mapping.yaml` enables LiDAR, IMU, and GNSS by default. Camera entries
 are available but commented out.
 
 --8<-- "includes/visualizer-remote-access.md"
 
-Set a goal with **2D Goal Pose** and select **Auto** in RViz2. To enable
-automatic route selection, engagement, and movement verification, start the
-launcher with:
+Set a goal with **2D Goal Pose** and select **Auto** in RViz2. After the stack
+is running, optional helpers can bake a local interface image or engage a
+forward route:
 
 ```bash
 ./start-carla-e2e-demo.sh --drive
+./start-carla-e2e-demo.sh --build
 ```
 
 ## Stop
 
 ```bash
-docker compose --env-file config.env down --remove-orphans
+./openadkit stop carla-simulation
 ```
 
 If autonomous mode is unavailable, inspect `/system/command_mode/availability`

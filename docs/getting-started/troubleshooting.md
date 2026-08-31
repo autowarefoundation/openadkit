@@ -51,10 +51,10 @@ Recovery depends on the deployment:
 
 | Deployment | Recover |
 |------------|---------|
-| `planning-simulation`, `scenario-simulation` | Run `./openadkit data <deployment> --force`. Maps land under `~/autoware_map`. |
-| `logging-simulation` | Run `./openadkit data logging-simulation --force` for the map and rosbag. GPU perception models remain under `~/autoware_data`. |
-| `zenoh-bridge` | From the source root, run `./openadkit data scenario-simulation --force` to refresh its Kashiwanoha map. |
-| `carla-simulation` | Re-run `deployments/carla-simulation/start-carla-e2e-demo.sh`; the standalone launcher manages Town01 assets. |
+| `planning-simulation`, `scenario-simulation` | Run `./openadkit fetch <deployment> --force`. Maps land under `~/autoware_map`. |
+| `logging-simulation` | Run `./openadkit fetch logging-simulation --force` for the map and rosbag. GPU perception models remain under `~/autoware_data`. |
+| `zenoh-bridge` | From the source root, run `./openadkit fetch scenario-simulation --force` to refresh its Kashiwanoha map. |
+| `carla-simulation` | Run `./openadkit fetch carla-simulation --force` for the Town01 map. |
 
 ## Getting Help
 

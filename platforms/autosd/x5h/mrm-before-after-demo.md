@@ -34,29 +34,29 @@ directory (`drive-<profile>.log`, `drive-probe-<profile>/`) is created.
 
 ## Prerequisites
 
-Stage two board-side scripts by hand before the first run — neither is in
-`aib/x5h-rootfs.aib.yml`'s manifest, and neither can be: both live under
-`/usr/local/sbin`, one of the two paths `aib` rejects outright for
-`make_dirs`/`add_files` (see [component-stack.md](component-stack.md#assets-staging-and-the-one-source-of-truth)).
-`x5h-stack-smoke.sh` is `$X5H_SMOKE` (default
-`/usr/local/sbin/x5h-stack-smoke.sh`, overridable in `site.conf`);
-`x5h-stop-metrics.awk` must sit next to it, in the same directory, because
-`drive` locates it with `$(dirname "$0")`:
+The two board-side scripts this demo drives — `x5h-stack-smoke.sh` and the
+`x5h-stop-metrics.awk` it reads as its neighbour — are installed by the image
+manifest into `/usr/sbin`, so a board flashed with a current image needs no
+staging step. `$X5H_SMOKE` (default `/usr/sbin/x5h-stack-smoke.sh`,
+overridable in `site.conf`) is what the demo invokes, and `drive` locates the
+awk with `$(dirname "$0")`, so the two always have to sit in one directory.
+
+Only iteration needs a copy. `/usr` is read-only at runtime, so to try an
+edited pair without rebuilding the image, put **both** files somewhere
+writable and point the demo at them:
 
 ```
 scp platforms/autosd/x5h/scripts/x5h-stack-smoke.sh \
     platforms/autosd/x5h/scripts/x5h-stop-metrics.awk \
-    root@192.168.0.20:/usr/local/sbin/
-ssh root@192.168.0.20 chmod 0755 /usr/local/sbin/x5h-stack-smoke.sh \
-                                  /usr/local/sbin/x5h-stop-metrics.awk
+    root@192.168.0.20:/var/tmp/
+ssh root@192.168.0.20 chmod 0755 /var/tmp/x5h-stack-smoke.sh
+echo 'X5H_SMOKE=/var/tmp/x5h-stack-smoke.sh' >> ~/.config/x5h-demo/site.conf
 ```
 
-Re-stage both whenever either changes. There is no `systemctl daemon-reload`
-equivalent here — a stale copy of either file is silently used as-is, and
-`drive`'s failure mode for a missing (never a stale) awk is
-`mrm_no_stop_metrics` (see the failure vocabulary below), discovered only
-once a leg has already flashed and rebooted the board onto that leg's
-payload.
+Copy the smoke alone and `drive` looks for the awk in `/var/tmp`, where it is
+not: `mrm_no_stop_metrics`, discovered only once a leg has already flashed and
+rebooted the board onto that leg's payload. Remove the override to go back to
+the image's copies.
 
 ## What the numbers mean
 

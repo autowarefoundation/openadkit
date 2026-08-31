@@ -592,6 +592,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert plan["bundle"] == {
         "asset": f"openadkit-{VERSION}.tar.gz",
         "deployments": [
+            "carla-simulation",
             "logging-simulation",
             "planning-simulation",
             "scenario-simulation",
@@ -640,7 +641,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         "#!/usr/bin/env bash\n"
         f'printf "%s|%s\\n" "${{ROS_DISTRO:-}}" "$*" >> {json.dumps(str(calls))}\n'
         'if [[ "$*" == *"config --services"* ]]; then\n'
-        "  printf '%s\\n' map map-check planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario_simulator\n"
+        "  printf '%s\\n' map map-check planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario_simulator carla carla-interface carla-map-loader\n"
         "fi\n"
         "exit 0\n",
     )
@@ -696,12 +697,13 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
 
     root = extract / f"openadkit-{VERSION}"
     assert os.access(root / "openadkit", os.X_OK)
-    assert (root / "openadkit.d/context.json").is_file()
+    assert (root / "openadkit.json").is_file()
     bundled_deployments = {
         path.name for path in (root / "deployments").iterdir() if path.is_dir()
     }
     assert bundled_deployments == {
         "base",
+        "carla-simulation",
         "logging-simulation",
         "planning-simulation",
         "scenario-simulation",
@@ -715,8 +717,9 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         capture_output=True,
         check=True,
     ).stdout
-    assert listed.count("\tverified\t") == 3
-    assert "custom/unverified" not in listed
+    assert listed.count("\tintact") == 4
+    assert "modified" not in listed
+    assert "zenoh" not in listed
 
     docker_calls = calls.read_text()
     assert "humble|" in docker_calls

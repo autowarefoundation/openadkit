@@ -1,0 +1,18 @@
+bootargs_common=pd_ignore_unused clk_ignore_unused rootwait rw panic=10 oops=panic enforcing=0 ip=@BOARD_IP@::192.168.0.1:255.255.255.0:@BOARD_HOSTNAME@:tsn5:none
+bootargs_cr52=${bootargs_common} root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 x5h.role=cr52
+bootargs_npu=${bootargs_common} root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 x5h.role=npu
+bootargs_yocto=pd_ignore_unused clk_ignore_unused rootwait rw panic=10 ip=@BOARD_IP@::192.168.0.1:255.255.255.0:@YOCTO_HOSTNAME@:tsn5:none root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e12 x5h.role=yocto
+probe_lu=ext4load scsi ${lu}:1 ${loadaddr} x5h-env.txt
+find_autosd=setenv lu 2; if run probe_lu; then true; else setenv lu 1; if run probe_lu; then true; else setenv lu 3; run probe_lu; fi; fi
+load_role=setenv role; ext4load scsi ${lu}:1 ${loadaddr} x5h-role.txt && env import -t ${loadaddr} ${filesize}
+check_role=if test "${role}" = cr52; then true; elif test "${role}" = npu; then true; elif test "${role}" = yocto; then true; else echo "x5h: role '${role}' invalid or unreadable, falling back to npu"; setenv role npu; fi
+bootcmd=ufs init; scsi rescan; run find_autosd; run load_role; run check_role; echo "x5h: booting role ${role} from lu ${lu}"; run bootcmd_${role}
+load_cr52=ext4load scsi ${lu}:1 ${kernel_addr_r} Image-autosd && ext4load scsi ${lu}:1 ${fdt_addr_r} r8a78000-ironhide-uio-autosd.dtb
+bootcmd_cr52=run find_autosd; run load_cr52 && setenv bootargs ${bootargs_cr52} && booti ${kernel_addr_r} - ${fdt_addr_r}
+load_npu=ext4load scsi ${lu}:1 0x61080000 Image-autosd && ext4load scsi ${lu}:1 0x61000000 r8a78000-ironhide-npu.dtb
+bootcmd_npu=run find_autosd; run load_npu && setenv bootargs ${bootargs_npu} && booti 0x61080000 - 0x61000000
+load_yocto=ext4load scsi ${lu}:1 0x61080000 Image-yocto && ext4load scsi ${lu}:1 0x61000000 r8a78000-ironhide-npu.dtb
+find_yocto=setenv lu 3; if run load_yocto; then true; else setenv lu 2; if run load_yocto; then true; else setenv lu 1; run load_yocto; fi; fi
+bootcmd_yocto=if run find_yocto; then setenv bootargs ${bootargs_yocto}; booti 0x61080000 - 0x61000000; else echo "x5h: no Image-yocto on any LU, booting npu instead"; setenv role npu; run bootcmd_npu; fi
+rescue_autosd=run bootcmd_autosd
+rescue_yocto_nfs=run bootcmd_yocto_nfs

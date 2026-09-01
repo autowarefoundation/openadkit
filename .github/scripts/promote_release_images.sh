@@ -18,6 +18,7 @@ jq -e '
   (.images | type == "array" and length > 0)
 ' "${plan_file}" >/dev/null
 VERSION=$(jq -r '.release.version' "${plan_file}")
+export VERSION
 DEFAULT_ROS_DISTRO=$(jq -r '.release.defaultRosDistro' "${plan_file}")
 PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
 STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")

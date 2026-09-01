@@ -1,9 +1,11 @@
 nav:
-  - index.md
-  - getting-started
-  - deployments
-  - components
-  - tools
-  - platforms
-  - hardware
-  - contributing
+  - Introduction:
+    - index.md
+    - Overview: overview.md
+  - Getting Started: getting-started
+  - Deployment: deployment
+  - Components: components
+  - Platforms: platforms
+  - Development: development
+  - Releases: releases
+  - Roadmap: roadmap.md

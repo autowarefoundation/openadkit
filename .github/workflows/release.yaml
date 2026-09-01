@@ -359,3 +359,12 @@ jobs:
           RELEASE_PLAN_FILE: release-output/release-plan.json
         run: bash .github/scripts/manage_github_release.sh publish
         shell: bash
+
+  deploy-docs:
+    needs: [validate, release-github]
+    if: needs.validate.outputs.is_stable_release == 'true' && needs.validate.outputs.publish_latest_aliases == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/deploy-docs.yaml
+    with:
+      source_ref: ${{ inputs.version }}

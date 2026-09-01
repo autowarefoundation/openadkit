@@ -5,6 +5,7 @@ import platform
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import zipfile
@@ -129,6 +130,7 @@ def deployment_checksum(directory):
             relative.name == "config.local.env"
             or "__pycache__" in relative.parts
             or relative.suffix == ".pyc"
+            or relative.parts[0] in {".cache", "output"}
         ):
             continue
         if candidate.is_symlink():
@@ -994,6 +996,22 @@ def _host_architecture():
     if machine in ("aarch64", "arm64"):
         return "arm64"
     return machine
+
+
+def test_deployment_checksum_ignores_runtime_output(tmp_path):
+    sys.path.insert(0, str(ROOT / "openadkit.d"))
+    import manifest as openadkit_manifest
+
+    directory = tmp_path / "scenario"
+    directory.mkdir()
+    (directory / "config.env").write_text("x=1\n")
+    (directory / "output").mkdir()
+    (directory / "output" / ".gitkeep").write_text("")
+    baseline = openadkit_manifest.deployment_checksum(directory)
+    (directory / "output" / "result.json").write_text("{}\n")
+    (directory / ".cache").mkdir()
+    (directory / ".cache" / "tmp").write_text("n\n")
+    assert openadkit_manifest.deployment_checksum(directory) == baseline
 
 
 def test_repository_inventory_includes_carla_and_excludes_zenoh():

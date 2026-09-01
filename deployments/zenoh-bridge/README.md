@@ -5,10 +5,13 @@ Edge/cloud bridge for remote visualization and teleoperation.
 **Guide (source of truth):**
 [Zenoh Bridge docs](https://autowarefoundation.github.io/openadkit/deployments/demos/zenoh-bridge/)
 
-Set `REMOTE_PASSWORD` in `config.env`, then download the sample map:
+This standalone demo is not in the CLI inventory. Fetch the shared
+Kashiwanoha map, then start the helpers:
 
 ```bash
-../../install.sh sample-data zenoh-bridge
+cd ../..
+./openadkit fetch scenario-simulation
+cd deployments/zenoh-bridge
 ./cloud.sh up -d
 ./edge.sh up -d
 ```

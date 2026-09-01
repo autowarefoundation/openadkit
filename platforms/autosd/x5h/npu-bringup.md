@@ -426,6 +426,176 @@ Stage 2 are separable at all:
 - The bootloader components proper live in a separate flash, reachable from
   Linux as an MTD device.
 
+## The AutoSD NPU personality
+
+The board's documented role is the Yocto NPU appliance. AutoSD runs the same NPU
+stack on the same hardware, booted one-shot, and it was measured against Yocto on
+2026-09-01 across three configurations. **The short answer: AutoSD costs nothing
+measurable.** End-to-end latency stayed within 0.7 % of the Yocto baseline in every
+configuration, and the accuracy check produced bit-identical numbers in all four.
+
+| Run | Rootfs | Kernel | Runtime | v6 e2e | v7 e2e | vs Yocto |
+|---|---|---|---|---|---|---|
+| R0 | Yocto | vendor | chroot | 21.429 ms | 21.430 ms | reference |
+| R1 | AutoSD | vendor | chroot | 21.084 ms | 21.451 ms | -1.6 % / +0.1 % |
+| R2 | AutoSD | `6.1.102-autosd` | chroot | 21.310 ms | 21.287 ms | -0.6 % / -0.7 % |
+| R3 | AutoSD | `6.1.102-autosd` | podman | 21.378 ms | 21.328 ms | -0.2 % / -0.5 % |
+
+Twenty runs each, every session reporting
+`['RenesasExecutionProvider', 'CPUExecutionProvider']` — a latency figure with only
+`CPUExecutionProvider` in that list is void, not a result. R3 minus R2 isolates the
+container runtime itself at +0.2 % to +0.3 %, measured on one boot, which is inside
+run-to-run noise. Accuracy was `worst_rel = 3.3772e-01` for both candidates in all
+four runs, identical to the value the Yocto appliance has produced since 08-26.
+
+All four numbers were measured on the **stock bootloader with DRAM ECC ON**, which is
+not the vendor's documented configuration for the AI package. They are mutually
+comparable because all four share it; only the absolute values would move if the
+bootloader were swapped.
+
+### The one-shot boot, and its three non-negotiables
+
+AutoSD is entered from the U-Boot prompt and nothing is persisted.
+
+- **Never run `saveenv`.** `bootcmd` probes LUN 3, then 2, then 1, so Yocto is what
+  an unmodified environment finds first. Every AutoSD boot is therefore one reset away
+  from the board's documented role, and that is the entire safety argument for
+  operating it remotely. It has been exercised: the board returned to Yocto unaided
+  after each AutoSD run.
+- **Load the kernel at `0x61080000` and the device tree at `0x61000000`.** Lower
+  addresses are stomped and produce an undefined-instruction oops before any console
+  output that would explain it.
+- **The bootargs must carry all three of the following.** Each was learned by losing a
+  session to its absence:
+  - `pd_ignore_unused clk_ignore_unused` — without them this BSP gates clocks and power
+    domains that are in use, and the SoC stalls at `clk: Disabling unused clocks` with
+    no oops, no panic, no watchdog and no SysRq. There is no software recovery.
+  - `root=PARTUUID=…`, never `root=PARTLABEL=…` — PARTLABEL is a udev construct, and
+    these boots carry no initramfs, so the kernel's `name_to_dev_t()` cannot resolve it.
+  - `enforcing=0` — the AutoSD rootfs is `SELINUX=enforcing` but carries no
+    `security.selinux` xattrs. This is inert under the vendor kernel, which has no
+    SELinux at all, and fatal under `Image-autosd`, which does: enforcing plus fully
+    unlabeled locks sshd out with a "Server accepts key" then "Permission denied"
+    signature. Confirmed from the other side too — an `Image-autosd` boot logs
+    `avc: denied` against `unlabeled_t` with `permissive=1`.
+
+The kernel and the device tree may live on different logical units; the NPU device
+tree `r8a78000-ironhide-npu.dtb` is on `x5h-boot` alongside `Image-autosd`. Address
+logical units by partlabel, never by device letter — the letters move between boots.
+
+### The safety harness, and what each layer does not catch
+
+Three independent layers, because the failure this guards against is a board that
+stops answering with nobody at the bench.
+
+| Layer | Catches | Blind to |
+|---|---|---|
+| `oops=panic` plus `panic=10` | any oops, including one that leaves PID 1 alive and the box apparently healthy | a wedge that produces no oops |
+| systemd hardware watchdog, 30 s pet / 60 s timeout | PID 1 stopping | anything that leaves PID 1 scheduling normally |
+| `npu-deadman.timer`, 30 min deadline | a session wedged with the OS still running | a kernel that has stopped scheduling userspace |
+
+`oops=panic` is the load-bearing one. The watchdog fires only if PID 1 stops petting
+it, so an oops that leaves systemd alive is invisible to it, and that is precisely the
+case that stranded this board before: the vendor remoteproc driver oopses at about
+10 s into an AutoSD boot under the NPU device tree, and without `oops=panic` the board
+sat there with a live kernel and no route back. Verify `panic_on_oops` reads `1` on
+every AutoSD boot before measuring anything. If it reads `0` the kernel ignored the
+argument and the session is unprotected.
+
+The deadman is a return-to-safety, not a reset loop: because no `saveenv` was issued,
+the reboot it triggers lands on Yocto. Defer it from any long step with
+`touch /run/npu-heartbeat`. Its first run self-bootstraps and exits, so it can never
+reboot a session that is still starting; with `OnBootSec=10min` the earliest it can
+fire is roughly 40 minutes in.
+
+**The harness is proven at the mechanism level only, and this should not be
+overstated.** `oops=panic`, `panic=10` and the watchdog arming have all been observed
+doing their jobs on real boots. What has never been exercised is a genuine hard
+lockup, because one cannot be injected on this board: there is no `lkdtm`
+(`/sys/kernel/debug/provoke-crash` is absent), `sysrq` is `16` rather than `1`, and
+there are no kernel headers to build a test module with.
+
+**Two panic controls that look obvious are unavailable and must not be added.**
+`/proc/sys/kernel/softlockup_panic` and `/proc/sys/kernel/hung_task_panic` do not
+exist on this kernel — verified directly, not inferred from a config. Adding
+`softlockup_panic=1` or `hung_task_panic=1` to the command line is silently ignored,
+so a harness that relies on them protects nothing. `panic_on_rcu_stall` **is**
+available and is set via `sysctl.kernel.panic_on_rcu_stall=1`.
+
+The harness itself lives in this repository as
+[`config/10-watchdog.conf`](config/10-watchdog.conf),
+[`config/npu-deadman.service`](config/npu-deadman.service),
+[`config/npu-deadman.timer`](config/npu-deadman.timer) and
+[`scripts/npu-deadman.sh`](scripts/npu-deadman.sh). **It is deliberately not wired
+into the image manifest.** These are tools for an attended-by-nobody bench session on
+a board that is deliberately off its documented role for an hour; a deadman that
+reboots on a missing heartbeat is exactly wrong in a shipped image, where no heartbeat
+is the normal state. Install them into the target rootfs for the session, and let a
+reset take them away with everything else.
+
+### Bringing the NPU up under AutoSD
+
+Most of this is now automatic, from configuration the image already installs
+(`x5h-uio.conf`, `51-x5h-uio.rules`, `52-x5h-cmem.rules`). On an `Image-autosd` boot,
+`uio_pdrv_genirq` autoloads with its `of_id`, udev creates `/dev/npuc0` and
+`/dev/npuc1`, and the runner scripts mount the NPU work partition by partlabel
+themselves. An older board image may predate those manifest entries; check
+`/etc/udev/rules.d/` and `/etc/modprobe.d/` before assuming the image is current.
+
+**One step is still manual, and it is a real gap rather than an oversight.** `cmemdrv`
+is an out-of-tree class driver that lives on the NPU work partition, not in the kernel
+module tree, so nothing autoloads it and `systemd-modules-load` reports
+`Failed to find module 'cmemdrv'`. It must be loaded by explicit path:
+
+```sh
+insmod /opt/npu/cmemdrv.ko      # vermagic must match the running kernel exactly
+```
+
+Note that the correct module differs per personality: the copy on the work partition
+is built for `6.1.102-autosd` and is the right one when booting `Image-autosd`, but a
+boot of the AutoSD rootfs on the *vendor* kernel needs the vendor-kernel build from
+the Yocto module tree instead. Closing this properly means the image build installing
+a kernel-matched `cmemdrv.ko` into the module tree, which it cannot do today because
+the module is not a repository artifact. Until then, a `modules-load.d` entry naming
+`cmemdrv` would only log a failure at every boot, so this repository deliberately does
+not ship one.
+
+### Two checks that report failure on a perfectly healthy board
+
+Both were written into an earlier revision of the procedure and both are wrong.
+
+- **`grep -c cmem_other /proc/iomem` returns `0` on every kernel**, vendor and AutoSD
+  alike, because `/proc/iomem` labels these regions generically as `reserved`. The
+  expected count of four is real, but it lives in sysfs: the four entries are class
+  devices created by `cmemdrv` when it loads.
+
+  ```sh
+  ls /sys/class/cmem/ | grep -c '^cmem_other'   # 4 on a healthy board
+  ```
+
+- **`dmesg | grep -ci oops` always matches**, because `oops=panic` on the command line
+  matches the harness's own check. The stricter
+  `grep -ciE 'Oops:|Unable to handle kernel|Internal error|Call trace'` is better but
+  still not safe on Yocto, where the GPU driver emits a benign `WARN_ON` at probe and
+  `Call trace:` matches any warning. Judge a boot on
+  `Oops:|Unable to handle kernel|Internal error` and treat a `Call trace` hit as
+  something to read before believing.
+
+### Running the NPU under podman
+
+The container path reproduces the chroot path exactly, with one correction that costs
+an afternoon if missed. `/dev/npuc0` and `/dev/npuc1` are udev **symlinks** to
+`uio2`/`uio3`; `--device /dev/npuc0` resolves the symlink and the node appears in the
+container under its resolved name, so the backend's literal `open("/dev/npuc1")` fails
+with `driver_open failed: -1`. Name the destination explicitly:
+
+```sh
+podman run --rm --privileged   --device /dev/uio2:/dev/npuc0 --device /dev/uio3:/dev/npuc1   -v /opt/npu:/npu -w /npu <image>   /usr/local/bin/python3 /npu/renesas_ep_eval_latency.py --artifacts <A> --runs <N>
+```
+
+Container storage is btrfs on its own partition, so the `EXT4_FS_SECURITY` gap
+recorded elsewhere for this board does not apply to podman here.
+
 ## Related
 
 - [UIO](uio.md) — the mechanism `/dev/npuc*` arrives through, and the drop-in

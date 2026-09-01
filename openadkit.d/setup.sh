@@ -50,7 +50,7 @@ sudo -v
 compose_capable() {
   local temporary
   temporary=$(mktemp -d)
-  trap 'rm -rf "$temporary"' RETURN
+  trap 'rm -rf "$temporary"; trap - RETURN' RETURN
   cat >"$temporary/base.yaml" <<'EOF'
 services:
   probe:
@@ -168,7 +168,7 @@ install_gpu() {
     local key list
     key=$(mktemp)
     list=$(mktemp)
-    trap 'rm -f "$key" "$list"' RETURN
+    trap 'rm -f "$key" "$list"; trap - RETURN' RETURN
     curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
       | gpg --batch --yes --dearmor -o "$key"
     curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
@@ -207,7 +207,7 @@ configure_dds_buffers() {
   local config temporary
   config=/etc/sysctl.d/99-openadkit-dds.conf
   temporary=$(mktemp)
-  trap 'rm -f "$temporary"' RETURN
+  trap 'rm -f "$temporary"; trap - RETURN' RETURN
   cat >"$temporary" <<'EOF'
 # Open AD Kit CycloneDDS buffers for high-bandwidth sensor data.
 net.core.rmem_max=2147483647

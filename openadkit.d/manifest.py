@@ -315,6 +315,7 @@ class Deployment:
         gpu: bool,
         *,
         operational: bool = False,
+        require_gpu: bool = True,
     ) -> Selection:
         distro = ros_distro or current_context.default_ros_distro
         architecture = host_architecture()
@@ -331,7 +332,7 @@ class Deployment:
 
         gpu_requirement = self.requirements["gpu"]
         if not operational:
-            if gpu_requirement == "required" and not gpu:
+            if require_gpu and gpu_requirement == "required" and not gpu:
                 raise OpenADKitError(f"{self.name} requires --gpu")
             if gpu_requirement == "none" and gpu:
                 raise OpenADKitError(f"{self.name} does not provide a GPU mode")

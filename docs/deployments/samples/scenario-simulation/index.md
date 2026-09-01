@@ -41,10 +41,7 @@ and map filenames consistently.
 ## Stop
 
 ```bash
-cd deployments/scenario-simulation
-docker compose \
-  --env-file config.env \
-  down
+./openadkit stop scenario-simulation
 ```
 
 See also [Scenario test simulation](https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/)

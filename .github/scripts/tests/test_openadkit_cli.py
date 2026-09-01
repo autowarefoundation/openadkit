@@ -451,6 +451,34 @@ def test_fetch_zip_is_checksum_verified_and_published_atomically(tmp_path, http_
     assert (tmp_path / "home/data/example/required.txt").read_text() == "ok"
 
 
+def test_fetch_skips_required_gpu_flag(tmp_path, http_files):
+    directory, base_url = http_files
+    archive = directory / "data.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("dataset/required.txt", "ok")
+    checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+    data = [
+        {
+            "name": "dataset",
+            "kind": "zip",
+            "destinationEnv": "MAP_PATH",
+            "expectedRoot": "dataset",
+            "url": f"{base_url}/data.zip",
+            "sha256": checksum,
+            "requiredFiles": ["required.txt"],
+        }
+    ]
+    manifest = minimal_manifest(data=data)
+    manifest["requirements"]["gpu"] = "required"
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    result = run_cli(root, ["fetch", "example"])
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "home/data/example/required.txt").read_text() == "ok"
+    blocked = run_cli(root, ["validate", "example"])
+    assert blocked.returncode != 0
+    assert "requires --gpu" in blocked.stderr
+
+
 def test_fetch_checksum_failure_preserves_existing_data(tmp_path, http_files):
     directory, base_url = http_files
     archive = directory / "data.zip"

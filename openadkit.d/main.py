@@ -110,7 +110,12 @@ def main() -> int:
     compose.ensure_runtime_user()
 
     if args.command in ("fetch", "validate", "run"):
-        selection = deployment.select(kit, args.ros_distro, args.gpu)
+        selection = deployment.select(
+            kit,
+            args.ros_distro,
+            args.gpu,
+            require_gpu=args.command != "fetch",
+        )
         if args.command == "fetch":
             data.install_data(deployment, selection, args.force, include_gpu=True)
             return 0

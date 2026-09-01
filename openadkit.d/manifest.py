@@ -350,8 +350,6 @@ class Deployment:
                     f"{self.name} GPU mode does not support {architecture}; expected "
                     f"{', '.join(gpu_architectures)}"
                 )
-        elif gpu_requirement != "none" and self.compose["gpuFiles"]:
-            gpu = True
 
         services = list(self.compose["services"])
         required_environment = list(self.requirements["requiredEnv"])

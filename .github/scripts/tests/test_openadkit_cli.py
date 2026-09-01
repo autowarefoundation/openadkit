@@ -528,6 +528,51 @@ def test_unsafe_zip_member_is_rejected(tmp_path, http_files):
     assert not (tmp_path / "home/data/example").exists()
 
 
+def test_run_accepts_force():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "run", "--help"],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "--force" in result.stdout
+
+
+def test_run_force_reinstalls_incomplete_data(tmp_path, http_files):
+    directory, base_url = http_files
+    payload = directory / "required.txt"
+    payload.write_text("replaced")
+    data = [
+        {
+            "name": "dataset",
+            "kind": "files",
+            "destinationEnv": "MAP_PATH",
+            "files": [
+                {
+                    "path": "required.txt",
+                    "url": f"{base_url}/required.txt",
+                    "sha256": hashlib.sha256(payload.read_bytes()).hexdigest(),
+                }
+            ],
+            "requiredFiles": ["required.txt"],
+        }
+    ]
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=data))
+    target = tmp_path / "home/data/example"
+    target.mkdir(parents=True)
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    blocked = run_cli(root, ["run", "example", "--pull", "never"], env=path_env)
+    assert blocked.returncode != 0
+    assert "incomplete data" in blocked.stderr
+    assert "rerun with --force" in blocked.stderr
+    result = run_cli(
+        root, ["run", "example", "--pull", "never", "--force"], env=path_env
+    )
+    assert result.returncode == 0, result.stderr
+    assert (target / "required.txt").read_text() == "replaced"
+
+
 @pytest.mark.parametrize("command", ("validate", "fetch", "run"))
 def test_selected_commands_accept_ros_distro(command):
     result = subprocess.run(
@@ -1000,21 +1045,36 @@ def test_empty_services_are_rejected(tmp_path):
     assert "compose.services must not be empty" in result.stdout
 
 
-def test_status_includes_gpu_overlay_without_flags(tmp_path):
+def test_status_uses_last_run_gpu_selection(tmp_path):
     manifest = minimal_manifest()
     manifest["requirements"]["gpu"] = "optional"
     manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
-    result = run_cli(
-        root,
-        ["status", "example"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
+    result = run_cli(root, ["status", "example"], env=path_env)
     assert result.returncode == 0, result.stderr
-    text = calls.read_text()
-    assert "docker-compose.gpu.yaml" in text
-    assert text.rstrip().endswith(" ps")
+    assert "docker-compose.gpu.yaml" not in calls.read_text()
+    assert calls.read_text().rstrip().endswith(" ps")
+
+    calls.write_text("")
+    result = run_cli(root, ["run", "example", "--gpu", "--pull", "never"], env=path_env)
+    assert result.returncode == 0, result.stderr
+
+    calls.write_text("")
+    result = run_cli(root, ["status", "example"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "docker-compose.gpu.yaml" in calls.read_text()
+
+    calls.write_text("")
+    result = run_cli(root, ["run", "example", "--pull", "never"], env=path_env)
+    assert result.returncode == 0, result.stderr
+
+    calls.write_text("")
+    result = run_cli(root, ["status", "example"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "docker-compose.gpu.yaml" not in calls.read_text()
 
 
 def _host_architecture():

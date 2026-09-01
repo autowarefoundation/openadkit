@@ -46,6 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--pull", choices=("missing", "always", "never"), default="missing"
     )
+    run.add_argument("--force", action="store_true")
 
     status = subparsers.add_parser("status", help="show deployment status")
     status.add_argument("deployment")
@@ -127,12 +128,15 @@ def main() -> int:
             return 0
 
         compose.check_daemon(selection)
-        data.install_data(deployment, selection, False)
+        data.install_data(deployment, selection, args.force)
         compose.start(deployment, selection, args.pull, configured_services)
+        compose.save_runtime(deployment, selection)
         print(f"running: {deployment.name}")
         return 0
 
-    selection = deployment.select(kit, None, False, operational=True)
+    saved = compose.load_runtime(deployment)
+    ros_distro, gpu = saved if saved else (None, False)
+    selection = deployment.select(kit, ros_distro, gpu, operational=True)
     compose.require_docker()
     if args.command == "status":
         compose.status(deployment, selection)

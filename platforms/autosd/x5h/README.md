@@ -46,6 +46,10 @@ answered before board time.
   Quadlet units, with the trajectory follower on the CR52 (issue #120 M7):
   staging, unit ordering, the three smoke modes and the MRM-chain oracle,
   and why the scenario's junit is red on a healthy board.
+- [MRM before/after demo](mrm-before-after-demo.md) — the CES-style
+  before/after comparison on this board: two CR52 actuation parameter
+  profiles, one scenario, stop distances compared by the companion-host
+  orchestrator.
 
 ## Folder Structure
 

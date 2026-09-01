@@ -90,3 +90,122 @@ extra_repos:
 # (content.ipp.yml's signing_info for aboot.img/ukibootN.efi) is
 # secure-boot signing metadata, unrelated to the partition/device layer.
 use_efipart: false
+
+# Keep Quadlet a BOOT-TIME generator instead of an image-build-time one.
+#
+# THE DEFECT THIS FIXES is not "no units are produced". On a default build
+# the component units ARE produced -- and then frozen at image-build time,
+# which is the actual problem.
+#
+# aib, with pregenerate_quadlets at its default of true, runs Quadlet inside
+# the build chroot (include/computed-vars.ipp.yml:741 emits an
+# org.osbuild.lorax-script stage running files/quadlet_preprocess.sh, which
+# does `chroot $ROOT /usr/lib/systemd/system-generators/podman-system-generator
+# -no-kmsg-log -v /usr/lib/systemd/system`) and writes the .service files and
+# their default.target.wants symlinks into /usr/lib/systemd/system. Having
+# done so it masks the runtime generator, because it believes the work is
+# already finished: computed-vars.ipp.yml:583-587 appends
+# podman-system-generator to image_masked_generators under
+# `mpp-if: pregenerate_quadlets`, and the org.osbuild.systemd stage at :637
+# materialises that as /etc/systemd/system-generators/podman-system-generator
+# -> /dev/null. Note the pre-generation at :741 comes AFTER the masking at
+# :637 in the same image_extra_stages list, and reaches the generator by its
+# absolute /usr/lib path, so the mask does not stop it. An image built that
+# way boots with working units.
+#
+# What it does not have is a live /etc/containers/systemd. Editing a
+# .container there and running `systemctl daemon-reload` changes nothing --
+# no error, no journal line, no warning, because the generator that would
+# have read the directory is masked. The only way to change a unit becomes a
+# ~23 minute CI image build followed by a reflash.
+#
+# That breaks the workflow every board procedure on this branch is built on:
+# the bring-up sequence documented in x5h-rootfs.aib.yml, the Stage 1/2 board
+# sessions that scp revised units into /etc/containers/systemd and reload,
+# and this manifest's own statement that Quadlet "auto-enables at
+# unit-generation time on every boot". A silently-ignored edit is also
+# precisely the class of failure this profile keeps paying for.
+#
+# WHY THE BOARD SHOWED NO UNITS AT ALL, and why that is not evidence for a
+# stronger claim than the one above. The 2026-08-18 Stage 1 session found
+# /etc/systemd/system-generators/ holding seventeen /dev/null masks and
+# `systemctl list-unit-files "awf-oak*"` completely empty, and had to install
+# a volatile /run/systemd/system-generators/podman-system-generator symlink
+# (that directory outranks /etc in systemd's generator search path) to get
+# any unit at all. The empty listing was NOT the mask suppressing units this
+# manifest installs. That board's image predates this manifest ever carrying
+# them: /etc/build-info says TIMESTAMP="2026-08-07 23:15:22 UTC", while the
+# component files were first added to the manifest by d95985c on 2026-08-18.
+# Pre-generation had nothing to pre-generate -- /usr/lib/systemd/system on
+# that board contains no awf-oak* unit and no awf-oak* entry under
+# default.target.wants -- and the mask then made the files the session
+# hand-copied into /etc/containers/systemd inert, which is the live-directory
+# problem above, hit from the runtime side.
+#
+# REMEDIATING A BOARD THAT ALREADY RUNS SUCH AN IMAGE, without a reflash. The
+# /run symlink that session installed is volatile, and on 2026-08-21 a cold
+# power cycle duly lost it: the generator did not run, no awf-oak unit existed,
+# and the component stack did not come back -- which reads as a regression in
+# the stack rather than as the mask it actually is. systemd logs the cause only
+# at debug level ("File '/usr/lib/systemd/system-generators/
+# podman-system-generator' is masked by previous entry"), so
+# `systemd-analyze log-level debug; systemctl daemon-reload` and grepping the
+# journal for "generator" is how to see it without rebooting.
+#
+# The durable fix on such a board is to point the /etc entry at the real
+# generator instead of at /dev/null:
+#
+#   ln -sf /usr/libexec/podman/quadlet \
+#     /etc/systemd/system-generators/podman-system-generator
+#
+# which is this manifest's decision applied by hand, and is revertible by
+# pointing it back at /dev/null. Verified on the board 2026-08-21: five units
+# generated at boot with no daemon-reload, all four component services active
+# and their containers up after a reboot. A board flashed with an image built
+# from this manifest needs none of it.
+#
+# WHAT SETTING IT FALSE DOES: podman-system-generator drops out of
+# image_masked_generators and the quadlet_preprocess stage drops out of the
+# build, so the stock generator at
+# /usr/lib/systemd/system-generators/podman-system-generator (present and
+# executable on the board, a symlink to ../../../libexec/podman/quadlet) runs
+# normally on the FIRST boot and on every daemon-reload after it. Verified by
+# running aib's own mpp preprocessor with the override in place: both the
+# masked-list entry and the pre-generation stage disappear.
+#
+# NOT the same cause as the fstab generator. selfboot.md:232 reports that
+# systemd-fstab-generator does not run on this image either. That is a
+# DIFFERENT mask: systemd-fstab-generator is a plain entry in aib's
+# unconditional image_masked_generators default
+# (include/defaults.ipp.yml:328, one of the sixteen that are always masked),
+# not something pregenerate_quadlets adds. Setting this flag false does NOT
+# unmask it. selfboot.md's explicit /etc/systemd/system/var-lib-containers.mount
+# workaround therefore remains necessary, and must not be removed on the
+# strength of this change -- without it podman silently uses the root
+# filesystem instead of the btrfs LUN.
+#
+# Why not unmask it from the manifest with an add_symlinks entry pointing
+# /etc/systemd/system-generators/podman-system-generator at
+# /usr/libexec/podman/quadlet -- the obvious-looking fix, and the one the
+# board report proposed. It does not merely fail to help, it BREAKS THE
+# BUILD. aib's add_symlinks becomes an org.osbuild.ln stage in the `rootfs`
+# pipeline, while the mask is created later, in the `ostree-tree` pipeline,
+# by org.osbuild.systemd's masked_generators handling -- and that stage does
+# a bare os.symlink("/dev/null", target) with no unlink-first and no
+# force flag. Our symlink would already occupy the path, so the masking stage
+# raises FileExistsError and the image build aborts. Verified against the
+# upstream stage source and reproduced locally. An add_files shim at the same
+# path collides identically, for the same reason.
+#
+# Nor a tmpfiles.d `L` line: generators run before systemd-tmpfiles-setup, so
+# the symlink would first exist one boot too late -- correct only from the
+# second boot onward, which is a worse trap than the bug.
+#
+# The cost of turning pre-generation off is a few hundred milliseconds of
+# generator run per boot, plus the loss of nothing else: the other sixteen
+# masked generators are untouched, because they come from aib's unconditional
+# image_masked_generators default (include/defaults.ipp.yml:307-334) rather
+# than from this flag. bootc-systemd-generator, for instance, stays masked --
+# it is one of those sixteen plain entries (:334), not something this flag
+# controls.
+pregenerate_quadlets: false

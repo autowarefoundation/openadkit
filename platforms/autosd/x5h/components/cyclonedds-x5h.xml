@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+
+  <!-- Sizing note (applies to both domains' <Sizing> blocks below):
+       ReceiveBufferSize and ReceiveBufferChunkSize are CycloneDDS's
+       internal receive-buffer pool, a different setting from
+       General/SocketReceiveBufferSize below, which is a request to the
+       kernel for a larger SO_RCVBUF on the underlying socket. The values
+       here (16384B / 2048B) are carried over unchanged from the CR52-side
+       DDS configuration this file was written to interoperate with, so that
+       both ends of the domain-2 link size their receive pools the same way.
+       They are internally coherent: 16384 is an exact multiple of 2048, and
+       the chunk size exceeds both tap0's 462-byte MTU and the 1400B
+       MaxMessageSize. ("MTU" deliberately, not "fragment size": domain 2
+       now sets General/FragmentSize explicitly and the two are unrelated
+       numbers.) Whether this pool is thin for six bridged
+       topics is an open question worth flagging here, not retuning in this
+       file.
+
+       This file deliberately does NOT set General/SocketReceiveBufferSize.
+       net.core.rmem_max is 212992 bytes (208KB) on both the companion host
+       and the board, and CycloneDDS treats a SocketReceiveBufferSize
+       minimum it cannot obtain from the kernel as fatal: it aborts at
+       participant creation ("failed to increase socket receive buffer size
+       to at least N bytes, current is 425984 bytes" -> "error creating
+       node: rcl node's rmw handle is invalid" -> exit 1) rather than
+       degrading to what it was given. Any value above rmem_max therefore
+       turns this file into a stack that will not start. Do not add
+       SocketReceiveBufferSize here.
+
+       This note used to say the images being overridden ship their own
+       cyclonedds.xml requesting <SocketReceiveBufferSize min="10MB"/>, and
+       that avoiding that request was why our config is mounted. That was
+       true of the retired componentized images and is NOT true of the
+       monolithic ones this profile now runs: measured on the board,
+       `find / -xdev -name "cyclonedds*.xml"` returns nothing in either
+       universe-after or scenario-simulator, and neither sets CYCLONEDDS_URI
+       in its image environment. There is no config to override and no
+       10MB request to avoid.
+
+       So the reason this file is mounted is now entirely POSITIVE, and it
+       is what would be lost by unmounting it: domain 2 has to be pinned to
+       tap0 by name with autodetermine="false", multicast disabled, a static
+       peer at the CR52, and a stated FragmentSize. CycloneDDS defaults do
+       none of that, and with no config at all domain 2 would not form. -->
+
+
+  <!-- Domain 1: the Autoware container plus the relay, the restamp node and
+       the scenario runner. All four use Network=host, so discovery stays on
+       the loopback path. -->
+  <Domain id="1">
+    <General>
+      <AllowMulticast>spdp</AllowMulticast>
+      <MaxMessageSize>1400B</MaxMessageSize>
+      <Interfaces>
+        <NetworkInterface autodetermine="true" priority="default" multicast="default" />
+      </Interfaces>
+    </General>
+    <Sizing>
+      <ReceiveBufferSize>16384B</ReceiveBufferSize>
+      <ReceiveBufferChunkSize>2048B</ReceiveBufferChunkSize>
+    </Sizing>
+    <Discovery>
+      <ParticipantIndex>none</ParticipantIndex>
+    </Discovery>
+  </Domain>
+
+  <!-- Domain 2: the CR52 actuation module, reached over the rpmsg-eth link.
+       tap0 is a point-to-point link with no multicast, so SPDP has nowhere
+       to multicast and the peer is configured statically. The CR52 side has
+       carried static peers since M6, so both ends of the link agree.
+
+       MaxMessageSize stays at 1400B: RTPS fragmentation down to tap0's
+       462-byte MTU happens below this setting, and lowering it here would
+       double-fragment for no benefit.
+
+       FragmentSize is pinned to 1344B, which IS the CycloneDDS default;
+       this changes no behaviour today, and that is the point. It is the
+       threshold that decides whether a sample goes out whole or as a
+       DATA_FRAG train: CycloneDDS compares the serialized sample size,
+       CDR encapsulation header included, against it with a strict ">" and
+       fragments if it loses (releases/0.10.x
+       src/core/ddsi/src/q_transmit.c:836; Humble ships cyclonedds 0.10.5).
+       On this link fragmentation is not a performance question. The CR52
+       is a RELIABLE reader on a 3MB heap, its receive path holds every
+       fragment for defragmentation, and the pool exhausts the heap and
+       _exits the firmware in about 8 s.
+
+       It is pinned because components/nodes/traj_relay.py sizes every
+       trajectory it publishes against this number: its SERIALIZED_BYTE_BUDGET
+       of 1200B exists to clear this 1344B with 144B to spare. Left as an
+       inherited default, a CycloneDDS upgrade could lower it and reintroduce
+       the heap death with no diff anywhere to point at. THE TWO NUMBERS MOVE
+       TOGETHER: change this and the relay's budget has to change with it.
+
+       Domain 1 is deliberately left alone. Its readers are Autoware
+       containers on the host loopback path with no such heap constraint,
+       and the failure this pin guards against is specific to the CR52.
+
+       The ${X5H_SI_INTERFACE:-tap0} / ${X5H_SI_PEER:-172.16.52.2} defaults
+       exist so a later host rehearsal can retarget domain 2 at a veth rig
+       without a second copy of this file. On the board both defaults are
+       correct and neither variable is set. -->
+  <Domain id="2">
+    <General>
+      <AllowMulticast>false</AllowMulticast>
+      <MaxMessageSize>1400B</MaxMessageSize>
+      <FragmentSize>1344B</FragmentSize>
+      <Interfaces>
+        <NetworkInterface autodetermine="false" priority="default" multicast="false" name="${X5H_SI_INTERFACE:-tap0}"/>
+      </Interfaces>
+    </General>
+    <Sizing>
+      <ReceiveBufferSize>16384B</ReceiveBufferSize>
+      <ReceiveBufferChunkSize>2048B</ReceiveBufferChunkSize>
+    </Sizing>
+    <Discovery>
+      <ParticipantIndex>none</ParticipantIndex>
+      <Peers>
+        <Peer address="${X5H_SI_PEER:-172.16.52.2}"/>
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

@@ -1,8 +1,10 @@
 #!/bin/sh
 # ExecStartPre helper for rpmsg-eth.service (installed at
-# /usr/local/sbin/rpmsg-eth-ifup.sh -- see config/rpmsg-eth.service for the
-# full install path). Creates tap0 and brings it up with the frozen link
-# parameters for the CR52 bridge: address 172.16.52.1/24, MAC
+# /usr/sbin/rpmsg-eth-ifup.sh by aib/x5h-rootfs.aib.yml -- NOT
+# /usr/local/sbin, which automotive-image-builder refuses to install into;
+# see config/rpmsg-eth.service for that split). Creates tap0 and brings it up
+# with the frozen link parameters for the CR52 bridge: address
+# 172.16.52.1/24, MAC
 # 02:5c:52:00:00:01, and, critically, MTU 462.
 #
 # MTU 462 is NOT a tuning knob: max Ethernet frame on this link is 476 bytes

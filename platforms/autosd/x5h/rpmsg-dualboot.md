@@ -246,22 +246,54 @@ invocation for staging onto the board.)
 
 ### Staging
 
-Not installed by `aib/x5h-rootfs.aib.yml` today — same manual
-install-to-`/usr/local` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above.
-Stage the daemon, its `ifup` helper and its unit onto the NFS export (see
+`aib/x5h-rootfs.aib.yml` installs `rpmsg-eth.service` (to
+`/etc/systemd/system/`) and its `ifup` helper to **`/usr/sbin/rpmsg-eth-ifup.sh`**
+today, so the manual procedure below covers the daemon binary and nothing
+else. Only the binary is not baked in — same manual
+install-to-`/usr/local/bin` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above,
+and the same reason: the board image ships no compiler, so nothing built
+from source lands there except by hand (see "Building" above).
+
+The `/usr/sbin` helper vs `/usr/local/bin` binary split is deliberate.
+`automotive-image-builder` installs only under `/etc/`, `/usr/` or `/var/`
+and refuses `/usr/local` outright — the build aborts with "Path
+'/usr/local/…' is not allowed" — because this rootfs is ostree-structured
+and ships `/usr/local` as a symlink to `../var/usrlocal` (see
+[selfboot.md](selfboot.md), "A trap when staging files into the image").
+So anything the **image** ships lives under `/usr`; anything the
+**operator** stages by hand after boot lives under `/usr/local`, which is
+the correct place for it at runtime. `cr52-rproc-up.sh` below is
+hand-staged for the same reason and likewise stays in `/usr/local/sbin`.
+
+`80-x5h.preset` deliberately does not enable `rpmsg-eth.service`, but that
+does not keep the unit out of a normal boot: `components/awf-oak-bridge.container`
+carries `Requires=rpmsg-eth.service` together with `[Install]
+WantedBy=default.target`, so Quadlet auto-enables the bridge and the bridge
+pulls the link up at boot whatever the preset says. The preset omission only
+matters on boots where nothing else wants the link — an image without the
+component stack, or a board where the bridge unit is disabled or masked.
+
+What keeps an unstaged binary benign is `ConditionPathExists=/usr/local/bin/rpmsg-eth`
+in the unit. Without it, `ExecStart` fails at once and `Restart=on-failure`
++ `RestartSec=1` + `StartLimitIntervalSec=0` retry forever at roughly 1 Hz
+— an endless restart loop, not the single permanently-failed unit this
+document used to claim. A condition that is not met is not a failure:
+systemd logs one line naming the missing path, skips the unit, and reports
+the start job as successful, so the bridge's `Requires=` is satisfied
+cleanly.
+
+Stage the daemon onto the NFS export (see
 "Staging the assets" above for why `/var/tmp`, not `/tmp`, is the export
-path to use), then install on the target:
+path to use), then install it on the target:
 
 ```
-install -m0755 rpmsg-eth rpmsg-eth-ifup.sh <export>/var/tmp/rpmsg/
-install -m0644 rpmsg-eth.service            <export>/var/tmp/rpmsg/
+install -m0755 rpmsg-eth <export>/var/tmp/rpmsg/
 ```
 
 ```
 install -m0755 /var/tmp/rpmsg/rpmsg-eth /usr/local/bin/rpmsg-eth
-install -m0755 /var/tmp/rpmsg/rpmsg-eth-ifup.sh /usr/local/sbin/rpmsg-eth-ifup.sh
-install -m0644 /var/tmp/rpmsg/rpmsg-eth.service /etc/systemd/system/rpmsg-eth.service
 systemctl daemon-reload
+systemctl enable --now rpmsg-eth.service
 ```
 
 ### Prerequisites

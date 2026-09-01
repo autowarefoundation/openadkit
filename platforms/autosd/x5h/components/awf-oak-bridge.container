@@ -1,0 +1,75 @@
+[Unit]
+Description=Open AD Kit X5H domain bridge (DDS domain 1 <-> domain 2)
+Wants=network-online.target
+After=network-online.target
+Requires=rpmsg-eth.service
+After=rpmsg-eth.service
+# rpmsg-eth.service brings up tap0 (domain 2's link to the CR52), and this
+# container pins domain 2 to tap0 with autodetermine="false" and starts
+# domain_bridge immediately. Without this Requires=/After= pair the bridge
+# can race a tap0 that does not exist yet. rpmsg-eth.service is
+# deliberately NOT enabled in this profile's boot preset (see
+# rpmsg-dualboot.md), so this dependency documents the requirement and
+# makes `systemctl start awf-oak-bridge` pull the link up itself rather
+# than failing obscurely.
+#
+# This is the ONLY Requires= anywhere in the five-unit set, and it points
+# at a host unit rather than at another container. No container unit here
+# requires or wants another one; see awf-oak-autoware.container for why
+# that rule exists and what breaks when it is relaxed.
+
+[Install]
+WantedBy=default.target
+
+[Container]
+# Network=host is the load-bearing line for domain 2: tap0 is a host
+# interface created by rpmsg-eth.service, and cyclonedds-x5h.xml pins domain
+# 2 to it by name with autodetermine="false". Without host networking the
+# bridge would come up in its own netns, tap0 would not exist there, and
+# CycloneDDS would fail to find the configured interface. Domain 1 stays
+# reachable on loopback for the same reason.
+Network=host
+ContainerName=awf-oak-bridge
+Image=${BRIDGE_IMAGE}
+# Pull=never. BRIDGE_IMAGE is a localhost/* reference, which podman reads
+# as a registry literally named `localhost`, NOT as "use the local store
+# only". While the image is present the local store answers first and the
+# mistake is invisible; when it is ABSENT podman retries https://localhost/v2/
+# three times and reports `dial tcp [::1]:443: connect: connection refused`
+# -- a registry error for what is really a missing image. Observed on the
+# board 2026-08-18 for this exact unit. With this key a missing image fails
+# as a missing image.
+Pull=never
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# `Z` (private label): this unit is the only one that mounts the topic map.
+Volume=/etc/containers/systemd/bridge-config.yaml:/autoware/bridge-config.yaml:ro,Z
+# No Exec=: the image entrypoint runs domain_bridge directly. Ours is the
+# APPEND-shaped entrypoint of the three in this set -- it runs the bridge
+# and treats any command it is given as a REPLACEMENT (see
+# components/bridge/entrypoint.sh), so setting Exec= here would silently
+# stop domain_bridge from running rather than adding to it.
+#
+# The bridge keeps its own image because domain_bridge is in NEITHER
+# monolithic image -- measured, not assumed: `ros2 pkg prefix domain_bridge`
+# reports "Package not found" in universe-after, and there is no
+# share/domain_bridge in either image. components/bridge/Dockerfile now
+# layers ros-humble-domain-bridge onto universe-after, the image the board
+# already holds, so the bridge costs one thin layer rather than a second
+# multi-gigabyte base on a store with ~6.3 GB free.
+
+[Service]
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${BRIDGE_IMAGE} expands to the empty string
+# and podman exits with "repository name must have at least one component".
+# Verify by parsing the generated [Service] section, not by grepping the
+# file for the key.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+# Restart=on-failure is a deviation from run.yml's `restart: "no"`, recorded
+# as such in awf-oak-x5h.env. StartLimitIntervalSec is what makes it safe:
+# see that note for the arithmetic.
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60

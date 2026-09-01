@@ -1,0 +1,122 @@
+[Unit]
+Description=Open AD Kit X5H scenario runner (MRM scenario)
+Wants=network-online.target
+After=network-online.target
+# Ordering only, no Requires= -- see the long note in
+# awf-oak-autoware.container. run.yml's `depends_on: planning:
+# service_started` is deliberately service_STARTED rather than
+# service_healthy, so the edge is "after", not "once ready"; the runner's
+# own INITIALIZE_DURATION is what actually waits for Autoware.
+After=awf-oak-autoware.service
+
+# Same map guard as awf-oak-autoware, and it belongs here independently:
+# this unit does not read map_path, it reads the scenario, and the
+# scenario's RoadNetwork hard-codes
+# /autoware/scenario-sim/map/lanelet2_map.osm (LogicFile) and
+# .../pointcloud_map.pcd (SceneGraphFile). With the map directory empty the
+# runner starts, fails to build the road network, and the run ends as a
+# timeout rather than as "the map is missing". See the long note in
+# awf-oak-autoware.container for why this is Condition and not Assert, and
+# for what the retired extractor's Requires= edge used to guarantee.
+ConditionPathExists=/var/lib/awf/scenario-sim/map/lanelet2_map.osm
+ConditionPathExists=/var/lib/awf/scenario-sim/map/pointcloud_map.pcd
+
+# NO [Install] SECTION, deliberately. A scenario must never run unbidden at
+# boot. Quadlet auto-enables any .container that has an [Install] section,
+# regardless of what 80-x5h.preset says, and there is no preset knob that
+# keeps a Quadlet-generated unit present but dormant -- omitting [Install]
+# is the only lever. This unit is started on demand, by x5h-stack-smoke.sh's
+# `drive` mode.
+#
+# The retired awf-oak-x5h.pod defeated this: pod members get a Wants= from
+# the generated pod service, so this unit ran without anyone starting it and
+# was killed with SIGTERM when the pod went down (observed 2026-08-18).
+# Dropping the pod is what makes the omission effective again; do not
+# reintroduce any Requires=/Wants= edge that points at this unit.
+
+[Container]
+# Host networking, matching run.yml's `network_mode: host` and putting
+# scenario_test_runner on the same domain 1 loopback path as Autoware.
+Network=host
+ContainerName=awf-oak-simulator
+# NOTE ON THE NAME, AND THE TRAP IT SETS: `awf-oak-simulator` previously
+# meant the componentized tier4_simulator_component unit. It now means the
+# scenario runner, matching run.yml's `simulator` service. The old meaning
+# is gone with the old image set, so a board still carrying the previous
+# unit file must have /etc/containers/systemd reinstalled, not merged.
+#
+# The sharper hazard is in scripts/x5h-stack-smoke.sh, which still lists
+# `awf-oak-simulator` in CORE_UNITS -- the set it starts for the Stage 1
+# "Autoware alone on domain 1" isolation gate. Under the new meaning that
+# line starts a SCENARIO RUN as part of an isolation gate. And because a
+# unit of that name still EXISTS, the mistake does not announce itself:
+# systemctl succeeds, check_units is satisfied, and the gate reports on a
+# board that is quietly driving a scenario. A rename that deleted the name
+# outright would have failed loudly instead; reusing it is what converts
+# the error into a silent one.
+#
+# That script is updated by a separate change (it also has to swap
+# awf-oak-map for awf-oak-autoware and awf-oak-scenario for this unit), so
+# it is deliberately not edited here -- but nothing in this file should be
+# read as saying the collision is harmless until it is.
+Image=${SCENARIO_SIMULATOR_IMAGE}
+# See the Pull=never note in awf-oak-autoware.container -- with a real
+# ghcr.io reference a store miss would otherwise start a 7.13 GB pull.
+Pull=never
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/etc/containers/systemd/cyclonedds-x5h.xml:/autoware/cyclonedds.xml:ro,z
+# Shared read-write with awf-oak-autoware; `z` not `Z` for that reason, and
+# read-write on purpose. Full reasoning, and the directory's contents, are
+# in awf-oak-autoware.container.
+Volume=/var/lib/awf/scenario-sim:/autoware/scenario-sim:z
+# SCENARIO= in awf-oak-x5h.env points at this exact in-container path, and
+# the scenario's own RoadNetwork/LogicFile and SceneGraphFile entries
+# hard-code /autoware/scenario-sim/map/{lanelet2_map.osm,pointcloud_map.pcd}
+# as absolute in-container paths. The three agree by construction; changing
+# any one of them means changing all three.
+Volume=/etc/containers/systemd/mrm-scenario.yaml:/autoware/scenario-sim/mrm-scenario.yaml:ro,z
+# The verdict path. OUTPUT_DIRECTORY=/var/log/awf/scenario-output in
+# awf-oak-x5h.env writes the junit result here, where the board smoke script
+# reads it. This diverges from the reference demo, which leaves
+# OUTPUT_DIRECTORY unset and lets the result land in the scenario directory
+# -- our milestone's verdict IS the junit file, so it gets a stable path of
+# its own that does not move if the scenario directory layout changes.
+# `Z` (private label) is correct: this unit is the only one that mounts it.
+Volume=/var/log/awf:/var/log/awf:Z
+# NO Exec=, and this is the single most breakable line in the file --
+# there is nothing here to see, which is the problem.
+#
+# This image's /entrypoint.sh runs `run_scenario_simulator` ONLY when it is
+# given no arguments:
+#
+#     if [ $# -gt 0 ]; then exec "$@"; else run_scenario_simulator; fi
+#
+# So any Exec= REPLACES the scenario run instead of configuring it, and the
+# unit then starts cleanly, exits cleanly, and produces no verdict at all.
+# Everything the runner needs is therefore driven through EnvironmentFile=.
+# The ten variables it reads are ARCHITECTURE_TYPE, SENSOR_MODEL,
+# VEHICLE_MODEL, INITIALIZE_DURATION, GLOBAL_FRAME_RATE, OUTPUT_DIRECTORY,
+# SCENARIO, GLOBAL_TIMEOUT, RECORD and USE_SIM_TIME; `launch_autoware` and
+# `launch_rviz` are hard-coded false inside the entrypoint and are NOT read
+# from the environment, which is why LAUNCH_AUTOWARE / LAUNCH_RVIZ /
+# LAUNCH_VISUALIZATION / USE_CUSTOM_CENTERLINE are gone from the env file.
+#
+# The retired awf-oak-scenario unit did the opposite -- it set Exec= and
+# computed scenario:= itself -- because the retired scenario-simulator-v2
+# image had no such entrypoint. Do not port that shape back.
+
+[Service]
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${SCENARIO_SIMULATOR_IMAGE} expands to the
+# empty string and podman exits with "repository name must have at least
+# one component". Verify by parsing the generated [Service] section, not by
+# grepping the file for the key.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+# Type=oneshot with RemainAfterExit, carried over from the retired
+# awf-oak-scenario unit: a scenario run terminates, and the unit staying
+# "active (exited)" afterwards is what lets the smoke script distinguish
+# "ran and finished" from "never started".
+Type=oneshot
+RemainAfterExit=yes

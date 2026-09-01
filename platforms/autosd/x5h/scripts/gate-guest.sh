@@ -49,7 +49,34 @@ systemctl --failed --no-legend 2>/dev/null | head -20
 # tree + host-side depmod make modprobe work here; a failure is a staging
 # bug and every later gate would fail confusingly without this loud marker
 # (the judge fails the run on it).
-if ! modprobe -a overlay veth bridge br_netfilter btrfs nf_tables; then
+#
+# The nft_* expression modules are named here EXPLICITLY rather than left to
+# the kernel's request_module() autoload, and that is the whole point of
+# listing them. netavark applies its ruleset atomically: one `table inet
+# netavark` carrying nat-type chains, a masquerade statement and ct-state
+# matches. If an expression it uses is not already resident, the apply is
+# rejected whole, with a single opaque line naming neither rule nor module:
+#
+#   internal:0:0-0: Error: Could not process rule: Operation not supported
+#
+# That failure is not confined to GATE6. captest_cap_ok() below has to
+# `podman run` a container, so a netavark that cannot build a network takes
+# GATE2, GATE3 and GATE4 down with it and makes three working container
+# stores look like broken ones. The kernel config is not the problem:
+# NF_TABLES_INET is built in and every module named below ships in the
+# injected tree -- only their residency when nft runs is.
+# nft_fib_* belongs in this list for the same reason as the rest, and its
+# absence here was an inconsistency with kernel/autosd.config, which states
+# the requirement outright: netavark builds its port-forwarding entry points
+# as `fib daddr type local jump NETAVARK-HOSTPORT-DNAT` in both prerouting
+# and output, so without the fib expression resident the same atomic apply
+# is rejected whole -- and that reads as GATE2/3/4 failing too, because
+# their capability probe has to start a container. inet is the family
+# netavark's table lives in; it resolves fib through the two address-family
+# backends, so all three are loaded.
+if ! modprobe -a overlay veth bridge br_netfilter btrfs nf_tables \
+        nf_conntrack nf_nat nft_chain_nat nft_nat nft_masq nft_ct \
+        nft_fib_ipv4 nft_fib_ipv6 nft_fib_inet; then
     echo GATE1_MODPROBE_FAIL
 fi
 
@@ -99,6 +126,107 @@ else
     echo GATE4_FAIL; tail -5 /tmp/g4.log
 fi
 
+# Bisect what nftables actually refuses, so a GATE6 failure names the
+# missing capability instead of only quoting netavark.
+#
+# netavark applies its whole ruleset in one atomic transaction, and nft
+# reports a rejection as a single opaque line that identifies neither the
+# rule nor the expression:
+#
+#   internal:0:0-0: Error: Could not process rule: Operation not supported
+#
+# That message is unactionable on its own -- it has already cost one CI
+# cycle spent on a wrong guess. This applies the pieces of a netavark-shaped
+# ruleset one at a time, each in its own throwaway table, and prints a
+# marker per step. The first FAIL names the capability the kernel is
+# missing. Every step is torn down again, so this observes and changes
+# nothing.
+nft_probe() {
+    _p_try() { # label ruleset
+        if printf '%s\n' "$2" | nft -f - 2>/dev/null; then
+            echo "GATE6_NFTPROBE_$1=ok"
+        else
+            echo "GATE6_NFTPROBE_$1=FAIL"
+        fi
+        nft delete table inet nftprobe 2>/dev/null
+    }
+    _p_try TABLE_INET 'table inet nftprobe {
+}'
+    _p_try CHAIN_FILTER 'table inet nftprobe {
+  chain c {
+    type filter hook forward priority filter; policy accept;
+  }
+}'
+    _p_try CHAIN_NAT 'table inet nftprobe {
+  chain c {
+    type nat hook postrouting priority srcnat; policy accept;
+  }
+}'
+    _p_try EXPR_COUNTER 'table inet nftprobe {
+  chain c {
+    counter
+  }
+}'
+    _p_try EXPR_CT 'table inet nftprobe {
+  chain c {
+    ct state established,related accept
+  }
+}'
+    # ct mark, separately from ct state: this is the one that was actually
+    # missing (NF_CONNTRACK_MARK, a bool inside nf_conntrack, shipped off in
+    # the board's base config). ct state is available either way, so testing
+    # only that hides the failure -- which is exactly what happened.
+    _p_try EXPR_CT_MARK 'table inet nftprobe {
+  chain c {
+    ct mark 0x00000001 accept
+  }
+}'
+    _p_try EXPR_CT_MARK_SET 'table inet nftprobe {
+  chain c {
+    ct mark set 0x00000001
+  }
+}'
+    _p_try EXPR_META_MARK_SET 'table inet nftprobe {
+  chain c {
+    meta mark set 0x00000001
+  }
+}'
+    # fib, in the exact shape netavark writes it (see the modprobe list at
+    # GATE1). Probing masquerade and dnat without this one would leave the
+    # single most fragile expression in netavark's ruleset untested: it is
+    # the only one that needs a module the container tooling never names,
+    # and a missing fib module presents as three broken container stores
+    # rather than as a firewall fault.
+    _p_try EXPR_FIB 'table inet nftprobe {
+  chain c {
+    type nat hook prerouting priority dstnat; policy accept;
+    fib daddr type local accept
+  }
+}'
+    _p_try EXPR_MASQ 'table inet nftprobe {
+  chain c {
+    type nat hook postrouting priority srcnat; policy accept;
+    masquerade
+  }
+}'
+    _p_try EXPR_DNAT 'table inet nftprobe {
+  chain c {
+    type nat hook prerouting priority dstnat; policy accept;
+    tcp dport 8080 dnat ip to 10.88.0.2:80
+  }
+}'
+    _p_try EXPR_JUMP 'table inet nftprobe {
+  chain t {
+  }
+  chain c {
+    type filter hook forward priority filter; policy accept;
+    jump t
+  }
+}'
+    echo "GATE6_NFTPROBE_MODULES=$(lsmod 2>/dev/null \
+        | awk '/^(nf_|nft_)/ {printf "%s ", $1}')"
+}
+
 # --- GATE6: netavark nftables — published port AND outbound SNAT (store
 # stays btrfs from GATE4). 60-nftables.conf overrides 50-x5h.conf's
 # firewall_driver="none", so podman/netavark run the nftables driver here;
@@ -125,6 +253,7 @@ else
     echo GATE6_NFT_PORT_FAIL
     tail -5 /tmp/g6.log
     nft list ruleset 2>&1 | head -30
+    nft_probe
 fi
 # Outbound SNAT: the CI workflow runs an HTTP listener on the runner's
 # 127.0.0.1:8099; slirp maps guest-side 10.0.2.2:8099 onto it. busybox wget

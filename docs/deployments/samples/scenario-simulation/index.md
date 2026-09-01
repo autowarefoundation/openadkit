@@ -5,20 +5,17 @@ Checkout assets live under `deployments/scenario-simulation/`.
 
 ## Prerequisites
 
-- Host setup via [`install.sh`](../../../getting-started/index.md)
+- Host setup via [Getting Started](../../../getting-started/index.md)
 - Kashiwanoha map (do **not** use `sample-map-planning`):
 
 ```bash
-./install.sh sample-data scenario-simulation
+./openadkit fetch scenario-simulation
 ```
 
 ## Run
 
 ```bash
-cd deployments/scenario-simulation
-docker compose \
-  --env-file config.env \
-  up -d
+./openadkit run scenario-simulation
 ```
 
 Open `https://localhost:6080/vnc.html` (`REMOTE_PASSWORD` in `config.env`).

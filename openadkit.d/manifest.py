@@ -722,6 +722,7 @@ def deployment_checksum(directory: Path) -> str:
             relative.name == "config.local.env"
             or "__pycache__" in relative.parts
             or relative.suffix == ".pyc"
+            or relative.parts[0] in {".cache", "output"}
         ):
             continue
         if candidate.is_symlink():

@@ -23,7 +23,6 @@ REGISTRY_CONTEXT_RESOLVER = (
     ROOT / ".github/scripts/resolve_registry_contexts.sh"
 ).read_text()
 CAPTURE_METADATA = (ROOT / ".github/scripts/capture_build_metadata.sh").read_text()
-INSTALLER = (ROOT / "install.sh").read_text()
 ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
@@ -352,12 +351,28 @@ def test_carla_registry_simulator_overrides_named_context():
     assert 'SIMULATOR_IMAGE = "simulator"' in BAKE
 
 
-def test_artifact_prerequisites_fail_before_playbook():
-    assert 'cd "$autoware_tmp" &&' in INSTALLER
-    assert (
-        'ansible-galaxy collection install -f -r "ansible-galaxy-requirements.yaml" &&'
-        in INSTALLER
+def test_logging_universe_image_has_compose_default():
+    logging = (ROOT / "deployments/logging-simulation/docker-compose.yaml").read_text()
+    assert "${AUTOWARE_UNIVERSE_IMAGE:-ghcr.io/autowarefoundation/autoware:universe@" in logging
+
+
+def test_carla_compose_uses_gpu_sensing_image():
+    carla = (ROOT / "deployments/carla-simulation/docker-compose.yaml").read_text()
+    env = (ROOT / "deployments/carla-simulation/config.env").read_text()
+    assert "SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda" in carla
+    assert "SENSING_PERCEPTION_GPU_IMAGE=" in env
+    assert "image: ${SENSING_PERCEPTION_IMAGE" not in carla
+
+
+def test_lint_validates_standalone_zenoh_compose():
+    assert "cd deployments/zenoh-bridge && docker compose --env-file config.env config -q" in (
+        LINT_WORKFLOW
     )
+
+
+def test_zenoh_stays_off_cli_inventory():
+    inventory = (ROOT / "openadkit.json").read_text()
+    assert '"zenoh-bridge"' not in inventory
 
 
 def test_zenoh_cloud_bridge_is_internal_only():

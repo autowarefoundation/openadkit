@@ -5,49 +5,25 @@ assets live under `deployments/logging-simulation/`.
 
 ## Prerequisites
 
-- Host setup via [`install.sh`](../../../getting-started/index.md)
-- Autoware artifacts (models under `~/autoware_data`):
+- Host setup via [Getting Started](../../../getting-started/index.md)
+- Sample map, rosbag, and GPU models:
 
 ```bash
-sudo ./install.sh --download-artifacts
-```
-
-- Sample map and rosbag:
-
-```bash
-./install.sh sample-data logging-simulation
+./openadkit fetch logging-simulation
 ```
 
 ## Run (CPU)
 
 ```bash
-cd deployments/logging-simulation
-docker compose \
-  --env-file config.env \
-  up -d
-```
-
-Play the rosbag (separate profile):
-
-```bash
-docker compose \
-  --env-file config.env \
-  --profile rosbag \
-  up -d rosbag
+./openadkit run logging-simulation
 ```
 
 ## Run (GPU)
 
-Requires the NVIDIA Container Toolkit. Overlay GPU settings for sensing and
-perception:
+Requires the NVIDIA Container Toolkit.
 
 ```bash
-cd deployments/logging-simulation
-docker compose \
-  --env-file config.env \
-  -f docker-compose.yaml \
-  -f docker-compose.gpu.yaml \
-  up -d
+./openadkit run logging-simulation --gpu
 ```
 
 ## Visualizer
@@ -58,11 +34,7 @@ Open `https://localhost:6080/vnc.html` and use `REMOTE_PASSWORD` from
 ## Stop
 
 ```bash
-cd deployments/logging-simulation
-docker compose \
-  --env-file config.env \
-  --profile rosbag \
-  down
+./openadkit stop logging-simulation
 ```
 
 ## Notes

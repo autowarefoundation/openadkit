@@ -11,7 +11,7 @@ For **complete documentation**, operational steps, and troubleshooting, see the 
 - [Planning Simulation](./planning-simulation) — Planning stack with a sample map
 - [Scenario Simulation](./scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
-- [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA as an external simulator (experimental, amd64 + GPU)
+- [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation --gpu`)
 - [Zenoh Bridge](./zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
 
 ## Directory Layout
@@ -22,6 +22,6 @@ deployments/
 ├── planning-simulation/      # complete deployment config.env
 ├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env
-├── carla-simulation/         # config.env + asset/start helper
+├── carla-simulation/         # CLI deployment (Humble, amd64, GPU)
 └── zenoh-bridge/              # self-contained topology + config.env
 ```

@@ -95,7 +95,7 @@ def runtime_tree(tmp_path, *, release=False, manifest=None):
     root = tmp_path / "openadkit-test"
     root.mkdir(parents=True)
     shutil.copy2(ENTRYPOINT, root / "openadkit")
-    shutil.copytree(ROOT / "openadkit.d", root / "openadkit.d")
+    shutil.copytree(ROOT / "cli", root / "cli")
     deployment = root / "deployments/example"
     deployment.mkdir(parents=True)
     manifest = manifest or minimal_manifest()
@@ -1087,7 +1087,7 @@ def _host_architecture():
 
 
 def test_deployment_checksum_ignores_runtime_output(tmp_path):
-    sys.path.insert(0, str(ROOT / "openadkit.d"))
+    sys.path.insert(0, str(ROOT / "cli"))
     import manifest as openadkit_manifest
 
     directory = tmp_path / "scenario"

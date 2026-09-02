@@ -8,7 +8,7 @@ on:
     paths:
       - '.gitignore'
       - 'openadkit'
-      - 'openadkit.d/**'
+      - 'cli/**'
       - '**/*.sh'
       - '**/*.json'
       - '**/*.json5'

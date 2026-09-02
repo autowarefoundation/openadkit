@@ -9,7 +9,7 @@ on:
     paths:
       - 'openadkit'
       - 'openadkit.json'
-      - 'openadkit.d/**'
+      - 'cli/**'
       - 'deployments/**'
       - '.github/scripts/tests/test_openadkit_cli.py'
       - '.github/workflows/install-host.yaml'

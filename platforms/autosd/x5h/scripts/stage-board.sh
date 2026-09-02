@@ -26,8 +26,15 @@
 # with no marker at all. That is ungradeable by construction, and at a console
 # it is indistinguishable from a hang or a dropped link -- the worst possible
 # input to "what state is the board in, and may I touch it again?". The EXIT
-# trap below is the backstop that keeps that true even for a command nobody
-# remembered to check. print-uboot is informational and emits no marker.
+# trap is the backstop for that, and INT/TERM/HUP/QUIT are trapped too: bash
+# enters the EXIT trap with $?=0 after an uncaught fatal signal, so EXIT alone
+# would let a killed or hung-up run finish silently. print-uboot is
+# informational and emits no marker.
+#
+# NEVER make a control-flow decision by substring-matching text a board can
+# influence. Board output is data. Remote scripts signal outcomes through
+# dedicated EXIT STATUS values, which the board's own file names, ls output and
+# tool messages cannot forge.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 X5H="$HERE/.."
@@ -37,18 +44,32 @@ MARKER_DONE=
 CLEANUP_MNT=
 mark() { if [ -z "$MARKER_DONE" ]; then MARKER_DONE=1; echo "$*"; fi; }
 die() { mark "$*"; exit 1; }
-on_exit() {
-    local rc=$?
+cleanup_mnt() {
     if [ -n "$CLEANUP_MNT" ]; then
         sudo umount "$CLEANUP_MNT" 2>/dev/null || true
         rmdir "$CLEANUP_MNT" 2>/dev/null || true
         CLEANUP_MNT=
     fi
+}
+on_exit() {
+    local rc=$?
+    cleanup_mnt
     if [ -z "$MARKER_DONE" ] && [ "$rc" -ne 0 ]; then
         echo "${MARKER_PREFIX}_FAIL reason=unexpected_exit rc=$rc"
     fi
 }
+on_signal() {
+    local sig=$1 num=$2
+    trap - EXIT INT TERM HUP QUIT
+    cleanup_mnt
+    mark "${MARKER_PREFIX}_FAIL reason=interrupted_by_signal signal=$sig"
+    exit $(( 128 + num ))
+}
 trap on_exit EXIT
+trap 'on_signal INT 2' INT
+trap 'on_signal TERM 15' TERM
+trap 'on_signal HUP 1' HUP
+trap 'on_signal QUIT 3' QUIT
 
 board=${1:-}; inputs=${2:-}; cmd=${3:-}; yes=${4:-}
 [ -n "$board" ] && [ -n "$inputs" ] && [ -n "$cmd" ] \
@@ -58,6 +79,13 @@ vars="$X5H/boards/$board.vars"
 BOARD_IP= BOARD_HOSTNAME= HAS_YOCTO=
 # shellcheck disable=SC1090
 . "$vars"
+# The vars file is arbitrary shell. It is only ever meant to set the three
+# BOARD_* keys, but a stray `yes=--yes` in it would disarm need_yes on every
+# destructive subcommand, and MARKER_DONE=1 would suppress every marker. The
+# command line is the ONLY authority for these, so re-bind them here, after the
+# source, where nothing in the file can reach them.
+board=${1:-}; inputs=${2:-}; cmd=${3:-}; yes=${4:-}
+MARKER_DONE=; MARKER_PREFIX=STAGE; CLEANUP_MNT=
 [ -n "$BOARD_IP" ] && [ -n "$BOARD_HOSTNAME" ] && [ -n "$HAS_YOCTO" ] \
     || die "STAGE_FAIL reason=incomplete_vars file=$vars"
 WORK=${X5H_STAGE_WORK:-/var/tmp/x5h-stage/$board}
@@ -68,6 +96,11 @@ AUTOSD_ROOT=/dev/disk/by-partlabel/x5h-root
 BOOT=/dev/disk/by-partlabel/x5h-boot
 LUN2='/dev/disk/by-path/*ufs-scsi-0:0:0:2'
 say() { echo "== $*"; }
+# Relay board output behind a gutter. Board text is data: a payload file named
+# STAGE_PAYLOAD_PASS would otherwise print as a line starting with a marker and
+# be counted as a second marker by any line-anchored grader. (sed reads to EOF,
+# so this pipeline has no early-terminating consumer.)
+relay() { printf '%s\n' "$1" | sed 's/^/| /'; }
 # ssh reports its own transport errors as 255; anything else is the remote
 # command's own status. The operator's next move differs -- retry the link, or
 # go and look at the board -- so the two never share a reason slug.
@@ -105,7 +138,8 @@ backup_keys() {
     say "saving ssh keys from the live board $BOARD_IP"
     # First board-touching subcommand of a session, so the one most likely to
     # meet a dead or unreachable board. A marker-less failure here would set
-    # the tone for the whole session.
+    # the tone for the whole session. (find | cpio runs on the board, whose
+    # non-interactive shell has no pipefail, and cpio reads to EOF regardless.)
     $SSH 'cd / && find etc/ssh/authorized_keys.d/root etc/ssh/ssh_host_* -type f 2>/dev/null | cpio -o -H newc 2>/dev/null' > "$WORK/keys.cpio" || rc=$?
     [ "$rc" -ne 255 ] || die "STAGE_KEYS_FAIL reason=board_unreachable rc=255"
     [ "$rc" -eq 0 ] || die "STAGE_KEYS_FAIL reason=remote_key_archive_failed rc=$rc"
@@ -126,7 +160,7 @@ prepare_root() {
     cp --reflink=auto "$inputs/x5h-rootfs.ext4" "$img" || die "STAGE_ROOT_FAIL reason=image_copy_failed"
     mnt=$(mktemp -d) || die "STAGE_ROOT_FAIL reason=mktemp_failed"
     sudo mount -o loop "$img" "$mnt" || { rmdir "$mnt" 2>/dev/null || true; die "STAGE_ROOT_FAIL reason=loop_mount_failed"; }
-    CLEANUP_MNT="$mnt"   # on_exit unmounts this on every path out
+    CLEANUP_MNT="$mnt"   # cleanup_mnt unmounts this on every path out, signals included
     printf '%s\n' "$BOARD_HOSTNAME" | sudo tee "$mnt/etc/hostname" >/dev/null \
         || die "STAGE_ROOT_FAIL reason=hostname_write_failed"
     printf 'BOARD_HOSTNAME=%s\nHAS_YOCTO=%s\n' "$BOARD_HOSTNAME" "$HAS_YOCTO" | sudo tee "$mnt/etc/x5h/board.conf" >/dev/null \
@@ -175,16 +209,25 @@ write_root() {
     [ "$rc" -eq 0 ] || die "STAGE_WRITE_FAIL reason=dd_failed rc=$rc target_state=unknown_partial_write"
     # Read back exactly the image's byte length. A plain count of size/4194304
     # truncates every image that is not a whole multiple of 4 MiB and then
-    # always reports readback_mismatch, so read the whole 4 MiB blocks and, if
-    # there is a remainder, one more aligned block trimmed to the tail length
-    # (the extra block keeps iflag=direct's alignment requirement satisfied).
-    local want got bytes full rem readcmd raw
+    # always reports readback_mismatch.
+    #
+    # The tail used to be `dd … | head -c $rem`. head exits at $rem, so dd took
+    # a SIGPIPE and the remote pipeline returned 141 -- harmless only because
+    # the board's non-interactive shell happens not to set pipefail. If it ever
+    # did, a byte-perfect read-back would report STAGE_WRITE_FAIL after a
+    # SUCCESSFUL dd and invite a re-write of a healthy root partition. There is
+    # now no early-terminating consumer anywhere in the remote command: the tail
+    # is one exact-length read via iflag=skip_bytes, and md5sum reads to EOF.
+    # Only the tail gives up iflag=direct (its length is not block-aligned); the
+    # bulk is still read direct, and the write used conv=fsync so the page cache
+    # cannot be stale with respect to the device.
+    local want got bytes full rem off readcmd raw
     raw=$(md5sum "$img") || die "STAGE_WRITE_FAIL reason=local_md5_failed"
     want=${raw:0:32}
     bytes=$(stat -c %s "$img") || die "STAGE_WRITE_FAIL reason=stat_failed"
-    full=$(( bytes / 4194304 )); rem=$(( bytes % 4194304 ))
+    full=$(( bytes / 4194304 )); rem=$(( bytes % 4194304 )); off=$(( full * 4194304 ))
     readcmd="dd if=$AUTOSD_ROOT bs=4M count=$full iflag=direct status=none"
-    [ "$rem" -eq 0 ] || readcmd="{ $readcmd; dd if=$AUTOSD_ROOT bs=4M skip=$full count=1 iflag=direct status=none 2>/dev/null | head -c $rem; }"
+    [ "$rem" -eq 0 ] || readcmd="{ $readcmd; dd if=$AUTOSD_ROOT bs=$rem count=1 skip=$off iflag=skip_bytes status=none; }"
     raw=$($SSH "$readcmd | md5sum") || die "STAGE_WRITE_FAIL reason=readback_failed rc=$? target_state=written_unverified"
     got=${raw:0:32}
     [ "$want" = "$got" ] || die "STAGE_WRITE_FAIL reason=readback_mismatch want=$want got=$got"
@@ -217,8 +260,15 @@ partition_lun2() {
     need_yes
     # A compound remote command, so a PARTIAL failure is the likely one, and
     # "GPT zapped but no filesystems" needs a different recovery from "nothing
-    # happened". Each step announces itself, and the marker reports the last
-    # step that completed.
+    # happened". Each step has its own EXIT STATUS, and the marker maps that
+    # status to the last step that completed. The status is the signal, not the
+    # LUN2_STAGE echoes -- those are for the operator to read, and board output
+    # must never drive control flow.
+    #
+    # The three mkfs targets are by-partlabel symlinks resolved by udev after
+    # the rereadpt, i.e. exactly the kind of name a stale or foreign partition
+    # can also own. Each is asserted to resolve to a partition OF THE DEVICE
+    # already resolved above before any of them is formatted.
     local remote out stage
     remote="set -u
 sgdisk -Z $dev && echo LUN2_STAGE=zapped || exit 11
@@ -227,25 +277,43 @@ sgdisk -n1:0:+1G  -c1:yocto-boot -u1:7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e11 \
        -n3:0:0    -c3:npu-work   -u3:7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e13 $dev && echo LUN2_STAGE=partitioned || exit 12
 blockdev --rereadpt $dev && echo LUN2_STAGE=rereadpt || exit 13
 sleep 2
+for L in yocto-boot yocto-root npu-work; do
+    P=\$(readlink -f /dev/disk/by-partlabel/\$L) || exit 18
+    case \"\$P\" in
+        \"$dev\"[0-9]*|\"$dev\"p[0-9]*) ;;
+        *) echo \"LUN2_BADLABEL \$L -> \$P (not a partition of $dev)\"; exit 18 ;;
+    esac
+    [ -b \"\$P\" ] || exit 18
+done
+echo LUN2_STAGE=labels_verified
 mkfs.ext4 -q -F -L yocto-boot /dev/disk/by-partlabel/yocto-boot && echo LUN2_STAGE=mkfs_yocto_boot || exit 14
 mkfs.ext4 -q -F -L yocto-root /dev/disk/by-partlabel/yocto-root && echo LUN2_STAGE=mkfs_yocto_root || exit 15
 mkfs.ext4 -q -F -L npu-work   /dev/disk/by-partlabel/npu-work && echo LUN2_STAGE=mkfs_npu_work || exit 16
 sgdisk -p $dev && echo LUN2_STAGE=done || exit 17"
     rc=0; out=$($SSH "$remote" 2>&1) || rc=$?
-    printf '%s\n' "$out"
+    relay "$out"
     if [ "$rc" -ne 0 ]; then
-        case "$out" in
-            *LUN2_STAGE=*) stage=${out##*LUN2_STAGE=}; stage=${stage%%$'\n'*} ;;
-            *) stage=nothing ;;
+        case "$rc" in
+            11) stage=nothing ;;
+            12) stage=zapped ;;
+            13) stage=partitioned ;;
+            18) stage=rereadpt_labels_unverified ;;
+            14) stage=labels_verified ;;
+            15) stage=mkfs_yocto_boot ;;
+            16) stage=mkfs_yocto_root ;;
+            17) stage=mkfs_npu_work ;;
+            *)  stage=unknown ;;
         esac
-        [ "$rc" -ne 255 ] || die "STAGE_LUN2_FAIL reason=transport_lost rc=255 completed=$stage"
+        [ "$rc" -ne 255 ] || die "STAGE_LUN2_FAIL reason=transport_lost rc=255 completed=indeterminate"
+        [ "$rc" -ne 18 ] || die "STAGE_LUN2_FAIL reason=partlabel_not_on_target_device rc=18 completed=$stage"
         die "STAGE_LUN2_FAIL reason=partitioning_failed rc=$rc completed=$stage"
     fi
     mark "STAGE_LUN2_PASS"
 }
 
 write_boot() {
-    local d="$WORK/boot" f keep=""
+    local d="$WORK/boot" ar="$WORK/boot.cpio" arerr="$WORK/boot.cpio.err"
+    local f keep="" manifest="" line
     rm -rf "$d" || die "STAGE_BOOT_FAIL reason=work_dir_cleanup_failed dir=$d"
     mkdir -p "$d" || die "STAGE_BOOT_FAIL reason=work_dir_unwritable dir=$d"
     cp "$inputs/Image-autosd" "$inputs/r8a78000-ironhide-uio-autosd.dtb" "$inputs/r8a78000-ironhide-npu.dtb" "$d/" \
@@ -254,32 +322,55 @@ write_boot() {
     printf 'role=npu\n' > "$d/x5h-role.txt" || die "STAGE_BOOT_FAIL reason=role_file_write_failed"
     for f in "$d"/*; do
         [ -s "$f" ] || die "STAGE_BOOT_FAIL reason=empty_staged_file file=${f##*/}"
+        case "${f##*/}" in *[:[:space:]]*) die "STAGE_BOOT_FAIL reason=unsafe_staged_filename file=${f##*/}" ;; esac
+        line=$(md5sum "$f") || die "STAGE_BOOT_FAIL reason=local_md5_failed file=${f##*/}"
+        manifest="$manifest ${f##*/}:${line%% *}"
         keep="$keep ${f##*/}"
     done
-    keep=${keep# }
+    manifest=${manifest# }; keep=${keep# }
+    # Build the archive to a FILE, not a process substitution. A process
+    # substitution's exit status is discarded by construction, so a producer
+    # that failed and emitted a well-formed but INCOMPLETE archive used to be
+    # invisible here -- and on an already-staged partition (the idempotent
+    # re-run this header advertises) the remote presence check then passed
+    # against last month's files and reported STAGE_BOOT_PASS having written
+    # nothing. Content, not presence, is what the remote verifies now.
+    rm -f "$ar" "$arerr"
+    ( cd "$d" && find . -type f | cpio -o -H newc ) > "$ar" 2>"$arerr" \
+        || { cat "$arerr" >&2; die "STAGE_BOOT_FAIL reason=archive_build_failed"; }
+    [ -s "$ar" ] || die "STAGE_BOOT_FAIL reason=archive_empty"
     say "PLAN: replace the contents of $BOOT on $board ($BOARD_IP) with these files, staged in $d:"
     (cd "$d" && ls -l) || die "STAGE_BOOT_FAIL reason=staging_listing_failed"
-    say "PLAN: they are extracted over the partition FIRST (cpio -idmu overwrites in place) and verified"
-    say "PLAN: present; only then is every OTHER regular file on $BOOT deleted -- Image-yocto and stale"
-    say "PLAN: env files included. The partition is therefore never empty at any instant."
+    say "PLAN: they are extracted over the partition FIRST (cpio -idmu overwrites in place), then each"
+    say "PLAN: file's md5 is verified against the staged copy; only once ALL match is every OTHER"
+    say "PLAN: regular file on $BOOT deleted -- Image-yocto and stale env files included."
+    say "PLAN: The partition is therefore never empty at any instant."
     need_yes
-    # One remote script, not an && chain: extract, verify, then delete the
-    # stale files, and umount on every path out. It accumulates a single reason
-    # and prints ONE marker at the end -- the loops below can each detect more
-    # than one problem, and "exactly one marker" has to hold remotely too.
-    local remote out rc=0
+    # The remote signals failure through EXIT STATUS 40 and carries its reason
+    # on a per-run NONCE channel. It must not print a bare STAGE_BOOT_FAIL: that
+    # line would be indistinguishable from a boot file named STAGE_BOOT_FAIL in
+    # the ls output, and guttering board text (relay) would strip it of marker
+    # status. The nonce is generated here, per run, so nothing already on the
+    # board can occupy that channel.
+    local remote out rc=0 nonce line mline=""
+    nonce="MK${RANDOM}${RANDOM}${RANDOM}$$"
     remote=$(cat <<REMOTE
 set -u
+nonce="$nonce"
 keep="$keep"
+manifest="$manifest"
 freason=; fdetail=
-m=\$(mktemp -d) || { echo "STAGE_BOOT_FAIL reason=remote_mktemp_failed"; exit 1; }
-mount $BOOT "\$m" || { echo "STAGE_BOOT_FAIL reason=boot_mount_failed"; rmdir "\$m" 2>/dev/null; exit 1; }
+m=\$(mktemp -d) || { echo "\$nonce reason=remote_mktemp_failed"; exit 40; }
+mount $BOOT "\$m" || { echo "\$nonce reason=boot_mount_failed"; rmdir "\$m" 2>/dev/null; exit 40; }
 # cpio runs in a subshell so this shell never holds \$m as its cwd, which would
 # make the umount below fail.
-(cd "\$m" && cpio -idmu) || freason=cpio_extract_failed
+(cd "\$m" && cpio -idmu) || { freason=cpio_extract_failed; fdetail=" boot_state=unverified_possibly_partial"; }
 if [ -z "\$freason" ]; then
-    for f in \$keep; do
-        if [ ! -s "\$m/\$f" ]; then freason=missing_after_extract; fdetail=" file=\$f"; break; fi
+    for e in \$manifest; do
+        n=\${e%%:*}; w=\${e#*:}
+        g=\$(md5sum "\$m/\$n" 2>/dev/null) || { freason=content_unreadable; fdetail=" file=\$n boot_state=unverified_possibly_partial"; break; }
+        g=\${g%% *}
+        if [ "\$g" != "\$w" ]; then freason=content_mismatch; fdetail=" file=\$n want=\$w got=\$g boot_state=stale_or_partial"; break; fi
     done
 fi
 if [ -z "\$freason" ]; then
@@ -294,27 +385,24 @@ sync
 ls -l "\$m"
 if umount "\$m"; then :; elif [ -z "\$freason" ]; then freason=boot_umount_failed; fi
 rmdir "\$m" 2>/dev/null || true
-if [ -n "\$freason" ]; then echo "STAGE_BOOT_FAIL reason=\$freason\$fdetail"; exit 1; fi
+if [ -n "\$freason" ]; then echo "\$nonce reason=\$freason\$fdetail"; exit 40; fi
 exit 0
 REMOTE
 )
-    out=$($SSH "$remote" < <(cd "$d" && find . -type f | cpio -o -H newc 2>/dev/null) 2>&1) || rc=$?
-    printf '%s\n' "$out"
-    if [ "$rc" -ne 0 ]; then
-        # `case`, not `grep -q`: grep -q exits at the match, printf can then
-        # take a SIGPIPE, and pipefail would report the pipeline as failed --
-        # emitting a redundant SECOND marker after the remote's own.
-        case "$out" in
-            *"STAGE_BOOT_FAIL "*) MARKER_DONE=1 ;;   # the remote emitted the one marker
-            *) if [ "$rc" -eq 255 ]; then
-                   mark "STAGE_BOOT_FAIL reason=transport_lost rc=255 boot_state=unknown"
-               else
-                   mark "STAGE_BOOT_FAIL reason=remote_update_failed rc=$rc"
-               fi ;;
+    out=$($SSH "$remote" < "$ar" 2>&1) || rc=$?
+    # Split the nonce channel out of the board's own output, then gutter the rest.
+    while IFS= read -r line; do
+        case "$line" in
+            "$nonce "*) if [ -z "$mline" ]; then mline=${line#"$nonce" }; fi ;;
+            *) printf '| %s\n' "$line" ;;
         esac
-        exit 1
-    fi
-    mark "STAGE_BOOT_PASS role=npu"
+    done <<<"$out"
+    case "$rc" in
+        0)   mark "STAGE_BOOT_PASS role=npu" ;;
+        40)  mark "STAGE_BOOT_FAIL ${mline:-reason=remote_failed_without_reason}"; exit 1 ;;
+        255) mark "STAGE_BOOT_FAIL reason=transport_lost rc=255 boot_state=unknown"; exit 1 ;;
+        *)   mark "STAGE_BOOT_FAIL reason=remote_update_failed rc=$rc boot_state=unknown"; exit 1 ;;
+    esac
 }
 
 stage_payload() {
@@ -328,8 +416,9 @@ stage_payload() {
     local dry ntotal ndel nsend rc=0
     [ -d "$inputs/npu" ] || die "STAGE_PAYLOAD_FAIL reason=no_npu_inputs dir=$inputs/npu"
     [ -n "$(ls -A "$inputs/npu")" ] || die "STAGE_PAYLOAD_FAIL reason=empty_npu_inputs dir=$inputs/npu"
-    $SSH 'mkdir -p /var/opt/npu && { mountpoint -q /var/opt/npu || mount /dev/disk/by-partlabel/npu-work /var/opt/npu; }' \
-        || die "STAGE_PAYLOAD_FAIL reason=npu_work_mount_failed rc=$?"
+    $SSH 'mkdir -p /var/opt/npu && { mountpoint -q /var/opt/npu || mount /dev/disk/by-partlabel/npu-work /var/opt/npu; }' || rc=$?
+    [ "$rc" -ne 255 ] || die "STAGE_PAYLOAD_FAIL reason=board_unreachable rc=255"
+    [ "$rc" -eq 0 ] || die "STAGE_PAYLOAD_FAIL reason=npu_work_mount_failed rc=$rc"
     say "PLAN: mirror $inputs/npu/ -> $board ($BOARD_IP):/var/opt/npu/ with rsync --delete"
     say "PLAN: --delete means EVERY path under /var/opt/npu ON THE BOARD that is absent from"
     say "PLAN: $inputs/npu/ is REMOVED. Confirm the inputs directory is the FULL set, not a"
@@ -351,17 +440,19 @@ stage_payload() {
     # is what an operator checks against the running kernel. cmemdrv.ko is the
     # out-of-tree module the whole npu role depends on, so a mirror that lacks
     # it is an explicit failure, not a silent one.
+    #
+    # Presence is reported by EXIT STATUS 20, not by a sentinel string mixed
+    # into ls output: a payload file named NO_CMEMDRV_notes.txt used to produce
+    # a false no_cmemdrv while cmemdrv.ko was present.
     local verify
     rc=0
-    verify=$($SSH 'ls /var/opt/npu; if [ -f /var/opt/npu/cmemdrv.ko ]; then modinfo -F vermagic /var/opt/npu/cmemdrv.ko; else echo "NO_CMEMDRV /var/opt/npu/cmemdrv.ko is not present"; fi' 2>&1) || rc=$?
-    printf '%s\n' "$verify"
-    [ "$rc" -eq 0 ] || die "STAGE_PAYLOAD_FAIL reason=verify_failed rc=$rc"
-    # The sentinel is a fixed token, not the path: a path-shaped sentinel has to
-    # be kept in sync with the literal above and silently stops matching if
-    # either side is reworded. Matched with `case`, not a `grep -q` pipeline,
-    # for the SIGPIPE reason given in write_boot.
-    case "$verify" in
-        *NO_CMEMDRV*) die "STAGE_PAYLOAD_FAIL reason=no_cmemdrv" ;;
+    verify=$($SSH 'ls /var/opt/npu; if [ -f /var/opt/npu/cmemdrv.ko ]; then modinfo -F vermagic /var/opt/npu/cmemdrv.ko; else echo "cmemdrv.ko is not present"; exit 20; fi' 2>&1) || rc=$?
+    relay "$verify"
+    case "$rc" in
+        0)   ;;
+        20)  die "STAGE_PAYLOAD_FAIL reason=no_cmemdrv" ;;
+        255) die "STAGE_PAYLOAD_FAIL reason=board_unreachable rc=255" ;;
+        *)   die "STAGE_PAYLOAD_FAIL reason=verify_failed rc=$rc" ;;
     esac
     mark "STAGE_PAYLOAD_PASS"
 }

@@ -80,5 +80,25 @@ if [ -n "$mod_tar" ]; then
   sudo test -e "$mnt/usr/lib/modules/$(basename "$mod_tar" .tar | sed 's/^modules-//')/kernel/fs/btrfs/btrfs.ko" \
     || { echo "FATAL: btrfs.ko missing after module injection" >&2; exit 1; }
 fi
+# aib's add_files copies CONTENT ONLY -- its schema has no mode field -- so
+# every script the image installs is 0644 unless the manifest's chmod_files
+# block names it. A build that dropped or never applied that block yields an
+# image whose units die 203/EXEC on the first boot; that is what board 2 was
+# written with on 2026-09-02, and it was found by reading the board's disk,
+# not the image. Verify it here, before a 12 GiB dd and a reboot, and derive
+# the list from the manifest so this file holds no second copy of it.
+aib_manifest="$(cd "$(dirname "$0")/../aib" && pwd)/x5h-rootfs.aib.yml"
+[ -r "$aib_manifest" ] || { echo "FATAL: manifest unreadable: $aib_manifest" >&2; exit 1; }
+execs=$(awk '
+  index($0, "  chmod_files:") == 1 { f = 1; next }
+  f && (/^[a-zA-Z_]+:/ || /^  [a-zA-Z_]+:/) { f = 0 }
+  f && /^[[:space:]]*-[[:space:]]*path:/ { sub(/^[^:]*:[[:space:]]*/, ""); print }
+' "$aib_manifest")
+[ -n "$execs" ] || { echo "FATAL: no chmod_files paths in $aib_manifest" >&2; exit 1; }
+while read -r execpath; do
+  sudo test -x "$mnt$execpath" \
+    || { echo "FATAL: $execpath is not executable in the image (chmod_files not applied)" >&2; exit 1; }
+done <<< "$execs"
+echo "EXEC_BITS_VERIFIED $(printf '%s\n' "$execs" | wc -l)"
 sudo umount "$mnt"
 echo "MAKE_UFS_ROOTFS_OK $out"

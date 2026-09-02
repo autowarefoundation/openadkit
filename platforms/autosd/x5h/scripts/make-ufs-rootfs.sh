@@ -43,6 +43,38 @@ if [ -n "$mod_tar" ]; then
   # in /usr/lib/modules without depending on the /lib -> usr/lib symlink.
   sudo tar -xf "$mod_tar" -C "$mnt/usr"
   echo "MODULES_INJECTED $(basename "$mod_tar")"
+  # An extracted module tree is useless to modprobe without modules.dep:
+  # `modprobe <name>` answers "Module not found in directory /lib/modules/<v>"
+  # for EVERY module, and only `insmod <full path>` still works. That is not a
+  # cosmetic gap. It silently disables everything loaded by name:
+  # modules-load.d/x5h-rpmsg.conf (rpmsg_ctrl, rpmsg_char -- the whole cr52
+  # RPMsg path), modprobe.d/x5h-uio.conf's of_id=generic-uio binding (so no
+  # /dev/uio*, no /dev/npuc*, and x5h-npu.service dies NPU_UP_FAIL
+  # reason=no_npuc), and any kernel-requested autoload such as btrfs. Board 2
+  # booted exactly that way on 2026-09-02: cmemdrv was loaded (insmod, by
+  # path) while uio_pdrv_genirq could not be found at all.
+  #
+  # scripts/inject-test-images.sh -- the CI gate's injection path -- has always
+  # run depmod here, which is precisely why the QEMU gate stayed green while
+  # the board path shipped an unusable module tree. The two paths must agree.
+  #
+  # depmod is arch-independent (it parses ELF metadata), so an x86_64 companion
+  # can index aarch64 modules. -b takes the directory holding lib/modules, and
+  # this tar was extracted under /usr, so the basedir is "$mnt/usr".
+  mod_dirs=("$mnt"/usr/lib/modules/*/)
+  [ "${#mod_dirs[@]}" -eq 1 ] || {
+    echo "FATAL: expected exactly one module tree under $mnt/usr/lib/modules, got ${#mod_dirs[@]}" >&2
+    exit 1
+  }
+  kver=$(basename "${mod_dirs[0]}")
+  sudo depmod -b "$mnt/usr" "$kver"
+  sudo test -f "$mnt/usr/lib/modules/$kver/modules.dep" \
+    || { echo "FATAL: depmod produced no modules.dep for $kver" >&2; exit 1; }
+  # Assert a module the npu role actually loads by name resolves, not just that
+  # the index file exists: an empty or partial index would still satisfy -f.
+  sudo grep -q 'uio_pdrv_genirq' "$mnt/usr/lib/modules/$kver/modules.dep" \
+    || { echo "FATAL: modules.dep for $kver does not index uio_pdrv_genirq" >&2; exit 1; }
+  echo "DEPMOD_OK $kver"
 fi
 # osbuild never runs `systemctl preset`, so the preset file describes
 # symlinks nobody created. Create them here from the preset itself, so the

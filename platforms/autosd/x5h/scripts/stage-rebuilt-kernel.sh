@@ -54,13 +54,6 @@ depmod -b "$DEST" "$KVER" \
     || { echo "FATAL: depmod -b $DEST $KVER failed"; exit 1; }
 [ -f "$DEST/lib/modules/$KVER/modules.dep" ] \
     || { echo "FATAL: depmod produced no modules.dep"; exit 1; }
-# This drop-in is additive at the filename level but NOT neutral across
-# kernels: it sets firewall_driver = "nftables", and both kernels boot this
-# same NFS root (that sharing is the whole point of staging additively). The
-# BSP kernel has no CONFIG_NF_TABLES, so once this file is staged, a U-Boot
-# rollback to the BSP kernel alone is not enough -- it would leave the BSP
-# kernel booting with a firewall driver it cannot run. See the rollback
-# instruction below, which spells out the extra step.
 # Refresh the test payload alongside the module tree. stage-nfs-rootfs.sh
 # only ever copies board-podman-smoke.sh once, at initial staging, and
 # refuses to re-run over an already-staged root -- so a board session that

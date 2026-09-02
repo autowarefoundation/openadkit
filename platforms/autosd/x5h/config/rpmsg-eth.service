@@ -51,6 +51,7 @@ Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
 # this condition an unstaged board restart-loops at ~1 Hz instead of
 # logging one skip line.
 ConditionPathExists=/usr/local/bin/rpmsg-eth
+ConditionKernelCommandLine=x5h.role=cr52
 # StartLimitIntervalSec=0 disables systemd's default start-rate limit (5
 # starts within a 10s window) outright, rather than leaving it in effect
 # or merely resizing it. Without an explicit override here, that default

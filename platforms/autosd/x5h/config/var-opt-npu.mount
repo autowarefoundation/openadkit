@@ -1,0 +1,14 @@
+[Unit]
+Description=X5H NPU work partition (UFS partlabel npu-work) at /opt/npu
+ConditionKernelCommandLine=x5h.role=npu
+After=local-fs-pre.target
+DefaultDependencies=no
+
+[Mount]
+What=/dev/disk/by-partlabel/npu-work
+Where=/var/opt/npu
+Type=ext4
+Options=defaults,nofail
+
+[Install]
+WantedBy=local-fs.target

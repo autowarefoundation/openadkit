@@ -153,7 +153,17 @@ backup_keys() {
     # meet a dead or unreachable board. A marker-less failure here would set
     # the tone for the whole session. (find | cpio runs on the board, whose
     # non-interactive shell has no pipefail, and cpio reads to EOF regardless.)
-    $SSH 'cd / && find etc/ssh/authorized_keys.d/root etc/ssh/ssh_host_* -type f 2>/dev/null | cpio -o -H newc 2>/dev/null' > "$WORK/keys.cpio" || rc=$?
+    # BOTH authorized_keys locations, because the two boards do not agree on
+    # which one they use. Board 2 keeps every key in
+    # etc/ssh/authorized_keys.d/root; board 1 keeps the external tier and the
+    # admin key there but the COMPANION's staging identity
+    # (~/.ssh/id_ed25519_x5h_board, pinned for both board IPs in the
+    # companion's ssh config) in root's own authorized_keys. Collecting only
+    # the first carries board 1 forward without the key every later
+    # stage-board.sh run needs -- a break that appears one session after the
+    # one that caused it. /root is an ostree symlink to /var/roothome, and
+    # cpio stores the name find printed, so name the real path here.
+    $SSH 'cd / && find etc/ssh/authorized_keys.d/root var/roothome/.ssh/authorized_keys etc/ssh/ssh_host_* -type f 2>/dev/null | cpio -o -H newc 2>/dev/null' > "$WORK/keys.cpio" || rc=$?
     [ "$rc" -ne 255 ] || die "STAGE_KEYS_FAIL reason=board_unreachable rc=255"
     [ "$rc" -eq 0 ] || die "STAGE_KEYS_FAIL reason=remote_key_archive_failed rc=$rc"
     [ -s "$WORK/keys.cpio" ] || die "STAGE_KEYS_FAIL reason=empty_archive"

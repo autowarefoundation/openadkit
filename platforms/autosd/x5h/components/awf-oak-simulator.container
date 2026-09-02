@@ -33,6 +33,8 @@ ConditionPathExists=/var/lib/awf/scenario-sim/map/pointcloud_map.pcd
 # was killed with SIGTERM when the pod went down (observed 2026-08-18).
 # Dropping the pod is what makes the omission effective again; do not
 # reintroduce any Requires=/Wants= edge that points at this unit.
+# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+ConditionKernelCommandLine=x5h.role=cr52
 
 [Container]
 # Host networking, matching run.yml's `network_mode: host` and putting

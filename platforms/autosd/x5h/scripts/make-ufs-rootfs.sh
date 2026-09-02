@@ -61,12 +61,20 @@ if [ -n "$mod_tar" ]; then
   # depmod is arch-independent (it parses ELF metadata), so an x86_64 companion
   # can index aarch64 modules. -b takes the directory holding lib/modules, and
   # this tar was extracted under /usr, so the basedir is "$mnt/usr".
-  mod_dirs=("$mnt"/usr/lib/modules/*/)
-  [ "${#mod_dirs[@]}" -eq 1 ] || {
-    echo "FATAL: expected exactly one module tree under $mnt/usr/lib/modules, got ${#mod_dirs[@]}" >&2
-    exit 1
-  }
-  kver=$(basename "${mod_dirs[0]}")
+  #
+  # The image already ships the AutoSD kernel's own module tree, so after the
+  # injection /usr/lib/modules holds MORE THAN ONE directory and a listing
+  # cannot say which one to index. The tar itself can: it roots at
+  # lib/modules/<kernelrelease>/. Derive the version from its entries rather
+  # than from the listing or from the tar's file name -- the name is a
+  # convention, the entries are the content.
+  kver=$(tar -tf "$mod_tar" | sed -n 's|^\(\./\)\?lib/modules/\([^/]*\)/.*|\2|p' | sort -u)
+  case "$kver" in
+    "")           echo "FATAL: $mod_tar carries no lib/modules/<version>/ tree" >&2; exit 1 ;;
+    *[[:space:]]*) echo "FATAL: $mod_tar carries more than one module tree: $(echo "$kver" | tr '\n' ' ')" >&2; exit 1 ;;
+  esac
+  sudo test -d "$mnt/usr/lib/modules/$kver" \
+    || { echo "FATAL: $mod_tar named $kver but no such tree after extraction" >&2; exit 1; }
   sudo depmod -b "$mnt/usr" "$kver"
   sudo test -f "$mnt/usr/lib/modules/$kver/modules.dep" \
     || { echo "FATAL: depmod produced no modules.dep for $kver" >&2; exit 1; }
@@ -109,7 +117,7 @@ done
 sudo test -x "$mnt/usr/bin/podman" || { echo "FATAL: podman missing in image" >&2; exit 1; }
 sudo test -x "$mnt/usr/sbin/sshd" || { echo "FATAL: sshd missing in image" >&2; exit 1; }
 if [ -n "$mod_tar" ]; then
-  sudo test -e "$mnt/usr/lib/modules/$(basename "$mod_tar" .tar | sed 's/^modules-//')/kernel/fs/btrfs/btrfs.ko" \
+  sudo test -e "$mnt/usr/lib/modules/$kver/kernel/fs/btrfs/btrfs.ko" \
     || { echo "FATAL: btrfs.ko missing after module injection" >&2; exit 1; }
 fi
 # aib's add_files copies CONTENT ONLY -- its schema has no mode field -- so

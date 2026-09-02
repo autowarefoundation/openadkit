@@ -91,6 +91,18 @@ content:
     - path: /var/log/awf
       parents: true
       exist_ok: true
+    - path: /etc/systemd/system.conf.d
+      parents: true
+      exist_ok: true
+    - path: /etc/modules-load.d
+      parents: true
+      exist_ok: true
+    - path: /etc/x5h
+      parents: true
+      exist_ok: true
+    - path: /etc/motd.d
+      parents: true
+      exist_ok: true
   # NOT in make_dirs, deliberately, and do not "fix" these back:
   #
   #   /usr/libexec, /usr/sbin -- the two install targets below. aib rejects
@@ -177,6 +189,38 @@ content:
       path: /etc/udev/rules.d/52-x5h-cmem.rules
     - source_path: ../config/80-x5h.preset
       path: /etc/systemd/system-preset/80-x5h.preset
+    # --- role machinery (selfboot.md, "Roles") -----------------------------
+    - source_path: ../scripts/x5h-role
+      path: /usr/sbin/x5h-role
+    - source_path: ../scripts/x5h-role-banner.sh
+      path: /usr/sbin/x5h-role-banner.sh
+    - source_path: ../config/x5h-role-banner.service
+      path: /etc/systemd/system/x5h-role-banner.service
+    # --- cr52 role: previously hand-installed per rpmsg-dualboot.md --------
+    - source_path: ../scripts/cr52-rproc-up.sh
+      path: /usr/sbin/cr52-rproc-up.sh
+    - source_path: ../config/cr52-remoteproc.service
+      path: /etc/systemd/system/cr52-remoteproc.service
+    - source_path: ../config/x5h-rpmsg-modules.conf
+      path: /etc/modules-load.d/x5h-rpmsg.conf
+    - source_path: ../config/60-nftables.conf
+      path: /etc/containers/containers.conf.d/60-nftables.conf
+    # --- npu role ----------------------------------------------------------
+    - source_path: ../scripts/x5h-npu-up.sh
+      path: /usr/sbin/x5h-npu-up.sh
+    - source_path: ../config/x5h-npu.service
+      path: /etc/systemd/system/x5h-npu.service
+    - source_path: ../config/var-opt-npu.mount
+      path: /etc/systemd/system/var-opt-npu.mount
+    - source_path: ../scripts/npu-contract-smoke.sh
+      path: /usr/sbin/npu-contract-smoke.sh
+    # --- role-independent: container store, watchdog, manifest -------------
+    - source_path: ../config/var-lib-containers.mount
+      path: /etc/systemd/system/var-lib-containers.mount
+    - source_path: ../config/10-watchdog.conf
+      path: /etc/systemd/system.conf.d/10-watchdog.conf
+    - source_path: ../scripts/x5h-manifest.sh
+      path: /usr/sbin/x5h-manifest.sh
     # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
     #
     # The bring-up sequence below only works because aib/vars.yml keeps
@@ -296,6 +340,14 @@ content:
     # and is deliberately NOT checked into the repo or copied by this
     # manifest -- it is staged onto the board separately, per the manual
     # install procedure documented in rpmsg-dualboot.md.
+    #
+    # The cr52-remoteproc trio (cr52-rproc-up.sh, cr52-remoteproc.service,
+    # x5h-rpmsg-modules.conf -- see the "cr52 role" block above) was
+    # previously hand-installed per that same doc; it is now installed by
+    # this manifest instead, because its script ships in the image. The
+    # rpmsg-eth daemon binary above is the only piece of this chain that
+    # remains hand-staged, and it is staged by stage-board.sh, not by the
+    # manual procedure rpmsg-dualboot.md describes.
     #
     # 80-x5h.preset below does NOT enable rpmsg-eth.service, but that does
     # not keep the unit out of a normal boot: awf-oak-bridge.container

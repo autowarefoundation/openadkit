@@ -44,6 +44,23 @@ if [ -n "$mod_tar" ]; then
   sudo tar -xf "$mod_tar" -C "$mnt/usr"
   echo "MODULES_INJECTED $(basename "$mod_tar")"
 fi
+# osbuild never runs `systemctl preset`, so the preset file describes
+# symlinks nobody created. Create them here from the preset itself, so the
+# preset stays the one place that says what is enabled.
+preset="$mnt/etc/systemd/system-preset/80-x5h.preset"
+sudo test -r "$preset" || { echo "FATAL: $preset missing in image" >&2; exit 1; }
+sudo grep '^enable ' "$preset" | while read -r _ unit; do
+  src=""
+  for d in /etc/systemd/system /usr/lib/systemd/system; do
+    sudo test -f "$mnt$d/$unit" && { src="$d/$unit"; break; }
+  done
+  [ -n "$src" ] || { echo "FATAL: preset enables $unit but the image has no such unit" >&2; exit 1; }
+  target=$(sudo sed -n 's/^WantedBy=//p' "$mnt$src" | head -1)
+  [ -n "$target" ] || { echo "FATAL: $unit has no [Install] WantedBy=" >&2; exit 1; }
+  sudo mkdir -p "$mnt/etc/systemd/system/$target.wants"
+  sudo ln -sfn "$src" "$mnt/etc/systemd/system/$target.wants/$unit"
+  echo "ENABLED $unit -> $target"
+done
 sudo test -x "$mnt/usr/bin/podman" || { echo "FATAL: podman missing in image" >&2; exit 1; }
 sudo test -x "$mnt/usr/sbin/sshd" || { echo "FATAL: sshd missing in image" >&2; exit 1; }
 if [ -n "$mod_tar" ]; then

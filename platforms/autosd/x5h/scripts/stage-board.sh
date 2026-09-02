@@ -217,13 +217,33 @@ stage_payload() {
     nsend=$(( ntotal - ndel ))
     say "PLAN: dry run: $ndel path(s) would be DELETED from the board, $nsend would be sent."
     if [ "$ndel" -gt 0 ]; then
-        printf '%s\n' "$dry" | grep '^\*deleting' | head -50
+        printf '%s\n' "$dry" | grep '^\*deleting' | head -50 || true   # head closing the pipe must not trip pipefail
         [ "$ndel" -le 50 ] || say "PLAN: ... and $(( ndel - 50 )) further deletions not listed above"
     fi
     need_yes
     rsync -a --delete --info=progress2 -e "$rsh" "$inputs/npu/" "root@$BOARD_IP:/var/opt/npu/" \
         || { echo "STAGE_PAYLOAD_FAIL reason=rsync_failed"; exit 1; }
-    $SSH 'ls /var/opt/npu; test -f /var/opt/npu/cmemdrv.ko && modinfo -F vermagic /var/opt/npu/cmemdrv.ko'
+    # Every exit from here carries exactly one marker. A bare $SSH would be
+    # killed by set -e with NO marker when its remote command fails, and the
+    # old `test -f … && modinfo …` did exactly that whenever cmemdrv.ko was
+    # absent: the operator saw output that just stopped. cmemdrv.ko is the
+    # out-of-tree module the whole npu role depends on, so a mirror that lacks
+    # it is an explicit failure, not a silent one. The listing and the vermagic
+    # line are printed either way -- that vermagic is what an operator checks
+    # against the running kernel.
+    local verify rc=0
+    verify=$($SSH 'ls /var/opt/npu; if [ -f /var/opt/npu/cmemdrv.ko ]; then modinfo -F vermagic /var/opt/npu/cmemdrv.ko; else echo "NO_CMEMDRV /var/opt/npu/cmemdrv.ko is not present"; fi' 2>&1) || rc=$?
+    printf '%s\n' "$verify"
+    [ "$rc" -eq 0 ] || { echo "STAGE_PAYLOAD_FAIL reason=verify_failed rc=$rc"; exit 1; }
+    # The sentinel is a fixed token, not the path: a path-shaped sentinel has to
+    # be kept in sync with the literal above and silently stops matching if
+    # either side is reworded. Matched with `case`, not a `grep -q` pipeline:
+    # grep -q exits on the first match, printf can then take a SIGPIPE, and
+    # pipefail would report the pipeline as failed -- turning a detected
+    # NO_CMEMDRV into a silent PASS.
+    case "$verify" in
+        *NO_CMEMDRV*) echo "STAGE_PAYLOAD_FAIL reason=no_cmemdrv"; exit 1 ;;
+    esac
     echo "STAGE_PAYLOAD_PASS"
 }
 

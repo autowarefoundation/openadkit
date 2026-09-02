@@ -19,6 +19,8 @@ CURATED_DEPLOYMENTS = (
     "planning-simulation",
     "scenario-simulation",
 )
+CARLA_INTERFACE_ENV = "CARLA_INTERFACE_IMAGE"
+CARLA_INTERFACE_TARGET = "carla-interface"
 ROS_DISTROS = ("humble", "jazzy")
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
@@ -43,13 +45,18 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def load_runtime(source_root: Path) -> ModuleType:
-    module_path = source_root / "openadkit.d/manifest.py"
+    module_path = source_root / "cli/manifest.py"
+    if not module_path.is_file():
+        fail(f"could not load runtime manifest module: {module_path}")
     spec = importlib.util.spec_from_file_location("openadkit_release_manifest", module_path)
     if spec is None or spec.loader is None:
         fail(f"could not load runtime manifest module: {module_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError) as error:
+        fail(f"could not load runtime manifest module: {module_path}: {error}")
     return module
 
 
@@ -131,7 +138,9 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         indexed[runtime_key] = row
 
     kit = runtime.load_kit(source_root)
-    runtime_targets = sorted(set(kit.component_images.values()))
+    component_images = dict(kit.component_images)
+    component_images[CARLA_INTERFACE_ENV] = CARLA_INTERFACE_TARGET
+    runtime_targets = sorted(set(component_images.values()))
     context_images: dict[str, dict[str, str]] = {}
     for distro in ROS_DISTROS:
         distro_images: dict[str, str] = {}
@@ -166,7 +175,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
     release_context = {
-        "componentImages": dict(kit.component_images),
+        "componentImages": component_images,
         "defaultRosDistro": args.default_ros_distro,
         "deployments": deployments,
         "images": context_images,
@@ -180,7 +189,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             "asset": asset_name,
             "deployments": list(CURATED_DEPLOYMENTS),
             "root": root_name,
-            "runtime": ["openadkit", "openadkit.d"],
+            "runtime": ["openadkit", "cli"],
             "shared": sorted(shared_names),
         },
         "githubAssets": [

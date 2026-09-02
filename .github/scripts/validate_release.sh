@@ -104,6 +104,7 @@ select_scan_metadata() {
   local scan_artifact_ids scan_artifact_id artifact_json artifact_run_id scan_run_id scan_run_attempt
   local scan_run_json scan_workflow_name scan_workflow_path scan_head_branch scan_status scan_conclusion
   local selected_scan_artifact_id selected_scan_run_id selected_scan_run_attempt selected_scan_status selected_scan_conclusion
+  local lookup_status scan_lookup_http_status
 
   scan_artifact_ids=$(
     gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=scan-metadata-${BUILD_TAG}" \
@@ -158,9 +159,15 @@ select_scan_metadata() {
       continue
     fi
 
-    if ! scan_run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${scan_run_id}/attempts/${scan_run_attempt}" 2>/dev/null); then
-      echo "Ignoring scan artifact ${scan_artifact_id}: could not read scan run ${scan_run_id}-${scan_run_attempt}" >&2
-      continue
+    lookup_status=0
+    scan_run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${scan_run_id}/attempts/${scan_run_attempt}" 2>/dev/null) || lookup_status=$?
+    if [ "${lookup_status}" -ne 0 ]; then
+      scan_lookup_http_status=$(jq -r '(.status // empty) | tostring' <<< "${scan_run_json}" 2>/dev/null || true)
+      if [ "${scan_lookup_http_status}" = "404" ]; then
+        echo "Ignoring scan artifact ${scan_artifact_id}: scan run ${scan_run_id}-${scan_run_attempt} was not found" >&2
+        continue
+      fi
+      fail "Could not read scan run ${scan_run_id}-${scan_run_attempt} for artifact ${scan_artifact_id}"
     fi
 
     scan_workflow_name=$(printf '%s' "${scan_run_json}" | jq -r '.name')

@@ -24,8 +24,8 @@ STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")
 
 stable_release="${STABLE_RELEASE}"
 
-# Record converged refs for the summary. Any failed promotion aborts immediately
-# so a later alias phase cannot expose a partially tagged release.
+# Record converged refs for the summary. Immutable version tags abort immediately.
+# Alias updates continue after a single failure so a rerun can finish leftovers.
 PROMOTED_REFS=()
 
 available_distros=$(jq -r '.images | unique_by(.rosDistro) | map(.rosDistro) | join(" ")' "${plan_file}")
@@ -148,10 +148,20 @@ done < <(jq -r '.images[] | [.releaseRef, .repo, .digest] | @tsv' "${plan_file}"
 
 check_alias_policy
 
+failed_aliases=()
 if [ "${stable_release}" = true ] && [ "${PUBLISH_LATEST_ALIASES}" = true ]; then
   while IFS=$'\t' read -r alias repo digest; do
-    promote_tag "${alias}" "${repo}" "${digest}" alias
+    [ -n "${alias}" ] || continue
+    if ! promote_tag "${alias}" "${repo}" "${digest}" alias; then
+      failed_aliases+=("${alias}")
+    fi
   done < <(jq -r '.images[] | .repo as $repo | .digest as $digest | .aliases[] | [., $repo, $digest] | @tsv' "${plan_file}")
 fi
 
 echo "Alias promotion summary: ${#PROMOTED_REFS[@]} converged."
+if [ "${#failed_aliases[@]}" -ne 0 ]; then
+  echo "Alias promotion incomplete. Converged refs: ${PROMOTED_REFS[*]:-<none>}" >&2
+  echo "Unconverged aliases: ${failed_aliases[*]}" >&2
+  echo "Rerun the release workflow to finish remaining aliases." >&2
+  exit 1
+fi

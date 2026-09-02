@@ -1,6 +1,5 @@
-bootargs_common=pd_ignore_unused clk_ignore_unused rootwait rw panic=10 oops=panic enforcing=0 ip=@BOARD_IP@::192.168.0.1:255.255.255.0:@BOARD_HOSTNAME@:tsn5:none
-bootargs_cr52=${bootargs_common} root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 x5h.role=cr52
-bootargs_npu=${bootargs_common} root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 x5h.role=npu
+bootargs_cr52=pd_ignore_unused clk_ignore_unused rootwait rw panic=10 oops=panic enforcing=0 ip=@BOARD_IP@::192.168.0.1:255.255.255.0:@BOARD_HOSTNAME@:tsn5:none root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 x5h.role=cr52
+bootargs_npu=pd_ignore_unused clk_ignore_unused rootwait rw panic=10 oops=panic enforcing=0 ip=@BOARD_IP@::192.168.0.1:255.255.255.0:@BOARD_HOSTNAME@:tsn5:none root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 x5h.role=npu
 bootargs_yocto=pd_ignore_unused clk_ignore_unused rootwait rw panic=10 ip=@BOARD_IP@::192.168.0.1:255.255.255.0:@YOCTO_HOSTNAME@:tsn5:none root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e12 x5h.role=yocto
 probe_lu=ext4load scsi ${lu}:1 ${loadaddr} x5h-env.txt
 find_autosd=setenv lu 2; if run probe_lu; then true; else setenv lu 1; if run probe_lu; then true; else setenv lu 3; run probe_lu; fi; fi

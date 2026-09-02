@@ -15,10 +15,31 @@ diff <(printf '%s\n' "$e1") <(printf '%s\n' "$e2") | grep '^[<>]' | grep -v 'ip=
 for role in cr52 npu yocto; do
     printf '%s\n' "$e1" | grep -q "^bootcmd_${role}=" || fail "no_bootcmd_${role}"
 done
-printf '%s\n' "$e1" | grep '^bootargs_common=' | grep -q 'pd_ignore_unused clk_ignore_unused' || fail no_clk_args
-printf '%s\n' "$e1" | grep '^bootargs_common=' | grep -q 'panic=10 oops=panic' || fail no_panic_args
-printf '%s\n' "$e1" | grep '^bootargs_common=' | grep -q 'ip=192.168.0.20::192.168.0.1:255.255.255.0:autosd-x5h:tsn5:none' || fail bad_ip_form
-printf '%s\n' "$e2" | grep '^bootargs_common=' | grep -q 'ip=192.168.0.21::192.168.0.1:255.255.255.0:autosd-x5h-2:tsn5:none' || fail bad_ip_form_2
+# Every bootargs_* value must be FULLY EXPANDED. U-Boot expands variables in a
+# value it *runs*, but not in a value it merely substitutes into a command:
+# `setenv bootargs ${bootargs_npu}` stores bootargs_npu's text verbatim, so a
+# `${bootargs_common}` inside it reaches the kernel as those 19 literal
+# characters. That shipped once and wedged board 2 at `clk: Disabling unused
+# clocks` on 2026-09-02 -- no oops, no panic, no watchdog, SW7 the only way
+# back -- because the clk args lived only in the nested variable. bootargs_* is
+# substituted, never run, so it must carry no ${...} at all.
+printf '%s\n' "$e1" | grep '^bootargs_' | grep -q '\${' && fail bootargs_not_flat
+# Each role's own bootargs therefore has to carry the load-bearing arguments
+# itself; there is no common line left to inherit them from.
+for role in cr52 npu yocto; do
+    printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'pd_ignore_unused clk_ignore_unused' || fail "no_clk_args_${role}"
+    printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'rootwait rw panic=10' || fail "no_panic_args_${role}"
+    printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q "x5h.role=${role}" || fail "no_role_arg_${role}"
+done
+# oops=panic is the remote-safety layer and only the two AutoSD roles get it
+# (the vendor Yocto root is not ours to make reboot on an oops).
+for role in cr52 npu; do
+    printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'oops=panic' || fail "no_oops_panic_${role}"
+    printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02' || fail "bad_root_${role}"
+    printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'ip=192.168.0.20::192.168.0.1:255.255.255.0:autosd-x5h:tsn5:none' || fail "bad_ip_form_${role}"
+    printf '%s\n' "$e2" | grep "^bootargs_${role}=" | grep -q 'ip=192.168.0.21::192.168.0.1:255.255.255.0:autosd-x5h-2:tsn5:none' || fail "bad_ip_form_2_${role}"
+done
+printf '%s\n' "$e1" | grep '^bootargs_yocto=' | grep -q 'root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e12' || fail bad_root_yocto
 printf '%s\n' "$e2" | grep '^bootargs_yocto=' | grep -q 'yocto-x5h-2' || fail yocto_hostname
 printf '%s\n' "$e1" | grep -q '^load_role=.*x5h-role.txt' || fail no_role_file_loader
 printf '%s\n' "$e1" | grep -q '^probe_lu=.*x5h-env.txt' || fail probe_not_env_file

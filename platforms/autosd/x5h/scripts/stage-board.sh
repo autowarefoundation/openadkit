@@ -12,7 +12,7 @@
 #   write-root --yes dd the prepared root to the board's x5h-root (board must
 #                    NOT be running from it: yocto role or rescue netboot)
 #   partition-lun2 --yes  GPT on the second LUN: yocto-boot/yocto-root/npu-work
-#   write-boot       replace x5h-boot contents (kernel, both dtbs, env, role)
+#   write-boot --yes replace x5h-boot contents (kernel, both dtbs, env, role)
 #   stage-payload    rsync inputs/npu -> npu-work (mounted on the board)
 #   stage-stack      container images + scenario map (existing scripts)
 #   print-uboot      the exact console lines to import the environment
@@ -83,37 +83,113 @@ write_root() {
     say "PLAN: dd $img -> $BOARD_IP:$AUTOSD_ROOT (the board must not be running from x5h-root)"
     $SSH "findmnt -n -o SOURCE / ; readlink -f $AUTOSD_ROOT"
     need_yes
+    # The partlabel symlink must resolve to a real block device before dd runs.
+    # readlink -f prints the path even when nothing is there, so without this
+    # the running-from-target test below passes, dd creates a regular FILE at
+    # that path, and the read-back reads back that very file: a false PASS that
+    # wrote nothing to the disk.
+    $SSH "test -b $AUTOSD_ROOT" || { echo "STAGE_WRITE_FAIL reason=target_not_block_device"; exit 1; }
     local rootsrc; rootsrc=$($SSH 'findmnt -n -o SOURCE /')
     [ "$rootsrc" != "$($SSH "readlink -f $AUTOSD_ROOT")" ] || { echo "STAGE_WRITE_FAIL reason=board_running_from_target"; exit 1; }
     $SSH "dd of=$AUTOSD_ROOT bs=4M conv=fsync status=none" < "$img"
-    local want got; want=$(md5sum "$img" | cut -c1-32)
-    got=$($SSH "dd if=$AUTOSD_ROOT bs=4M count=$(( $(stat -c %s "$img") / 4194304 )) iflag=direct status=none | md5sum" | cut -c1-32)
+    # Read back exactly the image's byte length. A plain count of size/4194304
+    # truncates every image that is not a whole multiple of 4 MiB and then
+    # always reports readback_mismatch, so read the whole 4 MiB blocks and, if
+    # there is a remainder, one more aligned block trimmed to the tail length
+    # (the extra block keeps iflag=direct's alignment requirement satisfied).
+    local want got bytes full rem readcmd
+    want=$(md5sum "$img" | cut -c1-32)
+    bytes=$(stat -c %s "$img"); full=$(( bytes / 4194304 )); rem=$(( bytes % 4194304 ))
+    readcmd="dd if=$AUTOSD_ROOT bs=4M count=$full iflag=direct status=none"
+    [ "$rem" -eq 0 ] || readcmd="{ $readcmd; dd if=$AUTOSD_ROOT bs=4M skip=$full count=1 iflag=direct status=none 2>/dev/null | head -c $rem; }"
+    got=$($SSH "$readcmd | md5sum" | cut -c1-32)
     [ "$want" = "$got" ] || { echo "STAGE_WRITE_FAIL reason=readback_mismatch want=$want got=$got"; exit 1; }
     echo "STAGE_WRITE_PASS md5=$got"
 }
 
 partition_lun2() {
-    say "PLAN: GPT on $LUN2 : yocto-boot 1G / yocto-root 8G / npu-work rest, PARTUUIDs ...5e11/12/13 -- DESTROYS current contents"
-    $SSH "for d in $LUN2; do readlink -f \$d; sgdisk -p \$(readlink -f \$d); done"
+    # The LUN2 glob must resolve to exactly ONE device before anything
+    # destructive runs: unquoted, a multi-match word-splits into sgdisk -Z and
+    # would zap every match. Resolve it here, then use the concrete path below
+    # so the glob never reaches the destructive command at all.
+    local matches n dev
+    matches=$($SSH "ls -1d $LUN2 2>/dev/null" || true)
+    n=$(printf '%s\n' "$matches" | grep -c . || true)
+    case "$n" in
+        1) ;;
+        0) echo "STAGE_LUN2_FAIL reason=no_lun2_device glob=$LUN2"; exit 1 ;;
+        *) echo "STAGE_LUN2_FAIL reason=ambiguous_lun2_device count=$n"; exit 1 ;;
+    esac
+    dev=$($SSH "readlink -f $matches")
+    $SSH "test -b $dev" || { echo "STAGE_LUN2_FAIL reason=lun2_not_block_device dev=$dev"; exit 1; }
+    say "PLAN: GPT on $dev (via $matches) : yocto-boot 1G / yocto-root 8G / npu-work rest, PARTUUIDs ...5e11/12/13 -- DESTROYS current contents"
+    $SSH "sgdisk -p $dev"
     need_yes
-    $SSH "d=\$(readlink -f $LUN2); sgdisk -Z \$d && \
+    $SSH "sgdisk -Z $dev && \
       sgdisk -n1:0:+1G  -c1:yocto-boot -u1:7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e11 \
              -n2:0:+8G  -c2:yocto-root -u2:7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e12 \
-             -n3:0:0    -c3:npu-work   -u3:7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e13 \$d && blockdev --rereadpt \$d && sleep 2 && \
+             -n3:0:0    -c3:npu-work   -u3:7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e13 $dev && blockdev --rereadpt $dev && sleep 2 && \
       mkfs.ext4 -q -F -L yocto-boot /dev/disk/by-partlabel/yocto-boot && \
       mkfs.ext4 -q -F -L yocto-root /dev/disk/by-partlabel/yocto-root && \
-      mkfs.ext4 -q -F -L npu-work   /dev/disk/by-partlabel/npu-work && sgdisk -p \$d"
+      mkfs.ext4 -q -F -L npu-work   /dev/disk/by-partlabel/npu-work && sgdisk -p $dev"
     echo "STAGE_LUN2_PASS"
 }
 
 write_boot() {
-    local d="$WORK/boot"
+    local d="$WORK/boot" f keep=""
     rm -rf "$d"; mkdir -p "$d"
     cp "$inputs/Image-autosd" "$inputs/r8a78000-ironhide-uio-autosd.dtb" "$inputs/r8a78000-ironhide-npu.dtb" "$d/"
     bash "$X5H/uboot/render-env.sh" "$vars" > "$d/x5h-env.txt"
     printf 'role=npu\n' > "$d/x5h-role.txt"
-    say "replacing x5h-boot contents on $BOARD_IP (old files removed: Image-yocto and stale env files included)"
-    $SSH "m=\$(mktemp -d); mount $BOOT \$m && rm -f \$m/* && cd \$m && cpio -idmu && sync && ls -l \$m && umount \$m" < <(cd "$d" && find . -type f | cpio -o -H newc 2>/dev/null)
+    for f in "$d"/*; do
+        [ -s "$f" ] || { echo "STAGE_BOOT_FAIL reason=empty_staged_file file=${f##*/}"; exit 1; }
+        keep="$keep ${f##*/}"
+    done
+    keep=${keep# }
+    say "PLAN: replace the contents of $BOOT on $board ($BOARD_IP) with these files, staged in $d:"
+    (cd "$d" && ls -l)
+    say "PLAN: they are extracted over the partition FIRST (cpio -idmu overwrites in place) and verified"
+    say "PLAN: present; only then is every OTHER regular file on $BOOT deleted -- Image-yocto and stale"
+    say "PLAN: env files included. The partition is therefore never empty at any instant."
+    need_yes
+    # One remote script, not an && chain: extract, verify, then delete the
+    # stale files, and umount on every path out.
+    local remote out rc=0
+    remote=$(cat <<REMOTE
+set -u
+keep="$keep"
+m=\$(mktemp -d) || { echo "STAGE_BOOT_FAIL reason=remote_mktemp_failed"; exit 1; }
+mount $BOOT "\$m" || { echo "STAGE_BOOT_FAIL reason=boot_mount_failed"; rmdir "\$m" 2>/dev/null; exit 1; }
+rc=0
+# cpio runs in a subshell so this shell never holds \$m as its cwd, which would
+# make the umount below fail.
+(cd "\$m" && cpio -idmu) || { echo "STAGE_BOOT_FAIL reason=cpio_extract_failed"; rc=1; }
+if [ \$rc -eq 0 ]; then
+    for f in \$keep; do
+        [ -s "\$m/\$f" ] || { echo "STAGE_BOOT_FAIL reason=missing_after_extract file=\$f"; rc=1; }
+    done
+fi
+if [ \$rc -eq 0 ]; then
+    for p in "\$m"/*; do
+        [ -f "\$p" ] || continue
+        b=\${p##*/}
+        case " \$keep " in *" \$b "*) continue ;; esac
+        rm -f "\$p" || { echo "STAGE_BOOT_FAIL reason=stale_removal_failed file=\$b"; rc=1; }
+    done
+fi
+sync
+ls -l "\$m"
+umount "\$m" || { echo "STAGE_BOOT_FAIL reason=boot_umount_failed"; rc=1; }
+rmdir "\$m" 2>/dev/null || true
+exit \$rc
+REMOTE
+)
+    out=$($SSH "$remote" < <(cd "$d" && find . -type f | cpio -o -H newc 2>/dev/null) 2>&1) || rc=$?
+    printf '%s\n' "$out"
+    if [ "$rc" -ne 0 ]; then
+        printf '%s\n' "$out" | grep -q '^STAGE_BOOT_FAIL ' || echo "STAGE_BOOT_FAIL reason=remote_update_failed rc=$rc"
+        exit 1
+    fi
     echo "STAGE_BOOT_PASS role=npu"
 }
 

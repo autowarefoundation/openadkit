@@ -29,4 +29,15 @@
 # (the MRM scenario ships its own matched map, staged onto the board by
 # scripts/stage-scenario-map.sh), so the line was naming a unit that no
 # longer exists and had to go with it.
+#
+# cr52-remoteproc.service is enabled now that its script ships in the
+# image; on a board without a staged ELF it logs
+# CR52_RPROC_SKIP reason=no_firmware and exits 0, and in the npu role its
+# condition skips it. rpmsg-eth.service is still NOT enabled (standing
+# ruling: its binary is hand-staged).
 enable sshd.service
+enable x5h-role-banner.service
+enable var-lib-containers.mount
+enable var-opt-npu.mount
+enable x5h-npu.service
+enable cr52-remoteproc.service

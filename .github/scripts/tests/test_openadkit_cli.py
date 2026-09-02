@@ -311,9 +311,12 @@ def test_runtime_command_without_deployment_lists_running(tmp_path, command):
         [command],
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "example"
+    assert result.returncode == 2
+    assert "error: deployment name required" in result.stderr
     assert f"./openadkit {command} <deployment>" in result.stderr
+    assert re.search(
+        r"example\s+source\s+none\s+Test deployment", result.stdout
+    )
 
 
 def test_logs_follow_without_deployment_requires_name(tmp_path):
@@ -330,7 +333,9 @@ def test_logs_follow_without_deployment_requires_name(tmp_path):
     assert result.returncode == 2
     assert "error: deployment name required" in result.stderr
     assert "./openadkit logs <deployment> --follow" in result.stderr
-    assert result.stdout.strip() == "example"
+    assert re.search(
+        r"example\s+source\s+none\s+Test deployment", result.stdout
+    )
     assert " logs" not in f" {calls.read_text()} "
 
 
@@ -710,6 +715,26 @@ def test_operational_commands_do_not_take_selection_flags(command):
     )
     assert "--ros-distro" not in result.stdout
     assert "--gpu" not in result.stdout
+
+
+def test_repository_default_distro_uses_short_image_alias(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    bin_dir, calls = fake_docker(tmp_path)
+    result = run_cli(
+        root,
+        ["validate", "example"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert (
+        "humble||"
+        "ghcr.io/autowarefoundation/openadkit:api|"
+        "ghcr.io/autowarefoundation/openadkit:localization-mapping|"
+        in calls.read_text()
+    )
+    assert "openadkit:api-humble" not in calls.read_text()
 
 
 def test_repository_injects_selected_distro_and_component_environment(tmp_path):

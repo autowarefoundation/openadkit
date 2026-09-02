@@ -234,7 +234,11 @@ class RuntimeContext:
         if self.kind == "repository":
             assert self.image_prefix_component is not None
             return {
-                name: f"{self.image_prefix_component}:{target}-{ros_distro}"
+                name: (
+                    f"{self.image_prefix_component}:{target}"
+                    if ros_distro == self.default_ros_distro
+                    else f"{self.image_prefix_component}:{target}-{ros_distro}"
+                )
                 for name, target in applicable.items()
             }
 

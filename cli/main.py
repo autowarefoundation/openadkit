@@ -148,12 +148,13 @@ def _print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
         )
 
 
-def list_deployments(root, kit) -> int:
-    if not kit.deployments:
+def list_deployments(root, kit, names: list[str] | None = None) -> int:
+    selected = list(kit.deployments if names is None else names)
+    if not selected:
         print("No deployments found.")
         return 0
     rows: list[tuple[str, ...]] = []
-    for name in kit.deployments:
+    for name in selected:
         try:
             deployment = get_deployment(root, kit, name)
             rows.append(
@@ -170,15 +171,20 @@ def list_deployments(root, kit) -> int:
     return 0
 
 
-def show_running(command: str, running: list[str], *, usage: bool = True) -> int:
+def require_deployment_name(command: str, extra: str = "") -> None:
+    print("error: deployment name required", file=sys.stderr)
+    suffix = f" {extra}" if extra else ""
+    print(f"usage: ./openadkit {command} <deployment>{suffix}", file=sys.stderr)
+    print(file=sys.stderr)
+
+
+def show_running(root, kit, command: str, running: list[str], *, extra: str = "") -> int:
     if not running:
         print("no running deployments")
         return 0
-    for name in running:
-        print(name)
-    if usage:
-        print(f"usage: ./openadkit {command} <deployment>", file=sys.stderr)
-    return 0
+    require_deployment_name(command, extra)
+    list_deployments(root, kit, running)
+    return 2
 
 
 def show_version(root, kit) -> int:
@@ -237,12 +243,7 @@ def main() -> int:
 
     if args.command in ("fetch", "validate", "run"):
         if not args.deployment:
-            print("error: deployment name required", file=sys.stderr)
-            print(
-                f"usage: ./openadkit {args.command} <deployment>",
-                file=sys.stderr,
-            )
-            print(file=sys.stderr)
+            require_deployment_name(args.command)
             list_deployments(root, kit)
             return 2
         deployment = get_deployment(root, kit, args.deployment)
@@ -275,17 +276,13 @@ def main() -> int:
     compose.ensure_runtime_user()
     compose.require_docker()
     if not args.deployment:
+        extra = "--follow" if args.command == "logs" and args.follow else ""
         running = compose.running_names(kit.deployments)
-        if args.command == "logs" and args.follow:
-            print("error: deployment name required", file=sys.stderr)
-            print(
-                "usage: ./openadkit logs <deployment> --follow",
-                file=sys.stderr,
-            )
-            print(file=sys.stderr)
-            show_running(args.command, running, usage=False)
+        if extra and not running:
+            require_deployment_name(args.command, extra)
+            print("no running deployments")
             return 2
-        return show_running(args.command, running)
+        return show_running(root, kit, args.command, running, extra=extra)
     deployment = get_deployment(root, kit, args.deployment)
     warn_if_modified(root, deployment, kit)
     saved = compose.load_runtime(deployment)

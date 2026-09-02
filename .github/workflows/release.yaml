@@ -121,10 +121,12 @@ jobs:
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
           path: src
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
-            openadkit
-            openadkit.d
-            deployments
+            /openadkit
+            /openadkit.json
+            /cli/
+            /deployments/
 
       - name: Download validated release metadata
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4

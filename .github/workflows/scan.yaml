@@ -144,7 +144,8 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Retry scan after transient failure
-        if: steps.trivy-scan.outcome == 'failure'
+        id: trivy-retry
+        if: ${{ steps.trivy-scan.outcome == 'failure' && hashFiles(format('trivy-{0}-{1}-{2}.sarif', matrix.target, matrix.ros_distro, matrix.platform_label)) == '' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_PLATFORM: ${{ matrix.platform }}
@@ -159,6 +160,10 @@ jobs:
           timeout: 15m
           trivyignores: .trivyignore
           limit-severities-for-sarif: true
+
+      - name: Fail on vulnerability findings
+        if: ${{ steps.trivy-scan.outcome == 'failure' && steps.trivy-retry.outcome != 'success' }}
+        run: exit 1
 
       - name: Upload scan results to GitHub Security
         if: ${{ always() && hashFiles(format('trivy-{0}-{1}-{2}.sarif', matrix.target, matrix.ros_distro, matrix.platform_label)) != '' }}

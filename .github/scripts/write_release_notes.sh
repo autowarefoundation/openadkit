@@ -10,8 +10,8 @@ jq -e '
   (.release.packagerSha | test("^[0-9a-f]{40}$")) and
   (.bundle.asset | type == "string") and
   (.bundle.root | type == "string") and
-  (.releaseContext.images.humble | length == 8) and
-  (.releaseContext.images.jazzy | length == 8) and
+  (.releaseContext.images.humble | length == 9) and
+  (.releaseContext.images.jazzy | length == 9) and
   (.releaseContext.deployments | length == 4) and
   (.releaseContext.shared | length == 1)
 ' "${plan_file}" >/dev/null

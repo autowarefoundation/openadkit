@@ -22,7 +22,7 @@ rm -rf dist staging
 mkdir -p dist "${bundle_root}/deployments"
 cp -a "${source_dir}/openadkit" "${bundle_root}/openadkit"
 cp -a "${source_dir}/openadkit.json" "${bundle_root}/openadkit.json"
-cp -a "${source_dir}/openadkit.d" "${bundle_root}/openadkit.d"
+cp -a "${source_dir}/cli" "${bundle_root}/cli"
 for name in base carla-simulation logging-simulation planning-simulation scenario-simulation; do
   cp -a "${source_dir}/deployments/${name}" "${bundle_root}/deployments/${name}"
 done

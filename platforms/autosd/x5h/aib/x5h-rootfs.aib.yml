@@ -421,6 +421,45 @@ content:
     - source_path: ../scripts/x5h-stop-metrics.awk
       path: /usr/sbin/x5h-stop-metrics.awk
 
+  # --- executable bits -----------------------------------------------------
+  # add_files copies CONTENT ONLY: its schema has no mode field, and every
+  # file it installs lands 0644 whatever the source file's mode is in git.
+  # For a config file that is right; for the ten scripts above it is a boot
+  # failure. Confirmed on board 2 on 2026-09-02 by reading the written
+  # x5h-root: /usr/sbin/x5h-role, x5h-npu-up.sh and cr52-rproc-up.sh were all
+  # 0644, so x5h-npu.service, cr52-remoteproc.service and
+  # x5h-role-banner.service would each have died 203/EXEC on the first boot,
+  # and `ssh root@board x5h-manifest.sh` -- the parity instrument -- would
+  # have been "permission denied".
+  #
+  # chmod_files is the only lever aib offers for this, and it must list every
+  # /usr/sbin script the add_files block installs. tests/test-aib-manifest.sh
+  # asserts that correspondence in both directions, so a script added above
+  # without a line here fails the host tests rather than the next board boot.
+  # The two ort-rootfs.container* files are deliberately absent: they are data
+  # read by `podman build`, not programs.
+  chmod_files:
+    - path: /usr/sbin/x5h-role
+      mode: "0755"
+    - path: /usr/sbin/x5h-role-banner.sh
+      mode: "0755"
+    - path: /usr/sbin/cr52-rproc-up.sh
+      mode: "0755"
+    - path: /usr/sbin/x5h-npu-up.sh
+      mode: "0755"
+    - path: /usr/sbin/npu-contract-smoke.sh
+      mode: "0755"
+    - path: /usr/sbin/x5h-manifest.sh
+      mode: "0755"
+    - path: /usr/sbin/selfboot-smoke.sh
+      mode: "0755"
+    - path: /usr/sbin/rpmsg-eth-ifup.sh
+      mode: "0755"
+    - path: /usr/sbin/rpmsg-eth-smoke.sh
+      mode: "0755"
+    - path: /usr/sbin/x5h-stack-smoke.sh
+      mode: "0755"
+
 auth:
   # root password "autosd" — dev/bench image only, never a board deliverable.
   root_password: '$6$G8EEOdazon1o20yt$T22wsSokbA6eqYp86lCfEOSxNErCZkUjFNJfigB.PF4ijgJTzbrDA4GNHKNufhBc1vyiLm6Be7Elb16olXv590'

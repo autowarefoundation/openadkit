@@ -51,4 +51,56 @@ done
 grep -q '/usr/sbin/selfboot-smoke\.sh' "$here/../selfboot.md" || fail selfboot_md_no_usr_sbin_path
 grep -q '/usr/sbin/rpmsg-eth-smoke\.sh' "$here/../selfboot.md" || fail selfboot_md_no_rpmsg_smoke_path
 
+# --- every script the image installs is executable in the image -----------
+# add_files has no mode field: it copies content and leaves the destination
+# 0644 whatever the source is in git. Three units ExecStart a script under
+# /usr/sbin, so a missing chmod_files line is a 203/EXEC on the first boot of
+# a freshly written board -- found exactly that way on board 2 on 2026-09-02,
+# after the image had already been written to the board. The manifest is the
+# only place that can fix it, and this check is what makes the two lists stay
+# in step: it derives the requirement from the add_files block itself, so a
+# script added there without a chmod_files line fails here, on the host, in a
+# second, rather than on the board 40 minutes into a staging session.
+section() {  # $1 = a key under content: -> the lines of its block
+    awk -v k="  $1:" '
+        index($0, k) == 1 { f = 1; next }
+        f && (/^[a-zA-Z_]+:/ || /^  [a-zA-Z_]+:/) { f = 0 }
+        f { print }
+    ' "$aib"
+}
+strip() { sed -n "s/^[[:space:]]*-\{0,1\}[[:space:]]*$1:[[:space:]]*//p"; }
+
+add_pairs=$(section add_files | awk '
+    /^[[:space:]]*-[[:space:]]*source_path:/ { sub(/^[^:]*:[[:space:]]*/, ""); src = $0; next }
+    /^[[:space:]]*path:/ && src != "" { sub(/^[^:]*:[[:space:]]*/, ""); print src "\t" $0; src = "" }
+')
+[ -n "$add_pairs" ] || fail add_files_unparseable
+
+chmod_block=$(section chmod_files)
+[ -n "$chmod_block" ] || fail no_chmod_files_block
+# Pair path with the mode that follows it, so a stray mode cannot satisfy a
+# path that has none of its own.
+chmod_pairs=$(printf '%s\n' "$chmod_block" | awk '
+    /^[[:space:]]*-[[:space:]]*path:/ { sub(/^[^:]*:[[:space:]]*/, ""); p = $0; next }
+    /^[[:space:]]*mode:/ && p != "" { sub(/^[^:]*:[[:space:]]*/, ""); gsub(/"/, ""); print p "\t" $0; p = "" }
+')
+[ -n "$chmod_pairs" ] || fail chmod_files_unparseable
+
+while IFS=$'\t' read -r src dest; do
+    case "$src" in ../scripts/*) ;; *) continue ;; esac
+    case "$dest" in /usr/sbin/*) ;; *) continue ;; esac
+    [ -x "$aibdir/$src" ] || continue          # data files (ort-rootfs.container*)
+    mode=$(printf '%s\n' "$chmod_pairs" | awk -F'\t' -v d="$dest" '$1 == d { print $2 }')
+    [ -n "$mode" ] || fail "executable_not_chmodded=$dest"
+    [ "$mode" = 0755 ] || fail "wrong_mode=$dest mode=$mode"
+done <<< "$add_pairs"
+
+# And nothing is chmodded that the manifest does not install: a path that
+# survives a renamed or deleted add_files entry is a silent no-op at best.
+while IFS=$'\t' read -r cpath _; do
+    printf '%s\n' "$add_pairs" | awk -F'\t' -v d="$cpath" '$2 == d { found = 1 } END { exit !found }' \
+        || fail "chmod_path_not_installed=$cpath"
+done <<< "$chmod_pairs"
+
+
 echo "TEST_PASS $name"

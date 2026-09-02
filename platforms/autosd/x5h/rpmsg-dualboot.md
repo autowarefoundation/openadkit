@@ -246,13 +246,31 @@ invocation for staging onto the board.)
 
 ### Staging
 
+**Almost all of this chain now ships in the image, and the two pieces that do
+not are staged by `scripts/stage-board.sh prepare-root`, not by hand.**
 `aib/x5h-rootfs.aib.yml` installs `rpmsg-eth.service` (to
-`/etc/systemd/system/`) and its `ifup` helper to **`/usr/sbin/rpmsg-eth-ifup.sh`**
-today, so the manual procedure below covers the daemon binary and nothing
-else. Only the binary is not baked in — same manual
-install-to-`/usr/local/bin` pattern as `rpmsg-ping`/`rpmsg-smoke.sh` above,
-and the same reason: the board image ships no compiler, so nothing built
-from source lands there except by hand (see "Building" above).
+`/etc/systemd/system/`), its `ifup` helper to
+**`/usr/sbin/rpmsg-eth-ifup.sh`**, and the whole `cr52-remoteproc` trio:
+`cr52-rproc-up.sh` to **`/usr/sbin/cr52-rproc-up.sh`**,
+`cr52-remoteproc.service` to `/etc/systemd/system/`, and
+`x5h-rpmsg-modules.conf` to `/etc/modules-load.d/x5h-rpmsg.conf`.
+`80-x5h.preset` enables `cr52-remoteproc.service`.
+
+Exactly two files are still staged onto the board, and `stage-board.sh
+prepare-root` injects both into the root image before it is written, so neither
+is a live-board step any more:
+
+- the `rpmsg-eth` daemon binary, into `/usr/local/bin/rpmsg-eth` (written as
+  `/var/usrlocal/bin/rpmsg-eth` in the mounted image, because `/usr/local` is a
+  symlink to `../var/usrlocal`), and
+- the CR52 ELF, into `/lib/firmware/`, with a matching
+  `CR52_FIRMWARE=` line written to `/etc/default/cr52-remoteproc`.
+
+Both are staged rather than baked for the same reason: the board image ships no
+compiler, and neither file is a repository artifact. The `cr52-*` and
+`rpmsg-eth` commands in the blocks below are therefore no longer instructions
+for a fresh board. Read them as the description of what the units do, which is
+what you need when one of them misbehaves.
 
 The `/usr/sbin` helper vs `/usr/local/bin` binary split is deliberate.
 `automotive-image-builder` installs only under `/etc/`, `/usr/` or `/var/`
@@ -262,8 +280,11 @@ and ships `/usr/local` as a symlink to `../var/usrlocal` (see
 [selfboot.md](selfboot.md), "A trap when staging files into the image").
 So anything the **image** ships lives under `/usr`; anything the
 **operator** stages by hand after boot lives under `/usr/local`, which is
-the correct place for it at runtime. `cr52-rproc-up.sh` below is
-hand-staged for the same reason and likewise stays in `/usr/local/sbin`.
+the correct place for it at runtime. `cr52-rproc-up.sh` used to be hand-staged
+under `/usr/local/sbin` for that reason; it is a repository script with no
+build step, so it now ships in the image and lives at `/usr/sbin/cr52-rproc-up.sh`
+like every other image-installed helper. The `rpmsg-eth` daemon is the piece
+that genuinely cannot be baked, and it is the reason the split still exists.
 
 `80-x5h.preset` deliberately does not enable `rpmsg-eth.service`, but that
 does not keep the unit out of a normal boot: `components/awf-oak-bridge.container`
@@ -282,9 +303,12 @@ systemd logs one line naming the missing path, skips the unit, and reports
 the start job as successful, so the bridge's `Requires=` is satisfied
 cleanly.
 
-Stage the daemon onto the NFS export (see
-"Staging the assets" above for why `/var/tmp`, not `/tmp`, is the export
-path to use), then install it on the target:
+The normal route is `stage-board.sh prepare-root`, which installs the binary
+into the root image on the companion before that image is written to the board,
+so a freshly imaged board already has it. The hand route below is for a board
+that is already running and only needs a newer daemon. Stage it onto the NFS
+export first (see "Staging the assets" above for why `/var/tmp`, not `/tmp`, is
+the export path to use), then install it on the target:
 
 ```
 install -m0755 rpmsg-eth <export>/var/tmp/rpmsg/
@@ -293,7 +317,7 @@ install -m0755 rpmsg-eth <export>/var/tmp/rpmsg/
 ```
 install -m0755 /var/tmp/rpmsg/rpmsg-eth /usr/local/bin/rpmsg-eth
 systemctl daemon-reload
-systemctl enable --now rpmsg-eth.service
+systemctl restart rpmsg-eth.service
 ```
 
 ### Prerequisites
@@ -318,29 +342,31 @@ relying on the retry to eventually paper over a skipped step.
 during the Stage 2 session: after a warm reboot the modules were unloaded and
 `remoteproc0` was back to `offline`, so the link stayed down (with the daemon
 correctly logging `no channel named 'rpmsg-eth' on the rpmsg bus yet`) until
-both were repeated by hand. Install the two helpers below to make the link come
-up on its own, and the manual commands above become a description of what they
-do rather than something to remember:
+both were repeated by hand. Two image-installed pieces make the link come up on
+its own, so the manual commands above are a description of what they do rather
+than something to remember:
+
+- `/etc/modules-load.d/x5h-rpmsg.conf` loads `rpmsg_ctrl` and `rpmsg_char` at
+  boot (source: `config/x5h-rpmsg-modules.conf`).
+- `cr52-remoteproc.service` runs `/usr/sbin/cr52-rproc-up.sh`, which does the
+  `start` write and polls for `running`. It is enabled by `80-x5h.preset` and
+  carries `ConditionKernelCommandLine=x5h.role=cr52`, so it is skipped
+  outright in the `npu` role. That gating is not optional: under the vendor NPU
+  device tree `cr52_1`'s `memory-region` phandle resolves to no node and a
+  `start` write panics the kernel by construction.
+
+The one remaining input is the ELF, and `stage-board.sh prepare-root` installs
+it together with its `CR52_FIRMWARE=` line while the root image is still on the
+companion:
 
 ```
-install -m0755 cr52-rproc-up.sh          <export>/var/tmp/rpmsg/
-install -m0644 cr52-remoteproc.service   <export>/var/tmp/rpmsg/
-install -m0644 x5h-rpmsg-modules.conf    <export>/var/tmp/rpmsg/
-```
-
-```
-install -m0755 /var/tmp/rpmsg/cr52-rproc-up.sh /usr/local/sbin/cr52-rproc-up.sh
-install -m0644 /var/tmp/rpmsg/cr52-remoteproc.service /etc/systemd/system/cr52-remoteproc.service
-install -m0644 /var/tmp/rpmsg/x5h-rpmsg-modules.conf /etc/modules-load.d/x5h-rpmsg.conf
-# Point remoteproc at the ELF matching what is flashed in the Core1 slot. The
-# staged ELF MUST match the flashed image: `start` parses the resource table out
-# of it to publish the vrings, so a mismatch yields a link that looks configured
-# and passes nothing.
 install -m0644 <the flashed firmware>.elf /lib/firmware/
 printf 'CR52_FIRMWARE=%s\n' "<the flashed firmware>.elf" > /etc/default/cr52-remoteproc
-systemctl daemon-reload
-systemctl enable --now cr52-remoteproc.service
 ```
+
+The staged ELF **must** match what is flashed in the Core1 slot: `start` parses
+the resource table out of it to publish the vrings, so a mismatch yields a link
+that looks configured and passes nothing.
 
 Leaving `CR52_FIRMWARE` unset is also valid: the driver's stock name is
 `rproc-cr52_1-fw`, so a symlink at `/lib/firmware/rproc-cr52_1-fw` works just as
@@ -349,15 +375,17 @@ or `CR52_RPROC_SKIP reason=no_firmware path=…` on a board where the ELF has no
 been staged yet, which is the expected state on a freshly imaged board and is
 deliberately not treated as a failure.
 
-Like the daemon, these three files are **not** installed by
-`aib/x5h-rootfs.aib.yml`. That is intentional rather than an omission: the unit's
-`ExecStart` is a script that ships in this repo, not in the image, so baking the
-unit in while the script was absent would leave every first boot with a failed
-unit and nothing gained. The whole `rpmsg-eth` stack is staged together.
+These three files used to be excluded from `aib/x5h-rootfs.aib.yml` on the
+argument that the unit's `ExecStart` was a script the image did not carry, so
+baking the unit in would leave every first boot with a failed unit. That
+argument was resolved by shipping the script too: all three are in the manifest
+now, and a board with no ELF staged yet reports
+`CR52_RPROC_SKIP reason=no_firmware` and exits 0 rather than failing.
 
-```
-systemctl enable --now rpmsg-eth.service
-```
+`rpmsg-eth.service` remains deliberately absent from `80-x5h.preset`, which is a
+standing ruling and not an oversight. It is still reached on a normal `cr52`
+boot, because `awf-oak-bridge.container` carries `Requires=rpmsg-eth.service`
+and pulls it up.
 
 ### Smoke
 

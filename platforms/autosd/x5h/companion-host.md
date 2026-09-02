@@ -97,6 +97,42 @@ a separate `<uplink>`. Substitute real names throughout. The reference host
 used a USB Gigabit adapter for `<BIF>` and Wi-Fi for the uplink; both work,
 and both have consequences called out below.
 
+## The two boards
+
+The bench holds two X5H boards behind the companion. They run the **same
+image, the same U-Boot environment template and the same partition map**;
+the only intended difference between them is the three-line variables file
+each is staged from (`boards/x5h1.vars`, `boards/x5h2.vars`).
+
+| | Board 1 `192.168.0.20` | Board 2 `192.168.0.21` |
+|---|---|---|
+| Default role | `npu` | `npu` |
+| Available roles | `cr52`, `npu` | `cr52`, `npu`, `yocto` |
+| `HAS_YOCTO` | `0` | `1` |
+| Hostname | `autosd-x5h` | `autosd-x5h-2` (`yocto-x5h-2` in the `yocto` role) |
+| LUN 1 (AutoSD) | `x5h-boot` 1 GiB / `x5h-root` 12 GiB / `autosd-store` 19 GiB btrfs, PARTUUID `…5e01/02/03` | identical |
+| LUN 2 | `yocto-boot` 1 GiB (empty) / `yocto-root` 8 GiB (empty) / `npu-work` rest, PARTUUID `…5e11/12/13` | same map, Yocto partitions populated |
+| `x5h-boot` contents | `Image-autosd`, both dtbs, `x5h-env.txt`, `x5h-role.txt` | identical |
+| CR52 slot | `actuation_x5h.elf` | identical (its silence remains the open escalation) |
+| Bootloader | Stage 2 AI-package chain, DRAM ECC off | identical |
+| Access | admin + dev + ext grants | admin only |
+
+`…5eXX` is shorthand for `7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5eXX`. Board 1 gets
+the whole LUN 2 map with its two Yocto partitions formatted and left empty,
+which is what lets one environment template serve both boards. The roles
+themselves are described in [selfboot.md](selfboot.md), "Roles".
+
+Two consequences worth stating plainly:
+
+- **Board 1 now carries the NPU boot path and the NPU payload.** The
+  2026-08-25 invariant that it did not is withdrawn, because external
+  developers need the NPU there. The vendor NDA material on `npu-work` is
+  therefore reachable by every root login on board 1. That is accepted, and
+  the Tailscale ACL below is deliberately unchanged.
+- **Board 2 is not the Yocto appliance any more.** Its default personality is
+  AutoSD in the `npu` role, like board 1; Yocto survives as a third role on
+  its second LUN, for vendor-kernel reproduction and vendor reports.
+
 ## 1. Base packages and tailnet
 
 ```sh
@@ -654,6 +690,49 @@ UDP 69 is not worth probing directly: a UDP connect test cannot distinguish
 "filtered" from "no reply". It sits in the same nftables rule and the same
 interface scope as udp/2049, so the NFS result covers it by construction.
 
+### Two-board parity
+
+The two boards are meant to differ only in their variables file, and that is
+checked rather than assumed. Collect a manifest from each board and diff
+them on the companion:
+
+```sh
+cd platforms/autosd/x5h
+for b in 20 21; do
+  ssh root@192.168.0.$b /usr/sbin/x5h-manifest.sh > /tmp/m-$b.txt
+done
+scripts/x5h-parity.sh /tmp/m-20.txt boards/x5h1.vars \
+                      /tmp/m-21.txt boards/x5h2.vars
+```
+
+Expect `BOARD_PARITY_PASS`. Anything else prints the residual diff first and
+then `BOARD_PARITY_FAIL reason=<residual_diff|bad_args|same_manifest|bad_vars|
+incomplete_manifest>`.
+
+Three things about this that matter more than they look:
+
+- **Redirect stdout only.** `x5h-manifest.sh` puts the manifest on stdout and
+  its own marker on stderr, precisely so a marker cannot be captured into the
+  manifest file and read back as a key. Watch the terminal for
+  `X5H_MANIFEST_OK`; a `X5H_MANIFEST_FAIL reason=<slug>` means the manifest is
+  empty and the collection has to be repeated, not that the board diverged.
+  If a failure marker does end up inside a file (a stray `2>&1`), parity
+  refuses it with `missing=manifest_marked_failed` rather than diffing it.
+- **Parity enforces a completeness floor.** A manifest missing `kernel`,
+  `cmdline`, `env.md5`, any `boot.*` or any `unit.*` key is rejected as
+  `incomplete_manifest`. Two boards that both lost the same category compare
+  equal, which is the false pass this floor exists to stop.
+- **`env.md5` is the U-Boot environment, normalized.** The raw
+  `boot.x5h-env.txt` hash is exempt because the rendered environment
+  legitimately differs per board; `env.md5` blanks only the client-address and
+  hostname fields of every `ip=` word and hashes the rest, so
+  `clk_ignore_unused`, the `root=PARTUUID=` values and the per-role load
+  addresses are all compared. It is not exempt from the diff.
+
+`fs.yocto-*` is exempt only when the two boards disagree about `HAS_YOCTO`.
+Point both invocations at variables files with the same value and those
+filesystems are compared like anything else.
+
 ### Netboot rescue through the companion
 
 One-shot boots from the U-Boot prompt; neither writes the environment, so
@@ -661,11 +740,18 @@ the board returns to UFS self-boot on the next reset with nothing to undo.
 `printenv` first, as always.
 
 ```
-=> printenv bootcmd bootcmd_yocto bootcmd_autosd
+=> printenv bootcmd role rescue_autosd rescue_yocto_nfs
 => ping 192.168.0.1            # host is alive -> the bench path works
-=> run bootcmd_yocto           # TFTP kernel+dtb, NFS root /export/rfs
-=> run bootcmd_autosd          # TFTP kernel+dtb, NFS root /export/rfs-autosd
+=> run rescue_yocto_nfs        # TFTP kernel+dtb, NFS root /export/rfs
+=> run rescue_autosd           # TFTP kernel+dtb, NFS root /export/rfs-autosd
 ```
+
+`bootcmd_yocto` is **not** the NFS rescue any more: it is the self-boot Yocto
+role from the second LUN. The NFS rescue is `rescue_yocto_nfs`, which runs
+the `bootcmd_yocto_nfs` the environment import renamed the old value into.
+On a board where that rename was skipped, `rescue_yocto_nfs` will fail on an
+undefined variable, and the fix is to reconstruct `bootcmd_yocto_nfs` from
+the `printenv` backup rather than to redefine `bootcmd_yocto`.
 
 Confirm on the booted system that the root really is the companion's export,
 rather than trusting that the command ran:
@@ -695,13 +781,31 @@ ssh root@192.168.0.20 reboot
 ssh root@192.168.0.20 sh /usr/local/bin/selfboot-smoke.sh   # boot B
 ```
 
-**`selfboot-smoke.sh` passes once per boot.** The CR52 announces its RPMsg
-endpoint exactly once per SoC reset, so a second run in the same boot fails
-on `service_timeout` no matter how long it waits — a failure that looks like
-a regression in whatever you last changed. Budget one smoke per boot and put
-a reset between the tiers you verify. `rpmsg-smoke.sh --check` is read-only
-and can be run as often as you like; `dmesg | grep -c 'creating channel'`
+`selfboot-smoke.sh` is repeatable now and reports the role it found on its
+PASS line. It no longer ends in a CR52 round trip: that step restarted
+remoteproc, raced `rpmsg-eth.service` and oopsed `rpmsg_char`, which under the
+`oops=panic` bootargs every role carries would now reboot the board mid
+rehearsal. The once-per-boot constraint went with it. **The CR52 link check
+that replaced it, `rpmsg-eth-smoke.sh`, still passes once per boot**, because
+the CR52 announces its RPMsg endpoint exactly once per SoC reset; a second run
+in the same boot fails no matter how long it waits, which reads as a
+regression in whatever you last changed. Budget one link check per boot and
+put a reset between the tiers you verify. `dmesg | grep -c 'creating channel'`
 returning 0 says the current boot's session is still unused.
+
+The rehearsal is also the cheapest place to exercise a role switch, since it
+already ends in a reset:
+
+```sh
+ssh root@192.168.0.20 x5h-role                  # current= and next=
+ssh root@192.168.0.20 x5h-role set cr52 --reboot
+# wait, then
+ssh root@192.168.0.20 'cat /run/x5h/role; sh /usr/local/bin/selfboot-smoke.sh'
+ssh root@192.168.0.20 x5h-role set npu --reboot  # leave it in the default role
+```
+
+The role is sticky, so a board left in `cr52` stays there through every
+reboot, panic and watchdog reset until someone sets it back.
 
 Comparing `/proc/sys/kernel/random/boot_id` either side of the reset is a
 cheap way to prove the board actually reset rather than merely stayed up.
@@ -737,6 +841,9 @@ wrong by days. Correlate against the companion's clock, not the board's.
 ## Related
 
 - [UFS self-boot](selfboot.md) — why the board no longer depends on this
-  host, and the rescue commands that still do.
+  host, the rescue commands that still do, the three boot roles, and the
+  `stage-board.sh` sequence that runs on this host.
+- [NPU bring-up](npu-bringup.md) covers the `npu` role's container contract,
+  which is what board 1's external developers consume.
 - [CR52 slot update](cr52-slot-update.md) — the remote firmware workflow
   this host makes reachable.

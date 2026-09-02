@@ -27,8 +27,10 @@ answered before board time.
   covers `rpmsg-eth`, the IP-over-RPMsg TAP bridge daemon (`rpmsg-eth/`)
   that gives the CR52 a normal Ethernet link to Linux.
 - [UFS self-boot](selfboot.md) — boot AutoSD unattended from the board's
-  own storage, with both netboots kept as named rescue commands; also the
-  reset semantics, including why a warm `reboot` restarts the CR52.
+  own storage, with both netboots kept as named rescue commands; the three
+  switchable boot roles (`cr52`, `npu`, `yocto`) and the `stage-board.sh`
+  staging sequence; also the reset semantics, including why a warm `reboot`
+  restarts the CR52.
 - [CR52 slot update](cr52-slot-update.md) — replace the realtime firmware
   by writing its boot slot from Linux, instead of the vendor serial-download
   tool and a trip to the board.
@@ -54,15 +56,20 @@ answered before board time.
 ## Folder Structure
 
 - `aib/`: automotive-image-builder manifest (distro `autosd10-sig`)
-- `config/`: files shipped into the image — containers.conf drop-ins (base)
-  or staged alongside the rebuilt kernel (`60-nftables.conf`), plus the
+- `config/`: files shipped into the image. Both containers.conf drop-ins
+  (`50-x5h.conf` and `60-nftables.conf`, the latter installed by the aib
+  manifest and no longer staged alongside the rebuilt kernel; it sorts later
+  and is therefore the effective `firewall_driver`), plus the
   self-boot set: key-only sshd drop-in, `authorized_keys`, the
   NetworkManager drop-in keeping `tsn5` kernel-managed, static resolvers,
   the rpmsg sample-driver blacklist, the `uio_pdrv_genirq` `of_id` binding
   and its udev naming rules (see [uio.md](uio.md)), the `rpmsg-eth.service`
-  host unit, the `tmpfiles.d` fragment that creates the stack's scenario
-  directory, and `80-x5h.preset`, which enables `sshd.service` and nothing
-  else —
+  and `cr52-remoteproc.service` host units, the `x5h-npu.service` /
+  `var-opt-npu.mount` / `var-lib-containers.mount` set, the role banner
+  unit, the watchdog drop-in, the `tmpfiles.d` fragment that creates the
+  stack's scenario
+  directory, and `80-x5h.preset`, which enables `sshd.service`, the role
+  banner, both mounts, `x5h-npu.service` and `cr52-remoteproc.service`;
   deliberately not `rpmsg-eth.service`, which `awf-oak-bridge` pulls in
   itself (see [rpmsg-dualboot.md](rpmsg-dualboot.md)), and deliberately not
   the five Quadlet units, which Quadlet enables itself from their
@@ -102,9 +109,19 @@ answered before board time.
 - `rpmsg-eth/`: the IP-over-RPMsg TAP bridge daemon (source, Makefile, and
   its own pty-mock unit test) — see [rpmsg-dualboot.md](rpmsg-dualboot.md)
   for cross-compile, staging, prerequisites and smoke
-- `uboot/`: `bootcmd_autosd` template (site values are filled at session
-  time, not committed), and `selfboot-env.txt` — the `env import -t` payload
-  defining the UFS self-boot plus both netboot rescue commands
+- `uboot/`: `autosd-boot.env`, the netboot `bootcmd_autosd` template (site
+  values are filled at session time, not committed), plus `x5h-env.tmpl` and
+  `render-env.sh`, one environment template rendered per board into the
+  `x5h-env.txt` that `env import -t` reads off the boot partition. It defines
+  the three boot roles (`cr52`, `npu`, `yocto`) and keeps both netboot paths
+  as `rescue_autosd` / `rescue_yocto_nfs`. See
+  [selfboot.md](selfboot.md), "Roles"
+- `boards/`: `x5h1.vars` and `x5h2.vars`, holding the three variables (`BOARD_IP`,
+  `BOARD_HOSTNAME`, `HAS_YOCTO`) that are the *only* intended difference
+  between the two boards. `scripts/x5h-parity.sh` fails if a manifest diff
+  shows anything else
+- `tests/`: host-side shell tests (no board, no root, no network).
+  `bash tests/run.sh` prints `ALL_TESTS_PASS`
 
 ## QEMU gate semantics
 
@@ -402,6 +419,17 @@ in the session log (with the fstype-qualified ones matching exactly, e.g.
 
 ### Board deployment
 
+> **This section is the netboot path, which is now the rescue path.** A board
+> in normal service self-boots from UFS and is staged by
+> `scripts/stage-board.sh <x5h1|x5h2> <inputs-dir> <subcommand> [--yes]`, which
+> writes the root, the boot partition, the second LUN and the NPU payload from
+> one place and reads the board's identity only from `boards/<board>.vars`.
+> Every destructive subcommand requires `--yes` and prints its plan first. See
+> [selfboot.md](selfboot.md), "Staging a board", for the subcommand order and
+> the approval gates, and "Roles" for the three boot roles the staged
+> environment provides. What follows here is the TFTP/NFS route the
+> `rescue_autosd` and `rescue_yocto_nfs` commands still use.
+
 Deployment is two steps: build the board's own kernel bundle, then stage it
 onto the NFS root and TFTP directory with
 `scripts/stage-rebuilt-kernel.sh <staged-nfs-root> <kernel-bundle-dir> <tftp-dir>`.
@@ -439,8 +467,7 @@ scripts/stage-rebuilt-kernel.sh <staged-nfs-root> <kernel-bundle-dir> <tftp-dir>
 
 This installs `Image-autosd` and `r8a78000-ironhide-uio-autosd.dtb` into
 `<tftp-dir>`, extracts and `depmod`s the module tree into `<staged-nfs-root>`,
-stages `config/60-nftables.conf` into
-`<staged-nfs-root>/etc/containers/containers.conf.d/`, and refreshes
+and refreshes
 `<staged-nfs-root>/var/lib/autosd-test/board-podman-smoke.sh` from this
 branch's copy — after this, both kernels boot the same NFS root (Board
 bring-up, step 2, is the U-Boot side of the selection). The refresh matters
@@ -462,17 +489,32 @@ U-Boot (rollback): setenv kernel_file Image ; setenv dtb_file <bsp-dtb> ; setenv
   NOTE: selinux_arg expands at 'setenv bootargs_autosd' time, not at 'run' time -- after setenv'ing it, re-enter the bootargs_autosd line from uboot/autosd-boot.env before 'run bootcmd_autosd', or the old value stays baked in.
 ```
 
-Rollback is **not** just those three variables set back to the BSP values.
-`stage-rebuilt-kernel.sh` also staged `60-nftables.conf` onto the shared NFS
-root, and the BSP kernel has no `CONFIG_NF_TABLES` — a U-Boot-only rollback
-would leave the BSP kernel booting with a firewall driver it cannot run.
-Complete rollback needs the drop-in removed too, exactly as the script
-prints it:
+Rollback is **not** just those three variables set back to the BSP values,
+and the extra step has changed. `60-nftables.conf` is no longer staged by
+`stage-rebuilt-kernel.sh`: it now ships in the aib image, and
+`stage-nfs-rootfs.sh` extracts that same tar, so the NFS rescue root gets the
+drop-in from the tarball, earlier than before. Nothing was lost by the move,
+but the install went from conditional to **unconditional**: the drop-in is
+present on a staged NFS root whether or not the rebuilt kernel was ever
+staged onto it. The BSP kernel has no `CONFIG_NF_TABLES`, so a U-Boot-only
+rollback still leaves it booting with a firewall driver it cannot run.
+
+The old recipe for that, `rm -f <staged-nfs-root>/etc/containers/
+containers.conf.d/60-nftables.conf`, is now not merely stale but
+**ineffective**: the next `stage-nfs-rootfs.sh` re-extracts the file from the
+tar and silently undoes the removal. Override it with a later-sorting drop-in
+instead, which survives a re-stage:
 
 ```
-Rollback ALSO needs: rm -f <staged-nfs-root>/etc/containers/containers.conf.d/60-nftables.conf
-  (the drop-in selects the nftables driver, which the BSP kernel cannot run -- both kernels share this NFS root)
+printf '[network]\nfirewall_driver = "none"\n' \
+  > <staged-nfs-root>/etc/containers/containers.conf.d/70-bsp-firewall.conf
 ```
+
+Remove that file again before booting the rebuilt kernel on the same root.
+`board-podman-smoke.sh` reads the effective driver rather than assuming one,
+and prints `SMOKE_<mode>_FIREWALL_DRIVER_UNRUNNABLE` on a BSP-kernel boot
+that still resolves `nftables`, so a red networking verdict there is
+attributable instead of mysterious.
 
 Fallback chain if the rebuilt kernel misbehaves, weakest change first:
 `enforcing=0` (default, permissive) → `selinux_arg=selinux=0` (SELinux out
@@ -717,9 +759,12 @@ rmdir "$mnt"
 #    (preserving the original as fstab.image) — skip that and the guest
 #    reboot-loops on the stock fstab's ESP entry (see Troubleshooting) —
 #    and now also extracts the rebuilt kernel's module tree from its third
-#    argument (depmod'ing it for the guest) and installs the in-tree
-#    `config/60-nftables.conf` drop-in, required by GATE1's modprobe
-#    prelude and GATE6's nftables driver respectively.
+#    argument (depmod'ing it for the guest), required by GATE1's modprobe
+#    prelude. It also installs the in-tree `config/60-nftables.conf`
+#    drop-in that GATE6's nftables driver needs. That install is now a
+#    redundant overwrite for a tar built from this branch, since the aib
+#    manifest already carries the file; it is kept so a replay against an
+#    older tar still gets it.
 ./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR"
 
 # 3. Start the host listener GATE6_SNAT_OK probes. The guest reaches it as
@@ -937,9 +982,14 @@ The networking check inside each phase auto-detects which kernel is running (`un
   retired GATE5 used: a port-published attempt (`curl http://127.0.0.1:8080/`) runs first
   and is **informational only** — it prints `SMOKE_<mode>_NET_PORT_OK` if it unexpectedly
   succeeds, but its failure never sets the script's fail state. It is expected to fail every
-  time under the currently-shipped `firewall_driver = "none"`: netavark's `none` driver never
-  installs a DNAT rule, so a published port is unreachable by construction. The check that
-  actually decides `SMOKE_<mode>_NET_OK` vs. `SMOKE_<mode>_NET_FAIL` is the
+  time, though the reason has changed. It used to be `firewall_driver = "none"`, whose
+  netavark driver installs no DNAT rule, so a published port was unreachable by
+  construction. Since `60-nftables.conf` moved into the aib image, a BSP-kernel boot on a
+  staged NFS root resolves `nftables` instead, on a kernel with no `CONFIG_NF_TABLES`,
+  a driver it cannot run at all. Either way the check is not evidence about the container
+  store, so it stays non-decisive here; `board-podman-smoke.sh` reads the effective driver
+  and prints `SMOKE_<mode>_FIREWALL_DRIVER_UNRUNNABLE` when it is the second case. The check
+  that actually decides `SMOKE_<mode>_NET_OK` vs. `SMOKE_<mode>_NET_FAIL` is the
   direct-container-IP path — `podman inspect`'s `.NetworkSettings.Networks` range form — run
   automatically, not left for the operator to trigger by hand.
 - **On the rebuilt kernel**, the port-published attempt is decisive instead:
@@ -954,8 +1004,12 @@ The networking check inside each phase auto-detects which kernel is running (`un
   `GATE6_SNAT_OK`/`GATE6_SNAT_FAIL`.
 
 If `SMOKE_<mode>_NET_FAIL` prints on the BSP kernel, both of its paths already failed
-automatically; look at `podman0`/`veth0` state and `podman` logs next, not at the firewall
-driver — `50-x5h.conf` already ships the only value the BSP kernel's netavark accepts.
+automatically. Look at the firewall driver **first** now: if
+`SMOKE_<mode>_FIREWALL_DRIVER_UNRUNNABLE` printed earlier in the same run, the staged root
+is resolving `nftables` on a kernel without `CONFIG_NF_TABLES`, and the fix is the
+`70-bsp-firewall.conf` override in "Rebuilt kernel (6.1.102-autosd)" above, not anything
+about `podman0`/`veth0`. Only with that marker absent is `podman0`/`veth0` state and the
+`podman` logs the right next place to look.
 
 Each phase prints `SMOKE_<mode>_STORE_FS=<fstype>` right after its mount succeeds (mirroring
 `gate-guest.sh`'s `GATE2_STORE_FS`/`GATE3_STORE_FS`/`GATE4_STORE_FS`) — check it reads

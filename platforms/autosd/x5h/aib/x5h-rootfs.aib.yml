@@ -214,6 +214,10 @@ content:
       path: /etc/systemd/system/var-opt-npu.mount
     - source_path: ../scripts/npu-contract-smoke.sh
       path: /usr/sbin/npu-contract-smoke.sh
+    - source_path: ../scripts/ort-rootfs.containerfile
+      path: /usr/sbin/ort-rootfs.containerfile
+    - source_path: ../scripts/ort-rootfs.containerignore
+      path: /usr/sbin/ort-rootfs.containerignore
     # --- role-independent: container store, watchdog, manifest -------------
     - source_path: ../config/var-lib-containers.mount
       path: /etc/systemd/system/var-lib-containers.mount

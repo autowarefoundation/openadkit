@@ -13,10 +13,10 @@
 #                    NOT be running from it: yocto role or rescue netboot)
 #   partition-lun2 --yes  GPT on the second LUN: yocto-boot/yocto-root/npu-work
 #   write-boot --yes replace x5h-boot contents (kernel, both dtbs, env, role)
-#   stage-payload    rsync inputs/npu -> npu-work (mounted on the board)
+#   stage-payload --yes  rsync inputs/npu -> npu-work (MIRROR: --delete)
 #   stage-stack      container images + scenario map (existing scripts)
 #   print-uboot      the exact console lines to import the environment
-# Flash-class subcommands print their plan and stop unless --yes is given.
+# Destructive subcommands print their plan and stop unless --yes is given.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 X5H="$HERE/.."
@@ -194,8 +194,35 @@ REMOTE
 }
 
 stage_payload() {
-    $SSH 'mkdir -p /var/opt/npu && mountpoint -q /var/opt/npu || mount /dev/disk/by-partlabel/npu-work /var/opt/npu'
-    rsync -a --delete --info=progress2 -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" "$inputs/npu/" "root@$BOARD_IP:/var/opt/npu/"
+    # rsync --delete MIRRORS: anything under /var/opt/npu on the board that is
+    # absent from $inputs/npu/ is removed. That directory holds vendor material
+    # and NPU calibration artifacts, several of which exist in exactly one
+    # place, and the documented workflow (Task 9) fills $inputs/npu/ by copying
+    # FROM that same board -- so a narrowed inbound copy followed by this
+    # command deletes the only remaining full set. Plan, then gate, then act.
+    local rsh="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    local dry ntotal ndel nsend
+    [ -d "$inputs/npu" ] || { echo "STAGE_PAYLOAD_FAIL reason=no_npu_inputs dir=$inputs/npu"; exit 1; }
+    [ -n "$(ls -A "$inputs/npu")" ] || { echo "STAGE_PAYLOAD_FAIL reason=empty_npu_inputs dir=$inputs/npu"; exit 1; }
+    $SSH 'mkdir -p /var/opt/npu && { mountpoint -q /var/opt/npu || mount /dev/disk/by-partlabel/npu-work /var/opt/npu; }' \
+        || { echo "STAGE_PAYLOAD_FAIL reason=npu_work_mount_failed"; exit 1; }
+    say "PLAN: mirror $inputs/npu/ -> $board ($BOARD_IP):/var/opt/npu/ with rsync --delete"
+    say "PLAN: --delete means EVERY path under /var/opt/npu ON THE BOARD that is absent from"
+    say "PLAN: $inputs/npu/ is REMOVED. Confirm the inputs directory is the FULL set, not a"
+    say "PLAN: narrowed copy, before approving."
+    dry=$(rsync -a --delete --dry-run --itemize-changes -e "$rsh" "$inputs/npu/" "root@$BOARD_IP:/var/opt/npu/") \
+        || { echo "STAGE_PAYLOAD_FAIL reason=dry_run_failed"; exit 1; }
+    ntotal=$(printf '%s\n' "$dry" | grep -c . || true)
+    ndel=$(printf '%s\n' "$dry" | grep -c '^\*deleting' || true)
+    nsend=$(( ntotal - ndel ))
+    say "PLAN: dry run: $ndel path(s) would be DELETED from the board, $nsend would be sent."
+    if [ "$ndel" -gt 0 ]; then
+        printf '%s\n' "$dry" | grep '^\*deleting' | head -50
+        [ "$ndel" -le 50 ] || say "PLAN: ... and $(( ndel - 50 )) further deletions not listed above"
+    fi
+    need_yes
+    rsync -a --delete --info=progress2 -e "$rsh" "$inputs/npu/" "root@$BOARD_IP:/var/opt/npu/" \
+        || { echo "STAGE_PAYLOAD_FAIL reason=rsync_failed"; exit 1; }
     $SSH 'ls /var/opt/npu; test -f /var/opt/npu/cmemdrv.ko && modinfo -F vermagic /var/opt/npu/cmemdrv.ko'
     echo "STAGE_PAYLOAD_PASS"
 }

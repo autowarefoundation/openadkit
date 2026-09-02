@@ -22,8 +22,11 @@
 #   X5H_STACK_PASS cr52_control_cmd=1 cr52_packets=<n>
 #   X5H_STACK_FAIL reason=<...>
 #   X5H_DRIVE_PASS junit=<path> tests=<n> failures=<n> errors=<n> \
-#                  mrm=succeeded stop_velocity=<v>
+#                  mrm=succeeded stop_velocity=<v> stop_distance_m=<d>
 #   X5H_DRIVE_FAIL reason=<...>
+#   X5H_DRIVE_STOP stop_distance_m=<d> rest_x=<x> rest_y=<y>
+#                             (informational, printed on the PASS path only,
+#                              immediately before the marker)
 #
 # WHAT X5H_DRIVE_PASS ASSERTS. It asserts that the stack was cycled, the
 # scenario ran to completion, a parseable junit result was produced, AND the
@@ -148,6 +151,21 @@
 #             mrm_nonzero_final_velocity=<v>
 #                                   the chain completed but the gate's last
 #                                   commanded velocity was not zero
+#             mrm_no_stop_metrics   the MRM chain completed but the stop
+#                                   distance could not be computed: the
+#                                   kinematic_state capture or the staged
+#                                   x5h-stop-metrics.awk is missing, no
+#                                   stamped fault record could anchor t=0,
+#                                   OR the ego never came to rest within the
+#                                   capture window (x5h-stop-metrics.awk's
+#                                   own never_rested case -- this script
+#                                   does not distinguish it from the other
+#                                   causes above; all collapse to this one
+#                                   reason). The chain result still stands;
+#                                   the run is failed because the
+#                                   before/after demo grades on this number
+#                                   and a PASS without it would be unusable
+#                                   there.
 #
 # No `set -e`: every failure must reach exactly one marker rather than
 # exiting silently mid-check.
@@ -467,7 +485,7 @@ drive)
     [ "$ready" -eq 1 ] || fail "autoware_not_ready" "DRIVE"
 
     # THE MRM-CHAIN CAPTURES, started before the scenario so the whole chain
-    # is observed. All four topics live on domain 1 (nothing about the MRM is
+    # is observed. All five topics live on domain 1 (nothing about the MRM is
     # bridged), so ros1 sees everything. PYTHONUNBUFFERED because these are
     # stopped by pkill after the run rather than by their own timeout, and a
     # block-buffered tail would lose exactly the samples the oracle needs.
@@ -482,6 +500,8 @@ drive)
         > "$PROBE/mrm_state.txt" &
     ros1 "PYTHONUNBUFFERED=1 timeout $((${GLOBAL_TIMEOUT:-240} + 60)) ros2 topic echo /control/command/control_cmd --field longitudinal" \
         > "$PROBE/gate_cmd.txt" &
+    ros1 "PYTHONUNBUFFERED=1 timeout $((${GLOBAL_TIMEOUT:-240} + 60)) ros2 topic echo /localization/kinematic_state" \
+        > "$PROBE/kinematic_state.txt" &
 
     # `restart`, not `start`, even though the stop above already left this
     # unit inactive: RemainAfterExit=yes means a `start` on an
@@ -554,7 +574,35 @@ drive)
     [ -n "$stopv" ] || fail "mrm_nonzero_final_velocity=none" "DRIVE"
     awk "BEGIN{exit !($stopv < 0.05)}" || fail "mrm_nonzero_final_velocity=$stopv" "DRIVE"
 
-    echo "X5H_DRIVE_PASS junit=$junit tests=$tests failures=$fails errors=$errs mrm=succeeded stop_velocity=$stopv"
+    # THE STOP-DISTANCE METRIC (before/after demo). Path length integrated
+    # from the ego's position at the injected fault (t0, taken from the
+    # events capture's own stamp) to rest, by x5h-stop-metrics.awk, which is
+    # staged NEXT TO this script and pinned by
+    # components/nodes/test_stop_metrics.py. There is NO fallback t0: the
+    # availability capture's first `autonomous: false` record is a
+    # pre-engagement startup record (present before the ego is ever
+    # engaged), not the post-fault drop, so anchoring there would silently
+    # integrate the entire autonomous drive into "stop distance" and report
+    # a large, plausible-looking, wrong number for the exact quantity this
+    # demo grades on. Confirmed against a real board capture: the
+    # availability capture's first `autonomous: false` sits at
+    # sec=1785573114, twenty-two seconds BEFORE the fault at sec=1785573136.
+    # Do not re-add a fallback here; the stamped events record is the only
+    # legitimate t0, and its absence is mrm_no_stop_metrics.
+    STOP_AWK="$(dirname "$0")/x5h-stop-metrics.awk"
+    [ -r "$STOP_AWK" ] || fail "mrm_no_stop_metrics" "DRIVE"
+    t0=$(awk -v mode=t0 -v pat='name: cpu_temperature_is_high' -f "$STOP_AWK" "$PROBE/events.txt")
+    [ -n "$t0" ] || fail "mrm_no_stop_metrics" "DRIVE"
+    metrics=$(awk -v t0="$t0" -f "$STOP_AWK" "$PROBE/kinematic_state.txt")
+    case "$metrics" in
+        stop_distance_m=*) ;;
+        *) fail "mrm_no_stop_metrics" "DRIVE" ;;
+    esac
+    stopd=${metrics%% *}
+    stopd=${stopd#stop_distance_m=}
+    echo "X5H_DRIVE_STOP $metrics"
+
+    echo "X5H_DRIVE_PASS junit=$junit tests=$tests failures=$fails errors=$errs mrm=succeeded stop_velocity=$stopv stop_distance_m=$stopd"
     ;;
 *)
     fail "usage" "STACK"

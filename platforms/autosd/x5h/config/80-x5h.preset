@@ -1,7 +1,7 @@
 # systemd presets for the Open AD Kit X5H image (issue #120 M7).
 # Installed by aib/x5h-rootfs.aib.yml to /etc/systemd/system-preset/.
 #
-# This file enables exactly one unit, and the short list is deliberate.
+# This file enables six units: sshd, the role banner, two container mounts, the NPU service, and CR52 remoteproc.
 #
 # THE FIVE QUADLET UNITS ARE NOT LISTED, and adding them would be a no-op
 # that reads like a decision. Quadlet generates their .service units at

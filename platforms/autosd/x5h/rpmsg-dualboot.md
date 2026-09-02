@@ -355,6 +355,40 @@ than something to remember:
   device tree `cr52_1`'s `memory-region` phandle resolves to no node and a
   `start` write panics the kernel by construction.
 
+**A condition on `x5h.role=cr52` is not satisfied by "not the npu role": it is
+also unsatisfied whenever `x5h.role=` is absent from the kernel command line
+altogether.** That is not a corner case. `uboot/autosd-boot.env` builds
+`bootargs_autosd` with no `x5h.role=` word, so every netboot rescue
+(`run rescue_autosd`, `run bootcmd_autosd`) lands on a root with no role, and
+so does any board that has not yet had the self-boot environment imported. The
+NFS rescue root is extracted from the same image tar, so it carries all nine
+role-gated units and skips every one of them; `/run/x5h/role` reads `unknown`
+and `selfboot-smoke.sh` on such a root fails with
+`SELFBOOT_SMOKE_FAIL reason=unknown_role role=unknown`, correctly. The
+procedure above therefore does nothing on a netbooted root unless the role is
+supplied by hand. Two ways to do that, in order of preference:
+
+- Append `x5h.role=cr52` to the rescue bootargs before booting, which is what
+  the self-boot roles do and what makes every unit behave identically to a
+  self-boot:
+
+  ```
+  => setenv bootargs_autosd "${bootargs_autosd} x5h.role=cr52"
+  => run bootcmd_autosd
+  ```
+
+  Re-enter the whole `setenv bootargs_autosd "..."` line rather than editing a
+  component of it: `bootargs_autosd` is double-quoted in that file and has
+  already expanded, so changing an input after the fact changes nothing.
+- Or, on the already-booted rescue root, run the two commands at the top of
+  this section by hand. They are the whole of what the unit does, and the
+  unit's condition is the only thing standing in the way.
+
+The netboot rescue is a first-class path in this branch's own workflow:
+[selfboot.md](selfboot.md), "Staging a board", recommends `rescue_autosd`
+precisely because it frees `x5h-root` for `write-root`. Do not read a rescue
+boot with no units running as a regression in the units.
+
 The one remaining input is the ELF, and `stage-board.sh prepare-root` installs
 it together with its `CR52_FIRMWARE=` line while the root image is still on the
 companion:
@@ -390,8 +424,12 @@ and pulls it up.
 ### Smoke
 
 ```
-scripts/rpmsg-eth-smoke.sh
+/usr/sbin/rpmsg-eth-smoke.sh
 ```
+
+The script ships in the image (`aib/x5h-rootfs.aib.yml`), so it is already on
+any board written by `stage-board.sh write-root`; the repository copy is the
+source, not something to copy across by hand.
 
 Asserts the channel is on the rpmsg bus, `rpmsg-eth.service` is active,
 `tap0` is up with the frozen address/MAC/MTU, then round-trip pings the

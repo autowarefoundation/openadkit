@@ -15,6 +15,9 @@
 #       artifacts also record absolute compile-host paths -- see npu-bringup.md)
 # Markers: NPU_CONTRACT_PASS avg_ms=<v> runs=<n> image=<ref>
 #          NPU_CONTRACT_FAIL reason=<wrong_role|npu_not_ready|no_image|no_artifacts|no_renesas_ep|no_latency|bad_args>
+# reason= appears exactly once per marker. The no_image case narrows itself
+# with detail=<no_ort_rootfs|build_failed> rather than a second reason= word,
+# which any key=value grader would read as a redefinition of reason.
 set -u
 IMAGE=${X5H_NPU_IMAGE:-localhost/x5h-ort-rootfs:latest}
 NPU=/opt/npu
@@ -25,9 +28,9 @@ fail() { echo "NPU_CONTRACT_FAIL reason=$1"; exit 1; }
 systemctl is-active --quiet x5h-npu.service || fail npu_not_ready
 [ -d "$NPU/$ART" ] || fail "no_artifacts path=$NPU/$ART"
 if ! podman image exists "$IMAGE"; then
-    [ -d "$NPU/ort-rootfs" ] || fail "no_image reason=no_ort_rootfs"
+    [ -d "$NPU/ort-rootfs" ] || fail "no_image detail=no_ort_rootfs"
     podman build -q -t "$IMAGE" -f /usr/sbin/ort-rootfs.containerfile \
-        --ignorefile /usr/sbin/ort-rootfs.containerignore "$NPU/ort-rootfs" >/dev/null || fail "no_image reason=build_failed"
+        --ignorefile /usr/sbin/ort-rootfs.containerignore "$NPU/ort-rootfs" >/dev/null || fail "no_image detail=build_failed"
 fi
 out=$(podman run --rm --privileged \
     --device /dev/uio2:/dev/npuc0 --device /dev/uio3:/dev/npuc1 \

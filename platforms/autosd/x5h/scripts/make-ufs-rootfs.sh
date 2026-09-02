@@ -49,7 +49,20 @@ fi
 # preset stays the one place that says what is enabled.
 preset="$mnt/etc/systemd/system-preset/80-x5h.preset"
 sudo test -r "$preset" || { echo "FATAL: $preset missing in image" >&2; exit 1; }
-sudo grep '^enable ' "$preset" | while read -r _ unit; do
+# Capture the preset lines before the loop. `sudo grep ... | while` dies
+# SILENTLY under `set -euo pipefail` when the preset has zero `enable ` lines:
+# grep exits 1, pipefail promotes that to the pipeline status, and the script
+# stops with no message at all -- the one silent failure on a path where every
+# other check is loud, and the resulting image would boot with none of the X5H
+# units enabled.
+preset_rc=0
+enables=$(sudo grep '^enable ' "$preset") || preset_rc=$?
+if [ "$preset_rc" -ne 0 ]; then
+  echo "FATAL: no 'enable ' lines in $preset (grep exit $preset_rc); the image" >&2
+  echo "       would boot with none of the X5H units enabled" >&2
+  exit 1
+fi
+printf '%s\n' "$enables" | while read -r _ unit; do
   src=""
   for d in /etc/systemd/system /usr/lib/systemd/system; do
     sudo test -f "$mnt$d/$unit" && { src="$d/$unit"; break; }

@@ -63,13 +63,20 @@ for dir in /etc/systemd/system /etc/containers /etc/modprobe.d /etc/modules-load
     [ -d "$dir" ] || continue
     find "$dir" -type f | sort | while read -r f; do emit "file.$f" "$(md5 "$f")"; done
 done
-for f in /etc/hostname /usr/sbin/x5h-* /usr/sbin/*rpmsg* /usr/sbin/cr52-* /usr/sbin/npu-* /usr/sbin/ort-rootfs.* /usr/local/bin/rpmsg-eth /etc/ssh/ssh_host_*_key.pub; do
+for f in /etc/hostname /usr/sbin/x5h-* /usr/sbin/*rpmsg* /usr/sbin/cr52-* /usr/sbin/npu-* /usr/sbin/selfboot-* /usr/sbin/ort-rootfs.* /usr/local/bin/rpmsg-eth /etc/ssh/ssh_host_*_key.pub; do
     [ -f "$f" ] && emit "file.$f" "$(md5 "$f")"
 done
 
 # Capture systemctl on its own line: piping into awk would hand $? to awk and
 # a broken systemctl would look like a board with no units.
-unitfiles=$(systemctl list-unit-files --no-legend --no-pager 'x5h-*' 'cr52-*' 'rpmsg-*' 'awf-oak-*' 'var-*.mount') || fail systemctl
+#
+# 'sshd*' is in the pattern list because sshd is the one unit that governs
+# remote access to the board, and the enablement of the unit is a different
+# fact from the content of its drop-in (which the /etc/ssh/sshd_config.d scan
+# above covers). Without it, a board whose sshd was disabled by hand mid
+# session still passes parity, and the authorized_keys.d exemption in
+# x5h-parity.sh would leave root SSH the least covered surface of the check.
+unitfiles=$(systemctl list-unit-files --no-legend --no-pager 'x5h-*' 'cr52-*' 'rpmsg-*' 'sshd*' 'awf-oak-*' 'var-*.mount') || fail systemctl
 units=$(printf '%s\n' "$unitfiles" | awk '{print $1}')
 [ -n "$units" ] || fail no_units
 for u in $units; do

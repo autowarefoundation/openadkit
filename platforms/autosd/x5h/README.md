@@ -946,6 +946,11 @@ no extra argument, between them.
 # themselves are not eyes-on steps, just the plumbing that follows that decision.
 lsblk
 sgdisk -n 1:0:0 -t 1:8300 -c 1:autosd-store <device>          # e.g. /dev/sdc — partition 1
+# NOTE: no -u, so this assigns a RANDOM partition GUID. That is fine for this
+# smoke, which addresses the partition by partlabel. It is NOT the two-board
+# self-boot map: there, config/var-lib-containers.mount matches autosd-store by
+# PARTUUID ...5e03 and is `nofail`, so a random GUID means the container store
+# silently falls back to the root filesystem. See selfboot.md, "Storage layout".
 mkfs.btrfs -f /dev/disk/by-partlabel/autosd-store             # the label now resolves
 
 /var/lib/autosd-test/board-podman-smoke.sh btrfs /dev/disk/by-partlabel/autosd-store

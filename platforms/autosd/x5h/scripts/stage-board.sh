@@ -4,7 +4,8 @@
 #
 #   stage-board.sh <x5h1|x5h2> <inputs-dir> <subcommand> [--yes]
 #
-# Subcommands (run in this order in a session; each is idempotent):
+# Subcommands (run in this order in a session; each is idempotent, with ONE
+# exception -- see partition-lun2 below):
 #   check-inputs     every input present; Image-autosd embeds the MP-PHY blob
 #   backup-keys      save authorized_keys + ssh host keys from the LIVE board
 #   prepare-root     copy x5h-rootfs.ext4 -> work/<board>-root.ext4, inject
@@ -12,6 +13,18 @@
 #   write-root --yes dd the prepared root to the board's x5h-root (board must
 #                    NOT be running from it: yocto role or rescue netboot)
 #   partition-lun2 --yes  GPT on the second LUN: yocto-boot/yocto-root/npu-work
+#                    NOT IDEMPOTENT IN CONTENT. It is idempotent in shape --
+#                    the same map, the same labels, the same pinned PARTUUIDs
+#                    every time -- but it runs mkfs.ext4 over all three
+#                    partitions, so a re-run on an already-populated board
+#                    ERASES the vendor Yocto appliance (yocto-boot +
+#                    yocto-root) and the whole NPU payload on npu-work.
+#                    stage-payload restores the NPU payload from <inputs>/npu;
+#                    NOTHING in this repository restores Yocto, and there is
+#                    no in-repo recipe for it -- it has to be reinstalled by
+#                    the vendor procedure. On a board with HAS_YOCTO=1 (board
+#                    2) treat this as a one-time conversion step, not as a
+#                    step to repeat when re-staging.
 #   write-boot --yes replace x5h-boot contents (kernel, both dtbs, env, role)
 #   stage-payload --yes  rsync inputs/npu -> npu-work (MIRROR: --delete)
 #   stage-stack      container images + scenario map (existing scripts)

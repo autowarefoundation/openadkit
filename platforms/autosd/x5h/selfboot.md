@@ -62,11 +62,40 @@ what lets one environment template serve both boards: the `yocto` role is
 defined everywhere, and on a board that has no Yocto image its loader
 simply fails and the fallback boots `npu` instead.
 
-The PARTUUIDs are fixed constants, not generated. They appear in three
-places that must agree: the partition tables (written by `stage-board.sh
-partition-lun2`), `uboot/x5h-env.tmpl`, and `scripts/selfboot-smoke.sh`.
-Changing one means changing all three. `scripts/x5h-parity.sh` compares
-them across the two boards as part of its manifest diff.
+The PARTUUIDs are fixed constants, not generated, and they are consumed in
+four places that must agree with the partition tables: `uboot/x5h-env.tmpl`
+(`root=PARTUUID=` for `…5e02` and `…5e12`), `config/var-lib-containers.mount`
+(`…5e03`), `scripts/selfboot-smoke.sh` (`…5e02` and `…5e03`) and
+`scripts/stage-board.sh` (`…5e11/12/13`). Changing one means changing all of
+them. `scripts/x5h-parity.sh` compares the whole partition map across the two
+boards as part of its manifest diff.
+
+**Only the LUN 2 table is written by anything in this repository.**
+`stage-board.sh partition-lun2` writes `…5e11/12/13` with explicit `sgdisk -u`
+flags. **The LUN 1 table, `…5e01/02/03`, is pre-existing on both boards and no
+script here creates it**; it was partitioned by hand and it holds the running
+AutoSD, so it is verified rather than rewritten. Verify it before converting a
+board, because every LUN 1 consumer above fails quietly rather than loudly if
+the GUIDs are wrong: `var-lib-containers.mount` is `nofail`, so a mismatched
+`…5e03` means the container store silently lands on the root filesystem
+instead of on `autosd-store`, and the first symptom is a full root partition
+weeks later. The `part.*` keys of the manifest are the check:
+
+```sh
+/usr/sbin/x5h-manifest.sh | grep '^part\.0\.'
+```
+
+Expect three lines whose values end in `…5e01`, `…5e02` and `…5e03`, in that
+order, with labels `x5h-boot`, `x5h-root` and `autosd-store`. (`part.0.*` is
+the first LUN in `/dev/disk/by-path` order; `part.1.*` is LUN 2.) Anything
+else means the board is not on the pinned map and must be corrected before
+`write-root`, not after.
+
+If a LUN 1 partition ever does have to be created by hand, pin its GUID with
+`sgdisk -u <n>:<the value from the table above>`. `sgdisk` without `-u`
+generates a random one, which is why the one-partition `autosd-store` recipe
+in [README.md](README.md) (a Strategy A bring-up step that predates this map)
+must not be copied here as it stands.
 
 `/var/lib/containers` is a separate partition because the container store
 is the one thing on the board that grows without bound, and keeping it off
@@ -108,6 +137,37 @@ in `bootargs`. Both halves are needed: `systemd.mask=` on the kernel
 command line was measured **not** to stop `cr52-remoteproc.service`, so
 the unit condition is what actually holds, and the device-tree selection
 is what makes the condition's verdict safe.
+
+**A root booted with no `x5h.role=` word at all has no role, and every one
+of the nine role-gated units is skipped.** The condition tests for a
+specific value; absence does not satisfy any of them. The path that hits
+this is the netboot rescue: `uboot/autosd-boot.env` builds
+`bootargs_autosd` without an `x5h.role=` word, and the NFS rescue root is
+extracted from the same image tar, so `run rescue_autosd` and
+`run bootcmd_autosd` both produce a full AutoSD userspace in which nothing
+role-gated starts. `/run/x5h/role` then reads `unknown` and
+`selfboot-smoke.sh` reports
+`SELFBOOT_SMOKE_FAIL reason=unknown_role role=unknown`, which is the
+correct verdict and not a defect to chase. The same is true of a board that
+has not yet had this environment imported.
+
+That matters here because the netboot rescue is one of the two ways this
+document recommends freeing `x5h-root` for `write-root` (see "Staging a
+board"). If you need the CR52 chain up on a netbooted root, supply the role
+in the rescue bootargs before booting:
+
+```
+=> setenv bootargs_autosd "${bootargs_autosd} x5h.role=cr52"
+=> run bootcmd_autosd
+```
+
+`bootargs_autosd` is double-quoted in `uboot/autosd-boot.env` and has
+already expanded, so re-enter the whole line rather than changing one of
+its inputs. `uboot/autosd-boot.env` itself is deliberately left alone: it
+mirrors environment that is hand-entered on a board's console, and a rescue
+boot is the one context where the role should be a conscious choice rather
+than a default. [rpmsg-dualboot.md](rpmsg-dualboot.md) carries the same
+warning next to the CR52 bring-up procedure it affects.
 
 ### The sticky role file and `x5h-role`
 
@@ -253,6 +313,12 @@ host's TFTP and NFS services.
 => run rescue_yocto_nfs     # BSP Yocto reference boot (runs bootcmd_yocto_nfs)
 ```
 
+**A rescue boot has no role**, and every role-gated unit is skipped on it;
+`selfboot-smoke.sh` there returns
+`SELFBOOT_SMOKE_FAIL reason=unknown_role role=unknown`, correctly. See
+"Roles" above for why and for the `setenv bootargs_autosd "${bootargs_autosd}
+x5h.role=cr52"` line that supplies one when the CR52 chain is needed.
+
 The indirection is not decoration. `bootcmd_yocto` is now the **self-boot**
 Yocto role, from `yocto-root` on LU 2, and the board's saved environment
 already had a `bootcmd_yocto` meaning the NFS rescue. So the saved one is
@@ -281,9 +347,10 @@ named by argument and never by an edited copy of the script:
 scripts/stage-board.sh <x5h1|x5h2> <inputs-dir> <subcommand> [--yes]
 ```
 
-Run the subcommands in this order. Each is idempotent, and each ends in
-exactly one marker: `<PREFIX>_PASS`, `<PREFIX>_FAIL reason=<slug>`, or
-`PLAN ONLY: …` for a gated subcommand invoked without approval.
+Run the subcommands in this order. Each ends in exactly one marker:
+`<PREFIX>_PASS`, `<PREFIX>_FAIL reason=<slug>`, or `PLAN ONLY: …` for a
+gated subcommand invoked without approval. Each is idempotent, with one
+exception called out below the table.
 
 | Subcommand | `--yes`? | Does |
 |---|---|---|
@@ -315,6 +382,18 @@ it is not a formality:
 - `write-boot` extracts over the partition first, verifies every file's
   md5 against the staged copy, and only then deletes the other regular
   files on `x5h-boot`, so the partition is never empty at any instant.
+
+**`partition-lun2` is the one subcommand that is not idempotent.** It is
+idempotent in *shape*: the same three partitions, the same labels, the same
+pinned PARTUUIDs, whatever it finds. It is not idempotent in *content*, and
+that difference is the whole of it: it runs `mkfs.ext4` over all three, so a
+second run erases `yocto-boot`, `yocto-root` and everything on `npu-work`.
+On board 2 that means the vendor Yocto appliance and the staged NPU payload
+together. `stage-payload` puts the NPU payload back from `<inputs>/npu/`;
+**nothing in this repository puts Yocto back, and no document here carries a
+recipe for it**: the Yocto image has to be reinstalled by the vendor procedure
+afterwards. Treat `partition-lun2` as a one-time conversion step
+per board, not as part of a re-stage.
 
 **The board must not be running from `x5h-root` during `write-root`.** The
 subcommand checks: it resolves both the mounted root's source and the
@@ -506,7 +585,7 @@ and everything the image ships lives under `/usr/sbin` instead, and why
 ## Verifying a self-boot
 
 ```
-sh /usr/local/bin/selfboot-smoke.sh
+sh /usr/sbin/selfboot-smoke.sh
 ```
 
 Expect `SELFBOOT_SMOKE_PASS root=… partuuid=… role=…`. The script resolves
@@ -524,9 +603,22 @@ next SoC reset; under `oops=panic` that is now a reboot. The per-role link
 checks are separate scripts:
 
 ```
-scripts/rpmsg-eth-smoke.sh          # cr52 role: RPMSG_ETH_PING_PASS
-npu-contract-smoke.sh <artifacts>   # npu role:  NPU_CONTRACT_PASS
+/usr/sbin/rpmsg-eth-smoke.sh              # cr52 role: RPMSG_ETH_PING_PASS
+/usr/sbin/npu-contract-smoke.sh <artifacts>   # npu role:  NPU_CONTRACT_PASS
 ```
+
+All three of these ship in the image (`aib/x5h-rootfs.aib.yml` installs them
+under `/usr/sbin`), so a board that has just been written by `stage-board.sh
+write-root` already has them and there is nothing to copy across. Run them by
+absolute path: `/usr/sbin` is on root's `PATH` on this image, but naming the
+path is what makes it obvious in a session log which copy was graded.
+
+A board flashed from an image built **before** these entries existed will not
+have `selfboot-smoke.sh` or `rpmsg-eth-smoke.sh`, only `x5h-manifest.sh`,
+`npu-contract-smoke.sh` and `x5h-stack-smoke.sh`. Check with
+`command -v selfboot-smoke.sh` rather than reading a `command not found` as a
+broken image; the fix is a rebuilt image and a `write-root`, not a hand copy
+into `/var/tmp`, which is what goes stale against the contract it grades.
 
 Run the smoke over SSH rather than the serial console when you want to
 prove the remote path works too.

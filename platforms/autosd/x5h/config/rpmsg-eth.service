@@ -84,8 +84,11 @@ StartLimitIntervalSec=0
 # and a build that tries it aborts. The OPERATOR stages the daemon binary by
 # hand after boot, and /usr/local/bin is exactly the right place for a
 # hand-staged local binary at runtime -- the restriction is only on what the
-# image bakes. Same reasoning for cr52-rproc-up.sh, which is also
-# hand-staged and also stays under /usr/local/sbin.
+# image bakes. cr52-rproc-up.sh used to be the other half of that argument;
+# it is no longer, and this comment is not evidence that it is. That script
+# now ships in the image at /usr/sbin/cr52-rproc-up.sh, which is what
+# cr52-remoteproc.service executes. The rpmsg-eth daemon binary is the one
+# remaining hand-staged piece of this chain.
 ExecStartPre=/usr/sbin/rpmsg-eth-ifup.sh tap0
 ExecStart=/usr/local/bin/rpmsg-eth -s rpmsg-eth -t tap0
 Restart=on-failure

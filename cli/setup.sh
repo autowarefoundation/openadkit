@@ -7,7 +7,7 @@ TARGET_USER=${SUDO_USER:-$(id -un)}
 FORCE_DOCKER_INSTALL=${OPENADKIT_CI_FORCE_DOCKER_INSTALL:-false}
 
 log() { printf '[openadkit] %s\n' "$*"; }
-fail() { printf '[openadkit] error: %s\n' "$*" >&2; exit 1; }
+fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 if [[ ${1:-} != setup ]]; then
   fail "setup helper must be invoked through ./openadkit setup"
@@ -45,7 +45,8 @@ case "$(uname -m)" in
   *) fail "unsupported architecture: $(uname -m)" ;;
 esac
 
-sudo -v
+RUNTIME_PACKAGES=(ca-certificates curl git gzip python3 python3-venv tar unzip)
+MISSING_PACKAGES=()
 
 compose_capable() {
   local temporary
@@ -71,11 +72,45 @@ EOF
   ) >/dev/null 2>&1
 }
 
-install_docker() {
-  if [[ $FORCE_DOCKER_INSTALL != true ]] \
+user_in_docker_group() {
+  [[ " $(id -nG "$TARGET_USER") " == *" docker "* ]]
+}
+
+docker_stack_ready() {
+  [[ $FORCE_DOCKER_INSTALL != true ]] \
     && command -v docker >/dev/null 2>&1 \
     && docker buildx version >/dev/null 2>&1 \
-    && compose_capable; then
+    && compose_capable
+}
+
+collect_missing_packages() {
+  local pkg
+  MISSING_PACKAGES=()
+  for pkg in "${RUNTIME_PACKAGES[@]}"; do
+    if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
+      MISSING_PACKAGES+=("$pkg")
+    fi
+  done
+}
+
+ensure_docker_group() {
+  if user_in_docker_group; then
+    return 0
+  fi
+  sudo groupadd docker 2>/dev/null || true
+  sudo usermod -aG docker "$TARGET_USER"
+}
+
+docker_run() {
+  if docker info >/dev/null 2>&1; then
+    docker "$@"
+  else
+    sudo docker "$@"
+  fi
+}
+
+install_docker() {
+  if docker_stack_ready; then
     log "Docker, Buildx, and Compose are already available"
   else
     log "installing Docker from the official Ubuntu repository"
@@ -91,8 +126,7 @@ install_docker() {
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     sudo systemctl enable --now docker
   fi
-  sudo groupadd docker 2>/dev/null || true
-  sudo usermod -aG docker "$TARGET_USER"
+  ensure_docker_group
 }
 
 nvidia_gl_libraries_present() {
@@ -222,9 +256,28 @@ EOF
   fi
 }
 
-log "installing Open AD Kit runtime dependencies"
-sudo apt-get update
-sudo apt-get install -y --no-install-recommends ca-certificates curl git gzip python3 python3-venv tar unzip
+collect_missing_packages
+need_sudo=false
+if ((${#MISSING_PACKAGES[@]} > 0)) || ! docker_stack_ready || ! user_in_docker_group; then
+  need_sudo=true
+fi
+if [[ $INSTALL_GPU == true ]]; then
+  need_sudo=true
+fi
+if [[ $RUN_VERIFY == true ]] && ! docker info >/dev/null 2>&1; then
+  need_sudo=true
+fi
+if [[ $need_sudo == true ]]; then
+  sudo -v
+fi
+
+if ((${#MISSING_PACKAGES[@]} > 0)); then
+  log "installing Open AD Kit runtime dependencies"
+  sudo apt-get update
+  sudo apt-get install -y --no-install-recommends "${MISSING_PACKAGES[@]}"
+else
+  log "runtime packages are already installed"
+fi
 install_docker
 
 if [[ $INSTALL_GPU == true ]]; then
@@ -233,11 +286,11 @@ if [[ $INSTALL_GPU == true ]]; then
 fi
 
 if [[ $RUN_VERIFY == true ]]; then
-  sudo docker run --rm hello-world >/dev/null
+  docker_run run --rm hello-world >/dev/null
   if [[ $INSTALL_GPU == true ]]; then
     command -v nvidia-smi >/dev/null 2>&1 || fail "nvidia-smi is unavailable"
     nvidia_gl_libraries_present || fail "NVIDIA OpenGL/Vulkan libraries are missing"
-    sudo docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi >/dev/null
+    docker_run run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi >/dev/null
   fi
 fi
 

@@ -197,6 +197,7 @@ def test_command_surface_is_exact():
         [str(ENTRYPOINT), "--help"], text=True, capture_output=True, check=True
     )
     for command in (
+        "setup",
         "list",
         "version",
         "validate",
@@ -234,8 +235,16 @@ def test_list_uses_bundle_inventory_and_ignores_unlisted_deployments(tmp_path):
     )
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tintact" in result.stdout
+    assert "example\tintact\tnone\tTest deployment" in result.stdout
     assert "custom" not in result.stdout
+
+
+def test_no_command_prints_help():
+    result = subprocess.run([str(ENTRYPOINT)], text=True, capture_output=True)
+    assert result.returncode == 2
+    assert "setup" in result.stdout
+    assert "list" in result.stdout
+    assert "examples:" in result.stdout
 
 
 def test_unknown_deployment_is_rejected(tmp_path):
@@ -243,6 +252,7 @@ def test_unknown_deployment_is_rejected(tmp_path):
     result = run_cli(root, ["run", "custom"])
     assert result.returncode != 0
     assert "unknown deployment: custom" in result.stderr
+    assert "available: example" in result.stderr
 
 
 def test_release_deployment_change_is_marked_modified(tmp_path):
@@ -536,6 +546,9 @@ def test_run_accepts_force():
         check=True,
     )
     assert "--force" in result.stdout
+    assert "replace existing data" in result.stdout
+    assert "image pull policy" in result.stdout
+    assert "GPU compose overlay" in result.stdout
 
 
 def test_run_force_reinstalls_incomplete_data(tmp_path, http_files):
@@ -571,6 +584,18 @@ def test_run_force_reinstalls_incomplete_data(tmp_path, http_files):
     )
     assert result.returncode == 0, result.stderr
     assert (target / "required.txt").read_text() == "replaced"
+
+
+def test_fetch_does_not_take_gpu_flag():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "fetch", "--help"],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "--gpu" not in result.stdout
+    assert "--ros-distro" in result.stdout
+    assert "--force" in result.stdout
 
 
 @pytest.mark.parametrize("command", ("validate", "fetch", "run"))
@@ -1110,10 +1135,10 @@ def test_repository_inventory_includes_carla_and_excludes_zenoh():
         capture_output=True,
         check=True,
     )
-    assert "planning-simulation\tsource" in result.stdout
-    assert "logging-simulation\tsource" in result.stdout
-    assert "scenario-simulation\tsource" in result.stdout
-    assert "carla-simulation\tsource" in result.stdout
+    assert "planning-simulation\tsource\tnone\t" in result.stdout
+    assert "logging-simulation\tsource\toptional\t" in result.stdout
+    assert "scenario-simulation\tsource\tnone\t" in result.stdout
+    assert "carla-simulation\tsource\trequired\t" in result.stdout
     assert "zenoh" not in result.stdout
 
 

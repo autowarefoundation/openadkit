@@ -18,17 +18,46 @@ from manifest import (
 )
 
 
-def add_run_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("deployment")
-    parser.add_argument("--ros-distro")
-    parser.add_argument("--gpu", action="store_true")
+class OpenADKitParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        print(f"error: {message}", file=sys.stderr)
+        raise SystemExit(2)
+
+
+def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> None:
+    parser.add_argument("deployment", help="curated deployment name from list")
+    parser.add_argument(
+        "--ros-distro",
+        metavar="DISTRO",
+        help="ROS distro (default: bundle default)",
+    )
+    if gpu:
+        parser.add_argument(
+            "--gpu",
+            action="store_true",
+            help="use the GPU compose overlay when the deployment provides one",
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="openadkit", description="Run Open AD Kit deployments."
+    parser = OpenADKitParser(
+        prog="openadkit",
+        description="Run Open AD Kit deployments.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  ./openadkit setup --verify\n"
+            "  ./openadkit list\n"
+            "  ./openadkit run planning-simulation\n"
+            "  ./openadkit run logging-simulation --gpu\n"
+            "  ./openadkit stop planning-simulation"
+        ),
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", parser_class=OpenADKitParser)
+    subparsers.add_parser(
+        "setup", help="installs Ubuntu host dependencies"
+    )
     subparsers.add_parser("list", help="list curated deployments")
     subparsers.add_parser("version", help="show repository or release version")
 
@@ -38,23 +67,34 @@ def build_parser() -> argparse.ArgumentParser:
     add_run_arguments(validate)
 
     fetch = subparsers.add_parser("fetch", help="download deployment data")
-    add_run_arguments(fetch)
-    fetch.add_argument("--force", action="store_true")
+    add_run_arguments(fetch, gpu=False)
+    fetch.add_argument(
+        "--force",
+        action="store_true",
+        help="replace existing data even if it already validates",
+    )
 
     run = subparsers.add_parser("run", help="fetch data and start a deployment")
     add_run_arguments(run)
     run.add_argument(
-        "--pull", choices=("missing", "always", "never"), default="missing"
+        "--pull",
+        choices=("missing", "always", "never"),
+        default="missing",
+        help="image pull policy (default: missing)",
     )
-    run.add_argument("--force", action="store_true")
+    run.add_argument(
+        "--force",
+        action="store_true",
+        help="replace existing data even if it already validates",
+    )
 
     status = subparsers.add_parser("status", help="show deployment status")
-    status.add_argument("deployment")
+    status.add_argument("deployment", help="curated deployment name from list")
     logs = subparsers.add_parser("logs", help="show deployment logs")
-    logs.add_argument("deployment")
-    logs.add_argument("--follow", action="store_true")
+    logs.add_argument("deployment", help="curated deployment name from list")
+    logs.add_argument("--follow", action="store_true", help="stream logs")
     stop = subparsers.add_parser("stop", help="stop and remove a deployment")
-    stop.add_argument("deployment")
+    stop.add_argument("deployment", help="curated deployment name from list")
     return parser
 
 
@@ -65,7 +105,10 @@ def list_deployments(root, kit) -> int:
     for name in kit.deployments:
         try:
             deployment = get_deployment(root, kit, name)
-            print(f"{name}\t{deployment_integrity(root, deployment, kit)}")
+            integrity = deployment_integrity(root, deployment, kit)
+            gpu = deployment.requirements["gpu"]
+            description = deployment.manifest["description"]
+            print(f"{name}\t{integrity}\t{gpu}\t{description}")
         except OpenADKitError as error:
             print(f"{name}\tinvalid\t{error}")
     return 0
@@ -96,8 +139,27 @@ def warn_if_modified(root, deployment, kit) -> None:
         )
 
 
+def print_run_next_steps(deployment, selection) -> None:
+    print(f"running: {deployment.name}")
+    if "visualizer" in selection.services:
+        print("visualizer: https://localhost:6080/vnc.html")
+        print("password: REMOTE_PASSWORD in config.env")
+    print(f"stop with: ./openadkit stop {deployment.name}")
+
+
 def main() -> int:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        return 2
+    if args.command == "setup":
+        print(
+            "error: run: ./openadkit setup [--gpu] [--verify]",
+            file=sys.stderr,
+        )
+        return 2
+
     root = root_path()
     kit = load_kit(root)
 
@@ -114,7 +176,7 @@ def main() -> int:
         selection = deployment.select(
             kit,
             args.ros_distro,
-            args.gpu,
+            getattr(args, "gpu", False),
             require_gpu=args.command != "fetch",
         )
         if args.command == "fetch":
@@ -124,14 +186,15 @@ def main() -> int:
         data.validate_destinations(deployment, selection)
         configured_services = compose.render(deployment, selection)
         if args.command == "validate":
-            print(f"valid: {deployment.name}")
+            mode = "gpu" if selection.gpu else "cpu"
+            print(f"valid: {deployment.name} ({selection.ros_distro}, {mode})")
             return 0
 
         compose.check_daemon(selection)
         data.install_data(deployment, selection, args.force)
         compose.start(deployment, selection, args.pull, configured_services)
         compose.save_runtime(deployment, selection)
-        print(f"running: {deployment.name}")
+        print_run_next_steps(deployment, selection)
         return 0
 
     saved = compose.load_runtime(deployment)

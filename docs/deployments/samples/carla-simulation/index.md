@@ -2,7 +2,7 @@
 
 Closed-loop CARLA 0.9.16 end-to-end simulation with modular Open AD Kit
 containers and `autoware_carla_interface`. Checkout assets live under
-`deployments/carla-simulation/`.
+`deployments/carla-simulation/`. Humble, amd64, and an NVIDIA GPU are required.
 
 ## Runtime
 
@@ -12,48 +12,53 @@ containers and `autoware_carla_interface`. Checkout assets live under
 
 ## Prerequisites
 
-- Docker with NVIDIA runtime (`nvidia-ctk runtime configure --runtime=docker`)
-- Run as a user in the `docker` group (**not** `sudo` — `sudo` resets `HOME` and
-  breaks `MAP_PATH`)
-- Large kernel UDP buffers for DDS:
+- Host setup via [Getting Started](../../../getting-started/index.md):
 
 ```bash
-sudo sysctl -w net.core.rmem_max=2147483647 net.core.wmem_max=2147483647 \
-  net.core.rmem_default=134217728 net.core.wmem_default=134217728
+./openadkit setup --gpu --verify
+```
+
+- Run as a user in the `docker` group (**not** `sudo` — `sudo` resets `HOME` and
+  breaks `MAP_PATH`)
+- Sample Town01 map:
+
+```bash
+./openadkit fetch carla-simulation
 ```
 
 Tested on Ubuntu 22.04; other hosts may work if Docker and the NVIDIA runtime are present.
 
-## Start
+## Run
+
+To use a locally baked `carla-interface` image, from
+`deployments/carla-simulation/` **before** starting the stack:
 
 ```bash
-cd deployments/carla-simulation
-./start-carla-e2e-demo.sh
+./start-carla-e2e-demo.sh --build
 ```
 
-The helper downloads Town01 map assets (checksummed), starts CARLA, preloads
-the map via `carla-map-loader`, then brings up Autoware components and (by
-default) the visualizer.
-
-Optional:
+Then start (or re-run) the stack so Compose picks up the loaded image:
 
 ```bash
-./start-carla-e2e-demo.sh --build    # build carla-interface locally
+./openadkit run carla-simulation --gpu
+```
+
+Open the visualizer at `https://localhost:6080/vnc.html` (accept the
+self-signed certificate). Use `REMOTE_PASSWORD` from `config.env`. In RViz:
+set **2D Goal Pose**, wait for planning, click **Auto**.
+
+## Optional helper
+
+After the stack is running, from `deployments/carla-simulation/`:
+
+```bash
 ./start-carla-e2e-demo.sh --drive    # auto route + engage smoke check
 ```
-
-## Visualizer
-
-`https://localhost:6080/vnc.html` — password from `config.env`
-(`REMOTE_PASSWORD`). In RViz: set **2D Goal Pose**, wait for planning, click
-**Auto**.
 
 ## Stop
 
 ```bash
-cd deployments/carla-simulation
-./start-carla-e2e-demo.sh --down
-# or: docker compose --env-file config.env down
+./openadkit stop carla-simulation
 ```
 
 ## Notes

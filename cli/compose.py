@@ -7,6 +7,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from manifest import Deployment, OpenADKitError, Selection
@@ -26,7 +27,7 @@ def ensure_runtime_user() -> None:
 
 
 def print_command(command: list[str]) -> None:
-    print("+ " + shlex.join(command))
+    print("+ " + shlex.join(command), file=sys.stderr, flush=True)
 
 
 def run_process(

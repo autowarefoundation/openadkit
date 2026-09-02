@@ -32,6 +32,11 @@ def download(url: str, destination: Path, checksum: str) -> None:
             with urllib.request.urlopen(
                 request, timeout=60
             ) as response, destination.open("wb") as output:
+                size = response.headers.get("Content-Length")
+                if size and size.isdigit():
+                    print(f"downloading {url} ({int(size)} bytes)", flush=True)
+                else:
+                    print(f"downloading {url}", flush=True)
                 shutil.copyfileobj(response, output)
             if sha256_file(destination) != checksum:
                 raise OpenADKitError(f"checksum mismatch for {url}")

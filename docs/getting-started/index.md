@@ -35,9 +35,11 @@
     newgrp docker
     ```
 
-3. Run a curated deployment. The CLI fetches the maps and data it needs:
+3. List curated deployments, then run one. The CLI fetches the maps and data
+    it needs:
 
     ```bash
+    ./openadkit list
     ./openadkit run planning-simulation
     ```
 

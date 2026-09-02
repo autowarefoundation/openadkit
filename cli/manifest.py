@@ -331,8 +331,8 @@ class Deployment:
             )
 
         gpu_requirement = self.requirements["gpu"]
-        if not operational:
-            if require_gpu and gpu_requirement == "required" and not gpu:
+        if not operational and require_gpu:
+            if gpu_requirement == "required" and not gpu:
                 raise OpenADKitError(f"{self.name} requires --gpu")
             if gpu_requirement == "none" and gpu:
                 raise OpenADKitError(f"{self.name} does not provide a GPU mode")
@@ -686,13 +686,22 @@ def load_kit(root: Path) -> RuntimeContext:
     )
 
 
+def available_deployments(kit: RuntimeContext) -> str:
+    return ", ".join(kit.deployments)
+
+
 def get_deployment(root: Path, kit: RuntimeContext, name: str) -> Deployment:
+    available = available_deployments(kit)
     if not NAME_RE.fullmatch(name):
-        raise OpenADKitError(f"invalid deployment name: {name}")
+        raise OpenADKitError(
+            f"invalid deployment name: {name}\navailable: {available}"
+        )
     try:
         reference = kit.deployments[name]
     except KeyError as error:
-        raise OpenADKitError(f"unknown deployment: {name}") from error
+        raise OpenADKitError(
+            f"unknown deployment: {name}\navailable: {available}"
+        ) from error
     directory = root.joinpath(*safe_relative(reference.path, "deployment path").parts)
     deployment = validate_manifest(root, directory)
     if deployment.name != name:

@@ -19,14 +19,32 @@ from manifest import (
 
 
 class OpenADKitParser(argparse.ArgumentParser):
+    help_inventory = None
+
     def error(self, message: str) -> None:
         self.print_usage(sys.stderr)
         print(f"error: {message}", file=sys.stderr)
         raise SystemExit(2)
 
+    def print_help(self, file=None) -> None:
+        super().print_help(file)
+        if self.help_inventory != "catalog":
+            return
+        try:
+            root = root_path()
+            kit = load_kit(root)
+        except OpenADKitError:
+            return
+        print(file=file)
+        list_deployments(root, kit)
+
 
 def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> None:
-    parser.add_argument("deployment", help="curated deployment name from list")
+    parser.add_argument(
+        "deployment",
+        nargs="?",
+        help="curated deployment name from list; omit to list available",
+    )
     parser.add_argument(
         "--ros-distro",
         metavar="DISTRO",
@@ -87,30 +105,79 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace existing data even if it already validates",
     )
+    for catalog in (validate, fetch, run):
+        catalog.help_inventory = "catalog"
 
     status = subparsers.add_parser("status", help="show deployment status")
-    status.add_argument("deployment", help="curated deployment name from list")
+    status.add_argument(
+        "deployment",
+        nargs="?",
+        help="curated deployment name from list; omit to list running",
+    )
     logs = subparsers.add_parser("logs", help="show deployment logs")
-    logs.add_argument("deployment", help="curated deployment name from list")
+    logs.add_argument(
+        "deployment",
+        nargs="?",
+        help="curated deployment name from list; omit to list running",
+    )
     logs.add_argument("--follow", action="store_true", help="stream logs")
     stop = subparsers.add_parser("stop", help="stop and remove a deployment")
-    stop.add_argument("deployment", help="curated deployment name from list")
+    stop.add_argument(
+        "deployment",
+        nargs="?",
+        help="curated deployment name from list; omit to list running",
+    )
     return parser
+
+
+def _print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+    print(
+        "  ".join(
+            header.ljust(widths[index]) for index, header in enumerate(headers)
+        ).rstrip()
+    )
+    for row in rows:
+        print(
+            "  ".join(
+                row[index].ljust(widths[index]) for index in range(len(headers))
+            ).rstrip()
+        )
 
 
 def list_deployments(root, kit) -> int:
     if not kit.deployments:
         print("No deployments found.")
         return 0
+    rows: list[tuple[str, ...]] = []
     for name in kit.deployments:
         try:
             deployment = get_deployment(root, kit, name)
-            integrity = deployment_integrity(root, deployment, kit)
-            gpu = deployment.requirements["gpu"]
-            description = deployment.manifest["description"]
-            print(f"{name}\t{integrity}\t{gpu}\t{description}")
+            rows.append(
+                (
+                    name,
+                    deployment_integrity(root, deployment, kit),
+                    deployment.requirements["gpu"],
+                    deployment.manifest["description"],
+                )
+            )
         except OpenADKitError as error:
-            print(f"{name}\tinvalid\t{error}")
+            rows.append((name, "invalid", "", str(error).replace("\n", " ")))
+    _print_table(("NAME", "STATE", "GPU", "DESCRIPTION"), rows)
+    return 0
+
+
+def show_running(command: str, running: list[str], *, usage: bool = True) -> int:
+    if not running:
+        print("no running deployments")
+        return 0
+    for name in running:
+        print(name)
+    if usage:
+        print(f"usage: ./openadkit {command} <deployment>", file=sys.stderr)
     return 0
 
 
@@ -168,11 +235,19 @@ def main() -> int:
     if args.command == "version":
         return show_version(root, kit)
 
-    deployment = get_deployment(root, kit, args.deployment)
-    warn_if_modified(root, deployment, kit)
-    compose.ensure_runtime_user()
-
     if args.command in ("fetch", "validate", "run"):
+        if not args.deployment:
+            print("error: deployment name required", file=sys.stderr)
+            print(
+                f"usage: ./openadkit {args.command} <deployment>",
+                file=sys.stderr,
+            )
+            print(file=sys.stderr)
+            list_deployments(root, kit)
+            return 2
+        deployment = get_deployment(root, kit, args.deployment)
+        warn_if_modified(root, deployment, kit)
+        compose.ensure_runtime_user()
         selection = deployment.select(
             kit,
             args.ros_distro,
@@ -197,10 +272,25 @@ def main() -> int:
         print_run_next_steps(deployment, selection)
         return 0
 
+    compose.ensure_runtime_user()
+    compose.require_docker()
+    if not args.deployment:
+        running = compose.running_names(kit.deployments)
+        if args.command == "logs" and args.follow:
+            print("error: deployment name required", file=sys.stderr)
+            print(
+                "usage: ./openadkit logs <deployment> --follow",
+                file=sys.stderr,
+            )
+            print(file=sys.stderr)
+            show_running(args.command, running, usage=False)
+            return 2
+        return show_running(args.command, running)
+    deployment = get_deployment(root, kit, args.deployment)
+    warn_if_modified(root, deployment, kit)
     saved = compose.load_runtime(deployment)
     ros_distro, gpu = saved if saved else (None, False)
     selection = deployment.select(kit, ros_distro, gpu, operational=True)
-    compose.require_docker()
     if args.command == "status":
         compose.status(deployment, selection)
     elif args.command == "logs":

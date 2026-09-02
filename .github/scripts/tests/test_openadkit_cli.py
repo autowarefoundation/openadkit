@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -153,10 +154,13 @@ def fake_docker(
     daemon_returncode=0,
     config_returncode=0,
     runtimes='{"nvidia": {}}',
+    compose_ls="[]",
 ):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     calls = tmp_path / "docker-calls"
+    ls_path = tmp_path / "compose-ls.json"
+    ls_path.write_text(compose_ls if compose_ls.endswith("\n") else compose_ls + "\n")
     executable(
         bin_dir / "docker",
         "#!/usr/bin/env bash\n"
@@ -169,6 +173,8 @@ def fake_docker(
         f"exit {daemon_returncode}; fi\n"
         'if [[ "$*" == "info --format {{json .Runtimes}}" ]]; then '
         f"printf '%s\\n' {json.dumps(runtimes)}; exit 0; fi\n"
+        'if [[ "$*" == "compose ls --format json" ]]; then '
+        f"cat {json.dumps(str(ls_path))}; exit 0; fi\n"
         'if [[ "$*" == *"config --services"* ]]; then '
         f"printf '%b' {json.dumps(configured)}; fi\n"
         'if [[ "$*" == *"config --quiet"* ]]; then '
@@ -235,7 +241,9 @@ def test_list_uses_bundle_inventory_and_ignores_unlisted_deployments(tmp_path):
     )
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tintact\tnone\tTest deployment" in result.stdout
+    assert re.search(
+        r"example\s+intact\s+none\s+Test deployment", result.stdout
+    )
     assert "custom" not in result.stdout
 
 
@@ -255,6 +263,89 @@ def test_unknown_deployment_is_rejected(tmp_path):
     assert "available: example" in result.stderr
 
 
+@pytest.mark.parametrize("command", ("run", "fetch", "validate"))
+def test_catalog_command_without_deployment_lists_available(tmp_path, command):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, [command])
+    assert result.returncode == 2
+    assert "error: deployment name required" in result.stderr
+    assert f"./openadkit {command} <deployment>" in result.stderr
+    assert re.search(
+        r"example\s+source\s+none\s+Test deployment", result.stdout
+    )
+
+
+def test_run_help_lists_catalog():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "run", "--help"],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert "planning-simulation" in result.stdout
+    assert "--gpu" in result.stdout
+
+
+@pytest.mark.parametrize("command", ("status", "logs", "stop"))
+def test_runtime_command_without_deployment_when_none_running(tmp_path, command):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, _ = fake_docker(tmp_path)
+    result = run_cli(
+        root,
+        [command],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "no running deployments"
+
+
+@pytest.mark.parametrize("command", ("status", "logs", "stop"))
+def test_runtime_command_without_deployment_lists_running(tmp_path, command):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, _ = fake_docker(
+        tmp_path,
+        compose_ls='[{"Name":"openadkit-example","Status":"running(1)"}]',
+    )
+    result = run_cli(
+        root,
+        [command],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "example"
+    assert f"./openadkit {command} <deployment>" in result.stderr
+
+
+def test_logs_follow_without_deployment_requires_name(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, calls = fake_docker(
+        tmp_path,
+        compose_ls='[{"Name":"openadkit-example","Status":"running(1)"}]',
+    )
+    result = run_cli(
+        root,
+        ["logs", "--follow"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 2
+    assert "error: deployment name required" in result.stderr
+    assert "./openadkit logs <deployment> --follow" in result.stderr
+    assert result.stdout.strip() == "example"
+    assert " logs" not in f" {calls.read_text()} "
+
+
+def test_named_stop_downs_even_when_compose_ls_is_empty(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, calls = fake_docker(tmp_path)
+    result = run_cli(
+        root,
+        ["stop", "example"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "down --remove-orphans" in calls.read_text()
+
+
 def test_release_deployment_change_is_marked_modified(tmp_path):
     root, deployment = runtime_tree(tmp_path, release=True)
     (deployment / "docker-compose.yaml").write_text(
@@ -262,7 +353,7 @@ def test_release_deployment_change_is_marked_modified(tmp_path):
     )
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tmodified" in result.stdout
+    assert re.search(r"example\s+modified", result.stdout)
 
 
 def test_release_shared_asset_change_is_marked_modified(tmp_path):
@@ -272,7 +363,7 @@ def test_release_shared_asset_change_is_marked_modified(tmp_path):
     (root / "deployments/base/runtime.env").write_text("ROS_DOMAIN_ID=2\n")
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
-    assert "example\tmodified" in result.stdout
+    assert re.search(r"example\s+modified", result.stdout)
 
 
 def test_modified_release_warns_but_still_runs(tmp_path):
@@ -1135,10 +1226,10 @@ def test_repository_inventory_includes_carla_and_excludes_zenoh():
         capture_output=True,
         check=True,
     )
-    assert "planning-simulation\tsource\tnone\t" in result.stdout
-    assert "logging-simulation\tsource\toptional\t" in result.stdout
-    assert "scenario-simulation\tsource\tnone\t" in result.stdout
-    assert "carla-simulation\tsource\trequired\t" in result.stdout
+    assert re.search(r"planning-simulation\s+source\s+none\s+", result.stdout)
+    assert re.search(r"logging-simulation\s+source\s+optional\s+", result.stdout)
+    assert re.search(r"scenario-simulation\s+source\s+none\s+", result.stdout)
+    assert re.search(r"carla-simulation\s+source\s+required\s+", result.stdout)
     assert "zenoh" not in result.stdout
 
 

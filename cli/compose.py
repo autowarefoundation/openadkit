@@ -8,9 +8,13 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from manifest import Deployment, OpenADKitError, Selection
+
+PROJECT_PREFIX = "openadkit-"
+LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
 
 
 COMPOSE_CONTROL_ENV = {
@@ -55,8 +59,10 @@ def capture_process(
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
     check: bool = True,
+    trace: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    print_command(command)
+    if trace:
+        print_command(command)
     try:
         return subprocess.run(
             command,
@@ -125,6 +131,49 @@ def compose_capture(
 def require_docker() -> None:
     if not shutil.which("docker"):
         raise OpenADKitError("Docker is unavailable. Run: ./openadkit setup")
+
+
+def _compose_ls_environment() -> dict[str, str]:
+    environment = dict(os.environ)
+    for name in COMPOSE_CONTROL_ENV:
+        environment.pop(name, None)
+    return environment
+
+
+def running_names(deployment_names: Iterable[str]) -> list[str]:
+    require_docker()
+    wanted = list(deployment_names)
+    result = capture_process(
+        ["docker", "compose", "ls", "--format", "json"],
+        env=_compose_ls_environment(),
+        check=False,
+        trace=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip()
+        suffix = f": {detail}" if detail else ""
+        raise OpenADKitError(f"could not list Compose projects{suffix}")
+    try:
+        projects = json.loads(result.stdout) if result.stdout.strip() else []
+    except json.JSONDecodeError as error:
+        raise OpenADKitError("could not parse Compose project list") from error
+    if not isinstance(projects, list):
+        raise OpenADKitError("could not parse Compose project list")
+    found: set[str] = set()
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        name = project.get("Name")
+        status = project.get("Status") or ""
+        if not isinstance(name, str) or not isinstance(status, str):
+            continue
+        if not name.startswith(PROJECT_PREFIX):
+            continue
+        key = name[len(PROJECT_PREFIX) :]
+        state = status.lower().split("(", 1)[0].strip()
+        if key in wanted and state in LIVE_PROJECT_STATES:
+            found.add(key)
+    return [name for name in wanted if name in found]
 
 
 def _runtime_state_path(deployment: Deployment) -> Path:

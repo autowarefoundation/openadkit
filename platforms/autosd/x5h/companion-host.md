@@ -733,6 +733,26 @@ Three things about this that matter more than they look:
 Point both invocations at variables files with the same value and those
 filesystems are compared like anything else.
 
+**Root-access grants are intentionally per board and are exempt from the
+verdict.** Board 1 carries admin + dev + ext, board 2 admin only (see "The two
+boards" above), and `stage-board.sh backup-keys` / `prepare-root` carry each
+board's own live `/etc/ssh/authorized_keys.d/root` forward across a re-image,
+so the two files are guaranteed to differ and an equality check on them would
+make `BOARD_PARITY_PASS` unreachable. `x5h-parity.sh` therefore allow-lists
+`file./etc/ssh/authorized_keys.d/*` alongside the ssh host keys. The grants are
+still emitted into the manifest, so they are reviewed by **reading the two
+manifests** rather than by the parity verdict:
+
+```sh
+diff <(grep 'authorized_keys' /tmp/m-20.txt) <(grep 'authorized_keys' /tmp/m-21.txt)
+ssh root@192.168.0.21 'cut -d" " -f3 /etc/ssh/authorized_keys.d/root'   # who is granted
+```
+
+Never close a residual here by copying one board's keys onto the other: that
+would grant board 2 to external developers, which the access model above
+deliberately forbids. `sshd*` is in the manifest's unit-file scan, so whether
+the daemon is *enabled* is still compared normally on both boards.
+
 ### Netboot rescue through the companion
 
 One-shot boots from the U-Boot prompt; neither writes the environment, so
@@ -775,10 +795,10 @@ which is exactly why self-boot uses a btrfs partition instead.
 From off-bench, over the tailnet only: smoke, remote reset, wait, smoke.
 
 ```sh
-ssh root@192.168.0.20 sh /usr/local/bin/selfboot-smoke.sh   # boot A
+ssh root@192.168.0.20 sh /usr/sbin/selfboot-smoke.sh   # boot A
 ssh root@192.168.0.20 reboot
 # wait for it to answer again, then
-ssh root@192.168.0.20 sh /usr/local/bin/selfboot-smoke.sh   # boot B
+ssh root@192.168.0.20 sh /usr/sbin/selfboot-smoke.sh   # boot B
 ```
 
 `selfboot-smoke.sh` is repeatable now and reports the role it found on its
@@ -800,7 +820,7 @@ already ends in a reset:
 ssh root@192.168.0.20 x5h-role                  # current= and next=
 ssh root@192.168.0.20 x5h-role set cr52 --reboot
 # wait, then
-ssh root@192.168.0.20 'cat /run/x5h/role; sh /usr/local/bin/selfboot-smoke.sh'
+ssh root@192.168.0.20 'cat /run/x5h/role; sh /usr/sbin/selfboot-smoke.sh'
 ssh root@192.168.0.20 x5h-role set npu --reboot  # leave it in the default role
 ```
 

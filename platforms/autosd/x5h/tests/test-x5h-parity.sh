@@ -133,4 +133,39 @@ out=$(bash "$p" "$d/y1" "$d/vbad" "$d/y2" "$v2"); rc=$?
 [ $rc -eq 2 ] || fail "bad_vars_rc: $rc"
 printf '%s\n' "$out" | grep -q 'BOARD_PARITY_FAIL reason=bad_vars' || fail "bad_vars: $out"
 
+# --- FIX 5: root-access grants are per board BY DESIGN -------------------
+# The two boards' /etc/ssh/authorized_keys.d/root files are guaranteed to
+# differ: board 1 grants admin + dev + ext, board 2 admin only, and
+# stage-board.sh's backup-keys/prepare-root pair carries each board's own live
+# file forward across a re-image. Before the allow-list covered them,
+# BOARD_PARITY_PASS was unreachable on the real bench while companion-host.md
+# told the operator to expect it. Two manifests differing in NOTHING ELSE must
+# pass.
+printf "$base1" > "$d/k1"; printf "$base1" > "$d/k2"
+printf 'file./etc/ssh/authorized_keys.d/root\tadmin_dev_ext\n' >> "$d/k1"
+printf 'file./etc/ssh/authorized_keys.d/root\tadmin_only\n' >> "$d/k2"
+out=$(bash "$p" "$d/k1" "$v1" "$d/k2" "$v1") || fail "authkeys_exempt_rc: $out"
+printf '%s\n' "$out" | grep -qx 'BOARD_PARITY_PASS' || fail "authkeys_exempt: $out"
+# The exemption must be scoped to that directory and nothing wider: a real
+# divergence anywhere else under /etc/ssh is still a residual.
+cp "$d/k1" "$d/k3"; cp "$d/k2" "$d/k4"
+printf 'file./etc/ssh/sshd_config.d/50-x5h.conf\taaaa\n' >> "$d/k3"
+printf 'file./etc/ssh/sshd_config.d/50-x5h.conf\tbbbb\n' >> "$d/k4"
+out=$(bash "$p" "$d/k3" "$v1" "$d/k4" "$v1"); rc=$?
+[ $rc -eq 1 ] || fail "sshd_dropin_diff_rc: $rc"
+printf '%s\n' "$out" | grep -q 'sshd_config.d/50-x5h.conf' || fail "sshd_dropin_diff: $out"
+# ... and a divergence in the sshd unit's enablement, which is what the
+# manifest's 'sshd*' pattern exists to surface, is likewise still a residual.
+cp "$d/k1" "$d/k5"; cp "$d/k2" "$d/k6"
+printf 'unit.sshd.service\tenabled\n' >> "$d/k5"
+printf 'unit.sshd.service\tdisabled\n' >> "$d/k6"
+out=$(bash "$p" "$d/k5" "$v1" "$d/k6" "$v1"); rc=$?
+[ $rc -eq 1 ] || fail "sshd_unit_diff_rc: $rc"
+printf '%s\n' "$out" | grep -q 'unit.sshd.service' || fail "sshd_unit_diff: $out"
+# The exemption is only defensible because the keys stay IN the manifest for a
+# human to diff, and because sshd enablement is collected at all. Both are
+# properties of the collector, so assert them there.
+grep -q '/etc/ssh/authorized_keys.d' "$mf" || fail manifest_stopped_collecting_authkeys
+grep -q "list-unit-files.*'sshd\*'" "$mf" || fail manifest_missing_sshd_unit_pattern
+
 echo "TEST_PASS $name"

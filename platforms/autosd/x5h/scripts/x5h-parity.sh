@@ -65,9 +65,23 @@ y2=$(read_has_yocto "$v2") || { echo "BOARD_PARITY_FAIL reason=bad_vars file=$v2
 #   boot.x5h-role.txt     the sticky role is operational state, not config
 #   file./etc/x5h/board.conf, hostname, file./etc/hostname
 #   file./etc/ssh/ssh_host_*  host keys are per board by nature
+#   file./etc/ssh/authorized_keys.d/*  root-access grants are per board BY
+#                         DESIGN: board 1 carries admin + dev + ext, board 2
+#                         admin only (companion-host.md, "The two boards"),
+#                         and stage-board.sh's backup-keys/prepare-root pair
+#                         deliberately carries each board's own live file
+#                         forward across a re-image. Comparing them for
+#                         equality therefore makes BOARD_PARITY_PASS
+#                         unreachable on the real bench. The keys are still
+#                         EMITTED into the manifest, so a human reading the
+#                         two manifests side by side still sees exactly who
+#                         is granted where; only the verdict is exempt.
+#                         Never close this the other way by equalising the
+#                         two boards' keys: that grants board 2 to external
+#                         developers, which the access model forbids.
 # The character before each closing quote is a literal TAB (the manifest's
 # key/value separator); a run of spaces there breaks the match invisibly.
-allow='^(boot\.x5h-env\.txt|boot\.x5h-role\.txt|file\./etc/x5h/board\.conf|file\./etc/hostname|hostname|file\./etc/ssh/ssh_host_.*)	'
+allow='^(boot\.x5h-env\.txt|boot\.x5h-role\.txt|file\./etc/x5h/board\.conf|file\./etc/hostname|hostname|file\./etc/ssh/ssh_host_.*|file\./etc/ssh/authorized_keys\.d/.*)	'
 # fs.yocto-* is exempt ONLY when the two boards disagree about HAS_YOCTO, i.e.
 # when one board is expected to carry a populated Yocto filesystem and the other
 # is not. When both boards set HAS_YOCTO=1 (or both 0) a divergence in those

@@ -228,6 +228,18 @@ content:
       path: /etc/systemd/system.conf.d/10-watchdog.conf
     - source_path: ../scripts/x5h-manifest.sh
       path: /usr/sbin/x5h-manifest.sh
+    # selfboot-smoke.sh is the branch's primary acceptance instrument:
+    # SELFBOOT_SMOKE_PASS is one of the four markers selfboot.md names, and
+    # both selfboot.md and companion-host.md tell the operator to run it
+    # straight after a self-boot. Until this entry existed it was in neither
+    # the image nor stage-board.sh's prepare-root, so a board freshly written
+    # by `write-root` did not have it at all and the acceptance step could
+    # only be performed by hand-copying a checker -- exactly the staleness
+    # trap the x5h-stack-smoke.sh note at the bottom of this block describes.
+    # /usr/sbin, not /usr/local/bin, because aib refuses /usr/local and /opt
+    # outright (see the make_dirs commentary above).
+    - source_path: ../scripts/selfboot-smoke.sh
+      path: /usr/sbin/selfboot-smoke.sh
     # Component stack (issue #120 M7). Quadlet reads /etc/containers/systemd.
     #
     # The bring-up sequence below only works because aib/vars.yml keeps
@@ -381,6 +393,15 @@ content:
       path: /etc/systemd/system/rpmsg-eth.service
     - source_path: ../scripts/rpmsg-eth-ifup.sh
       path: /usr/sbin/rpmsg-eth-ifup.sh
+    # The cr52 role's link check, named by selfboot.md as the per-role
+    # companion to selfboot-smoke.sh. Same argument as selfboot-smoke.sh
+    # above: a check the documents route the operator to must be ON the board
+    # a `write-root` produces, not hand-copied into /var/tmp where it goes
+    # stale against the contract it grades. It only reads state (rpmsg bus,
+    # tap0 attributes, one ping run) and drives no remoteproc, so shipping it
+    # adds nothing to the boot path.
+    - source_path: ../scripts/rpmsg-eth-smoke.sh
+      path: /usr/sbin/rpmsg-eth-smoke.sh
     # The board smoke, installed BY THE IMAGE rather than copied onto the
     # board by hand. component-stack.md calls this manifest the source of
     # truth for every file on the board and says the mapping installs the

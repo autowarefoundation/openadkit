@@ -51,6 +51,9 @@ content:
     # tcpdump; check with `command -v tcpdump` before relying on it, rather
     # than concluding from an empty capture that the link is dead.
     - tcpdump
+    # stage-board.sh stages the NPU payload with rsync --delete so re-staging
+    # is idempotent; the image has no tar.
+    - rsync
   # add_files (org.osbuild.copy) does not create parent directories, and
   # nothing else in the pipeline creates /etc/containers/containers.conf.d
   # (init_rootfs_dirs_stage creates /etc itself, but not this subtree).

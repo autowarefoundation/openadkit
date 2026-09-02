@@ -185,8 +185,24 @@ prepare_root() {
         || die "STAGE_ROOT_FAIL reason=cr52_elf_install_failed"
     printf 'CR52_FIRMWARE=%s\n' "$CR52_ELF" | sudo tee "$mnt/etc/default/cr52-remoteproc" >/dev/null \
         || die "STAGE_ROOT_FAIL reason=cr52_default_write_failed"
-    sudo test -f "$mnt/etc/systemd/system/multi-user.target.wants/sshd.service" || die "STAGE_ROOT_FAIL reason=sshd_not_enabled_in_image"
-    sudo test -f "$mnt/etc/systemd/system/multi-user.target.wants/x5h-npu.service" || die "STAGE_ROOT_FAIL reason=npu_unit_not_enabled_in_image"
+    # The preset symlinks make-ufs-rootfs.sh creates are ABSOLUTE
+    # (-> /usr/lib/systemd/system/sshd.service), which is correct for the
+    # booted board but wrong to dereference here: inside a loop mount, an
+    # absolute target resolves against the HOST root, not the image. `test -f`
+    # follows the link and therefore fails on any host that lacks an
+    # identically named unit -- a false STAGE_ROOT_FAIL on a perfectly good
+    # image, which is exactly what it did on the companion. Assert the link
+    # exists AND that its target exists inside the image instead.
+    for want in sshd.service:sshd_not_enabled_in_image x5h-npu.service:npu_unit_not_enabled_in_image; do
+        unit=${want%%:*}; slug=${want#*:}
+        link="$mnt/etc/systemd/system/multi-user.target.wants/$unit"
+        sudo test -L "$link" || die "STAGE_ROOT_FAIL reason=$slug detail=no_wants_symlink"
+        target=$(sudo readlink "$link") || die "STAGE_ROOT_FAIL reason=$slug detail=unreadable_symlink"
+        case "$target" in
+            /*) sudo test -e "$mnt$target" || die "STAGE_ROOT_FAIL reason=$slug detail=dangling_inside_image target=$target" ;;
+            *)  sudo test -e "$(dirname "$link")/$target" || die "STAGE_ROOT_FAIL reason=$slug detail=dangling_relative target=$target" ;;
+        esac
+    done
     sudo umount "$mnt" || die "STAGE_ROOT_FAIL reason=umount_failed"
     CLEANUP_MNT=
     rmdir "$mnt" 2>/dev/null || true

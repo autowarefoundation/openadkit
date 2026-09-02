@@ -260,12 +260,30 @@ board that has no Yocto image.
 
 ### Bootargs every role carries
 
-`bootargs_common` is not adjustable at a session's convenience:
+Each role has one `bootargs_<role>` line, and every one of them repeats the
+same load-bearing arguments in full. That repetition is deliberate and must
+not be factored out into a shared variable:
 
 ```
 pd_ignore_unused clk_ignore_unused rootwait rw panic=10 oops=panic
 enforcing=0 ip=<board>::192.168.0.1:255.255.255.0:<hostname>:tsn5:none
+root=PARTUUID=<pinned> x5h.role=<role>
 ```
+
+U-Boot expands `${var}` in a value it **runs** but not in a value it
+**substitutes** into a command. `bootcmd_npu` does
+`setenv bootargs ${bootargs_npu}`, which stores that variable's text
+verbatim, so a `${bootargs_common}` nested inside it is handed to the
+kernel as those literal characters. A `bootargs_common` factoring shipped
+on this branch and wedged board 2 on 2026-09-02: the kernel logged
+`Kernel command line: ${bootargs_common} root=PARTUUID=...`, never saw
+`clk_ignore_unused`, and stopped dead at `clk: Disabling unused clocks`
+with no oops, no panic and no network. `tests/test-render-env.sh` now
+fails `bootargs_not_flat` if any `bootargs_*` value contains `${`.
+
+The same asymmetry is why the variables that *are* nested work fine:
+`probe_lu`, `load_role`, `load_npu` and friends are reached through `run`,
+which re-parses and expands them.
 
 - `pd_ignore_unused clk_ignore_unused` are mandatory. Omitting them wedges
   the SoC at `clk: Disabling unused clocks` with no oops, no panic, no

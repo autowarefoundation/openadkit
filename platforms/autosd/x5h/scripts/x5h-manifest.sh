@@ -136,15 +136,18 @@ done
 # with no oops, no panic, no watchdog), the pinned root=PARTUUID= values and the
 # per-role kernel/dtb load addresses.
 #
-# uboot/x5h-env.tmpl has exactly three placeholders -- @BOARD_IP@ (twice),
-# @BOARD_HOSTNAME@ and @YOCTO_HOSTNAME@ -- and every one of them sits inside an
-# `ip=` word, in the client-address field and the hostname field:
+# uboot/x5h-env.tmpl has exactly three placeholder names -- @BOARD_IP@ (three
+# times, once per role's bootargs), @BOARD_HOSTNAME@ (twice) and
+# @YOCTO_HOSTNAME@ -- and every one of them sits inside an `ip=` word, in the
+# client-address field and the hostname field:
 #   ip=<client>:<server>:<gw>:<netmask>:<hostname>:<device>:<autoconf>
 # So normalizing means blanking those two fields of every `ip=` word and
-# nothing else. Substitute, never delete the line: deleting bootargs_common or
-# bootargs_yocto would throw away clk_ignore_unused and the PARTUUIDs, which is
-# precisely the content this key exists to protect. Gateway, netmask, device
-# and autoconf stay in the hash, as does the whole rest of every line.
+# nothing else. Substitute, never delete the line: each bootargs_<role> line
+# carries its own full copy of clk_ignore_unused and the pinned PARTUUID (they
+# cannot be factored into a shared variable -- see uboot/x5h-env.tmpl), so
+# dropping any one of them would throw away precisely the content this key
+# exists to protect. Gateway, netmask, device and autoconf stay in the hash, as
+# does the whole rest of every line.
 [ -f "$m/x5h-env.txt" ] || fail no_env_txt
 envmd5=$(sed 's/\(ip=\)[^: ]*\(:[^: ]*:[^: ]*:[^: ]*:\)[^: ]*\(:\)/\1@IP@\2@HOST@\3/g' "$m/x5h-env.txt" | md5sum | cut -c1-32)
 [ ${#envmd5} -eq 32 ] || fail env_md5

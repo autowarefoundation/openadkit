@@ -5,20 +5,17 @@ Checkout assets live under `deployments/scenario-simulation/`.
 
 ## Prerequisites
 
-- Host setup via [`install.sh`](../../../getting-started/index.md)
+- Host setup via [Getting Started](../../../getting-started/index.md)
 - Kashiwanoha map (do **not** use `sample-map-planning`):
 
 ```bash
-./install.sh sample-data scenario-simulation
+./openadkit fetch scenario-simulation
 ```
 
 ## Run
 
 ```bash
-cd deployments/scenario-simulation
-docker compose \
-  --env-file config.env \
-  up -d
+./openadkit run scenario-simulation
 ```
 
 Open `https://localhost:6080/vnc.html` (`REMOTE_PASSWORD` in `config.env`).
@@ -34,7 +31,6 @@ Edit `config.env`:
 | `SCENARIO` | Scenario path inside the container (empty = bundled sample) |
 | `SCENARIO_HOST_DIR` | Host dir mounted at `/scenarios` |
 | `OUTPUT_HOST_PATH` | Host dir for results |
-| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image |
 | `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware readiness |
 | `MAP_PATH` | Host map directory (must match the scenario map) |
 
@@ -44,10 +40,7 @@ and map filenames consistently.
 ## Stop
 
 ```bash
-cd deployments/scenario-simulation
-docker compose \
-  --env-file config.env \
-  down
+./openadkit stop scenario-simulation
 ```
 
 See also [Scenario test simulation](https://autowarefoundation.github.io/autoware-documentation/main/demos/scenario-simulation/scenario-simulator/scenario-test-simulation/)

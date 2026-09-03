@@ -5,18 +5,23 @@ A **deployment** is a running instance of Open AD Kit, a specific combination of
 Runnable Compose assets live under `deployments/<name>/` in the repository.
 Each directory has a short README that points here for the full guide.
 
-Shared base: `deployments/base/` (`docker-compose.yaml` + `runtime.env` for
-container ROS/DDS). Each deployment has one complete `config.env`:
+Start curated samples with the CLI:
 
 ```bash
-docker compose --env-file config.env up -d
+./openadkit list
+./openadkit run planning-simulation
 ```
+
+Shared base: `deployments/base/` (`docker-compose.yaml` + `runtime.env` for
+container ROS/DDS). Each deployment has one complete `config.env`. The CLI
+passes it to Compose; you do not need to invoke `docker compose` directly.
 
 `runtime.env` is loaded by services via `env_file:`; `config.env` is loaded by
 Compose via `--env-file`.
 
-Fetch maps/rosbags with `./install.sh sample-data <name>` (see
-[Getting Started](../getting-started/index.md)).
+Fetch maps/rosbags with `./openadkit fetch <name>` or `./openadkit run <name>`
+(see [Getting Started](../getting-started/index.md)). Zenoh is a standalone
+demo: fetch `scenario-simulation`, then use `cloud.sh` / `edge.sh`.
 
 ## Samples
 

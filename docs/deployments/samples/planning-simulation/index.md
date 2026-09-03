@@ -6,11 +6,11 @@ map and the dummy simulator. Checkout assets live under
 
 ## Prerequisites
 
-- Host setup via [`install.sh`](../../../getting-started/index.md)
+- Host setup via [Getting Started](../../../getting-started/index.md)
 - Sample map:
 
 ```bash
-./install.sh sample-data planning-simulation
+./openadkit fetch planning-simulation
 ```
 
 ## Run
@@ -18,10 +18,7 @@ map and the dummy simulator. Checkout assets live under
 From a source checkout:
 
 ```bash
-cd deployments/planning-simulation
-docker compose \
-  --env-file config.env \
-  up -d
+./openadkit run planning-simulation
 ```
 
 Open the visualizer at `https://localhost:6080/vnc.html` (accept the
@@ -33,21 +30,18 @@ to set an initial pose and engage.
 Smoke-test compose without starting containers:
 
 ```bash
-./check-planning-simulation.sh
+./openadkit validate planning-simulation
 ```
 
 ## Stop
 
 ```bash
-cd deployments/planning-simulation
-docker compose \
-  --env-file config.env \
-  down
+./openadkit stop planning-simulation
 ```
 
 ## Notes
 
 - `config.env` is the complete Compose configuration for this deployment.
 - `map-check` fails fast if `MAP_PATH` is missing `lanelet2_map.osm` /
-  `pointcloud_map.pcd` — run `install.sh sample-data` first.
+  `pointcloud_map.pcd` — run `./openadkit fetch planning-simulation` first.
 - Single-stack per host (`network_mode: host`; `ROS_DOMAIN_ID=1` in `base/runtime.env`).

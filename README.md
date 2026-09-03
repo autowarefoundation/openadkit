@@ -25,6 +25,18 @@ The Autoware Foundation is a voting member of the [SOAFEE (Scalable Open Archite
 - **[Documentation](https://autowarefoundation.github.io/openadkit/)**
 - **[Contributing](https://autowarefoundation.github.io/openadkit/contributing/)**
 
+## Run a sample
+
+```bash
+./openadkit setup --verify
+./openadkit list
+./openadkit run planning-simulation
+```
+
+GPU hosts: `./openadkit setup --gpu --verify`. Logging Simulation GPU mode is
+`./openadkit run logging-simulation --gpu`. See
+[Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/).
+
 ## Container Image Tags
 
 Open AD Kit publishes build-specific, release, latest-stable, and CI development image tags to GitHub Container Registry.

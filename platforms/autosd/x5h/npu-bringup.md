@@ -19,9 +19,11 @@ step goes wrong.
 > vendor NPU device tree omits the realtime core's reserved memory, so the two
 > cannot run in one configuration — see [Where this stops](#where-this-stops).
 > The NULL dereference that omission triggers in the BSP remoteproc driver is
-> a vendor defect in its own right. In practice NPU verification runs on a
-> separate board rather than reconciling the two; board roles are in
-> [companion-host.md](companion-host.md).
+> a vendor defect in its own right. They are now offered as two switchable boot
+> roles on the same board rather than as two boards: `npu` and `cr52`, one per
+> boot, described in [selfboot.md](selfboot.md), "Roles". The earlier practice
+> of keeping NPU verification on a separate board is withdrawn, along with the
+> 2026-08-25 invariant that board 1 carries no NPU boot path.
 >
 > Measured NPU figures stay in the working area, outside this repository.
 
@@ -113,8 +115,9 @@ for the name of a variable you know was set — the offset is a property of the
 U-Boot build, so search rather than hard-code it. Doing it this way is
 strictly better than a `printenv` transcript: it captures the stored form
 rather than a rendering of it, and it costs no reboot and no console. Self-boot
-can also be restored from `selfboot-env.txt` on the boot partition with no host
-at all ([selfboot.md](selfboot.md)), so that remains belt and braces.
+can also be restored from `x5h-env.txt` and `x5h-role.txt` on the boot partition
+with no host at all ([selfboot.md](selfboot.md)), so that remains belt and
+braces.
 
 ## Stage 1: bring the NPU up with no flash writes at all
 
@@ -209,7 +212,12 @@ Everything here is remote-capable. None of it touches flash.
      work. Disable that service (and the RPMsg bridge above it) before the
      experiment — losing the realtime core for that boot is already implied by
      the device tree you are booting. `systemd.mask=` on the kernel command
-     line did **not** take effect here; `systemctl disable` did.
+     line did **not** take effect here; `systemctl disable` did. On an image
+     built from this branch neither is needed by hand: `cr52-remoteproc.service`
+     and `rpmsg-eth.service` both carry
+     `ConditionKernelCommandLine=x5h.role=cr52`, so a boot in the `npu` role
+     skips them, and that condition is what the design relies on precisely
+     because `systemd.mask=` was measured not to work.
    - **Loading a model can oops the kernel, on the vendor's own artifacts, with
      the documented prerequisite absent.** On a boot with no prior oops, the
      precompiled yolov5s sample — Renesas-built, single fused subgraph, no
@@ -299,6 +307,81 @@ question to schedule whenever someone is next at the bench. If it fails in a
 way that points at the IPL, Stage 2 becomes necessary and its cost is now
 known rather than assumed.
 
+## The container contract (npu role)
+
+Everything above is about making the NPU reachable. This section is the
+handoff: what a board booted in the `npu` role guarantees to a container, in
+the exact form the board itself asserts it. `scripts/npu-contract-smoke.sh`
+ships in the image at `/usr/sbin/npu-contract-smoke.sh` and is the executable
+copy of this contract; if the two ever disagree, the script is right.
+
+The prerequisite is the role's own bring-up unit. `x5h-npu.service` carries
+`ConditionKernelCommandLine=x5h.role=npu`, requires `var-opt-npu.mount` (the
+unit is named for `/var/opt/npu` because `/opt` is a symlink to `var/opt` on
+this rootfs), inserts `cmemdrv.ko` from `npu-work`, waits for the device nodes
+and logs `NPU_READY uio=<n> cmem=<n>`. Until that marker is in the journal
+there is no contract to hand anyone, and `npu-contract-smoke.sh` refuses to run
+with `NPU_CONTRACT_FAIL reason=npu_not_ready`.
+
+The image is built on the board, from the vendor `ort-rootfs` tree that lives
+on `npu-work` and never in this repository:
+
+```sh
+podman build -t localhost/x5h-ort-rootfs:latest \
+  -f /usr/sbin/ort-rootfs.containerfile \
+  --ignorefile /usr/sbin/ort-rootfs.containerignore /opt/npu/ort-rootfs
+```
+
+The ignore file is not optional: `ort-rootfs/npu` is the bind target of
+`/opt/npu`, which contains `ort-rootfs` itself, so a build without it recurses
+forever. `tar | podman import` is not an alternative, because the AutoSD image
+ships no `tar`.
+
+The run is the contract proper:
+
+```sh
+podman run --rm --privileged \
+  --device /dev/uio2:/dev/npuc0 --device /dev/uio3:/dev/npuc1 \
+  --device /dev/cmem0 --device /dev/cmem_other0 --device /dev/cmem_other1 \
+  --device /dev/cmem_other2 --device /dev/cmem_other3 \
+  -v /opt/npu:/npu -w /npu localhost/x5h-ort-rootfs:latest \
+  /usr/local/bin/python3 /npu/renesas_ep_eval_latency.py \
+    --artifacts /npu/<artifact-set> --runs 20
+```
+
+Three details in that command are load-bearing:
+
+- **The `uioN:npucN` destinations must be spelled out.** `npuc0` and `npuc1`
+  are udev symlinks, so `--device /dev/npuc0` resolves on the host and podman
+  creates the node inside the container under its resolved name, `uio2`. The
+  backend then calls `open("/dev/npuc1")` literally and fails. Naming the
+  destination is what makes the container see the names the runtime expects.
+- **`/opt/npu` is mounted at `/npu`, not somewhere convenient.** Artifact sets
+  are addressed relative to it, and compiled artifacts also record absolute
+  compile-host paths, so the mount point is part of the contract rather than a
+  preference.
+- **`cmem_other0` through `cmem_other3`, all four.** Their count comes from the
+  `/cmem` node's phandle list, so a missing one is a device-tree fault and not
+  something the container can work around. `x5h-npu.service` already refuses to
+  reach `NPU_READY` unless four exist.
+
+Grade the run by output, never by exit status: `renesas_ep_eval_latency.py`
+catches every exception and still exits 0 (see "Three traps in step 4"). The
+smoke script prints `NPU_CONTRACT_PASS avg_ms=<v> runs=<n> image=<ref>` only
+when the session listed `RenesasExecutionProvider` and a latency figure could
+be parsed, and otherwise `NPU_CONTRACT_FAIL reason=<wrong_role|npu_not_ready|
+no_image|no_artifacts|no_renesas_ep|no_latency|bad_args>`.
+
+**Switching away from this role is a full SoC reset, and it reloads the CR52.**
+`x5h-role set cr52 --reboot` is not a userspace handover: a warm reboot on this
+board is a PSCI cold reset, so the realtime core restarts and re-reads its
+flashed payload. That is the mechanism that makes the two roles safe to
+alternate at all, because in the `npu` role the CR52's shared window and its
+three small RAM regions lie inside the NPU's model-binary region and must be
+assumed overwritten. Nothing has to be done by hand to repair it; equally,
+nothing short of that reset repairs it, so do not expect a role switch without
+a reboot to work.
+
 ## Where this stops
 
 **The appendix that would settle which regions may move is not in this SDK.** It belongs to the separate hardware user's manual. Every document that ships
@@ -378,9 +461,9 @@ Two traps, both of which cost real work if hit.
 write list includes the stock payloads for them, and one of those slots
 currently holds this branch's RPMsg responder — measured, not assumed: its
 contents differ from the vendor payload in every chunk compared. Running the
-procedure unedited breaks the CR52 round trip and therefore
-`selfboot-smoke.sh`. Edit the flash-target definition to disable every entry
-except the single component being changed.
+procedure unedited breaks the CR52 round trip, and therefore the `cr52` role:
+`rpmsg-eth-smoke.sh` is the check that goes red. Edit the flash-target
+definition to disable every entry except the single component being changed.
 
 **Never enable the tool's Linux-files stage.** Alongside the bootloader
 entries, the same definition can repartition the storage and write a kernel,
@@ -404,9 +487,11 @@ is.
 - **IPL** — the package ships the stock binary it replaces; write it back the
   same way it was replaced.
 - **Realtime firmware slots** — restore from the Stage 0 copies.
-- **U-Boot environment** — re-import `selfboot-env.txt` from the boot
-  partition ([selfboot.md](selfboot.md)). This needs no host, which is the
-  point of it living on the board.
+- **U-Boot environment**: re-import `x5h-env.txt` from the boot partition,
+  and check `x5h-role.txt` beside it ([selfboot.md](selfboot.md)). This needs
+  no host, which is the point of both files living on the board. A missing or
+  unreadable role file is not fatal on its own: U-Boot falls back to the `npu`
+  role.
 - **A board that will not boot at all** — the serial flash writer, DIP
   switches and a power cycle. This is the floor, and it is why Stage 2 is a
   bench operation.

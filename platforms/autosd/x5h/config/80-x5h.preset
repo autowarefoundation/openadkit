@@ -1,7 +1,8 @@
 # systemd presets for the Open AD Kit X5H image (issue #120 M7).
 # Installed by aib/x5h-rootfs.aib.yml to /etc/systemd/system-preset/.
 #
-# This file enables exactly one unit, and the short list is deliberate.
+# This file enables six units: SSH daemon, role banner, container store
+# mount, NPU work partition mount, NPU service, and CR52 remoteproc.
 #
 # THE FIVE QUADLET UNITS ARE NOT LISTED, and adding them would be a no-op
 # that reads like a decision. Quadlet generates their .service units at
@@ -29,4 +30,15 @@
 # (the MRM scenario ships its own matched map, staged onto the board by
 # scripts/stage-scenario-map.sh), so the line was naming a unit that no
 # longer exists and had to go with it.
+#
+# cr52-remoteproc.service is enabled now that its script ships in the
+# image; on a board without a staged ELF it logs
+# CR52_RPROC_SKIP reason=no_firmware and exits 0, and in the npu role its
+# condition skips it. rpmsg-eth.service is still NOT enabled (standing
+# ruling: its binary is hand-staged).
 enable sshd.service
+enable x5h-role-banner.service
+enable var-lib-containers.mount
+enable var-opt-npu.mount
+enable x5h-npu.service
+enable cr52-remoteproc.service

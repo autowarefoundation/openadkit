@@ -31,7 +31,6 @@ Edit `config.env`:
 | `SCENARIO` | Scenario path inside the container (empty = bundled sample) |
 | `SCENARIO_HOST_DIR` | Host dir mounted at `/scenarios` |
 | `OUTPUT_HOST_PATH` | Host dir for results |
-| `SCENARIO_SIMULATOR_IMAGE` | TIER IV scenario simulator image |
 | `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware readiness |
 | `MAP_PATH` | Host map directory (must match the scenario map) |
 

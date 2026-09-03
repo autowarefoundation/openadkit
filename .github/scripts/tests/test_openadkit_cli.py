@@ -840,6 +840,51 @@ def test_repository_component_image_override_is_preserved(tmp_path):
     assert calls.read_text().split("|", 5)[2] == exact
 
 
+def test_release_ignores_env_file_component_images(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
+    root, deployment = runtime_tree(tmp_path, release=True, manifest=manifest)
+    kit_path = root / "openadkit.json"
+    current = json.loads(kit_path.read_text())
+    exact = f"registry.example/api@sha256:{'a' * 64}"
+    current["images"]["humble"]["api"] = exact
+    kit_path.write_text(json.dumps(current))
+    (deployment / "config.env").write_text(
+        (deployment / "config.env").read_text() + "API_IMAGE=registry.example/from-config\n"
+    )
+    (deployment / "config.local.env").write_text("API_IMAGE=registry.example/from-local\n")
+    bin_dir, calls = fake_docker(tmp_path)
+    result = run_cli(
+        root,
+        ["validate", "example"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split("|", 5)[2] == exact
+
+
+def test_gpu_component_image_injected_only_with_gpu(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    bin_dir, calls = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    expected = (
+        "ghcr.io/autowarefoundation/openadkit:"
+        f"sensing-perception-cuda-{_host_architecture()}-humble"
+    )
+
+    result = run_cli(root, ["validate", "example"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split("|", 5)[4] == ""
+
+    calls.write_text("")
+    result = run_cli(root, ["validate", "example", "--gpu"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split("|", 5)[4] == expected
+
+
 def test_validate_renders_without_accessing_docker_daemon(tmp_path):
     root, _ = runtime_tree(tmp_path)
     bin_dir, calls = fake_docker(tmp_path, daemon_returncode=37)

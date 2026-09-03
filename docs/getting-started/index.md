@@ -4,7 +4,6 @@
 
 - Docker Engine
 - NVIDIA Container Toolkit and OpenGL/Vulkan libraries (Optional but highly recommended for sensing, perception, and CARLA)
-- Autoware artifacts (Optional in general, but required for sensing and perception deployments such as Logging Simulation)
 
     > Host dependencies are installed by `./openadkit setup`.
 

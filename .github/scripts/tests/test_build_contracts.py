@@ -360,7 +360,7 @@ def test_carla_compose_uses_gpu_sensing_image():
     carla = (ROOT / "deployments/carla-simulation/docker-compose.yaml").read_text()
     env = (ROOT / "deployments/carla-simulation/config.env").read_text()
     assert "SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda" in carla
-    assert "SENSING_PERCEPTION_GPU_IMAGE=" in env
+    assert "SENSING_PERCEPTION_GPU_IMAGE=" not in env
     assert "image: ${SENSING_PERCEPTION_IMAGE" not in carla
 
 

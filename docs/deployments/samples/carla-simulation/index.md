@@ -30,15 +30,6 @@ Tested on Ubuntu 22.04; other hosts may work if Docker and the NVIDIA runtime ar
 
 ## Run
 
-To use a locally baked `carla-interface` image, from
-`deployments/carla-simulation/` **before** starting the stack:
-
-```bash
-./start-carla-e2e-demo.sh --build
-```
-
-Then start (or re-run) the stack so Compose picks up the loaded image:
-
 ```bash
 ./openadkit run carla-simulation --gpu
 ```
@@ -46,14 +37,6 @@ Then start (or re-run) the stack so Compose picks up the loaded image:
 Open the visualizer at `https://localhost:6080/vnc.html` (accept the
 self-signed certificate). Use `REMOTE_PASSWORD` from `config.env`. In RViz:
 set **2D Goal Pose**, wait for planning, click **Auto**.
-
-## Optional helper
-
-After the stack is running, from `deployments/carla-simulation/`:
-
-```bash
-./start-carla-e2e-demo.sh --drive    # auto route + engage smoke check
-```
 
 ## Stop
 

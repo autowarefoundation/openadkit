@@ -8,15 +8,3 @@ are required.
 ./openadkit run carla-simulation --gpu
 ./openadkit stop carla-simulation
 ```
-
-Bake a local `carla-interface` image **before** run (then re-run to pick it up):
-
-```bash
-./start-carla-e2e-demo.sh --build
-```
-
-After the stack is running:
-
-```bash
-./start-carla-e2e-demo.sh --drive    # route + engage
-```

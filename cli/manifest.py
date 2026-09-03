@@ -225,7 +225,9 @@ class RuntimeContext:
     deployments: dict[str, DeploymentRef]
     shared: dict[str, str]
 
-    def component_environment(self, ros_distro: str, gpu: bool) -> dict[str, str]:
+    def component_environment(
+        self, ros_distro: str, architecture: str, gpu: bool
+    ) -> dict[str, str]:
         applicable = {
             name: target
             for name, target in self.component_images.items()
@@ -235,9 +237,7 @@ class RuntimeContext:
             assert self.image_prefix_component is not None
             return {
                 name: (
-                    f"{self.image_prefix_component}:{target}"
-                    if ros_distro == self.default_ros_distro
-                    else f"{self.image_prefix_component}:{target}-{ros_distro}"
+                    f"{self.image_prefix_component}:{target}-{architecture}-{ros_distro}"
                 )
                 for name, target in applicable.items()
             }
@@ -360,7 +360,9 @@ class Deployment:
         environment = self.configuration_environment
         injections: dict[str, str] = {"ROS_DISTRO": distro}
         injections.update(self.distro_environment.get(distro, {}))
-        component_environment = current_context.component_environment(distro, gpu)
+        component_environment = current_context.component_environment(
+            distro, architecture, gpu
+        )
         if current_context.kind == "repository":
             injections.update(
                 {

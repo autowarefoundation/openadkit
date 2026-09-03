@@ -717,7 +717,7 @@ def test_operational_commands_do_not_take_selection_flags(command):
     assert "--gpu" not in result.stdout
 
 
-def test_repository_default_distro_uses_short_image_alias(tmp_path):
+def test_repository_default_distro_uses_development_image_alias(tmp_path):
     manifest = minimal_manifest()
     manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
@@ -728,13 +728,14 @@ def test_repository_default_distro_uses_short_image_alias(tmp_path):
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
+    architecture = _host_architecture()
     assert (
         "humble||"
-        "ghcr.io/autowarefoundation/openadkit:api|"
-        "ghcr.io/autowarefoundation/openadkit:localization-mapping|"
+        f"ghcr.io/autowarefoundation/openadkit:api-{architecture}-humble|"
+        "ghcr.io/autowarefoundation/openadkit:"
+        f"localization-mapping-{architecture}-humble|"
         in calls.read_text()
     )
-    assert "openadkit:api-humble" not in calls.read_text()
 
 
 def test_repository_injects_selected_distro_and_component_environment(tmp_path):
@@ -749,10 +750,12 @@ def test_repository_injects_selected_distro_and_component_environment(tmp_path):
         env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
     )
     assert result.returncode == 0, result.stderr
+    architecture = _host_architecture()
     assert (
         "jazzy|jazzy-value|"
-        "ghcr.io/autowarefoundation/openadkit:api-jazzy|"
-        "ghcr.io/autowarefoundation/openadkit:localization-mapping-jazzy|"
+        f"ghcr.io/autowarefoundation/openadkit:api-{architecture}-jazzy|"
+        "ghcr.io/autowarefoundation/openadkit:"
+        f"localization-mapping-{architecture}-jazzy|"
         in calls.read_text()
     )
 

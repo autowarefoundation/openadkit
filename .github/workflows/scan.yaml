@@ -1,3 +1,6 @@
+permissions:
+  contents: read
+
 # Full image scan workflow for an existing build-all-images run.
 # It runs automatically only when the build requested scanning, or manually for
 # any build_tag. A successful scan metadata artifact makes a build promotable.
@@ -25,11 +28,13 @@ jobs:
   prepare:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
     outputs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
+      policy_sha: ${{ steps.prepare.outputs.policy_sha }}
       matrix: ${{ steps.prepare.outputs.matrix }}
       should_scan: ${{ steps.prepare.outputs.should_scan }}
     steps:
@@ -65,6 +70,11 @@ jobs:
           else
             should_scan=true
           fi
+          policy_sha=$(jq -r '.openadkit_sha' build-metadata/build-metadata.json)
+          if ! printf '%s\n' "${policy_sha}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Invalid OpenADKit SHA in build metadata: ${policy_sha}" >&2
+            exit 1
+          fi
 
           matrix=$(
             jq -c '{include: [.images[] as $image | $image.platforms[] | {
@@ -80,6 +90,7 @@ jobs:
 
           {
             echo "build_tag=${build_tag}"
+            echo "policy_sha=${policy_sha}"
             echo "should_scan=${should_scan}"
             echo "matrix=${matrix}"
           } >> "$GITHUB_OUTPUT"
@@ -89,6 +100,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.should_scan == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: read
@@ -98,15 +110,25 @@ jobs:
       max-parallel: 6
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
+      - name: Checkout OpenADKit repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.policy_sha }}
+          sparse-checkout: .trivyignore
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Scan ${{ matrix.target }}-${{ matrix.ros_distro }} (${{ matrix.platform }})
-        uses: aquasecurity/trivy-action@0.30.0
+        id: trivy-scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
@@ -115,11 +137,37 @@ jobs:
           output: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
           exit-code: '1'
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          scanners: vuln
+          timeout: 15m
+          trivyignores: .trivyignore
           limit-severities-for-sarif: true
 
+      - name: Retry scan after transient failure
+        id: trivy-retry
+        if: ${{ steps.trivy-scan.outcome == 'failure' && hashFiles(format('trivy-{0}-{1}-{2}.sarif', matrix.target, matrix.ros_distro, matrix.platform_label)) == '' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          image-ref: ${{ matrix.image_ref }}
+          format: sarif
+          output: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          scanners: vuln
+          timeout: 15m
+          trivyignores: .trivyignore
+          limit-severities-for-sarif: true
+
+      - name: Fail on vulnerability findings
+        if: ${{ steps.trivy-scan.outcome == 'failure' && steps.trivy-retry.outcome != 'success' }}
+        run: exit 1
+
       - name: Upload scan results to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && hashFiles(format('trivy-{0}-{1}-{2}.sarif', matrix.target, matrix.ros_distro, matrix.platform_label)) != '' }}
+        uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
           category: ${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}
@@ -128,12 +176,15 @@ jobs:
     needs: [prepare, scan]
     if: always() && needs.prepare.outputs.should_scan == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     permissions:
+      actions: write
       contents: read
     steps:
       - name: Write scan metadata
         env:
           BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          POLICY_SHA: ${{ needs.prepare.outputs.policy_sha }}
           SCAN_RESULT: ${{ needs.scan.result }}
           SCAN_MATRIX: ${{ needs.prepare.outputs.matrix }}
         run: |
@@ -147,6 +198,7 @@ jobs:
 
           jq -n \
             --arg build_tag "${BUILD_TAG}" \
+            --arg policy_sha "${POLICY_SHA}" \
             --arg scan_status "${status}" \
             --arg scan_result "${SCAN_RESULT}" \
             --arg run_id "${GITHUB_RUN_ID}" \
@@ -154,6 +206,7 @@ jobs:
             --argjson scan_matrix "${SCAN_MATRIX}" \
             '{
               build_tag: $build_tag,
+              policy_sha: $policy_sha,
               scan_scope: "all",
               scan_status: $scan_status,
               scan_result: $scan_result,
@@ -171,7 +224,7 @@ jobs:
         shell: bash
 
       - name: Upload scan metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scan-metadata-${{ needs.prepare.outputs.build_tag }}
           path: scan-metadata/scan-metadata.json

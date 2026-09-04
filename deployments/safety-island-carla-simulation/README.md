@@ -19,8 +19,11 @@ stays running so Auto/Engage works.
 
 ```bash
 export SAFETY_ISLAND_REPO=/path/to/autoware-safety-island
-./start.sh
+cd ../..
+./openadkit run safety-island-carla-simulation --gpu
 ```
+
+Or from this directory: `./start.sh` (wraps the CLI).
 
 Then from the Safety Island repository: `vcan0`, domain-bridge,
 `freertos-posix --control-output CAN_ONLY`, and
@@ -28,11 +31,9 @@ Then from the Safety Island repository: `vcan0`, domain-bridge,
 
 Do not pass `--drive`. Do not start `carla-simulation` first and recreate
 `carla-interface`. Set a goal in RViz and engage after the CAN path is live.
-`start.sh` pins Humble `*-amd64-humble` images so RViz and Auto match the
-layout CLI would inject.
 
 ## Stop
 
 ```bash
-./start.sh --down
+./openadkit stop safety-island-carla-simulation
 ```

@@ -1,6 +1,6 @@
 services:
   sensing:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
     deploy:
       resources:
         reservations:
@@ -9,7 +9,7 @@ services:
               count: all
               capabilities: [gpu]
   perception:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
     command: >
       ros2 launch autoware_launch tier4_perception_component.launch.xml
       data_path:=/autoware_data

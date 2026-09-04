@@ -1,13 +1,11 @@
 # CARLA Simulation
 
-Runnable assets for CARLA 0.9.16 end-to-end simulation.
-
-**Guide (source of truth):**
-[CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/samples/carla-simulation/)
+Closed-loop Autoware against CARLA 0.9.16. Humble, amd64, and an NVIDIA GPU
+are required.
 
 ```bash
-# Uses config.env; requires Docker NVIDIA runtime + large UDP buffers (see docs)
-./start-carla-e2e-demo.sh
+cd ../..
+./openadkit setup --gpu --verify
+./openadkit run carla-simulation --gpu
+./openadkit stop carla-simulation
 ```
-
-Optional: `./start-carla-e2e-demo.sh --drive` · `--build` · `--down`

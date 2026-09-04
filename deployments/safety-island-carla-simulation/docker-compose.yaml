@@ -1,0 +1,26 @@
+# Full stack: CARLA simulation + sensors-only autoware_carla_interface.
+# Start this compose once. Do not run carla-simulation first and recreate
+# carla-interface; that leaves a second ego in CARLA and breaks NDT.
+include:
+  - ../carla-simulation/docker-compose.yaml
+
+services:
+  carla-interface:
+    volumes:
+      - ${SAFETY_ISLAND_REPO}/demo/carla-closed-loop/overlay/patch_sensors_only.py:/autoware_config/patch_sensors_only.py:ro
+      - ${SAFETY_ISLAND_REPO}/demo/carla-closed-loop/overlay/carla-interface-entrypoint.sh:/autoware_config/carla-interface-entrypoint.sh:ro
+      - ${SAFETY_ISLAND_REPO}/demo/carla-closed-loop/overlay/carla_autoware.py:/opt/autoware/autoware_carla_interface/local/lib/python3.10/dist-packages/autoware_carla_interface/carla_autoware.py:ro
+    command: >
+      bash /autoware_config/carla-interface-entrypoint.sh
+      host:=${CARLA_RPC_HOST}
+      port:=${CARLA_RPC_PORT}
+      timeout:=${CARLA_LOAD_TIMEOUT}
+      carla_map:=${CARLA_WORLD}
+      sensor_kit_name:=carla_sensor_kit_description
+      sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
+      input_control_cmd:=/unused/control_cmd
+      output_actuation_cmd:=/unused/actuation_cmd
+
+  control:
+    volumes:
+      - ../base/config/vehicle_cmd_gate.param.yaml:/opt/autoware/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml:ro

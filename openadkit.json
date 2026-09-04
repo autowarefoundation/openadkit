@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "repository",
+  "defaultRosDistro": "humble",
+  "imagePrefixComponent": "ghcr.io/autowarefoundation/openadkit",
+  "componentImages": {
+    "LOCALIZATION_MAPPING_IMAGE": "localization-mapping",
+    "PLANNING_CONTROL_IMAGE": "planning-control",
+    "VEHICLE_SYSTEM_IMAGE": "vehicle-system",
+    "API_IMAGE": "api",
+    "VISUALIZER_IMAGE": "visualizer",
+    "SIMULATOR_IMAGE": "simulator",
+    "SENSING_PERCEPTION_IMAGE": "sensing-perception",
+    "SENSING_PERCEPTION_GPU_IMAGE": "sensing-perception-cuda"
+  },
+  "deployments": {
+    "planning-simulation": {
+      "path": "deployments/planning-simulation"
+    },
+    "logging-simulation": {
+      "path": "deployments/logging-simulation"
+    },
+    "scenario-simulation": {
+      "path": "deployments/scenario-simulation"
+    },
+    "carla-simulation": {
+      "path": "deployments/carla-simulation"
+    },
+    "safety-island-carla-simulation": {
+      "path": "deployments/safety-island-carla-simulation"
+    }
+  }
+}

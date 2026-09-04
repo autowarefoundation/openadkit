@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "name": "safety-island-carla-simulation",
+  "description": "CARLA simulation with sensors-only interface for Safety Island CAN actuation",
+  "shared": ["base"],
+  "compose": {
+    "files": ["docker-compose.yaml"],
+    "gpuFiles": [],
+    "profiles": [],
+    "services": [
+      "carla",
+      "map",
+      "system",
+      "carla-interface",
+      "sensing",
+      "perception",
+      "localization",
+      "planning",
+      "vehicle",
+      "control",
+      "api",
+      "visualizer"
+    ],
+    "resetServices": ["map-check", "carla-map-loader"],
+    "waitTimeout": 480
+  },
+  "requirements": {
+    "architectures": ["amd64"],
+    "rosDistros": ["humble"],
+    "gpu": "required",
+    "requiredEnv": ["SAFETY_ISLAND_REPO"]
+  },
+  "data": [
+    {
+      "name": "town01-map",
+      "kind": "files",
+      "destinationEnv": "MAP_PATH",
+      "files": [
+        {
+          "path": "lanelet2_map.osm",
+          "url": "https://bitbucket.org/carla-simulator/autoware-contents/raw/062f94b5322e679ee0430e2daa6995dca9f7f0ea/maps/vector_maps/lanelet2/Town01.osm",
+          "sha256": "5e3c0873004666a399494a59048b93ecfbd1d40433c29d29e7319847a2a8afa2"
+        },
+        {
+          "path": "pointcloud_map.pcd",
+          "url": "https://bitbucket.org/carla-simulator/autoware-contents/raw/062f94b5322e679ee0430e2daa6995dca9f7f0ea/maps/point_cloud_maps/Town01.pcd",
+          "sha256": "296d6429ae0190b19a35458a155d76d8e3c4f460eb718cde3d669bc5a8f03ba2"
+        }
+      ],
+      "generatedFiles": {
+        "map_projector_info.yaml": "projector_type: Local\n"
+      },
+      "requiredFiles": [
+        "lanelet2_map.osm",
+        "pointcloud_map.pcd",
+        "map_projector_info.yaml"
+      ]
+    }
+  ]
+}

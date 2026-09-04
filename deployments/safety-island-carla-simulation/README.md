@@ -28,6 +28,8 @@ Then from the Safety Island repository: `vcan0`, domain-bridge,
 
 Do not pass `--drive`. Do not start `carla-simulation` first and recreate
 `carla-interface`. Set a goal in RViz and engage after the CAN path is live.
+`start.sh` pins Humble `*-amd64-humble` images so RViz and Auto match the
+layout CLI would inject.
 
 ## Stop
 

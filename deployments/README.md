@@ -11,7 +11,9 @@ For **complete documentation**, operational steps, and troubleshooting, see the 
 - [Planning Simulation](./planning-simulation) — Planning stack with a sample map
 - [Scenario Simulation](./scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
+<<<<<<< HEAD
 - [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation --gpu`)
+- [Safety Island CARLA Simulation](./safety-island-carla-simulation) — CARLA plus Autoware with Safety Island CAN (`./openadkit run safety-island-carla-simulation --gpu`)
 - [Zenoh Bridge](./zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
 
 ## Directory Layout
@@ -22,6 +24,8 @@ deployments/
 ├── planning-simulation/      # complete deployment config.env
 ├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env
+<<<<<<< HEAD
 ├── carla-simulation/         # CLI deployment (Humble, amd64, GPU)
+├── safety-island-carla-simulation/  # CARLA + SI CAN overlay
 └── zenoh-bridge/              # self-contained topology + config.env
 ```

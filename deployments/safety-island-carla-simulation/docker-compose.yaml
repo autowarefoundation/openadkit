@@ -20,3 +20,7 @@ services:
       sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
       input_control_cmd:=/unused/control_cmd
       output_actuation_cmd:=/unused/actuation_cmd
+
+  control:
+    volumes:
+      - ../base/config/vehicle_cmd_gate.param.yaml:/opt/autoware/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml:ro

@@ -43,6 +43,16 @@ if [[ ! -f "$SAFETY_ISLAND_REPO/demo/carla-closed-loop/overlay/carla_autoware.py
   printf 'SAFETY_ISLAND_REPO=%s is missing the sensors-only overlay\n' "$SAFETY_ISLAND_REPO" >&2
   exit 1
 fi
+export SAFETY_ISLAND_REPO
+: "${VISUALIZER_IMAGE:=ghcr.io/autowarefoundation/openadkit:visualizer-amd64-humble}"
+: "${PLANNING_CONTROL_IMAGE:=ghcr.io/autowarefoundation/openadkit:planning-control-amd64-humble}"
+: "${VEHICLE_SYSTEM_IMAGE:=ghcr.io/autowarefoundation/openadkit:vehicle-system-amd64-humble}"
+: "${API_IMAGE:=ghcr.io/autowarefoundation/openadkit:api-amd64-humble}"
+: "${LOCALIZATION_MAPPING_IMAGE:=ghcr.io/autowarefoundation/openadkit:localization-mapping-amd64-humble}"
+: "${SENSING_PERCEPTION_GPU_IMAGE:=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda-amd64-humble}"
+: "${RVIZ_CONFIG:=/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz}"
+export VISUALIZER_IMAGE PLANNING_CONTROL_IMAGE VEHICLE_SYSTEM_IMAGE API_IMAGE
+export LOCALIZATION_MAPPING_IMAGE SENSING_PERCEPTION_GPU_IMAGE RVIZ_CONFIG
 
 compose=(
   docker compose

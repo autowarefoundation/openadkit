@@ -1,0 +1,30 @@
+# Overlay on deployments/carla-simulation: stub Autoware follower and
+# sensors-only autoware_carla_interface. Use as a second compose file:
+#   docker compose --env-file ../carla-simulation/config.env \
+#     -f ../carla-simulation/docker-compose.yaml \
+#     -f docker-compose.yaml up
+services:
+  carla-interface:
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ../carla-simulation/sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
+      - ${SAFETY_ISLAND_REPO}/demo/carla-closed-loop/overlay/patch_sensors_only.py:/autoware_config/patch_sensors_only.py:ro
+      - ${SAFETY_ISLAND_REPO}/demo/carla-closed-loop/overlay/carla-interface-entrypoint.sh:/autoware_config/carla-interface-entrypoint.sh:ro
+    command: >
+      bash /autoware_config/carla-interface-entrypoint.sh
+      host:=${CARLA_RPC_HOST}
+      port:=${CARLA_RPC_PORT}
+      timeout:=${CARLA_LOAD_TIMEOUT}
+      carla_map:=${CARLA_WORLD}
+      sensor_kit_name:=carla_sensor_kit_description
+      sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
+      input_control_cmd:=/unused/control_cmd
+      output_actuation_cmd:=/unused/actuation_cmd
+
+  control:
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ../base/config/vehicle_cmd_gate.param.yaml:/opt/autoware/autoware_vehicle_cmd_gate/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml:ro
+      - ../base/config/vehicle_cmd_gate.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml:ro
+      - ${SAFETY_ISLAND_REPO}/demo/launch/control.launch.xml:/opt/autoware/share/tier4_control_launch/launch/control.launch.xml:ro
+      - ${SAFETY_ISLAND_REPO}/demo/launch/control.launch.xml:/opt/autoware/tier4_control_launch/share/tier4_control_launch/launch/control.launch.xml:ro

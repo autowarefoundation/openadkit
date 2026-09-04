@@ -14,6 +14,7 @@ CLI and release bundle:
 - [Scenario Simulation](./scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
 - [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation --gpu`)
+- [Safety Island CARLA Simulation](./safety-island-carla-simulation) — CARLA plus Autoware with Safety Island CAN (`./openadkit run safety-island-carla-simulation --gpu`)
 
 Standalone source-checkout helper:
 
@@ -28,5 +29,6 @@ deployments/
 ├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env
 ├── carla-simulation/         # CLI deployment (Humble, amd64, GPU)
+├── safety-island-carla-simulation/  # CARLA + SI CAN overlay
 └── zenoh-bridge/              # self-contained topology + config.env
 ```

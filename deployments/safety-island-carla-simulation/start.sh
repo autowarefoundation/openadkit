@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-CARLA=$(cd -- "$HERE/../carla-simulation" && pwd -P)
-PROJECT=openadkit-safety-island-carla-simulation
+ROOT=$(cd -- "$HERE/../.." && pwd -P)
 
 usage() {
   cat <<'EOF'
 Usage: ./start.sh [options]
 
-Starts CARLA simulation with a sensors-only carla-interface in one compose
-pass so a second ego is not left in the world.
+Starts CARLA + sensors-only carla-interface via the Open AD Kit CLI.
 
 Requires SAFETY_ISLAND_REPO (absolute path to autoware-safety-island).
 Does not start the Safety Island binary, vcan, domain-bridge, or
@@ -18,6 +15,7 @@ CAN-CARLA bridge.
 
 Options:
   --down     Stop and remove the stack
+  --gpu      Forwarded to ./openadkit run (default)
   -h, --help Show this help
 EOF
 }
@@ -44,27 +42,16 @@ if [[ ! -f "$SAFETY_ISLAND_REPO/demo/carla-closed-loop/overlay/carla_autoware.py
   exit 1
 fi
 export SAFETY_ISLAND_REPO
-: "${VISUALIZER_IMAGE:=ghcr.io/autowarefoundation/openadkit:visualizer-amd64-humble}"
-: "${PLANNING_CONTROL_IMAGE:=ghcr.io/autowarefoundation/openadkit:planning-control-amd64-humble}"
-: "${VEHICLE_SYSTEM_IMAGE:=ghcr.io/autowarefoundation/openadkit:vehicle-system-amd64-humble}"
-: "${API_IMAGE:=ghcr.io/autowarefoundation/openadkit:api-amd64-humble}"
-: "${LOCALIZATION_MAPPING_IMAGE:=ghcr.io/autowarefoundation/openadkit:localization-mapping-amd64-humble}"
-: "${SENSING_PERCEPTION_GPU_IMAGE:=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda-amd64-humble}"
-: "${RVIZ_CONFIG:=/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz}"
-export VISUALIZER_IMAGE PLANNING_CONTROL_IMAGE VEHICLE_SYSTEM_IMAGE API_IMAGE
-export LOCALIZATION_MAPPING_IMAGE SENSING_PERCEPTION_GPU_IMAGE RVIZ_CONFIG
-
-compose=(
-  docker compose
-  --project-name "$PROJECT"
-  --env-file "$CARLA/config.env"
-  -f "$HERE/docker-compose.yaml"
-)
 
 if [[ " $* " == *" --down "* ]]; then
-  exec "${compose[@]}" down --remove-orphans
+  exec "$ROOT/openadkit" stop safety-island-carla-simulation
 fi
 
-"${compose[@]}" up --detach --wait --wait-timeout 480 --remove-orphans
-printf 'visualizer: https://localhost:6080/vnc.html\n'
-printf 'stop with: %s --down\n' "$0"
+forwarded=()
+for arg in "$@"; do
+  case "$arg" in
+    --down|--drive|-h|--help) ;;
+    *) forwarded+=("$arg") ;;
+  esac
+done
+exec "$ROOT/openadkit" run safety-island-carla-simulation --gpu "${forwarded[@]}"

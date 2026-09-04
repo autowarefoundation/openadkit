@@ -2,7 +2,8 @@
 
 CARLA 0.9.16 plus Autoware, with Safety Island as the controller. Actuation
 is classic CAN from `autoware-safety-island`, not
-`autoware_carla_interface.apply_control()`.
+`autoware_carla_interface.apply_control()`. Autoware's trajectory follower
+stays running so Auto/Engage works.
 
 **Safety Island guide:** that repository's
 `documentation/user_guide/can_carla_closed_loop.rst`.
@@ -25,8 +26,8 @@ Then from the Safety Island repository: `vcan0`, domain-bridge,
 `freertos-posix --control-output CAN_ONLY`, and
 `demo/can_carla_bridge/bridge.py --role ego_vehicle`.
 
-Do not pass `--drive`. Set a goal in RViz and engage after the CAN path is
-live.
+Do not pass `--drive`. Do not start `carla-simulation` first and recreate
+`carla-interface`. Set a goal in RViz and engage after the CAN path is live.
 
 ## Stop
 

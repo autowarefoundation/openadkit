@@ -46,3 +46,7 @@ capture/
 
 # Playwright CLI artifacts
 .playwright-cli/
+
+# Local deployment overrides and runtime state
+deployments/*/config.local.env
+deployments/*/.cache/

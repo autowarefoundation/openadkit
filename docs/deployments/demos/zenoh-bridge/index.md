@@ -15,9 +15,8 @@ Zenoh inside one Compose project. Checkout assets live under
 ## Setup
 
 ```bash
+./openadkit fetch scenario-simulation
 cd deployments/zenoh-bridge
-# set REMOTE_PASSWORD in config.env
-../../install.sh sample-data zenoh-bridge
 ```
 
 ## Run

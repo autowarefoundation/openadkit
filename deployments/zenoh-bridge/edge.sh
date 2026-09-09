@@ -89,11 +89,7 @@ if [ "$CMD" == "up" ]; then
     for map_file in lanelet2_map.osm pointcloud_map.pcd; do
         if [ ! -f "${MAP_DIR}/${map_file}" ]; then
             echo -e "${RED}[Error]${NC} Map file ${map_file} not found in ${MAP_DIR}."
-            if [ -f ./install.sh ]; then
-                echo -e "       Run ./install.sh sample-data zenoh-bridge --force to (re-)fetch the map."
-            else
-                echo -e "       Run ../../install.sh sample-data zenoh-bridge --force to (re-)fetch the map."
-            fi
+            echo -e "       From the repository root, run: ./openadkit fetch scenario-simulation"
             exit 1
         fi
     done

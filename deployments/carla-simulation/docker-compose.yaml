@@ -132,7 +132,7 @@ services:
     restart: "no"
 
   sensing:
-    image: ${SENSING_PERCEPTION_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
     container_name: autoware-sensing
     network_mode: host
     init: true
@@ -161,7 +161,7 @@ services:
     restart: on-failure
 
   perception:
-    image: ${SENSING_PERCEPTION_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
     container_name: autoware-perception
     network_mode: host
     init: true

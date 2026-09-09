@@ -6,8 +6,8 @@ Runnable assets for the Autoware planning simulation.
 [Planning Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/samples/planning-simulation/)
 
 ```bash
-../../install.sh sample-data planning-simulation
-docker compose --env-file config.env up -d
+cd ../..
+./openadkit run planning-simulation
 ```
 
-Smoke-test without starting: `./check-planning-simulation.sh`
+Smoke-test without starting: `./openadkit validate planning-simulation`

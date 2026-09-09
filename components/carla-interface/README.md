@@ -3,12 +3,11 @@
 This image packages Autoware's CARLA interface with the CARLA 0.9.16 Python API
 for the CARLA e2e deployment (`deployments/carla-simulation/`).
 
-The image has no default launch command. Use the deployment launcher (map
-prep + full Compose stack):
+The image has no default launch command. Start the CARLA deployment with:
 
 ```bash
-cd deployments/carla-simulation
-./start-carla-e2e-demo.sh
+./openadkit setup --gpu --verify
+./openadkit run carla-simulation --gpu
 ```
 
 Guide: [CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/samples/carla-simulation/)

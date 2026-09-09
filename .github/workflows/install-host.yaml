@@ -7,9 +7,11 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'install.sh'
+      - 'openadkit'
+      - 'openadkit.json'
+      - 'cli/**'
       - 'deployments/**'
-      - '.github/scripts/tests/test_install_sample_data.py'
+      - '.github/scripts/tests/test_openadkit_cli.py'
       - '.github/workflows/install-host.yaml'
 
 concurrency:
@@ -29,33 +31,26 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Test sample-data installer safety
+      - name: Test Open AD Kit CLI safety
         run: |
           python3 -m pip install --user pytest
-          python3 -m pytest .github/scripts/tests/test_install_sample_data.py
+          python3 -m pytest .github/scripts/tests/test_openadkit_cli.py
 
       - name: Install host dependencies from official packages
-        # Force installation only on this disposable runner so the test cannot
-        # pass solely because GitHub's preinstalled Docker happens to work.
+        # Force the install path only on this disposable runner so the test
+        # cannot pass solely because GitHub's preinstalled Docker works.
         run: |
-          sudo env CI=true OPENADKIT_CI_FORCE_DOCKER_INSTALL=true \
-            ./install.sh --no-nvidia --verify
+          env CI=true OPENADKIT_CI_FORCE_DOCKER_INSTALL=true \
+            ./openadkit setup --verify
 
       - name: Validate repository Compose configs
         run: |
           set -euo pipefail
-          export REMOTE_PASSWORD="ci-validate"
-          validate() {
-            local dir="$1"
-            shift
-            (
-              cd "${dir}"
-              docker compose "$@" config -q
-            )
-          }
-          validate deployments/planning-simulation --env-file config.env
-          validate deployments/scenario-simulation --env-file config.env
-          validate deployments/logging-simulation --env-file config.env
-          validate deployments/logging-simulation --env-file config.env -f docker-compose.yaml -f docker-compose.gpu.yaml
-          validate deployments/carla-simulation --env-file config.env
-          validate deployments/zenoh-bridge --env-file config.env
+          for ros_distro in humble jazzy; do
+            for deployment in planning-simulation scenario-simulation logging-simulation; do
+              ./openadkit validate "${deployment}" --ros-distro "${ros_distro}"
+            done
+            ./openadkit validate logging-simulation \
+              --ros-distro "${ros_distro}" --gpu
+          done
+          ./openadkit validate carla-simulation --gpu --ros-distro humble

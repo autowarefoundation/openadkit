@@ -1,0 +1,13 @@
+[Unit]
+Description=X5H container store (UFS partition autosd-store)
+After=local-fs-pre.target
+DefaultDependencies=no
+
+[Mount]
+What=/dev/disk/by-partuuid/7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e03
+Where=/var/lib/containers
+Type=btrfs
+Options=defaults,nofail
+
+[Install]
+WantedBy=local-fs.target

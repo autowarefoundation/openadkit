@@ -173,16 +173,18 @@ use_efipart: false
 # running aib's own mpp preprocessor with the override in place: both the
 # masked-list entry and the pre-generation stage disappear.
 #
-# NOT the same cause as the fstab generator. selfboot.md:232 reports that
+# NOT the same cause as the fstab generator. selfboot.md ("First boot")
+# reports that
 # systemd-fstab-generator does not run on this image either. That is a
 # DIFFERENT mask: systemd-fstab-generator is a plain entry in aib's
 # unconditional image_masked_generators default
 # (include/defaults.ipp.yml:328, one of the sixteen that are always masked),
 # not something pregenerate_quadlets adds. Setting this flag false does NOT
-# unmask it. selfboot.md's explicit /etc/systemd/system/var-lib-containers.mount
-# workaround therefore remains necessary, and must not be removed on the
+# unmask it. The explicit /etc/systemd/system/var-lib-containers.mount unit
+# (config/var-lib-containers.mount, installed by x5h-rootfs.aib.yml and enabled
+# by 80-x5h.preset) therefore remains necessary, and must not be removed on the
 # strength of this change -- without it podman silently uses the root
-# filesystem instead of the btrfs LUN.
+# filesystem instead of the btrfs LUN. The same applies to var-opt-npu.mount.
 #
 # Why not unmask it from the manifest with an add_symlinks entry pointing
 # /etc/systemd/system-generators/podman-system-generator at

@@ -22,6 +22,11 @@
 # The modprobes live in modules-load.d rather than here (see
 # config/x5h-rpmsg-modules.conf) so that the module load is not tied to this
 # unit's success, and so `lsmod` is explainable without reading a unit file.
+#
+# Gated to the cr52 role: under the vendor NPU dtb (npu role) `cr52_1`'s
+# memory-region phandle resolves to nothing and a `start` write panics the
+# kernel, so this unit must never run there. `systemd.mask=` on the command
+# line was measured NOT to stop it; the condition does.
 [Unit]
 Description=Publish the CR52 RPMsg vdev (remoteproc start)
 Documentation=file:///usr/share/doc/x5h/rpmsg-dualboot.md
@@ -29,12 +34,13 @@ After=systemd-modules-load.service
 Wants=systemd-modules-load.service
 Before=rpmsg-eth.service
 ConditionPathExists=/sys/class/remoteproc/remoteproc0
+ConditionKernelCommandLine=x5h.role=cr52
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=-/etc/default/cr52-remoteproc
-ExecStart=/usr/local/sbin/cr52-rproc-up.sh
+ExecStart=/usr/sbin/cr52-rproc-up.sh
 
 [Install]
 WantedBy=multi-user.target

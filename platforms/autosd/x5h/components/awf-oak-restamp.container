@@ -8,6 +8,8 @@ After=network-online.target
 # /control/trajectory_follower/control_cmd with domain 1's clock in all
 # three stamps. Without the bridge it simply sees nothing; it does not fail.
 After=awf-oak-bridge.service
+# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+ConditionKernelCommandLine=x5h.role=cr52
 
 [Install]
 WantedBy=default.target

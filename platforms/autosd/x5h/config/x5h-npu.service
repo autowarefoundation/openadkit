@@ -1,0 +1,13 @@
+[Unit]
+Description=X5H NPU bring-up (cmemdrv, /dev/npuc*) in the npu role
+ConditionKernelCommandLine=x5h.role=npu
+Requires=var-opt-npu.mount
+After=var-opt-npu.mount systemd-modules-load.service systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/x5h-npu-up.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -54,15 +54,6 @@ depmod -b "$DEST" "$KVER" \
     || { echo "FATAL: depmod -b $DEST $KVER failed"; exit 1; }
 [ -f "$DEST/lib/modules/$KVER/modules.dep" ] \
     || { echo "FATAL: depmod produced no modules.dep"; exit 1; }
-# This drop-in is additive at the filename level but NOT neutral across
-# kernels: it sets firewall_driver = "nftables", and both kernels boot this
-# same NFS root (that sharing is the whole point of staging additively). The
-# BSP kernel has no CONFIG_NF_TABLES, so once this file is staged, a U-Boot
-# rollback to the BSP kernel alone is not enough -- it would leave the BSP
-# kernel booting with a firewall driver it cannot run. See the rollback
-# instruction below, which spells out the extra step.
-install -D -m 0644 "$HERE/../config/60-nftables.conf" \
-    "$DEST/etc/containers/containers.conf.d/60-nftables.conf"
 # Refresh the test payload alongside the module tree. stage-nfs-rootfs.sh
 # only ever copies board-podman-smoke.sh once, at initial staging, and
 # refuses to re-run over an already-staged root -- so a board session that
@@ -80,5 +71,3 @@ echo "OK: $KVER staged into $DEST and $TFTP"
 echo "U-Boot (rebuilt): setenv kernel_file Image-autosd ; setenv dtb_file r8a78000-ironhide-uio-autosd.dtb ; setenv selinux_arg enforcing=0"
 echo "U-Boot (rollback): setenv kernel_file Image ; setenv dtb_file <bsp-dtb> ; setenv selinux_arg selinux=0"
 echo "  NOTE: selinux_arg expands at 'setenv bootargs_autosd' time, not at 'run' time -- after setenv'ing it, re-enter the bootargs_autosd line from uboot/autosd-boot.env before 'run bootcmd_autosd', or the old value stays baked in."
-echo "Rollback ALSO needs: rm -f $DEST/etc/containers/containers.conf.d/60-nftables.conf"
-echo "  (the drop-in selects the nftables driver, which the BSP kernel cannot run -- both kernels share this NFS root)"

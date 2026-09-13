@@ -9,7 +9,7 @@ on:
     paths:
       - mkdocs.yaml
       - openadkit
-      - "openadkit.d/**"
+      - "cli/**"
       - docs/macros.py
       - .github/image-inventory.json
       - docs/requirements.txt
@@ -20,6 +20,8 @@ on:
       - "**/*.jpg"
       - "docs/assets/**"
       - "docs/overrides/**"
+      - "docs/.pages"
+      - "docs/**/.pages"
       - "**/*.pages"
       - ".github/actions/build-docs/**"
       - ".github/workflows/pr-preview.yaml"

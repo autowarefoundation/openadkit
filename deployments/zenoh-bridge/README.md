@@ -8,7 +8,6 @@ From the source root, prepare the Kashiwanoha map, then start the standalone
 helpers:
 
 ```bash
-cd ../..
 ./openadkit fetch scenario-simulation
 cd deployments/zenoh-bridge
 ./cloud.sh up -d

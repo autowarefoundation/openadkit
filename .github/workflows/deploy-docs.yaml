@@ -7,7 +7,7 @@ on:
     paths:
       - mkdocs.yaml
       - openadkit
-      - "openadkit.d/**"
+      - "cli/**"
       - docs/macros.py
       - .github/image-inventory.json
       - docs/requirements.txt

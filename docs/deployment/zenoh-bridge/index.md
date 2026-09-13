@@ -28,19 +28,18 @@ filters and namespaces in `config/zenoh-bridge-ros2dds.json5`.
 ./openadkit setup --verify
 ./openadkit fetch scenario-simulation
 cd deployments/zenoh-bridge
-export REMOTE_PASSWORD=replace-me
 ```
 
 --8<-- "includes/docker-group-activation.md"
 
 This standalone deployment requires a source checkout and is not included in
-the unified release bundle or manifest-driven CLI. Export overrides before
-invoking the helpers, or update its `config.env`:
+the unified release bundle or manifest-driven CLI. Override these in the
+environment or `config.env` before invoking the helpers:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `MAP_PATH` | Kashiwanoha map directory | `$HOME/autoware_map/kashiwanoha_map` |
-| `REMOTE_PASSWORD` | Required noVNC password | None |
+| `REMOTE_PASSWORD` | Required noVNC password | `openadkit` |
 
 The deployment uses wall time and does not bridge `/clock`.
 

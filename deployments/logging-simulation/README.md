@@ -18,5 +18,7 @@ cd ../..
 ./openadkit run logging-simulation --gpu
 ```
 
-The CLI downloads the map, rosbag, and pinned GPU models selected by the
-manifest. Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
+The CLI downloads the map and rosbag selected by the manifest. CenterPoint
+models are fetched only for `./openadkit run logging-simulation --gpu` or
+`./openadkit fetch logging-simulation`. Add `--ros-distro jazzy` to select
+Jazzy; Humble is the default.

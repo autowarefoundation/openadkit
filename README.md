@@ -40,10 +40,10 @@ The manifest-driven CLI and release bundle support these curated deployments:
 - **[planning-simulation](https://autowarefoundation.github.io/openadkit/deployment/planning-simulation/)** - Run planning with a simulator-backed vehicle interface
 - **[logging-simulation](https://autowarefoundation.github.io/openadkit/deployment/logging-simulation/)** - Replay sample data through the logging/perception stack
 - **[scenario-simulation](https://autowarefoundation.github.io/openadkit/deployment/scenario-simulation/)** - Run scenario-based simulation workflows
+- **[carla-simulation](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/)** - Connect Autoware to CARLA simulation (Humble, amd64, GPU)
 
-The source checkout also contains standalone CARLA and Zenoh deployments:
+The source checkout also contains a standalone Zenoh deployment:
 
-- **[carla-simulation](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/)** - Connect Autoware to CARLA simulation
 - **[zenoh-bridge](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)** - Bridge isolated edge and visualization ROS domains in one Compose project
 
 ## Images and Releases

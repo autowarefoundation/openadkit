@@ -60,7 +60,7 @@ the [hardware page](hardware/index.md).
 | Ubuntu 24.04 + Docker Compose deployments | **Committed** | Supported host; some demos (e.g. CARLA 0.9.16) stay on 22.04 |
 | Component images amd64 + arm64 (non-CUDA) | **Committed** | Published per [image inventory](https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json) |
 | `sensing-perception-cuda` | **Committed** (amd64 only) | Requires NVIDIA Container Toolkit |
-| `carla-interface` / CARLA deployment | **Experimental** | amd64 + Humble + Ubuntu 22.04 host only |
+| `carla-interface` / CARLA deployment | **Experimental** | Image is amd64 Humble and Jazzy; the deployment is Humble + Ubuntu 22.04 only |
 | AutoSD planning-simulator assets | **Experimental** | Platform demo with upstream Autoware images; not modular OAK components |
 | Jazzy multi-arch matrix (where green) | **Best-effort** until sustained green promotion | Built in parallel; Humble remains the default documented path |
 | EWAOL | **Unsupported** | Upstream SOAFEE background only; no in-repo assets |

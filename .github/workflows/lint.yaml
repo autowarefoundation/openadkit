@@ -44,6 +44,8 @@ on:
       - 'docs/overrides/**'
       - 'docs/**/*.yaml'
       - 'docs/**/*.yml'
+      - 'docs/.pages'
+      - 'docs/**/.pages'
       - 'platforms/autosd/x5h/components/nodes/*.py'
       - 'platforms/autosd/x5h/components/nodes/fixtures/*'
       - 'platforms/autosd/x5h/scripts/*.awk'

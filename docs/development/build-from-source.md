@@ -78,16 +78,21 @@ touch autoware/src/middleware/external/.keep
 docker buildx bake -f components/docker-bake.hcl universe-common
 
 # 6. Build and tag all component images (~2 hours)
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64|amd64) ARCH=amd64 ;;
+  aarch64|arm64) ARCH=arm64 ;;
+esac
 docker buildx bake -f components/docker-bake.hcl \
-  --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-humble \
-  --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping-humble \
-  --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control-humble \
-  --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system-humble \
-  --set api.tags=ghcr.io/autowarefoundation/openadkit:api-humble \
-  --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer-humble \
-  --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator-humble \
-  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-humble \
-  --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda-humble \
+  --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-${ARCH}-humble \
+  --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping-${ARCH}-humble \
+  --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control-${ARCH}-humble \
+  --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system-${ARCH}-humble \
+  --set api.tags=ghcr.io/autowarefoundation/openadkit:api-${ARCH}-humble \
+  --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer-${ARCH}-humble \
+  --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator-${ARCH}-humble \
+  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-amd64-humble \
+  --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda-amd64-humble \
   --load \
   component
 
@@ -96,9 +101,12 @@ docker buildx bake -f components/docker-bake.hcl \
 ```
 
 The `--load` flag makes images available in the local Docker store (without it,
-Bake only populates the BuildKit cache). Repository-mode `./openadkit` resolves
-component defaults as `<target>-<ros-distro>`, so local tags must carry the
-matching suffix. For Jazzy, build with `ROS_DISTRO=jazzy` and use `-jazzy` tags.
+Bake only populates the BuildKit cache). Repository-mode `./openadkit` injects
+`<prefix>:<target>-<arch>-<ros-distro>` (for example
+`planning-control-amd64-humble`). Local tags must match that name, or set the
+`*_IMAGE` variables in `config.local.env`. For Jazzy, build with
+`ROS_DISTRO=jazzy` and use `-jazzy` suffixes. `carla-interface` and
+`sensing-perception-cuda` are amd64-only.
 
 ### Build Targets (Reference)
 
@@ -146,7 +154,7 @@ ROS_DISTRO=humble UPSTREAM_TAG="$AUTOWARE_REF" \
 
 CI builds every target automatically via [`.github/workflows/build-all-images.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml), which invokes the same Bake file across a build matrix. The matrix (targets, platforms, ROS distros) is driven by [`.github/image-inventory.json`](https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json) — the source of truth for what gets built and on which architectures.
 
-The workflow runs staged jobs — `prepare`, then `build-common` and `build-components`, then `build-carla-interface` (which depends on `simulator`) — so each layer is pushed before the layer that depends on it. Most targets build for `{humble, jazzy} × {amd64, arm64}`; `sensing-perception-cuda` is amd64-only and `carla-interface` is amd64 + Humble only. A final `create-manifests` job stitches the per-arch tags into multi-arch manifests.
+The workflow runs staged jobs — `prepare`, then `build-common` and `build-components`, then `build-carla-interface` (which depends on `simulator`) — so each layer is pushed before the layer that depends on it. Most targets build for `{humble, jazzy} × {amd64, arm64}`; `sensing-perception-cuda` and `carla-interface` are amd64-only (Humble and Jazzy). A final `create-manifests` job stitches the per-arch tags into multi-arch manifests.
 
 If a scheduled build fails, a `notify-failure` job creates a GitHub issue with the run URL so maintainers are notified without polling the Actions tab. Failure notifications are only created for scheduled builds, not for push or manual triggers.
 
@@ -190,7 +198,7 @@ flowchart LR
 ```
 
 Prerequisite CI (`build-all-images` + passing `scan-images`) runs before the
-release workflow. The six release jobs then run in the order above.
+release workflow. The seven release jobs then run in the order above.
 
 #### Validation Gates
 

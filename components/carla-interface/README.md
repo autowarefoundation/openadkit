@@ -19,7 +19,11 @@ the following from the repository root:
 
 ```bash
 docker buildx bake -f components/docker-bake.hcl \
-  --set carla-interface.tags=openadkit:carla-interface \
+  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-amd64-humble \
   --load \
   carla-interface
 ```
+
+`./openadkit run carla-simulation --gpu` uses that reference from
+`deployments/carla-simulation/config.env`. Override it in
+`config.local.env` if you tag the image differently.

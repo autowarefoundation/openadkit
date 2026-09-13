@@ -44,14 +44,7 @@ are available but commented out.
 
 --8<-- "includes/visualizer-remote-access.md"
 
-Set a goal with **2D Goal Pose** and select **Auto** in RViz2. After the stack
-is running, optional helpers can bake a local interface image or engage a
-forward route:
-
-```bash
-./start-carla-e2e-demo.sh --drive
-./start-carla-e2e-demo.sh --build
-```
+Set a goal with **2D Goal Pose** and select **Auto** in RViz2.
 
 ## Stop
 

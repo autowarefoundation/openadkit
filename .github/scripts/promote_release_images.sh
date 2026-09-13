@@ -129,11 +129,11 @@ check_alias_policy() {
 }
 
 preflight_aliases() {
-  local alias lookup_status existing_digest
+  local alias lookup_status
   while IFS= read -r alias; do
     [ -n "${alias}" ] || continue
     lookup_status=0
-    existing_digest=$(registry_manifest_digest "${alias}") || lookup_status=$?
+    registry_manifest_digest "${alias}" >/dev/null || lookup_status=$?
     if [ "${lookup_status}" -ne 0 ] && [ "${lookup_status}" -ne 1 ]; then
       return "${lookup_status}"
     fi

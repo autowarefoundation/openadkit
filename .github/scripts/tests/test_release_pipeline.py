@@ -34,6 +34,23 @@ RUNTIME_TARGETS = {
 }
 
 
+def manifest_validation_matrix():
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    rows = []
+    for name in sorted(kit["deployments"]):
+        manifest = json.loads(
+            (ROOT / kit["deployments"][name]["path"] / "deployment.json").read_text()
+        )
+        gpu = manifest["requirements"]["gpu"]
+        for distro in manifest["requirements"]["rosDistros"]:
+            if gpu in ("none", "optional"):
+                rows.append({"deployment": name, "gpu": False, "rosDistro": distro})
+            if gpu in ("required", "optional"):
+                rows.append({"deployment": name, "gpu": True, "rosDistro": distro})
+    rows.sort(key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"]))
+    return rows
+
+
 def executable(path, content):
     path.write_text(content)
     path.chmod(0o755)
@@ -737,18 +754,14 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     result, output = write_plan(tmp_path)
     assert result.returncode == 0, result.stderr
     plan = json.loads(output.read_text())
-    assert plan["bundle"] == {
-        "asset": f"openadkit-{VERSION}.tar.gz",
-        "deployments": [
-            "carla-simulation",
-            "logging-simulation",
-            "planning-simulation",
-            "scenario-simulation",
-        ],
-        "root": f"openadkit-{VERSION}",
-        "runtime": ["openadkit", "cli"],
-        "shared": ["base"],
-    }
+    assert plan["bundle"]["asset"] == f"openadkit-{VERSION}.tar.gz"
+    assert plan["bundle"]["root"] == f"openadkit-{VERSION}"
+    assert plan["bundle"]["runtime"] == ["openadkit", "openadkit.json", "cli"]
+    assert plan["bundle"]["shared"] == ["base"]
+    assert plan["bundle"]["deployments"] == sorted(
+        json.loads((ROOT / "openadkit.json").read_text())["deployments"]
+    )
+    assert plan["bundle"]["validation"] == manifest_validation_matrix()
     context = plan["releaseContext"]
     assert context["defaultRosDistro"] == "humble"
     assert context["componentImages"]["CARLA_INTERFACE_IMAGE"] == "carla-interface"
@@ -853,16 +866,15 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert bundled_context["kind"] == "release"
     assert bundled_context["componentImages"]["CARLA_INTERFACE_IMAGE"] == "carla-interface"
     assert "carla-interface" in bundled_context["images"]["humble"]
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    expected_deployments = set(kit["deployments"])
+    for name, reference in kit["deployments"].items():
+        manifest = json.loads((ROOT / reference["path"] / "deployment.json").read_text())
+        expected_deployments.update(manifest["shared"])
     bundled_deployments = {
         path.name for path in (root / "deployments").iterdir() if path.is_dir()
     }
-    assert bundled_deployments == {
-        "base",
-        "carla-simulation",
-        "logging-simulation",
-        "planning-simulation",
-        "scenario-simulation",
-    }
+    assert bundled_deployments == expected_deployments
     assert not (root / "install.sh").exists()
     listed = subprocess.run(
         [str(root / "openadkit"), "list"],
@@ -872,7 +884,12 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         capture_output=True,
         check=True,
     ).stdout
-    assert listed.count("\tintact") == 4
+    states = [
+        line.split()[1]
+        for line in listed.splitlines()[1:]
+        if line.strip()
+    ]
+    assert states == ["intact"] * len(bundled_context["deployments"])
     assert "modified" not in listed
     assert "zenoh" not in listed
 
@@ -905,3 +922,17 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     notes = (tmp_path / "release-notes.md").read_text()
     assert "## Open AD Kit Bundle" in notes
     assert notes.count(asset.name) == 1
+
+
+def test_release_scripts_do_not_hardcode_product_catalog():
+    packager = PACKAGER.read_text()
+    notes = WRITE_NOTES.read_text()
+    planner = PLANNER.read_text()
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    for name in kit["deployments"]:
+        assert name not in packager
+        assert name not in notes
+    assert "CURATED_DEPLOYMENTS" not in planner
+    assert "ROS_DISTROS" not in planner
+    assert "length == 9" not in notes
+    assert "length == 4" not in notes

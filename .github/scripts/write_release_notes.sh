@@ -4,16 +4,20 @@ set -euo pipefail
 
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
 jq -e '
-  .schemaVersion == 1 and
-  (.release.version | type == "string") and
-  (.release.releaseSha | test("^[0-9a-f]{40}$")) and
-  (.release.packagerSha | test("^[0-9a-f]{40}$")) and
-  (.bundle.asset | type == "string") and
-  (.bundle.root | type == "string") and
-  (.releaseContext.images.humble | length == 9) and
-  (.releaseContext.images.jazzy | length == 9) and
-  (.releaseContext.deployments | length == 4) and
-  (.releaseContext.shared | length == 1)
+  . as $plan
+  | ($plan.releaseContext.componentImages | [.[]] | unique | sort) as $targets
+  | $plan.schemaVersion == 1 and
+  ($plan.release.version | type == "string") and
+  ($plan.release.releaseSha | test("^[0-9a-f]{40}$")) and
+  ($plan.release.packagerSha | test("^[0-9a-f]{40}$")) and
+  ($plan.bundle.asset | type == "string") and
+  ($plan.bundle.root | type == "string") and
+  ($targets | length) > 0 and
+  ($plan.bundle.deployments | type == "array" and length > 0) and
+  (($plan.releaseContext.deployments | keys | sort) == ($plan.bundle.deployments | sort)) and
+  (($plan.releaseContext.shared | keys | sort) == ($plan.bundle.shared | sort)) and
+  ($plan.releaseContext.images | type == "object" and length > 0) and
+  all($plan.releaseContext.images[]; type == "object" and (keys | sort) == $targets)
 ' "${plan_file}" >/dev/null
 
 VERSION=$(jq -r '.release.version' "${plan_file}")

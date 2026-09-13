@@ -13,15 +13,8 @@ from types import ModuleType
 from typing import Any
 
 
-CURATED_DEPLOYMENTS = (
-    "carla-simulation",
-    "logging-simulation",
-    "planning-simulation",
-    "scenario-simulation",
-)
 CARLA_INTERFACE_ENV = "CARLA_INTERFACE_IMAGE"
 CARLA_INTERFACE_TARGET = "carla-interface"
-ROS_DISTROS = ("humble", "jazzy")
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
@@ -66,10 +59,115 @@ def require_string(value: Any, name: str) -> str:
     return value
 
 
+def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
+    kit = runtime.load_kit(source_root)
+    if not kit.deployments:
+        fail("release source has no deployments")
+
+    deployments: dict[str, dict[str, str]] = {}
+    shared_names: set[str] = set()
+    distros: set[str] = set()
+    validation: list[dict[str, Any]] = []
+    for name in sorted(kit.deployments):
+        deployment = runtime.get_deployment(source_root, kit, name)
+        deployments[name] = {
+            "path": kit.deployments[name].path,
+            "checksum": runtime.deployment_checksum(deployment.directory),
+        }
+        shared_names.update(deployment.shared)
+        gpu = deployment.requirements["gpu"]
+        for distro in deployment.requirements["rosDistros"]:
+            distros.add(distro)
+            if gpu in ("none", "optional"):
+                validation.append(
+                    {"deployment": name, "gpu": False, "rosDistro": distro}
+                )
+            if gpu in ("required", "optional"):
+                validation.append(
+                    {"deployment": name, "gpu": True, "rosDistro": distro}
+                )
+
+    if not distros:
+        fail("release deployments do not declare any ROS distros")
+    if not validation:
+        fail("release deployments do not produce any validation cases")
+    if not shared_names:
+        fail("release deployments do not declare shared assets")
+    for name in sorted(shared_names):
+        shared_dir = source_root / "deployments" / name
+        if not shared_dir.is_dir():
+            fail(f"missing shared deployment assets: {name}")
+
+    validation.sort(key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"]))
+    return {
+        "kit": kit,
+        "deployments": deployments,
+        "distros": sorted(distros),
+        "shared": {
+            name: runtime.deployment_checksum(source_root / "deployments" / name)
+            for name in sorted(shared_names)
+        },
+        "validation": validation,
+    }
+
+
+def verify_staged_bundle(source_root: Path, plan: dict[str, Any]) -> None:
+    runtime = load_runtime(source_root)
+    context = plan.get("releaseContext")
+    bundle = plan.get("bundle")
+    if not isinstance(context, dict) or not isinstance(bundle, dict):
+        fail("release plan is missing bundle or releaseContext")
+
+    expected_deployments = bundle.get("deployments")
+    expected_shared = bundle.get("shared")
+    if not isinstance(expected_deployments, list) or not expected_deployments:
+        fail("release plan bundle.deployments must be a nonempty array")
+    if not isinstance(expected_shared, list) or not expected_shared:
+        fail("release plan bundle.shared must be a nonempty array")
+    if sorted(expected_deployments) != sorted(context.get("deployments", {})):
+        fail("release plan deployments do not match releaseContext")
+    if sorted(expected_shared) != sorted(context.get("shared", {})):
+        fail("release plan shared assets do not match releaseContext")
+
+    for name in expected_deployments:
+        meta = context["deployments"].get(name)
+        if not isinstance(meta, dict):
+            fail(f"release plan is missing deployment context: {name}")
+        path = require_string(meta.get("path"), f"releaseContext.deployments.{name}.path")
+        expected = require_string(
+            meta.get("checksum"), f"releaseContext.deployments.{name}.checksum"
+        )
+        actual = runtime.deployment_checksum(source_root / path)
+        if actual != expected:
+            fail(f"deployment checksum mismatch: {name}")
+
+    for name in expected_shared:
+        expected = require_string(
+            context["shared"].get(name), f"releaseContext.shared.{name}"
+        )
+        actual = runtime.deployment_checksum(source_root / "deployments" / name)
+        if actual != expected:
+            fail(f"shared checksum mismatch: {name}")
+
+
+def verify_release_integrity(source_root: Path, plan: dict[str, Any]) -> None:
+    runtime = load_runtime(source_root)
+    kit = runtime.load_kit(source_root)
+    expected = plan["bundle"]["deployments"]
+    if sorted(kit.deployments) != sorted(expected):
+        fail("staged bundle deployments do not match the release plan")
+    for name in expected:
+        deployment = runtime.get_deployment(source_root, kit, name)
+        state = runtime.deployment_integrity(source_root, deployment, kit)
+        if state != "intact":
+            fail(f"packaged deployment is not intact: {name} ({state})")
+
+
 def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     source_root = args.source_root.resolve()
     metadata = load_json(args.build_metadata)
     runtime = load_runtime(source_root)
+    product = load_product(runtime, source_root)
 
     if not SEMVER_RE.fullmatch(args.version):
         fail(f"invalid release version: {args.version}")
@@ -77,7 +175,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         fail("release SHA must be 40 lowercase hexadecimal characters")
     if not SHA_RE.fullmatch(args.packager_sha):
         fail("packager SHA must be 40 lowercase hexadecimal characters")
-    if args.default_ros_distro not in ROS_DISTROS:
+    if args.default_ros_distro not in product["distros"]:
         fail(f"unsupported default ROS distro: {args.default_ros_distro}")
     if args.publish_latest_aliases and not args.stable_release:
         fail("prereleases cannot publish stable aliases")
@@ -137,12 +235,12 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             fail(f"duplicate target/distro image across repositories: {target}-{distro}")
         indexed[runtime_key] = row
 
-    kit = runtime.load_kit(source_root)
+    kit = product["kit"]
     component_images = dict(kit.component_images)
     component_images[CARLA_INTERFACE_ENV] = CARLA_INTERFACE_TARGET
     runtime_targets = sorted(set(component_images.values()))
     context_images: dict[str, dict[str, str]] = {}
-    for distro in ROS_DISTROS:
+    for distro in product["distros"]:
         distro_images: dict[str, str] = {}
         for target in runtime_targets:
             row = indexed.get((target, distro))
@@ -151,46 +249,26 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             distro_images[target] = row["releaseExactRef"]
         context_images[distro] = distro_images
 
-    if set(kit.deployments) != set(CURATED_DEPLOYMENTS):
-        fail(
-            "release source must contain exactly the curated deployments: "
-            + ", ".join(CURATED_DEPLOYMENTS)
-        )
-    deployments: dict[str, dict[str, str]] = {}
-    shared_names: set[str] = set()
-    for name in CURATED_DEPLOYMENTS:
-        deployment = runtime.get_deployment(source_root, kit, name)
-        deployments[name] = {
-            "path": kit.deployments[name].path,
-            "checksum": runtime.deployment_checksum(deployment.directory),
-        }
-        shared_names.update(deployment.shared)
-    if shared_names != {"base"}:
-        fail("curated deployments must use exactly the shared base assets")
-    shared = {
-        name: runtime.deployment_checksum(source_root / "deployments" / name)
-        for name in sorted(shared_names)
-    }
-
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
     release_context = {
         "componentImages": component_images,
         "defaultRosDistro": args.default_ros_distro,
-        "deployments": deployments,
+        "deployments": product["deployments"],
         "images": context_images,
         "kind": "release",
         "schemaVersion": 1,
-        "shared": shared,
+        "shared": product["shared"],
         "version": args.version,
     }
     return {
         "bundle": {
             "asset": asset_name,
-            "deployments": list(CURATED_DEPLOYMENTS),
+            "deployments": sorted(product["deployments"]),
             "root": root_name,
-            "runtime": ["openadkit", "cli"],
-            "shared": sorted(shared_names),
+            "runtime": ["openadkit", "openadkit.json", "cli"],
+            "shared": sorted(product["shared"]),
+            "validation": product["validation"],
         },
         "githubAssets": [
             {"name": "release-plan.json", "path": "release-plan.json"},
@@ -240,17 +318,40 @@ def parse_bool(value: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--build-metadata", type=Path, required=True)
-    parser.add_argument("--version", required=True)
-    parser.add_argument("--release-sha", required=True)
-    parser.add_argument("--packager-sha", required=True)
-    parser.add_argument("--default-ros-distro", required=True)
-    parser.add_argument("--stable-release", type=parse_bool, required=True)
-    parser.add_argument("--publish-latest-aliases", type=parse_bool, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--build-metadata", type=Path)
+    parser.add_argument("--version")
+    parser.add_argument("--release-sha")
+    parser.add_argument("--packager-sha")
+    parser.add_argument("--default-ros-distro")
+    parser.add_argument("--stable-release", type=parse_bool)
+    parser.add_argument("--publish-latest-aliases", type=parse_bool)
     parser.add_argument("--context-output", type=Path)
     args = parser.parse_args()
     try:
+        source_root = args.source_root.resolve()
+        if args.verify:
+            plan = load_json(args.output)
+            verify_staged_bundle(source_root, plan)
+            context_path = args.context_output or (source_root / "openadkit.json")
+            write_json(context_path, plan["releaseContext"])
+            verify_release_integrity(source_root, plan)
+            return 0
+
+        required = {
+            "--build-metadata": args.build_metadata,
+            "--version": args.version,
+            "--release-sha": args.release_sha,
+            "--packager-sha": args.packager_sha,
+            "--default-ros-distro": args.default_ros_distro,
+            "--stable-release": args.stable_release,
+            "--publish-latest-aliases": args.publish_latest_aliases,
+        }
+        missing = [flag for flag, value in required.items() if value is None]
+        if missing:
+            parser.error("the following arguments are required: " + ", ".join(missing))
+
         plan = build_plan(args)
         write_json(args.output, plan)
         if args.context_output:

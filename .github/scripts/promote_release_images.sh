@@ -10,12 +10,14 @@ source "${script_dir}/stable_alias_policy.sh"
 
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
 jq -e '
-  .schemaVersion == 1 and
-  (.release.version | type == "string") and
-  (.release.defaultRosDistro | IN("humble", "jazzy")) and
-  (.release.stable | type == "boolean") and
-  (.release.publishLatestAliases | type == "boolean") and
-  (.images | type == "array" and length > 0)
+  . as $plan
+  | $plan.schemaVersion == 1 and
+  ($plan.release.version | type == "string") and
+  ($plan.release.defaultRosDistro | type == "string") and
+  any($plan.images[]; .rosDistro == $plan.release.defaultRosDistro) and
+  ($plan.release.stable | type == "boolean") and
+  ($plan.release.publishLatestAliases | type == "boolean") and
+  ($plan.images | type == "array" and length > 0)
 ' "${plan_file}" >/dev/null
 VERSION=$(jq -r '.release.version' "${plan_file}")
 DEFAULT_ROS_DISTRO=$(jq -r '.release.defaultRosDistro' "${plan_file}")

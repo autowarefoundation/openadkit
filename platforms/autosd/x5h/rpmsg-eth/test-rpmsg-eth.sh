@@ -114,6 +114,21 @@ FRAME="$(timeout 10 dd if="$PTY_DIR/epB" bs=600 count=1 2>/dev/null | xxd)" || t
 grep -qi '0806' <<<"$FRAME" \
   || { echo "TEST_FAIL: no ARP frame relayed tap->endpoint"; exit 1; }
 
+# A full-MTU frame must relay whole. With MTU 1500 a 1472-byte UDP payload
+# leaves as one 1514-byte Ethernet frame. Resolve the peer MAC by hand so
+# the kernel emits the datagram instead of another ARP probe. head -c blocks
+# until 1514 bytes have arrived on epB, so a relay that truncates or drops
+# the frame times out here instead of passing on a short read.
+ip neigh replace 172.16.52.2 lladdr 02:5c:52:00:00:02 dev tap0
+socat -u -b 1472 OPEN:/dev/zero,readbytes=1472 UDP-SENDTO:172.16.52.2:9 >/dev/null 2>&1 || true
+BIG=$(timeout 10 head -c 1514 "$PTY_DIR/epB" | wc -c) || true
+[ "${BIG:-0}" -ge 1514 ] \
+  || { echo "TEST_FAIL: full-MTU frame not relayed whole (got ${BIG:-0} bytes, want 1514)"; exit 1; }
+# The replace above left a PERMANENT neighbor entry, which plain
+# "ip neigh flush" does not remove. Delete it so the rebind check further
+# down still observes a fresh ARP probe instead of a cached resolution.
+ip neigh del 172.16.52.2 dev tap0 2>/dev/null || true
+
 # …and a frame written to epB must reach tap0 *intact* (checked via
 # tcpdump on tap0, filtered on the injected frame's own src MAC -- tap0
 # emits its own ARP retries with its *own* auto-assigned MAC while
@@ -367,7 +382,7 @@ wait_until "stall-test daemon to open both fds and become ready" 300 stall_daemo
 # that gets) and because a continuous stream, not a fixed packet count,
 # is what reliably overruns the buffer chain regardless of its exact
 # size on a given kernel. -b keeps each UDP datagram at 400 bytes,
-# comfortably under the 462 netif MTU so each one leaves as a single
+# comfortably under the 1500 netif MTU so each one leaves as a single
 # unfragmented frame.
 socat -u -b 400 OPEN:/dev/zero UDP-SENDTO:172.16.99.2:9 >/dev/null 2>&1 & STALL_FLOOD=$!
 

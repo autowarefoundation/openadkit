@@ -211,8 +211,8 @@ reboot from both Yocto and AutoSD. See
 the CR52's `rpmsg-eth` rpmsg channel to a Linux TAP device (`tap0`), one
 Ethernet frame per RPMsg message in both directions — a normal IP link to
 the safety island, on top of the same remoteproc/RPMsg stack described
-above. Frozen wire constants: service name `rpmsg-eth`; MTU **462** / max
-frame 476 (see `scripts/rpmsg-eth-ifup.sh`); Linux side `172.16.52.1/24`,
+above. Frozen wire constants: service name `rpmsg-eth`; MTU **1500** / max
+frame 1514 (see `scripts/rpmsg-eth-ifup.sh`); Linux side `172.16.52.1/24`,
 MAC `02:5c:52:00:00:01`; CR52 side `172.16.52.2/24`, MAC
 `02:5c:52:00:00:02`; DDS domain 2. The CR52 uses lwIP's `etharp`
 (`NETIF_FLAG_ETHARP`) and resolves peers dynamically, so ARP passes

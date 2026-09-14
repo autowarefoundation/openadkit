@@ -44,7 +44,7 @@ content:
     # package is installed anyway, because the board has no `dnf` and no
     # `rpm-ostree`: a tool that is absent mid-session cannot be installed,
     # only worked around or misread, and tap0 is a link whose failures
-    # (silent oversize drops at MTU 462, RTPS fragments that never
+    # (silent oversize drops at MTU 1500, RTPS fragments that never
     # reassemble) are diagnosed by looking at frames rather than at
     # counters. Note a board
     # flashed from an image built BEFORE this entry existed will not have

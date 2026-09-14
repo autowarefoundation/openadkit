@@ -1,0 +1,20 @@
+rpmsg: virtio: raise the buffer size to 2048
+
+The X5H rpmsg-eth link carries Ethernet frames over RPMsg. With the
+default 512-byte buffer the netif MTU is 462 and every DDS sample above
+348 bytes fragments. 2048 fits a 1514-byte frame plus the 16-byte
+RPMsg header. 512 buffers times 2048 is 1 MiB, inside the 2 MiB cr52_1
+carveout the demo device tree reserves. The CR52 firmware sets the
+matching RPMSG_BUFFER_SIZE.
+
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -128,7 +128,7 @@
+  * processor.
+  */
+ #define MAX_RPMSG_NUM_BUFS	(512)
+-#define MAX_RPMSG_BUF_SIZE	(512)
++#define MAX_RPMSG_BUF_SIZE	(2048)
+
+ /*
+  * Local addresses are dynamically allocated on-demand.

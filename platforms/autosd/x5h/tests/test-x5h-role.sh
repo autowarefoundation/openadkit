@@ -23,6 +23,10 @@ out=$(run); printf '%s\n' "$out" | grep -qx 'next=cr52' || fail "show_next: $out
 # invalid role refused, file untouched
 run set bogus >/dev/null 2>&1 && fail accepts_bogus
 [ "$(cat "$d/boot/x5h-role.txt")" = "role=cr52" ] || fail bogus_changed_file
+# demo is the fourth role and the setter must accept it like cr52 and npu.
+out=$(run set demo) || fail set_demo_exit
+printf '%s\n' "$out" | grep -qx 'ROLE_SET next=demo' || fail "set_demo_marker: $out"
+[ "$(cat "$d/boot/x5h-role.txt")" = "role=demo" ] || fail "demo_file_content: $(cat "$d/boot/x5h-role.txt")"
 # yocto refused on a board without it, accepted with HAS_YOCTO=1
 out=$(run set yocto 2>&1); printf '%s\n' "$out" | grep -q 'ROLE_SET_FAIL reason=yocto_absent' || fail "yocto_absent: $out"
 printf 'BOARD_HOSTNAME=autosd-x5h-2\nHAS_YOCTO=1\n' > "$d/board.conf"

@@ -52,6 +52,9 @@ Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
 # logging one skip line.
 ConditionPathExists=/usr/local/bin/rpmsg-eth
 ConditionKernelCommandLine=x5h.role=cr52
+# demo runs the CR52 link alongside the NPU stack, on a dtb that carries
+# the same carveout as the cr52 role's. Repeated conditions are OR'ed.
+ConditionKernelCommandLine=x5h.role=demo
 # StartLimitIntervalSec=0 disables systemd's default start-rate limit (5
 # starts within a 10s window) outright, rather than leaving it in effect
 # or merely resizing it. Without an explicit override here, that default

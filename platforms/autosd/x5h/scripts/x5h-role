@@ -2,7 +2,7 @@
 # x5h-role -- show or set this board's boot role.
 #
 #   x5h-role                     show current (from the kernel cmdline) and next (from x5h-boot)
-#   x5h-role set <cr52|npu|yocto> [--reboot]
+#   x5h-role set <cr52|npu|demo|yocto> [--reboot]
 #
 # The role is a one-line file, x5h-role.txt on the x5h-boot partition, that
 # U-Boot imports on every boot (uboot/x5h-env.tmpl). It is sticky: it stays
@@ -10,6 +10,8 @@
 # Roles:
 #   cr52  -- uio dtb, CR52 remoteproc + rpmsg-eth + the component stack (MRM)
 #   npu   -- vendor NPU dtb, /opt/npu mounted, cmemdrv loaded (VisionPilot)
+#   demo  -- derived demo dtb, NPU regions plus the relocated CR52 carveout
+#             (VisionPilot and the Safety Island together)
 #   yocto -- vendor kernel from the second LUN (boards with HAS_YOCTO=1 only)
 # See selfboot.md, "Roles".
 set -u
@@ -55,7 +57,7 @@ show() {
 set_role() {
     role=$1
     case "$role" in
-        cr52|npu) ;;
+        cr52|npu|demo) ;;
         yocto)
             has=$(sed -n 's/^HAS_YOCTO=//p' "$BOARD_CONF" 2>/dev/null | head -1)
             [ "$has" = 1 ] || { echo "ROLE_SET_FAIL reason=yocto_absent"; exit 1; } ;;
@@ -78,5 +80,5 @@ case "${1:-show}" in
         set_role "$2"
         if [ "${3:-}" = --reboot ]; then exec systemctl reboot; fi
         ;;
-    *) echo "usage: x5h-role [set <cr52|npu|yocto> [--reboot]]" >&2; exit 2 ;;
+    *) echo "usage: x5h-role [set <cr52|npu|demo|yocto> [--reboot]]" >&2; exit 2 ;;
 esac

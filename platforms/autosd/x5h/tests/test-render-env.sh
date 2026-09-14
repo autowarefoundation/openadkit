@@ -12,7 +12,7 @@ e2=$(bash "$r" "$here/../boards/x5h2.vars") || fail render_x5h2
 # The only lines allowed to differ carry the board's ip/hostname.
 diff <(printf '%s\n' "$e1") <(printf '%s\n' "$e2") | grep '^[<>]' | grep -v 'ip=192.168.0' && fail non_vars_diff
 # Every role has a bootcmd and the common bootargs carry the load-bearing arguments.
-for role in cr52 npu yocto; do
+for role in cr52 npu yocto demo; do
     printf '%s\n' "$e1" | grep -q "^bootcmd_${role}=" || fail "no_bootcmd_${role}"
 done
 # Every bootargs_* value must be FULLY EXPANDED. U-Boot expands variables in a
@@ -26,14 +26,14 @@ done
 printf '%s\n' "$e1" | grep '^bootargs_' | grep -q '\${' && fail bootargs_not_flat
 # Each role's own bootargs therefore has to carry the load-bearing arguments
 # itself; there is no common line left to inherit them from.
-for role in cr52 npu yocto; do
+for role in cr52 npu yocto demo; do
     printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'pd_ignore_unused clk_ignore_unused' || fail "no_clk_args_${role}"
     printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'rootwait rw panic=10' || fail "no_panic_args_${role}"
     printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q "x5h.role=${role}" || fail "no_role_arg_${role}"
 done
 # oops=panic is the remote-safety layer and only the two AutoSD roles get it
 # (the vendor Yocto root is not ours to make reboot on an oops).
-for role in cr52 npu; do
+for role in cr52 npu demo; do
     printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'oops=panic' || fail "no_oops_panic_${role}"
     printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02' || fail "bad_root_${role}"
     printf '%s\n' "$e1" | grep "^bootargs_${role}=" | grep -q 'ip=192.168.0.20::192.168.0.1:255.255.255.0:autosd-x5h:tsn5:none' || fail "bad_ip_form_${role}"
@@ -46,9 +46,14 @@ printf '%s\n' "$e1" | grep -q '^probe_lu=.*x5h-env.txt' || fail probe_not_env_fi
 printf '%s\n' "$e1" | grep '^bootcmd=' | grep -q 'run find_autosd; run load_role; run check_role' || fail bootcmd_order
 printf '%s\n' "$e1" | grep '^check_role=' | grep -q 'setenv role npu' || fail check_role_no_fallback
 printf '%s\n' "$e1" | grep '^load_role=' | grep -q 'if ' && fail load_role_uses_if
-for role in cr52 npu; do
+for role in cr52 npu demo; do
     printf '%s\n' "$e1" | grep "^bootcmd_${role}=" | grep -q '&& booti' || fail "bootcmd_${role}_booti_not_chained"
 done
+# The demo role boots the NPU kernel image with the derived demo tree, which
+# is the NPU tree plus the relocated CR52 carveout (uboot/make-demo-dtb.sh).
+printf '%s\n' "$e1" | grep '^check_role=' | grep -q '"${role}" = demo; then true' || fail check_role_no_demo
+printf '%s\n' "$e1" | grep '^load_demo=' | grep -q 'Image-autosd && ext4load scsi ${lu}:1 0x61000000 r8a78000-ironhide-demo.dtb' || fail load_demo_files
+printf '%s\n' "$e1" | grep '^bootcmd_demo=' | grep -q 'run load_demo && setenv bootargs ${bootargs_demo} && booti 0x61080000 - 0x61000000' || fail bootcmd_demo_chain
 # No placeholder survives rendering, and no line is empty (env import -t would still accept it, but it hides mistakes).
 printf '%s\n' "$e1" | grep -q '@' && fail placeholder_left
 printf '%s\n' "$e1" | grep -q '^$' && fail empty_line

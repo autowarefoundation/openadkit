@@ -112,7 +112,7 @@ the NPU is superseded by this paragraph.
 
 ## Roles
 
-One image, one environment template, three boot roles. A role is chosen by
+One image, one environment template, four boot roles. A role is chosen by
 a one-line file on `x5h-boot`, and it decides which device tree boots,
 which root filesystem is mounted, and which units start.
 
@@ -121,14 +121,17 @@ which root filesystem is mounted, and which units start.
 | `cr52` | `Image-autosd` + `r8a78000-ironhide-uio-autosd.dtb` | `…5e02` | CR52 remoteproc, `rpmsg-eth`, the component stack (MRM) |
 | `npu` | `Image-autosd` + `r8a78000-ironhide-npu.dtb` | `…5e02` | `var-opt-npu.mount`, `cmemdrv`, `/dev/npuc*` (VisionPilot) |
 | `yocto` | `Image-yocto` + the vendor dtb | `…5e12` | the vendor Yocto appliance, on boards with `HAS_YOCTO=1` |
+| `demo` | `Image-autosd` + `r8a78000-ironhide-demo.dtb` | `…5e02` | NPU tree plus the relocated CR52 carveout at `0x5da00000`. VisionPilot on the NPU and the Safety Island on the CR52 in one boot. The blob is derived at staging time by `uboot/make-demo-dtb.sh` and is never committed. |
 
-`npu` is the default on both boards. There are three roles rather than one
+`npu` is the default on both boards. There are four roles rather than one
 boot because the shipped memory map does not let the NPU and the realtime
 core coexist: the NPU's model-binary region contains the CR52's shared
 window and all three of its small RAM regions outright, and under the
 vendor NPU device tree a remoteproc `start` panics the kernel by
 construction. Reconciling them is a vendor question, not a configuration
-one ([npu-bringup.md](npu-bringup.md), "Where this stops").
+one ([npu-bringup.md](npu-bringup.md), "Where this stops"). `demo` does not
+reconcile the vendor map. It relocates the CR52 carveout in its own derived
+device tree instead, for the demo pairing rather than as a daily default.
 
 The split is enforced twice, deliberately. Which `bootcmd_<role>` runs
 decides which device tree is loaded, and each role's units carry a

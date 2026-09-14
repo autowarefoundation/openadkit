@@ -18,8 +18,22 @@
 # Markers on stdout, so `systemctl status` and the journal are self-explaining:
 #   CR52_RPROC_UP name=<n> firmware=<f>
 #   CR52_RPROC_SKIP reason=<no_device|no_firmware>
+#   CR52_RPROC_SKIP reason=role role=<r>   (role without a CR52 carveout)
 #   CR52_RPROC_FAIL reason=<firmware_write|start_write|not_running> ...
 set -uo pipefail
+
+# Only the roles whose device tree carries a CR52 carveout may start the
+# core. Under the npu tree, cr52_1's memory-region is a dangling phandle and
+# rcar_gen5_rproc turns the `start` write into a kernel panic; with
+# oops=panic on the command line the board then reboots into the same role.
+# The role is a kernel argument (see uboot/x5h-env.tmpl), not a file, so a
+# stale x5h-role.txt cannot lie to this check.
+CMDLINE_FILE=${CMDLINE_FILE:-/proc/cmdline}
+role=$(tr ' ' '\n' < "$CMDLINE_FILE" 2>/dev/null | sed -n 's/^x5h\.role=//p' | tail -1)
+case "$role" in
+    cr52|demo) ;;
+    *) echo "CR52_RPROC_SKIP reason=role role=${role:-unset}"; exit 0 ;;
+esac
 
 RPROC_DIR=${RPROC_DIR:-/sys/class/remoteproc/remoteproc0}
 # Empty means "leave whatever the driver already has", which is the stock

@@ -81,15 +81,17 @@ struct rpmsg_endpoint_info {
 
 /*
  * Largest Ethernet frame this bridge will relay tap -> endpoint: netif MTU
- * 462 (frozen with the FreeRTOS side) + a 14-byte Ethernet header = 476.
+ * 1500 (frozen with the FreeRTOS side) + a 14-byte Ethernet header = 1514.
  * That equals the biggest frame the CR52 side is built to accept, and it
- * sits comfortably under the 496-byte RPMsg payload budget. Anything
- * larger is dropped here rather than handed to write(): a local drop is
- * recoverable, but writing an oversize frame to the endpoint would just
- * turn into a write() failure on the other side of the same trade-off.
- * With MTU 462 enforced on the tap interface this must never trigger.
+ * sits under the 2032-byte RPMsg payload budget (a 2048-byte buffer minus
+ * the 16-byte RPMsg header; MAX_RPMSG_BUF_SIZE is raised to 2048 by
+ * kernel/patches/0001-rpmsg-virtio-raise-buffer-size-to-2048.patch).
+ * Anything larger is dropped here rather than handed to write(): a local
+ * drop is recoverable, but writing an oversize frame to the endpoint would
+ * just turn into a write() failure on the other side of the same trade-off.
+ * With MTU 1500 enforced on the tap interface this must never trigger.
  */
-#define MAX_FRAME_LEN 476
+#define MAX_FRAME_LEN 1514
 /* Read buffer: comfortably above MAX_FRAME_LEN so an oversize frame is
  * captured whole and counted, rather than silently truncated. */
 #define BUF_LEN 2048

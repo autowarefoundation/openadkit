@@ -23,7 +23,7 @@
 # config/x5h-rpmsg-modules.conf) so that the module load is not tied to this
 # unit's success, and so `lsmod` is explainable without reading a unit file.
 #
-# Gated to the cr52 role: under the vendor NPU dtb (npu role) `cr52_1`'s
+# Gated to the cr52 and demo roles: under the vendor NPU dtb (npu role) `cr52_1`'s
 # memory-region phandle resolves to nothing and a `start` write panics the
 # kernel, so this unit must never run there. `systemd.mask=` on the command
 # line was measured NOT to stop it; the condition does. The demo role is

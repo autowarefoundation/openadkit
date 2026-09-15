@@ -1,10 +1,12 @@
 [Unit]
 Description=X5H NPU work partition (UFS partlabel npu-work) at /opt/npu
-ConditionKernelCommandLine=x5h.role=npu
+ConditionKernelCommandLine=|x5h.role=npu
 # demo boots the derived demo dtb, which carries the NPU regions alongside
 # the relocated CR52 carveout, so /opt/npu belongs there too. Repeated
-# ConditionKernelCommandLine= lines are OR'ed by systemd.
-ConditionKernelCommandLine=x5h.role=demo
+# conditions of one type are ANDed by systemd, so each role line carries a
+# pipe after the equals sign to make it a triggering condition: the unit
+# runs when at least one triggering condition matches.
+ConditionKernelCommandLine=|x5h.role=demo
 After=local-fs-pre.target
 DefaultDependencies=no
 

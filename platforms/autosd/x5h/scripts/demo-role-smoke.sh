@@ -42,6 +42,13 @@ for r in 1400000000 1c00000000 64000000 8e400000; do
     [ -d "$DT_ROOT/reserved-memory/linux,npu_region@$r" ] || fail "npu_region_${r}_missing"
 done
 [ -e "$UIO_DIR/uio2" ] || fail uio2_missing
-"$DMESG_CMD" | grep -q 'assigned reserved memory node linux,npu_region' || fail cmem_probe_missing
+# Capture, then match on the string. `dmesg | grep -q` lets grep exit at the
+# first match, closing the pipe under this script's `set -o pipefail` --
+# dmesg then takes a SIGPIPE on its next write and reports 141, which
+# pipefail turns into a FAIL on the very invariant this check exists to
+# confirm is present. Board-confirmed 2026-09-14: 5/5 false failures on
+# board 1, 3/5 on board 2, on an otherwise healthy boot.
+dmesg_out=$("$DMESG_CMD")
+grep -q 'assigned reserved memory node linux,npu_region' <<<"$dmesg_out" || fail cmem_probe_missing
 state=$(cat "$RPROC_DIR/state" 2>/dev/null) || fail remoteproc_missing
 echo "DEMO_ROLE_PASS role=demo carveout=0x$BASE remoteproc=$state"

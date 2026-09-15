@@ -121,7 +121,11 @@ answered before board time.
   between the two boards. `scripts/x5h-parity.sh` fails if a manifest diff
   shows anything else
 - `tests/`: host-side shell tests (no board, no root, no network).
-  `bash tests/run.sh` prints `ALL_TESTS_PASS`
+  `bash tests/run.sh` prints `ALL_TESTS_PASS`. When `KERNEL_SRC` is unset,
+  the runner skips `test-kernel-patches.sh` and prints `TEST_SKIP`. That
+  test needs a pristine copy of the pinned kernel tree. Export `KERNEL_SRC`
+  to run it. When `dtc` is absent, the runner skips `test-make-demo-dtb.sh`
+  the same way. Run that one inside the `dtc` container
 
 ## QEMU gate semantics
 

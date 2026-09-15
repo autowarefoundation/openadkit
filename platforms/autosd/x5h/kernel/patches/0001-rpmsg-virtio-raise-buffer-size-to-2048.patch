@@ -9,12 +9,30 @@ matching RPMSG_BUFFER_SIZE.
 
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -110,14 +110,14 @@
+ 	container_of(_rpdev, struct virtio_rpmsg_channel, rpdev)
+ 
+ /*
+- * We're allocating buffers of 512 bytes each for communications. The
++ * We're allocating buffers of 2048 bytes each for communications. The
+  * number of buffers will be computed from the number of buffers supported
+  * by the vring, upto a maximum of 512 buffers (256 in each direction).
+  *
+- * Each buffer will have 16 bytes for the msg header and 496 bytes for
++ * Each buffer will have 16 bytes for the msg header and 2032 bytes for
+  * the payload.
+  *
+- * This will utilize a maximum total space of 256KB for the buffers.
++ * This will utilize a maximum total space of 1MB for the buffers.
+  *
+  * We might also want to add support for user-provided buffers in time.
+  * This will allow bigger buffer size flexibility, and can also be used
 @@ -128,7 +128,7 @@
   * processor.
   */
  #define MAX_RPMSG_NUM_BUFS	(512)
 -#define MAX_RPMSG_BUF_SIZE	(512)
 +#define MAX_RPMSG_BUF_SIZE	(2048)
-
+ 
  /*
   * Local addresses are dynamically allocated on-demand.

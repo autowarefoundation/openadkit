@@ -414,6 +414,10 @@ content:
     # things the units mount.
     - source_path: ../scripts/x5h-stack-smoke.sh
       path: /usr/sbin/x5h-stack-smoke.sh
+    # Gate D1a's judge: same staleness argument as the three smokes above, so
+    # it ships in the image instead of being hand-copied onto the board.
+    - source_path: ../scripts/demo-role-smoke.sh
+      path: /usr/sbin/demo-role-smoke.sh
     # Same directory as the smoke, and that is a requirement rather than
     # tidiness: `drive` locates this file as $(dirname "$0")/x5h-stop-
     # metrics.awk, so the pair has to be installed together or the metric
@@ -458,6 +462,8 @@ content:
     - path: /usr/sbin/rpmsg-eth-smoke.sh
       mode: "0755"
     - path: /usr/sbin/x5h-stack-smoke.sh
+      mode: "0755"
+    - path: /usr/sbin/demo-role-smoke.sh
       mode: "0755"
 
 auth:

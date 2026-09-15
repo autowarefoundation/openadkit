@@ -30,7 +30,7 @@ done < <(sed -n 's/^[[:space:]]*-[[:space:]]*source_path:[[:space:]]*//p' "$aib"
 # aib refuses /usr/local and /opt outright (both are symlinks into /var on
 # this ostree-structured rootfs and the build aborts), so /usr/sbin is the
 # only option -- see the make_dirs commentary in the manifest.
-for smoke in selfboot-smoke.sh rpmsg-eth-smoke.sh npu-contract-smoke.sh x5h-stack-smoke.sh; do
+for smoke in selfboot-smoke.sh rpmsg-eth-smoke.sh npu-contract-smoke.sh x5h-stack-smoke.sh demo-role-smoke.sh; do
     [ -f "$here/../scripts/$smoke" ] || fail "script_missing=$smoke"
     grep -A1 -F "source_path: ../scripts/$smoke" "$aib" \
         | grep -qF "path: /usr/sbin/$smoke" || fail "not_installed_to_usr_sbin=$smoke"

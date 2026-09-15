@@ -316,7 +316,8 @@ ships in the image at `/usr/sbin/npu-contract-smoke.sh` and is the executable
 copy of this contract; if the two ever disagree, the script is right.
 
 The prerequisite is the role's own bring-up unit. `x5h-npu.service` carries
-`ConditionKernelCommandLine=x5h.role=npu`, requires `var-opt-npu.mount` (the
+`ConditionKernelCommandLine=x5h.role=npu` and a second such line for
+`x5h.role=demo`, requires `var-opt-npu.mount` (the
 unit is named for `/var/opt/npu` because `/opt` is a symlink to `var/opt` on
 this rootfs), inserts `cmemdrv.ko` from `npu-work`, waits for the device nodes
 and logs `NPU_READY uio=<n> cmem=<n>`. Until that marker is in the journal

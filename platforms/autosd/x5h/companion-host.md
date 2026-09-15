@@ -107,7 +107,7 @@ each is staged from (`boards/x5h1.vars`, `boards/x5h2.vars`).
 | | Board 1 `192.168.0.20` | Board 2 `192.168.0.21` |
 |---|---|---|
 | Default role | `npu` | `npu` |
-| Available roles | `cr52`, `npu` | `cr52`, `npu`, `yocto` |
+| Available roles | `cr52`, `npu`, `demo` | `cr52`, `npu`, `demo`, `yocto` |
 | `HAS_YOCTO` | `0` | `1` |
 | Hostname | `autosd-x5h` | `autosd-x5h-2` (`yocto-x5h-2` in the `yocto` role) |
 | LUN 1 (AutoSD) | `x5h-boot` 1 GiB / `x5h-root` 12 GiB / `autosd-store` 19 GiB btrfs, PARTUUID `…5e01/02/03` | identical |
@@ -861,7 +861,7 @@ wrong by days. Correlate against the companion's clock, not the board's.
 ## Related
 
 - [UFS self-boot](selfboot.md) — why the board no longer depends on this
-  host, the rescue commands that still do, the three boot roles, and the
+  host, the rescue commands that still do, the four boot roles, and the
   `stage-board.sh` sequence that runs on this host.
 - [NPU bring-up](npu-bringup.md) covers the `npu` role's container contract,
   which is what board 1's external developers consume.

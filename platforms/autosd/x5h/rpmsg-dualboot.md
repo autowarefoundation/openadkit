@@ -350,8 +350,9 @@ than something to remember:
   boot (source: `config/x5h-rpmsg-modules.conf`).
 - `cr52-remoteproc.service` runs `/usr/sbin/cr52-rproc-up.sh`, which does the
   `start` write and polls for `running`. It is enabled by `80-x5h.preset` and
-  carries `ConditionKernelCommandLine=x5h.role=cr52`, so it is skipped
-  outright in the `npu` role. That gating is not optional: under the vendor NPU
+  carries `ConditionKernelCommandLine=x5h.role=cr52` and a second such line
+  for `x5h.role=demo`, so it is skipped outright in the `npu` role. That
+  gating is not optional: under the vendor NPU
   device tree `cr52_1`'s `memory-region` phandle resolves to no node and a
   `start` write panics the kernel by construction.
 

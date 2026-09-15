@@ -1,9 +1,31 @@
 # EWAOL
 
-EWAOL is a planned Open AD Kit target, but this repository does not yet contain EWAOL-specific deployment assets, container orchestration files, or step-by-step runtime instructions.
+!!! abstract ""
+    EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It was the original SOAFEE reference implementation, extending cloud-native methods to automotive with an emphasis on real-time execution and deterministic behavior.
 
-Current status:
+## Status
 
-- AutoSD is the platform-specific workflow implemented in this repository today.
-- EWAOL support is still being scoped.
-- This page will be expanded once runnable EWAOL assets land in the tree.
+<span class="oak-badge oak-badge--neutral">Upstream reference</span>
+
+!!! note "Not a committed Open AD Kit target"
+    EWAOL is retained as upstream SOAFEE background. Open AD Kit may explore
+    related Arm Automotive Solutions / RD-1 AE FVP paths later; there is no
+    committed in-repo target or validated deployment for those stacks today.
+    EWAOL-specific deployment assets are **not present** in this repository;
+    this page is a pointer to the upstream project only.
+
+## What is EWAOL?
+
+EWAOL is delivered via the `meta-ewaol` Yocto layer and provides a container-native edge runtime (Docker and K3s, with optional Xen virtualization for mixed-criticality separation). It offers runtime parity between edge hardware (ADLINK AVA with Arm Neoverse N1) and cloud instances (AWS Graviton), making it suited to hybrid development and deployment workflows.
+
+## Documentation
+
+For installation and runtime instructions, see the upstream SOAFEE documentation:
+
+- [meta-ewaol documentation](https://meta-ewaol.docs.soafee.io/)
+- [meta-ewaol source (GitLab)](https://gitlab.com/soafee/ewaol/meta-ewaol)
+
+## Related
+
+- [Supported Platforms overview](../index.md)
+- [AutoSD platform](../autosd/index.md)

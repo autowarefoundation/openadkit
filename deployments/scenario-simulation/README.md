@@ -1,13 +1,13 @@
 # Scenario Simulation
 
-Runnable assets for TIER IV scenario simulator + Autoware components.
-
-**Guide (source of truth):**
-[Scenario Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/samples/scenario-simulation/)
+Runs TIER IV Scenario Simulator workflows. See the
+[canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/scenario-simulation/)
+for configuration and troubleshooting.
 
 ```bash
 cd ../..
 ./openadkit run scenario-simulation
 ```
 
-Use the Kashiwanoha map from sample-data (not `sample-map-planning`).
+The CLI downloads the required Kashiwanoha map. Add `--ros-distro jazzy` to
+select Jazzy; Humble is the default.

@@ -1,93 +1,121 @@
 # Components
 
-Open AD Kit is a component-based project designed to run on a variety of platforms with containerized services. Each **Autoware function** remains independently deployable, while the published images group closely related functions together where that keeps the runtime layout simpler.
+Open AD Kit is a component-based project designed to run on a variety of platforms with containerized services. Each **Autoware function** remains independently deployable, while the published images group closely related functions together to keep the runtime layout simpler.
 
-![Granular Components](../assets/images/granular-components.png)
+## Architecture Overview
+
+Autoware uses a **Core / Universe** architecture. **Core** contains rigorously reviewed base functionality required for safe autonomous driving. **Universe** contains community extensions and research features that build on the Core foundation. Open AD Kit packages Universe components into focused container images that can be composed into complete AD systems.
+
+## Build Pipeline
+
+--8<-- "includes/build-pipeline.md"
+
+`universe-common` is an Open AD Kit-owned thin intermediate built on top of the
+upstream `autoware:core-devel`/`base` images. The bake groups and build commands
+are documented in [Build from Source](../development/build-from-source.md).
+
+## Interface Layers
+
+Autoware defines three formal interface categories that govern how components communicate:
+
+<div class="oak-component-grid">
+
+<div class="oak-component-item">
+<strong>AD API</strong>
+<span>External interface for fleet management and HMI. Exposed as ROS 2 services and topics for vehicle state queries and commands; external gateways (e.g. HTTP/MQTT) can be layered on top.</span>
+</div>
+
+<div class="oak-component-item">
+<strong>Component Interface</strong>
+<span>Internal inter-module communication via ROS 2 topics and services. Standardized message types ensure compatibility across components.</span>
+</div>
+
+<div class="oak-component-item">
+<strong>Local Interface</strong>
+<span>Intra-component communication within a single image. Implementation details that do not cross component boundaries.</span>
+</div>
+
+</div>
+
+```mermaid
+flowchart LR
+    subgraph AD_API["AD API (External)"]
+        A1[ROS 2 Services / Topics]
+    end
+
+    subgraph Component_Interface["Component Interface"]
+        C1[ROS 2 Topics]
+        C2[ROS 2 Services]
+    end
+
+    subgraph Local_Interface["Local Interface"]
+        L1[Intra-component Communication]
+    end
+
+    AD_API --> Component_Interface
+    Component_Interface --> Local_Interface
+```
 
 ## Autoware Components
 
-### Sensing
+Each Autoware function is packaged into a focused container image. Select a component from the sidebar or explore the pages below.
 
-The sensing component is responsible for collecting data from the vehicle's sensors. Sensing component can be configured to collect data from a variety of sensors, including **cameras, lidars, and radars**. For more details on the [Autoware sensing design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/sensing/).
+<div class="oak-component-grid">
 
-### Perception
+<div class="oak-component-item">
+<strong><a href="sensing-perception/">Sensing &amp; Perception</a></strong>
+<span>Sensor preprocessing plus object detection, tracking, and multi-sensor fusion.</span>
+</div>
 
-The perception component is responsible for processing the data from the vehicle's sensors and creating a map of the environment. Perception component can be configured to use a variety of perception algorithms, including **object detection, tracking, and mapping**. For more details, see the [Autoware perception design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/perception/).
+<div class="oak-component-item">
+<strong><a href="localization-mapping/">Localization &amp; Mapping</a></strong>
+<span>HD map serving plus GNSS, IMU, visual odometry, and LiDAR map matching.</span>
+</div>
 
-### Mapping
+<div class="oak-component-item">
+<strong><a href="planning-control/">Planning &amp; Control</a></strong>
+<span>Route, behavior, motion, and goal planning with PID/MPC trajectory tracking.</span>
+</div>
 
-The mapping component is responsible for creating a map of the environment. Mapping component can be configured to use a variety of mapping algorithms, including **occupancy grid mapping and point cloud mapping**. For more details, see the [Autoware mapping design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/map/).
+<div class="oak-component-item">
+<strong><a href="vehicle-system/">Vehicle and System</a></strong>
+<span>Vehicle interface and system-level orchestration services.</span>
+</div>
 
-### Localization
+<div class="oak-component-item">
+<strong><a href="api/">API</a></strong>
+<span>AD API for external fleet management and HMI integration.</span>
+</div>
 
-The localization component is responsible for determining the vehicle's position in the map. Localization component can be configured to use a variety of localization algorithms, including **GPS, IMU, and visual odometry**. For more details, see the [Autoware localization design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/localization/).
+<div class="oak-component-item">
+<strong><a href="simulator/">Simulator</a></strong>
+<span>Closed-loop simulation for validation and local development.</span>
+</div>
 
-### Planning
+<div class="oak-component-item">
+<strong><a href="visualizer/">Visualizer</a></strong>
+<span>Browser-accessible RViz2 via noVNC for remote monitoring.</span>
+</div>
 
-The planning component is responsible for planning the vehicle's path. Planning component can be configured to use a variety of planning algorithms, including **Route Planning, Goal Planning, and Behavior Planning**. For more details, see the [Autoware planning design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/planning/).
+<div class="oak-component-item">
+<strong><a href="carla-interface/">CARLA Interface</a></strong>
+<span>Bridge for closed-loop simulation with the CARLA simulator.</span>
+</div>
 
-### Control
+</div>
 
-The control component is responsible for controlling the vehicle's actuators. Control component can be configured to use a variety of control algorithms, including **PID and MPC**. For more details, see the [Autoware control design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/control/).
+## Image Reference
 
-### Vehicle and System
+The published component images and their platforms. This table is generated from
+the image catalog (`.github/image-inventory.json`), so it always matches what CI
+builds. See [Container Images & Versioning](../getting-started/container-images.md) for the tag
+naming scheme.
 
-The `vehicle-system` image packages both the vehicle interface and system-level services used by the Open AD Kit deployments. On the functional side, the vehicle component manages vehicle-specific interfaces and state, while the system component provides health monitoring and related system services. For more details, see the [Autoware vehicle design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/components/vehicle/).
+{{ component_table() }}
 
-### API
+## Related
 
-The API component is responsible for providing [AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-interfaces/ad-api/) interface for the vehicle's state. API component can be configured to enable or disable various interfaces. For more details, see the [Autoware Interface design document](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/).
-
-## Building from source
-
-Open AD Kit images are built with `docker buildx bake` using
-[`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl).
-The build graph is:
-
-```
-upstream autoware:core-devel / base / base-cuda-{devel,runtime}
-        │
-        ▼
-universe-common  (openadkit-owned thin intermediate)
-        │
-        ▼
-component images (sensing-perception, localization-mapping,
-planning-control, vehicle-system, api, visualizer, simulator,
-carla-interface)
-```
-
-Devel stages start from upstream `core-devel`. The `universe-common`
-runtime starts from lean upstream `base` and copies the compiled
-core/common tree from devel so final layers do not keep core's
-development files.
-
-`sensing-perception-cuda` is a parallel CUDA branch: it inherits from
-upstream `base-cuda-{devel,runtime}` and additionally grafts in the
-`universe-common` install tree (so it has both CUDA toolkit access and the
-universe-common compiled packages).
-
-### Bake groups
-
-| Group | Targets |
-|-------|---------|
-| `default` | everything: `universe-common` + `component` |
-| `planning` | `universe-common` plus localization, planning-control, vehicle-system, api, visualizer, simulator |
-| `universe-common` | `universe-common-devel`, `universe-common` |
-| `component` | the eight non-CUDA component images plus `sensing-perception-cuda` |
-
-### Upstream pin
-
-The `UPSTREAM_TAG` bake variable pins the upstream Autoware release the
-images are built against. CI sets it from a repository Variable; leaving it
-empty uses upstream's plain `<name>-<distro>` multi-arch tag.
-
-## CI pipeline
-
-`build-all-images.yaml` builds the universe-common graph on pushes,
-schedules, and manual dispatch. It walks the `{humble, jazzy} × {amd64,
-arm64}` matrix through staged jobs — `prepare`, then `build-common` and
-`build-components` — so each layer is pushed before the
-layer that depends on it. A final `create-manifests` job stitches the
-per-arch tags into multi-arch manifests via the `combine-multi-arch-images`
-composite action. `release-all-images.yaml` runs on a schedule to track
-Autoware release tags and build the matching single-arch release images.
+- [Deployments](../deployment/index.md) — How to compose components into running systems
+- [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
+- [Roadmap](../roadmap.md) — Release ladder and focus areas
+- [Supported Platforms](../platforms/index.md) — Where to deploy

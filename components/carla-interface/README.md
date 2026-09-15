@@ -10,7 +10,7 @@ The image has no default launch command. Start the CARLA deployment with:
 ./openadkit run carla-simulation --gpu
 ```
 
-Guide: [CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/samples/carla-simulation/)
+Guide: [CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployment/carla-simulation/)
 
 The image is built by GitHub Actions as part of the component pipeline from `components/docker-bake.hcl`.
 
@@ -19,7 +19,11 @@ the following from the repository root:
 
 ```bash
 docker buildx bake -f components/docker-bake.hcl \
-  --set carla-interface.tags=openadkit:carla-interface \
+  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-amd64-humble \
   --load \
   carla-interface
 ```
+
+`./openadkit run carla-simulation --gpu` uses that reference from
+`deployments/carla-simulation/config.env`. Override it in
+`config.local.env` if you tag the image differently.

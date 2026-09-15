@@ -18,11 +18,16 @@ UIO_DIR=${UIO_DIR:-/sys/class/uio}
 RPROC_DIR=${RPROC_DIR:-/sys/class/remoteproc/remoteproc0}
 DMESG_CMD=${DMESG_CMD:-dmesg}
 BASE=5da00000
+# 2 MiB. The end address is derived from the base and the size rather than
+# written out, so moving BASE alone cannot leave a reservation check that no
+# board can ever satisfy.
+SIZE=200000
+END=$(printf '%x' $((0x$BASE + 0x$SIZE - 1)))
 fail() { echo "DEMO_ROLE_FAIL reason=$1"; exit 1; }
 hex32() { od -An -tx1 "$1" 2>/dev/null | tr -d ' \n'; }
 
-grep -qw 'x5h.role=demo' "$CMDLINE_FILE" || fail role_not_demo
-grep -q "${BASE}-5dbfffff : reserved" "$IOMEM_FILE" || fail carveout_not_reserved
+grep -qw 'x5h\.role=demo' "$CMDLINE_FILE" || fail role_not_demo
+grep -q "$BASE-$END : reserved" "$IOMEM_FILE" || fail carveout_not_reserved
 node="$DT_ROOT/reserved-memory/cr52_ram1@$BASE"
 [ -d "$node" ] || fail carveout_node_missing
 [ "$(hex32 "$node/phandle")" = "0000010a" ] || fail carveout_phandle

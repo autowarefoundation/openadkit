@@ -1,0 +1,37 @@
+[Unit]
+Description=VisionPilot on the X5H NPU (CES 2027 demo)
+ConditionKernelCommandLine=x5h.role=demo
+Requires=x5h-npu.service
+After=x5h-npu.service network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=x5h-vp
+Image=localhost/x5h-visionpilot:latest
+Pull=never
+Network=host
+PodmanArgs=--privileged
+AddDevice=/dev/uio2:/dev/npuc0
+AddDevice=/dev/uio3:/dev/npuc1
+AddDevice=/dev/cmem0
+AddDevice=/dev/cmem_other0
+AddDevice=/dev/cmem_other1
+AddDevice=/dev/cmem_other2
+AddDevice=/dev/cmem_other3
+Volume=/opt/npu:/npu
+Volume=/etc/containers/systemd/vision_pilot.conf:/usr/share/visionpilot/config/vision_pilot.conf:ro,z
+Volume=/etc/containers/systemd/vision_pilot_ros2.conf:/usr/share/visionpilot/config/vision_pilot_ros2.conf:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h-demo.xml:/etc/x5h/cyclonedds.xml:ro,z
+Environment=ROS_DOMAIN_ID=1
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file:///etc/x5h/cyclonedds.xml
+Environment=QT_QPA_PLATFORM=offscreen
+Exec=--no-window
+
+[Service]
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+
+[Install]
+WantedBy=multi-user.target

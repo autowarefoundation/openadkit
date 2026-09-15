@@ -20,4 +20,15 @@ for u in cr52-remoteproc.service rpmsg-eth.service; do
     [ "$(gates "$u" cr52)" = 1 ] || fail "cr52_gate_lost_$u"
     [ "$(gates "$u" demo)" = 1 ] || fail "no_demo_gate_$u"
 done
+# Units are only half of it. Every script that branches on the role has to
+# name every role it must run in as well, and the first sweep for demo missed
+# these: selfboot-smoke.sh failed a correct demo boot with unknown_role and
+# npu-contract-smoke.sh refused the one role that exists to run the NPU. A
+# board session is the worst place to find that, so the next role has to pass
+# here before it can repeat it. Matched as a case arm, so a passing mention
+# of demo in a comment does not satisfy this.
+for s in selfboot-smoke.sh npu-contract-smoke.sh cr52-rproc-up.sh x5h-role; do
+    [ -f "$here/../scripts/$s" ] || fail "missing_$s"
+    grep -Eq '(^|[[:space:]|(])demo\)' "$here/../scripts/$s" || fail "no_demo_arm_$s"
+done
 echo "TEST_PASS $name"

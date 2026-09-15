@@ -27,8 +27,8 @@ answered before board time.
   covers `rpmsg-eth`, the IP-over-RPMsg TAP bridge daemon (`rpmsg-eth/`)
   that gives the CR52 a normal Ethernet link to Linux.
 - [UFS self-boot](selfboot.md) — boot AutoSD unattended from the board's
-  own storage, with both netboots kept as named rescue commands; the three
-  switchable boot roles (`cr52`, `npu`, `yocto`) and the `stage-board.sh`
+  own storage, with both netboots kept as named rescue commands; the four
+  switchable boot roles (`cr52`, `npu`, `demo`, `yocto`) and the `stage-board.sh`
   staging sequence; also the reset semantics, including why a warm `reboot`
   restarts the CR52.
 - [CR52 slot update](cr52-slot-update.md) — replace the realtime firmware
@@ -113,8 +113,8 @@ answered before board time.
   values are filled at session time, not committed), plus `x5h-env.tmpl` and
   `render-env.sh`, one environment template rendered per board into the
   `x5h-env.txt` that `env import -t` reads off the boot partition. It defines
-  the three boot roles (`cr52`, `npu`, `yocto`) and keeps both netboot paths
-  as `rescue_autosd` / `rescue_yocto_nfs`. See
+  the four boot roles (`cr52`, `npu`, `demo`, `yocto`) and keeps both netboot
+  paths as `rescue_autosd` / `rescue_yocto_nfs`. See
   [selfboot.md](selfboot.md), "Roles"
 - `boards/`: `x5h1.vars` and `x5h2.vars`, holding the three variables (`BOARD_IP`,
   `BOARD_HOSTNAME`, `HAS_YOCTO`) that are the *only* intended difference
@@ -426,7 +426,7 @@ in the session log (with the fstype-qualified ones matching exactly, e.g.
 > one place and reads the board's identity only from `boards/<board>.vars`.
 > Every destructive subcommand requires `--yes` and prints its plan first. See
 > [selfboot.md](selfboot.md), "Staging a board", for the subcommand order and
-> the approval gates, and "Roles" for the three boot roles the staged
+> the approval gates, and "Roles" for the four boot roles the staged
 > environment provides. What follows here is the TFTP/NFS route the
 > `rescue_autosd` and `rescue_yocto_nfs` commands still use.
 

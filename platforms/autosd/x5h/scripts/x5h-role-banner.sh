@@ -8,4 +8,4 @@ role=$(tr ' ' '\n' < "$CMDLINE" | sed -n 's/^x5h\.role=//p' | head -1)
 role=${role:-unknown}
 mkdir -p "$RUN_DIR" "$MOTD_DIR"
 printf '%s\n' "$role" > "$RUN_DIR/role"
-printf 'X5H boot role: %s   (x5h-role set <cr52|npu|yocto> --reboot to switch)\n' "$role" > "$MOTD_DIR/x5h-role"
+printf 'X5H boot role: %s   (x5h-role set <cr52|npu|demo|yocto> --reboot to switch)\n' "$role" > "$MOTD_DIR/x5h-role"

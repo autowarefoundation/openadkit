@@ -20,6 +20,9 @@ for u in cr52-remoteproc.service rpmsg-eth.service; do
     [ "$(gates "$u" cr52)" = 1 ] || fail "cr52_gate_lost_$u"
     [ "$(gates "$u" demo)" = 1 ] || fail "no_demo_gate_$u"
 done
+# Deliberately absent from both loops: the five awf-oak-*.container units stay
+# gated to cr52 alone until the firmware plan lands, so the component stack
+# does not come up under demo. That is a choice, not an oversight.
 # Units are only half of it. Every script that branches on the role has to
 # name every role it must run in as well, and the first sweep for demo missed
 # these: selfboot-smoke.sh failed a correct demo boot with unknown_role and

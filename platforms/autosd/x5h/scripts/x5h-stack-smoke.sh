@@ -211,7 +211,12 @@ CR52_TIMEOUT="${X5H_CR52_TIMEOUT:-150}"
 CORE_UNITS="awf-oak-autoware"
 # The bridged stack. awf-oak-relay and awf-oak-restamp are LOAD-BEARING, not
 # accessories: bridge-config.yaml routes the trajectory through traj_relay
-# (domain 2's MTU 1500 cannot carry a full trajectory) and control_cmd back
+# (domain 2's MTU 1500 cannot carry a full trajectory: traj_relay.py records
+# one as about 170 points and about 15 kB. The relay downsamples to 13 points,
+# which serialize to 1172 bytes and so cross as a single datagram at MTU 1500,
+# where at 462 they had to fragment. The relay is still required for the full
+# trajectory; what changed is that its result now arrives whole) and
+# control_cmd back
 # through control_restamp (the CR52 stamps with its own uptime clock). With
 # either one down, a completely healthy board fails no_cr52_control_cmd: with
 # the relay down the CR52 never receives a trajectory it can carry, and with

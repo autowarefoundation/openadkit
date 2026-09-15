@@ -8,6 +8,20 @@ s="$here/../scripts/demo-role-smoke.sh"
 fail() { echo "TEST_FAIL $name reason=$1"; exit 1; }
 [ -x "$s" ] || fail script_missing
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+# A large, matching-line-early dmesg is the point: the real bug is a race
+# (grep -q closes the pipe on its first match, dmesg then SIGPIPEs on its
+# next write, pipefail turns that 141 into a false FAIL) and a race needs
+# enough trailing output that the producer is still writing when the
+# consumer exits. A single short line never reaches the pipe buffer, so the
+# old fixture could not have caught this.
+write_big_dmesg() {
+    {
+        echo '#!/bin/sh'
+        echo 'echo "[1.0] assigned reserved memory node linux,npu_region@8e400000"'
+        echo 'i=0; while [ $i -lt 5000 ]; do echo "[1.$i] filler line padding dmesg well past a pipe buffer"; i=$((i+1)); done'
+    } > "$tmp/g/dmesg"
+    chmod +x "$tmp/g/dmesg"
+}
 good() {
     rm -rf "$tmp/g"; mkdir -p "$tmp/g/dt/reserved-memory/cr52_ram1@5da00000" "$tmp/g/dt/soc/cr52_1" "$tmp/g/uio/uio2" "$tmp/g/rproc"
     for r in 1400000000 1c00000000 64000000 8e400000; do mkdir -p "$tmp/g/dt/reserved-memory/linux,npu_region@$r"; done
@@ -16,7 +30,7 @@ good() {
     echo 'root=x x5h.role=demo' > "$tmp/g/cmdline"
     printf '40000000-8affffff : System RAM\n  5da00000-5dbfffff : reserved\n' > "$tmp/g/iomem"
     echo offline > "$tmp/g/rproc/state"
-    printf '#!/bin/sh\necho "[1.0] assigned reserved memory node linux,npu_region@8e400000"\n' > "$tmp/g/dmesg"; chmod +x "$tmp/g/dmesg"
+    write_big_dmesg
 }
 run() { CMDLINE_FILE="$tmp/g/cmdline" IOMEM_FILE="$tmp/g/iomem" DT_ROOT="$tmp/g/dt" UIO_DIR="$tmp/g/uio" RPROC_DIR="$tmp/g/rproc" DMESG_CMD="$tmp/g/dmesg" bash "$s"; }
 good; out=$(run) || fail good_tree_rejected

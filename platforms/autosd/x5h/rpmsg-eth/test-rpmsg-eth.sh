@@ -119,7 +119,11 @@ grep -qi '0806' <<<"$FRAME" \
 # the kernel emits the datagram instead of another ARP probe. head -c blocks
 # until 1514 bytes have arrived on epB, so a relay that truncates or drops
 # the frame times out here instead of passing on a short read.
-ip neigh replace 172.16.52.2 lladdr 02:5c:52:00:00:02 dev tap0
+# Guarded like every other command here: the file runs under `set -e`, so a
+# bare failure would kill the script before any TEST_FAIL marker printed. A
+# replace that did not take shows up as the full-MTU check below timing out,
+# which reports it properly.
+ip neigh replace 172.16.52.2 lladdr 02:5c:52:00:00:02 dev tap0 || true
 socat -u -b 1472 OPEN:/dev/zero,readbytes=1472 UDP-SENDTO:172.16.52.2:9 >/dev/null 2>&1 || true
 BIG=$(timeout 10 head -c 1514 "$PTY_DIR/epB" | wc -c) || true
 [ "${BIG:-0}" -ge 1514 ] \

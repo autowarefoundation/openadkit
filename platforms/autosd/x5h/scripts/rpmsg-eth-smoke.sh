@@ -12,7 +12,7 @@
 #
 # Markers on stdout (grep-able, one per line):
 #   RPMSG_ETH_PING_PASS
-#   RPMSG_ETH_PING_FAIL reason=<bad_args|no_channel|service_inactive|no_tap|no_carrier|no_ping|ping_loss>
+#   RPMSG_ETH_PING_FAIL reason=<bad_args|no_channel|service_inactive|no_tap|no_carrier|no_ping|ping_loss|big_frame_loss>
 #
 # -n skips the rpmsg-bus channel assertion, for bench runs with no board
 # attached (e.g. validating the tap0/ping plumbing against a manually
@@ -154,5 +154,18 @@ if [ -z "$TX" ] || [ -z "$RX" ] || [ "$TX" -eq 0 ] || [ "$TX" != "$RX" ]; then
     echo "$OUT" >&2
     fail ping_loss
 fi
+
+# --- one full-size frame, which is the only check that catches MTU skew ----
+# Every assertion above passes on a board that runs this rootfs over an older
+# kernel: tap0 comes up at 1500 and small frames cross, but the kernel still
+# caps the RPMsg buffer at 512, so every large frame dies. Only a full-size
+# datagram sees that. 1472 bytes of payload plus the 28-byte IP and ICMP
+# headers is exactly one 1500-byte packet, and -M do forbids fragmenting it,
+# so a link that cannot carry the frame whole fails here instead of on the
+# board later.
+BIG="$(ping -c 1 -s 1472 -M do "$PEER" 2>&1)" || {
+    echo "$BIG" >&2
+    fail big_frame_loss
+}
 
 echo RPMSG_ETH_PING_PASS

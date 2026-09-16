@@ -34,7 +34,6 @@ for the RViz workflow.
 ./openadkit status planning-simulation
 ./openadkit logs planning-simulation --follow
 ./openadkit stop planning-simulation
-./openadkit stop planning-simulation
 ```
 
 Put local overrides in

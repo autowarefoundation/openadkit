@@ -1,8 +1,8 @@
 """mkdocs-macros module — single-source repeated reference facts.
 
-The default ROS distro title comes from openadkit.json. The component image
-table is generated from the catalog (.github/image-inventory.json) so the docs
-cannot drift from what CI actually builds.
+The registry prefix and default ROS distro title come from openadkit.json. The
+component image table is generated from the catalog
+(.github/image-inventory.json) so the docs cannot drift from what CI builds.
 
 Used by the `macros` plugin configured in mkdocs.yaml. Reference in any page
 under docs/ as `{{ registry }}`, `{{ default_distro_title }}`, or
@@ -20,9 +20,6 @@ REPO_ROOT = Path(__file__).parent.parent
 INVENTORY = REPO_ROOT / ".github" / "image-inventory.json"
 KIT = REPO_ROOT / "openadkit.json"
 
-# The container registry + repository that all Open AD Kit component images share.
-REGISTRY = "ghcr.io/autowarefoundation/openadkit"
-
 
 def _load_json(path, label):
     try:
@@ -33,7 +30,12 @@ def _load_json(path, label):
 
 def define_env(env):
     kit = _load_json(KIT, "bundle manifest")
-    env.variables["registry"] = REGISTRY
+    registry = kit["imagePrefixComponent"]
+    if not isinstance(registry, str) or not registry.strip():
+        raise RuntimeError(
+            "bundle manifest imagePrefixComponent must be a non-empty string"
+        )
+    env.variables["registry"] = registry
     env.variables["default_distro_title"] = kit["defaultRosDistro"].capitalize()
 
     @env.macro
@@ -56,6 +58,6 @@ def define_env(env):
             distros = ", ".join(img.get("ros_distros", global_distros))
             arches = ", ".join(p.rsplit("/", 1)[-1] for p in img["platforms"])
             rows.append(
-                f"| `{target}` | `{REGISTRY}:{target}` | {distros} | {arches} |"
+                f"| `{target}` | `{registry}:{target}` | {distros} | {arches} |"
             )
         return "\n".join(rows)

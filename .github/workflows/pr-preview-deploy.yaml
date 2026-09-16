@@ -10,10 +10,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: preview-deploy-${{ github.event.workflow_run.pull_requests[0].number || github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
-
 jobs:
   deploy-preview:
     if: >-
@@ -24,6 +20,10 @@ jobs:
       github.event.workflow_run.pull_requests[0].number != null
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+      queue: max
     permissions:
       actions: read
       contents: write
@@ -116,6 +116,10 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: write
       pull-requests: write

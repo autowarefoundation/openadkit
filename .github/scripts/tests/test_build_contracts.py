@@ -311,6 +311,22 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
     release = (ROOT / ".github/workflows/release.yaml").read_text()
     assert "source_ref: ${{ github.sha }}" in release
     assert "source_ref: ${{ inputs.version }}" not in release
+    preview_deploy = (ROOT / ".github/workflows/pr-preview-deploy.yaml").read_text()
+    shared_pages = (
+        "group: gh-pages\n"
+        "      cancel-in-progress: false\n"
+        "      queue: max"
+    )
+    assert shared_pages in DOCS_WORKFLOW
+    assert DOCS_WORKFLOW.count(shared_pages) == 1
+    assert shared_pages in preview_deploy
+    assert preview_deploy.count(shared_pages) == 2
+    assert "group: preview-deploy-" not in preview_deploy
+    actionlint_config = (ROOT / ".github/actionlint.yaml").read_text()
+    assert 'unexpected key "queue" for "concurrency" section' in actionlint_config
+    macros = (ROOT / "docs/macros.py").read_text()
+    assert 'kit["imagePrefixComponent"]' in macros
+    assert 'REGISTRY = "ghcr.io/autowarefoundation/openadkit"' not in macros
 
 
 def test_capture_metadata_uses_retrying_registry_lookup():

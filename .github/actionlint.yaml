@@ -1,0 +1,10 @@
+# actionlint 1.7.x (CI download script defaults to 1.7.11) does not model
+# GitHub's concurrency.queue key yet. Drop these ignores when actionlint
+# accepts queue: max.
+paths:
+  .github/workflows/deploy-docs.yaml:
+    ignore:
+      - unexpected key "queue" for "concurrency" section
+  .github/workflows/pr-preview-deploy.yaml:
+    ignore:
+      - unexpected key "queue" for "concurrency" section

@@ -26,14 +26,19 @@ Put overrides in `deployments/scenario-simulation/config.local.env`:
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `SCENARIO` | Scenario path inside the container | Bundled example |
-| `SCENARIO_HOST_DIR` | Host scenario directory | `./scenarios` |
-| `OUTPUT_HOST_PATH` | Host results directory | `./output` |
+| `SCENARIO_HOST_DIR` | Host scenario directory | `deployments/scenario-simulation/scenarios` |
+| `OUTPUT_HOST_PATH` | Host results directory | `deployments/scenario-simulation/output` |
 | `SCENARIO_READY_TIMEOUT` | Autoware readiness timeout in seconds | `300` |
 | `MAP_PATH` | Host map directory | `~/autoware_map/kashiwanoha_map` |
 
-For a custom scenario, place its YAML under `SCENARIO_HOST_DIR` and set, for
-example, `SCENARIO=/scenarios/my-scenario.yaml`. A custom map must provide
-matching `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE` values.
+`config.env` stores those host paths as `./scenarios` and `./output`. Compose
+resolves them from `deployments/scenario-simulation/`, not the repository root.
+
+For a custom scenario, place its YAML in
+`deployments/scenario-simulation/scenarios` (or another `SCENARIO_HOST_DIR`)
+and set, for example, `SCENARIO=/scenarios/my-scenario.yaml`. A custom map must
+provide matching `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE`
+values.
 
 ## Run
 
@@ -46,7 +51,8 @@ Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
 
 Initialization takes about 90 seconds. The runner waits up to
 `SCENARIO_READY_TIMEOUT`, executes the scenario, and writes results to
-`OUTPUT_HOST_PATH`.
+`deployments/scenario-simulation/output` unless `OUTPUT_HOST_PATH` is
+overridden.
 
 --8<-- "includes/visualizer-remote-access.md"
 

@@ -34,11 +34,6 @@ on:
 permissions:
   contents: read
 
-# All triggers deploy the same production site, so serialize them globally.
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -69,6 +64,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Serialize gh-pages writers across production and PR previews. queue: max
+    # keeps a pending production deploy when another preview/close is queued;
+    # default queue: single would cancel that pending run. Builds stay off this
+    # lane. JamesIves uses force: false, so a parallel push is a non-fast-forward.
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: write
     steps:

@@ -1085,9 +1085,12 @@ It declares four services.
 - `bridge` and `si-gate`: the sibling vision_pilot plan's `visionpilot:si` image, on DDS domain 1.
 - `demo`: an idle container carrying `scripts/x5h-ces2027-demo.sh` and an ssh client.
 
-Start the stack with `docker compose -f components/demo/docker-compose.yaml up -d`. Every
-host path is an env var with a `$HOME`-relative default. The booth script itself needs only
-`ssh` to the board:
+Run `cd components/demo && docker compose up -d` to start the stack. Every host path is an
+env var with a `$HOME`-relative default. Run compose from `components/demo` and not from
+elsewhere: the `demo` container's `COMPOSE_FILE` default is built from that working
+directory, and `x5h-ces2027-demo.sh run` uses it to print the right compose command back to
+you. Running compose from another directory needs an explicit `COMPOSE_FILE` override. The
+booth script itself needs only `ssh` to the board:
 
 ```
 x5h-ces2027-demo.sh check                 # ready? prints the READY/FAIL marker above

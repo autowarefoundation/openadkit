@@ -59,4 +59,22 @@ out=$(SSH_FAIL=1 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" c
 exact "$out" 'X5H_CES_DEMO_FAIL reason=ssh_failed' ssh_failed_reason
 [ "$rc" -ne 0 ] || fail ssh_failed_exit_zero
 
+# `fault` is the demo moment. A VP_SI with no si_fault.sh must fail loudly,
+# not silently do nothing.
+rc=0
+out=$(VP_SI="$tmp/si" bash "$s" fault kill) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=no_fault_script' fault_missing_reason
+[ "$rc" -ne 0 ] || fail fault_missing_exit_zero
+
+mkdir -p "$tmp/si-fault"
+printf '#!/bin/sh\nexit 0\n' > "$tmp/si-fault/si_fault.sh"
+out=$(VP_SI="$tmp/si-fault" bash "$s" fault kill) || fail "fault_ok_failed $out"
+exact "$out" '' fault_ok_no_output
+
+printf '#!/bin/sh\nexit 1\n' > "$tmp/si-fault/si_fault.sh"
+rc=0
+out=$(VP_SI="$tmp/si-fault" bash "$s" fault kill) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=fault_failed' fault_script_fail_reason
+[ "$rc" -ne 0 ] || fail fault_script_fail_exit_zero
+
 echo "TEST_PASS $name"

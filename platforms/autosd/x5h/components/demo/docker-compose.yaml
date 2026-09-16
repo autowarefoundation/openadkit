@@ -121,6 +121,13 @@ services:
       - X5H_BOARD=${X5H_BOARD:-root@192.168.0.20}
       - CARLA_PKG=/carla-pkg
       - VP_SI=/ws/si
+      # This script is mounted alone here, with no sibling components/demo
+      # directory, so its own $0-relative default for the compose file path
+      # cannot resolve inside this container. ${PWD} is the host directory
+      # `docker compose` was run from; this is correct when that is
+      # components/demo (see README.md, "Running the demo"). Invoking
+      # compose from elsewhere: override COMPOSE_FILE explicitly.
+      - COMPOSE_FILE=${COMPOSE_FILE:-${PWD}/docker-compose.yaml}
     volumes:
       - ../../scripts/x5h-ces2027-demo.sh:/usr/local/bin/x5h-ces2027-demo.sh:ro
       - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro

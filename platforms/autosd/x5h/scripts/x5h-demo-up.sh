@@ -18,9 +18,26 @@ if ! "$SYSTEMCTL" cat x5h-vp.service >/dev/null 2>&1; then
         || { echo "X5H_DEMO_UP_FAIL reason=quadlet"; exit 1; }
     "$SYSTEMCTL" daemon-reload
 fi
+# systemd returns rc=0 for a unit it SKIPPED because a Condition failed (board-
+# verified: ConditionPathExists on a missing binary gives START RC=0,
+# is-active: inactive). `start` succeeding is therefore not proof the unit
+# runs; check `is-active` too. The container units can take a moment to
+# report active, so retry a few times with a short, bounded wait -- three
+# tries, 0.2s apart, well under a second -- rather than trusting one
+# immediate check or waiting unboundedly.
+is_active() {
+    local tries=3
+    while [ "$tries" -gt 0 ]; do
+        [ "$("$SYSTEMCTL" is-active "$1" 2>/dev/null)" = active ] && return 0
+        tries=$((tries - 1))
+        [ "$tries" -eq 0 ] || sleep 0.2
+    done
+    return 1
+}
 n=0
 for u in $UNITS; do
     "$SYSTEMCTL" start "$u" || { echo "X5H_DEMO_UP_FAIL reason=$u"; exit 1; }
+    is_active "$u" || { echo "X5H_DEMO_UP_FAIL reason=$u"; exit 1; }
     n=$((n + 1))
 done
 echo "X5H_DEMO_UP units=$n"

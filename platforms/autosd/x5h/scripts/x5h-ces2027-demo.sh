@@ -16,7 +16,14 @@
 set -uo pipefail
 SSH="${SSH:-ssh}"; BOARD="${X5H_BOARD:-root@192.168.0.20}"
 CARLA_PKG="${CARLA_PKG:-$HOME/carla-pkg}"; VP_SI="${VP_SI:-$HOME/vp-ros2/si}"
-COMPOSE_FILE="${COMPOSE_FILE:-$(cd "$(dirname "$0")/../components/demo" && pwd)/docker-compose.yaml}"
+# When run directly on the host, $0 sits next to ../components/demo and the
+# default below resolves. Inside the `demo` container this script is mounted
+# alone at /usr/local/bin, so that directory does not exist there -- the
+# container's own COMPOSE_FILE env var (set by docker-compose.yaml from the
+# host's $PWD) is what makes it correct in that context; see README.md,
+# "Running the demo". Do not resolve a directory that is not there: an empty
+# `cd` result used to silently become "/docker-compose.yaml".
+COMPOSE_FILE="${COMPOSE_FILE:-}"
 UNITS="x5h-si-link x5h-demo-bridge x5h-demo-restamp x5h-demo-hb x5h-vp"
 fail() { echo "X5H_CES_DEMO_FAIL reason=$1"; exit 1; }
 cmd="${1:-}"
@@ -50,12 +57,23 @@ case "$cmd" in
     # Bringing carla-server/bridge/si-gate up is compose's job, not this
     # script's: printing the two commands keeps the booth operator off
     # `docker` directly and this script out of needing the host's
-    # /var/run/docker.sock mounted into any container. Nothing here is
-    # executed, so `run` has no failure mode of its own to test.
+    # /var/run/docker.sock mounted into any container.
+    if [ -z "$COMPOSE_FILE" ]; then
+        d=$(cd "$(dirname "$0")/../components/demo" 2>/dev/null && pwd) || true
+        [ -n "$d" ] || fail no_compose_file
+        COMPOSE_FILE="$d/docker-compose.yaml"
+    fi
     echo "CARLA_PKG=$CARLA_PKG VP_SI=$VP_SI docker compose -f $COMPOSE_FILE up -d"
     echo "$SSH $BOARD 'systemctl restart x5h-demo.service && systemctl status x5h-demo.service --no-pager | grep X5H_DEMO_UP'" ;;
   fault)
-    case "${2:-}" in kill|channel) bash "$VP_SI/si_fault.sh" "$2" ;; *) fail usage ;; esac ;;
+    case "${2:-}" in
+      kill|channel)
+        # This is the demo moment: a missing or failing fault script must
+        # say so, not do nothing.
+        [ -f "$VP_SI/si_fault.sh" ] || fail no_fault_script
+        bash "$VP_SI/si_fault.sh" "$2" || fail fault_failed ;;
+      *) fail usage ;;
+    esac ;;
   reset)
     $SSH "$BOARD" 'systemctl kill -s USR2 x5h-si-link.service; systemctl start x5h-vp.service' || fail reset
     echo "X5H_CES_DEMO_RESET" ;;

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# demo-role-smoke.sh judges the demo boot from /proc and /sys. Feed it a
-# fake tree of each and check its verdicts.
+# demo-role-smoke.sh judges a derived-tree boot from /proc and /sys. Feed it
+# a fake tree of each and check its verdicts. demo and dev boot that same
+# tree, so both must pass and the retired roles must not.
 set -u
 name=test-demo-role-smoke
 here=$(cd "$(dirname "$0")" && pwd)
@@ -33,10 +34,20 @@ good() {
     write_big_dmesg
 }
 run() { CMDLINE_FILE="$tmp/g/cmdline" IOMEM_FILE="$tmp/g/iomem" DT_ROOT="$tmp/g/dt" UIO_DIR="$tmp/g/uio" RPROC_DIR="$tmp/g/rproc" DMESG_CMD="$tmp/g/dmesg" bash "$s"; }
-good; out=$(run) || fail good_tree_rejected
-grep -q '^DEMO_ROLE_PASS role=demo carveout=0x5da00000 remoteproc=offline$' <<<"$out" || fail no_pass_marker
-good; echo 'x5h.role=npu' > "$tmp/g/cmdline"; out=$(run) && fail npu_accepted
-grep -q 'reason=role_not_demo' <<<"$out" || fail npu_reason
+# Both AD Kit roles pass, and the marker reports which one was found rather
+# than asserting demo, so a dev boot cannot be read back as a demo boot.
+for role in demo dev; do
+    good; echo "root=x x5h.role=$role" > "$tmp/g/cmdline"
+    out=$(run) || fail "good_tree_rejected_$role"
+    grep -q "^DEMO_ROLE_PASS role=$role carveout=0x5da00000 remoteproc=offline$" <<<"$out" || fail "no_pass_marker_$role"
+done
+# yocto, the two retired roles, and no role word at all are all refused.
+for bad in yocto cr52 npu; do
+    good; echo "x5h.role=$bad" > "$tmp/g/cmdline"; out=$(run) && fail "${bad}_accepted"
+    grep -q "reason=wrong_role role=$bad" <<<"$out" || fail "${bad}_reason"
+done
+good; echo 'root=x quiet' > "$tmp/g/cmdline"; out=$(run) && fail unset_accepted
+grep -q 'reason=wrong_role role=unset' <<<"$out" || fail unset_reason
 good; echo '40000000-8affffff : System RAM' > "$tmp/g/iomem"; out=$(run) && fail missing_reservation_accepted
 grep -q 'reason=carveout_not_reserved' <<<"$out" || fail reservation_reason
 good; printf '\0\0\1\v' > "$tmp/g/dt/reserved-memory/cr52_ram1@5da00000/phandle"; out=$(run) && fail wrong_phandle_accepted

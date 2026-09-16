@@ -23,7 +23,8 @@
 set -uo pipefail
 
 # Only the roles whose device tree carries a CR52 carveout may start the
-# core. Under the npu tree, cr52_1's memory-region is a dangling phandle and
+# core. demo and dev both boot the derived tree and so both qualify. Under a
+# vendor NPU tree, cr52_1's memory-region is a dangling phandle and
 # rcar_gen5_rproc turns the `start` write into a kernel panic; with
 # oops=panic on the command line the board then reboots into the same role.
 # The role is a kernel argument (see uboot/x5h-env.tmpl), not a file, so a
@@ -31,7 +32,7 @@ set -uo pipefail
 CMDLINE_FILE=${CMDLINE_FILE:-/proc/cmdline}
 role=$(tr ' ' '\n' < "$CMDLINE_FILE" 2>/dev/null | sed -n 's/^x5h\.role=//p' | tail -1)
 case "$role" in
-    cr52|demo) ;;
+    demo|dev) ;;
     *) echo "CR52_RPROC_SKIP reason=role role=${role:-unset}"; exit 0 ;;
 esac
 

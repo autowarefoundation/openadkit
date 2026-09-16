@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# demo-role-smoke.sh -- gate D1a: the board booted the demo role with the NPU
-# tree intact and the CR52 carveout relocated to 0x5da00000. Read-only: it
-# writes nothing to sysfs and never starts the remoteproc. Run it on the
-# board after every demo-role boot.
+# demo-role-smoke.sh -- gate D1a: the board booted the derived device tree,
+# with the NPU tree intact and the CR52 carveout relocated to 0x5da00000.
+# demo and dev boot that same tree, so either role satisfies this gate and
+# the marker reports which one it found. Read-only: it writes nothing to
+# sysfs and never starts the remoteproc. Run it after every such boot.
 #
 # Markers on stdout:
-#   DEMO_ROLE_PASS role=demo carveout=0x5da00000 remoteproc=<state>
-#   DEMO_ROLE_FAIL reason=<role_not_demo|carveout_not_reserved|carveout_node_missing|
+#   DEMO_ROLE_PASS role=<demo|dev> carveout=0x5da00000 remoteproc=<state>
+#   DEMO_ROLE_FAIL reason=<wrong_role|carveout_not_reserved|carveout_node_missing|
 #                          carveout_phandle|cr52_memory_region|cr52_node_ambiguous|
 #                          npu_region_<base>_missing|uio2_missing|cmem_probe_missing|
 #                          remoteproc_missing>
@@ -26,7 +27,8 @@ END=$(printf '%x' $((0x$BASE + 0x$SIZE - 1)))
 fail() { echo "DEMO_ROLE_FAIL reason=$1"; exit 1; }
 hex32() { od -An -tx1 "$1" 2>/dev/null | tr -d ' \n'; }
 
-grep -qw 'x5h\.role=demo' "$CMDLINE_FILE" || fail role_not_demo
+role=$(tr ' ' '\n' < "$CMDLINE_FILE" | sed -n 's/^x5h\.role=//p' | tail -1)
+case "$role" in demo|dev) ;; *) fail "wrong_role role=${role:-unset}" ;; esac
 grep -q "$BASE-$END : reserved" "$IOMEM_FILE" || fail carveout_not_reserved
 node="$DT_ROOT/reserved-memory/cr52_ram1@$BASE"
 [ -d "$node" ] || fail carveout_node_missing
@@ -51,4 +53,4 @@ done
 dmesg_out=$("$DMESG_CMD")
 grep -q 'assigned reserved memory node linux,npu_region' <<<"$dmesg_out" || fail cmem_probe_missing
 state=$(cat "$RPROC_DIR/state" 2>/dev/null) || fail remoteproc_missing
-echo "DEMO_ROLE_PASS role=demo carveout=0x$BASE remoteproc=$state"
+echo "DEMO_ROLE_PASS role=$role carveout=0x$BASE remoteproc=$state"

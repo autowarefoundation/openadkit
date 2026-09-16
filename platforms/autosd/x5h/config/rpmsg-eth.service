@@ -26,13 +26,13 @@
 #   install -m0755 rpmsg-eth /usr/local/bin/rpmsg-eth
 #   systemctl enable --now rpmsg-eth.service
 #
-# 80-x5h.preset deliberately does not enable this unit, but that does NOT
-# keep it out of a normal boot: awf-oak-bridge.container carries
-# Requires=rpmsg-eth.service and [Install] WantedBy=default.target, so
-# Quadlet auto-enables the bridge and the bridge pulls this unit in at
-# boot regardless of the preset. Omitting the preset line only matters on
-# boots where nothing else wants the link -- e.g. an image without the
-# component stack, or a board where the bridge unit is disabled or masked.
+# 80-x5h.preset deliberately does not enable this unit. Nothing else pulls
+# it up at boot either: the demo stack's x5h-demo-bridge.container and the
+# MRM stack's awf-oak-bridge.container both carry
+# Requires=rpmsg-eth.service, but the MRM units no longer auto-start (they
+# have no [Install] section) and the demo stack is started by
+# x5h-demo-up.sh. So the link comes up when a stack that needs it is
+# started, not before.
 #
 # ConditionPathExists=/usr/local/bin/rpmsg-eth below is therefore what
 # keeps a missing binary benign, not the preset omission. Without it, an
@@ -51,14 +51,13 @@ Description=RPMsg-to-TAP Ethernet bridge (CR52 link)
 # this condition an unstaged board restart-loops at ~1 Hz instead of
 # logging one skip line.
 ConditionPathExists=/usr/local/bin/rpmsg-eth
-ConditionKernelCommandLine=|x5h.role=cr52
-# demo runs the CR52 link alongside the NPU stack, on a dtb that carries
-# the same carveout as the cr52 role's. Repeated conditions of one type
-# are ANDed by systemd, so both role lines carry a pipe after the equals
-# sign to make them triggering conditions: the unit runs when at least one
-# triggering condition matches and the ConditionPathExists= above, a
-# regular condition, still applies.
+# demo and dev boot the identical derived device tree, so this unit belongs
+# under both. Repeated conditions of one type are ANDed by systemd, so each
+# role line carries a pipe after the equals sign to make it a triggering
+# condition: the unit runs when at least one triggering condition matches and the ConditionPathExists= above, a regular
+# condition, still applies.
 ConditionKernelCommandLine=|x5h.role=demo
+ConditionKernelCommandLine=|x5h.role=dev
 # StartLimitIntervalSec=0 disables systemd's default start-rate limit (5
 # starts within a 10s window) outright, rather than leaving it in effect
 # or merely resizing it. Without an explicit override here, that default

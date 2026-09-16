@@ -11,8 +11,8 @@
 # restart oopsed rpmsg_char and left RPMsg dead until the next SoC reset. Under
 # the `oops=panic panic=10` bootargs every role now carries, that oops is a
 # reboot instead, so the line is gone. The per-role link check is
-# rpmsg-eth-smoke.sh (cr52 role) and npu-contract-smoke.sh (npu role), and the
-# demo role wants both; this script only asserts that the role's own bring-up
+# rpmsg-eth-smoke.sh (the CR52 link) and npu-contract-smoke.sh (the NPU), and
+# demo and dev both want both; this script only asserts that the role's own bring-up
 # units reached active.
 set -u
 
@@ -55,14 +55,12 @@ fi
 # banner unit did not run, and nothing downstream that keys on the role can be
 # trusted either.
 role=$(cat /run/x5h/role 2>/dev/null || echo unknown)
-# demo runs the NPU stack and the CR52 in the same boot, so it has to satisfy
-# both single-role arms rather than either one: its device tree carries the
-# NPU regions and the relocated CR52 carveout together, and a demo boot that
+# demo and dev boot the identical derived tree, which carries the NPU regions
+# and the relocated CR52 carveout together, so both roles bring up the whole
+# platform layer and both are checked the same way. A boot in either that
 # brought up only one of them is a finding, not a pass.
 case "$role" in
-  cr52) systemctl is-active --quiet cr52-remoteproc.service || fail cr52_remoteproc_inactive ;;
-  npu)  systemctl is-active --quiet x5h-npu.service || fail npu_not_ready ;;
-  demo) systemctl is-active --quiet x5h-npu.service || fail npu_not_ready
+  demo|dev) systemctl is-active --quiet x5h-npu.service || fail npu_not_ready
         systemctl is-active --quiet cr52-remoteproc.service || fail cr52_remoteproc_inactive ;;
   *) fail "unknown_role role=$role" ;;
 esac

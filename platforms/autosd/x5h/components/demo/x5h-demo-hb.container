@@ -1,0 +1,51 @@
+[Unit]
+Description=X5H CES 2027 demo VisionPilot heartbeat node
+Wants=network-online.target
+After=network-online.target
+# Ordering only, no Requires=/Wants= -- see awf-oak-autoware.container. This
+# node subscribes to /vehicle/throttle_cmd (VisionPilot, domain 1) and
+# republishes /safety_island/vp_heartbeat, which bridge-demo.yaml relays to
+# domain 2 for the CR52 to watch. Without the bridge it simply publishes
+# into a domain nobody on the CR52 side sees yet; it does not fail.
+After=x5h-demo-bridge.service
+# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+ConditionKernelCommandLine=x5h.role=demo
+
+[Install]
+WantedBy=multi-user.target
+
+[Container]
+Network=host
+ContainerName=x5h-demo-hb
+# BRIDGE_IMAGE, not AUTOWARE_IMAGE: this node only needs rclpy, std_msgs and
+# tier4_debug_msgs (Float64Stamped), and the domain_bridge image already
+# carries all three on top of universe-after. No dedicated image for one
+# small node.
+Image=${BRIDGE_IMAGE}
+# See the Pull=never note in awf-oak-autoware.container.
+Pull=never
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+Volume=/etc/containers/systemd/cyclonedds-x5h-demo.xml:/autoware/cyclonedds.xml:ro,z
+# `Z` (private label): this unit is the only one that mounts this file.
+Volume=/etc/containers/systemd/vp_heartbeat.py:/autoware/vp_heartbeat.py:ro,Z
+# No `bash -lc` wrapper: components/bridge/entrypoint.sh sources both the
+# ROS and the Autoware overlays before `exec "$@"` when given a command, the
+# same shape /ros_entrypoint.sh uses on the monolithic images. See
+# awf-oak-relay.container for the verification command.
+Exec=python3 /autoware/vp_heartbeat.py
+
+[Service]
+# NOT redundant with the [Container] copy above. Quadlet renames
+# [Container] to [X-Container], which systemd ignores, so only THIS copy
+# reaches systemd -- and systemd is what expands ${...} in the generated
+# ExecStart. Without it Image=${BRIDGE_IMAGE} expands to the empty string
+# and podman exits with "repository name must have at least one component".
+# Verify by parsing the generated [Service] section, not by grepping the
+# file for the key.
+EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
+# Restart=on-failure is a deviation from run.yml's `restart: "no"`, recorded
+# as such in awf-oak-x5h.env. StartLimitIntervalSec is what makes it safe:
+# see that note for the arithmetic.
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60

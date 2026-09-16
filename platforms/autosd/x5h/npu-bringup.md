@@ -19,9 +19,10 @@ step goes wrong.
 > vendor NPU device tree omits the realtime core's reserved memory, so the two
 > cannot run in one configuration — see [Where this stops](#where-this-stops).
 > The NULL dereference that omission triggers in the BSP remoteproc driver is
-> a vendor defect in its own right. They are now offered as two switchable boot
-> roles on the same board rather than as two boards: `npu` and `cr52`, one per
-> boot, described in [selfboot.md](selfboot.md), "Roles". The earlier practice
+> a vendor defect in its own right. The derived device tree settles it: it
+> relocates the CR52 carveout out of the NPU's way, so one boot runs both and
+> the `npu` and `cr52` roles that used to separate them are gone. See
+> [selfboot.md](selfboot.md), "Roles". The earlier practice
 > of keeping NPU verification on a separate board is withdrawn, along with the
 > 2026-08-25 invariant that board 1 carries no NPU boot path.
 >
@@ -214,9 +215,9 @@ Everything here is remote-capable. None of it touches flash.
      the device tree you are booting. `systemd.mask=` on the kernel command
      line did **not** take effect here; `systemctl disable` did. On an image
      built from this branch neither is needed by hand: `cr52-remoteproc.service`
-     and `rpmsg-eth.service` both carry
-     `ConditionKernelCommandLine=x5h.role=cr52`, so a boot in the `npu` role
-     skips them, and that condition is what the design relies on precisely
+     and `rpmsg-eth.service` are both gated to the roles that boot the derived
+     tree, so a boot under any other role skips them, and that condition is
+     what the design relies on precisely
      because `systemd.mask=` was measured not to work.
    - **Loading a model can oops the kernel, on the vendor's own artifacts, with
      the documented prerequisite absent.** On a boot with no prior oops, the
@@ -307,17 +308,17 @@ question to schedule whenever someone is next at the bench. If it fails in a
 way that points at the IPL, Stage 2 becomes necessary and its cost is now
 known rather than assumed.
 
-## The container contract (npu role)
+## The container contract
 
 Everything above is about making the NPU reachable. This section is the
-handoff: what a board booted in the `npu` role guarantees to a container, in
+handoff: what a board booted in `demo` or `dev` guarantees to a container, in
 the exact form the board itself asserts it. `scripts/npu-contract-smoke.sh`
 ships in the image at `/usr/sbin/npu-contract-smoke.sh` and is the executable
 copy of this contract; if the two ever disagree, the script is right.
 
-The prerequisite is the role's own bring-up unit. `x5h-npu.service` carries
-`ConditionKernelCommandLine=x5h.role=npu` and a second such line for
-`x5h.role=demo`, requires `var-opt-npu.mount` (the
+The prerequisite is the platform layer's bring-up unit. `x5h-npu.service`
+carries `ConditionKernelCommandLine=|x5h.role=demo` and a second such line
+for `x5h.role=dev`, requires `var-opt-npu.mount` (the
 unit is named for `/var/opt/npu` because `/opt` is a symlink to `var/opt` on
 this rootfs), inserts `cmemdrv.ko` from `npu-work`, waits for the device nodes
 and logs `NPU_READY uio=<n> cmem=<n>`. Until that marker is in the journal
@@ -373,15 +374,16 @@ when the session listed `RenesasExecutionProvider` and a latency figure could
 be parsed, and otherwise `NPU_CONTRACT_FAIL reason=<wrong_role|npu_not_ready|
 no_image|no_artifacts|no_renesas_ep|no_latency|bad_args>`.
 
-**Switching away from this role is a full SoC reset, and it reloads the CR52.**
-`x5h-role set cr52 --reboot` is not a userspace handover: a warm reboot on this
-board is a PSCI cold reset, so the realtime core restarts and re-reads its
-flashed payload. That is the mechanism that makes the two roles safe to
-alternate at all, because in the `npu` role the CR52's shared window and its
-three small RAM regions lie inside the NPU's model-binary region and must be
-assumed overwritten. Nothing has to be done by hand to repair it; equally,
-nothing short of that reset repairs it, so do not expect a role switch without
-a reboot to work.
+**Any role switch is a full SoC reset, and it reloads the CR52.**
+`x5h-role set <role> --reboot` is not a userspace handover: a warm reboot on
+this board is a PSCI cold reset, so the realtime core restarts and re-reads
+its flashed payload. That mattered most under the old `npu` role, where the
+CR52's shared window and its three small RAM regions lay inside the NPU's
+model-binary region and had to be assumed overwritten. The derived tree the
+`demo` and `dev` roles boot relocates the carveout clear of it, so the two
+no longer overlap. Nothing has to be done by hand to repair the core;
+equally, nothing short of that reset repairs it, so do not expect a role
+switch without a reboot to work.
 
 ## Where this stops
 
@@ -462,7 +464,8 @@ Two traps, both of which cost real work if hit.
 write list includes the stock payloads for them, and one of those slots
 currently holds this branch's RPMsg responder — measured, not assumed: its
 contents differ from the vendor payload in every chunk compared. Running the
-procedure unedited breaks the CR52 round trip, and therefore the `cr52` role:
+procedure unedited breaks the CR52 round trip, and therefore every role that
+depends on it:
 `rpmsg-eth-smoke.sh` is the check that goes red. Edit the flash-target
 definition to disable every entry except the single component being changed.
 

@@ -2,7 +2,13 @@
 
 Runs the Open AD Kit MRM demo on the board as five Quadlet units — Autoware, the scenario runner, the domain bridge, and two small relay nodes — with the trajectory follower on the CR52 realtime core. Autoware and the scenario tooling live on DDS domain 1 on the application cluster; the CR52 runs the actuation module on domain 2, reached over the `rpmsg-eth` TAP link described in [rpmsg-dualboot.md](rpmsg-dualboot.md). The verdict of a run is a junit file, graded by an on-board smoke script; the board is headless throughout.
 
-**Runs in the `cr52` role only.** All five `.container` units carry `ConditionKernelCommandLine=x5h.role=cr52`, so on a board booted in the `npu` or `yocto` role they are skipped with one journal line each rather than started and failed. That is not a precaution about tidiness: domain 2 exists only over `tap0`, which exists only when `rpmsg-eth` has a CR52 endpoint to bridge, and under the vendor NPU device tree the `npu` role boots there is no valid CR52 remoteproc to talk to at all. Switch the board before anything in this document: `x5h-role set cr52 --reboot`, then confirm `/run/x5h/role` reads `cr52` on the way back up. The role is sticky, so remember to return the board to `npu` when the session ends. See [selfboot.md](selfboot.md), "Roles".
+**Runs in the `dev` role only, and never starts on its own.** All five `.container` units carry `ConditionKernelCommandLine=x5h.role=dev`, so on a board booted in `demo` or `yocto` they are skipped with one journal line each rather than started and failed. None of them carries an `[Install]` section either, so Quadlet writes no `default.target.wants` symlink and a `dev` boot brings up no application containers at all. Both brakes are deliberate. Domain 2 exists only over `tap0`, which exists only when `rpmsg-eth` has a CR52 endpoint to bridge, and this stack and the CES 2027 demo stack each bind domain 1 and domain 2 with their own `domain_bridge`, so the two must never share a boot. Switch the board before anything in this document: `x5h-role set dev --reboot`, confirm `/run/x5h/role` reads `dev` on the way back up, then start the stack by hand:
+
+```
+systemctl start awf-oak-autoware awf-oak-bridge awf-oak-relay awf-oak-restamp
+```
+
+The role is sticky, so remember to return the board to `demo` if the booth needs it. See [selfboot.md](selfboot.md), "Roles".
 
 This is issue #120 milestone 7. The reference for every configuration value is the working compose demo of this exact topology, not `deployments/samples/scenario-simulation/` — the sample shares the scenario-simulation shape but none of the single-ECU, CR52-in-the-loop constraints that drive this profile. Deviations from the reference compose file are enumerated exhaustively in `components/awf-oak-x5h.env`; anything not listed there is intended to match it.
 

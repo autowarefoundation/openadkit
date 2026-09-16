@@ -350,13 +350,13 @@ than something to remember:
   boot (source: `config/x5h-rpmsg-modules.conf`).
 - `cr52-remoteproc.service` runs `/usr/sbin/cr52-rproc-up.sh`, which does the
   `start` write and polls for `running`. It is enabled by `80-x5h.preset` and
-  carries `ConditionKernelCommandLine=x5h.role=cr52` and a second such line
-  for `x5h.role=demo`, so it is skipped outright in the `npu` role. That
+  carries `ConditionKernelCommandLine=|x5h.role=demo` and a second such line
+  for `x5h.role=dev`, so it is skipped outright in the `yocto` role. That
   gating is not optional: under the vendor NPU
   device tree `cr52_1`'s `memory-region` phandle resolves to no node and a
   `start` write panics the kernel by construction.
 
-**A condition on `x5h.role=cr52` is not satisfied by "not the npu role": it is
+**A role condition is not satisfied by "not some other role": it is
 also unsatisfied whenever `x5h.role=` is absent from the kernel command line
 altogether.** That is not a corner case. `uboot/autosd-boot.env` builds
 `bootargs_autosd` with no `x5h.role=` word, so every netboot rescue
@@ -369,12 +369,12 @@ and `selfboot-smoke.sh` on such a root fails with
 procedure above therefore does nothing on a netbooted root unless the role is
 supplied by hand. Two ways to do that, in order of preference:
 
-- Append `x5h.role=cr52` to the rescue bootargs before booting, which is what
+- Append `x5h.role=dev` to the rescue bootargs before booting, which is what
   the self-boot roles do and what makes every unit behave identically to a
   self-boot:
 
   ```
-  => setenv bootargs_autosd "${bootargs_autosd} x5h.role=cr52"
+  => setenv bootargs_autosd "${bootargs_autosd} x5h.role=dev"
   => run bootcmd_autosd
   ```
 

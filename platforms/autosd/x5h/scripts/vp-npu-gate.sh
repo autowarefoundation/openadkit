@@ -5,10 +5,21 @@
 # backend's "Offload gate PASSED" line (a run that completes on the CPU
 # fallback is not a pass) and N consecutive Latency lines under the limit.
 set -uo pipefail
+bad_args() { echo "VP_NPU_FAIL reason=bad_args"; exit 1; }
 FRAMES=396; MAX=30; LOG=""
 while [ $# -gt 0 ]; do case "$1" in
-  --frames) FRAMES=$2; shift 2 ;; --max-wall-ms) MAX=$2; shift 2 ;; --log) LOG=$2; shift 2 ;;
-  *) echo "VP_NPU_FAIL reason=bad_args"; exit 1 ;; esac; done
+  --frames)
+    [ $# -ge 2 ] || bad_args
+    [[ $2 =~ ^[0-9]+$ ]] || bad_args
+    FRAMES=$2; shift 2 ;;
+  --max-wall-ms)
+    [ $# -ge 2 ] || bad_args
+    [[ $2 =~ ^[0-9]+([.][0-9]+)?$ ]] || bad_args
+    MAX=$2; shift 2 ;;
+  --log)
+    [ $# -ge 2 ] || bad_args
+    LOG=$2; shift 2 ;;
+  *) bad_args ;; esac; done
 if [ -n "$LOG" ]; then text=$(cat "$LOG"); else text=$(podman logs x5h-vp 2>&1); fi
 grep -q 'Offload gate PASSED' <<<"$text" || { echo "VP_NPU_FAIL reason=no_offload"; exit 1; }
 awk -v want="$FRAMES" -v max="$MAX" '

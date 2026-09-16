@@ -1,10 +1,11 @@
 # Scenario simulation — single-host graph.
 #
 # Assembles the shared Autoware and scenario service files and restores the
-# single-host wiring: scenario_simulator waits for Autoware and joins the map
-# PID namespace. Split-host runs use --role autoware / --role scenario, where
-# the CLI selects one service file plus the base Zenoh fragment. This file
-# never includes the Zenoh bridge.
+# single-host wiring: scenario_simulator waits for Autoware, including the
+# local /map/pointcloud_map topic, and joins the map PID namespace.
+# Split-host runs use --role autoware / --role scenario, where the CLI
+# selects one service file plus the base Zenoh fragment. This file never
+# includes the Zenoh bridge.
 include:
   - services.autoware.yaml
   - services.scenario.yaml
@@ -12,6 +13,8 @@ include:
 services:
   scenario_simulator:
     pid: service:map
+    environment:
+      - WAIT_FOR_POINTCLOUD_MAP=1
     depends_on:
       - api
       - control

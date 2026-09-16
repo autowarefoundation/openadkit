@@ -471,6 +471,8 @@ def test_real_compose_views_keep_default_and_role_graphs_isolated():
     default = compose_config(scenario, ["docker-compose.yaml"])
     assert "zenoh-bridge" not in default["services"]
     assert {"scenario_simulator", "map", "planning"} <= set(default["services"])
+    default_sim = default["services"]["scenario_simulator"]
+    assert default_sim.get("environment", {}).get("WAIT_FOR_POINTCLOUD_MAP") == "1"
     autoware = compose_config(
         scenario, ["services.autoware.yaml", "../base/compose.zenoh.yaml"], env=env
     )
@@ -484,7 +486,15 @@ def test_real_compose_views_keep_default_and_role_graphs_isolated():
         scenario, ["services.scenario.yaml", "../base/compose.zenoh.yaml"], env=env
     )
     assert set(simulator["services"]) == {"scenario_simulator", "zenoh-bridge"}
-    assert "pid" not in simulator["services"]["scenario_simulator"]
+    role_sim = simulator["services"]["scenario_simulator"]
+    assert "pid" not in role_sim
+    assert role_sim.get("environment", {}).get("WAIT_FOR_POINTCLOUD_MAP") != "1"
+    default_cmd = default_sim.get("command")
+    default_text = default_cmd if isinstance(default_cmd, str) else "\n".join(default_cmd)
+    role_cmd = role_sim.get("command")
+    role_text = role_cmd if isinstance(role_cmd, str) else "\n".join(role_cmd)
+    assert "wait_for_topic /map/pointcloud_map" in default_text
+    assert "wait_for_topic /map/pointcloud_map" in role_text
 
     carla = ROOT / "deployments/carla-simulation"
     env = role_compose_env(carla)

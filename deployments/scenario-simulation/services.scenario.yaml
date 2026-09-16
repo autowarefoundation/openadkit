@@ -1,7 +1,8 @@
 # Scenario-host service for scenario simulation.
 #
 # Shared by the single-host entry point (docker-compose.yaml, which adds
-# pid/depends_on back) and the `--role scenario` view (this file plus
+# pid/depends_on and WAIT_FOR_POINTCLOUD_MAP back) and the `--role scenario`
+# view (this file plus
 # deployments/base/compose.zenoh.yaml, attached by the CLI).
 # Autoware edges and pid: service:map live in the default entry point, not here:
 # the role view has no Autoware services and no map.
@@ -77,9 +78,9 @@ services:
           done
         }
 
-        # /map/pointcloud_map is intentionally not waited for: the map blobs
-        # stay local to each host and are not routed over Zenoh. The scenario
-        # host has no map publisher in split mode.
+        if [ "$${WAIT_FOR_POINTCLOUD_MAP:-}" = 1 ]; then
+          wait_for_topic /map/pointcloud_map
+        fi
         wait_for_topic /api/autoware/get/engage
         wait_for_service /api/autoware/set/engage
         wait_for_service /api/operation_mode/change_to_autonomous

@@ -70,9 +70,22 @@ services:
     restart: on-failure
 
   # The stop gate (gate D6): watches domain 1 for the CR52-authored stop.
-  # Same image as the bridge. The sibling plan's si/ helpers (including the
-  # gate script itself) have not landed on this host yet, so SI_GATE_CMD is
-  # a placeholder the operator points at the real script once they have.
+  # Same image as the bridge. Command and args are the sibling plan's own
+  # invocation:
+  #   docker run --rm --net=host -e ROS_DOMAIN_ID=1 \
+  #     -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  #     -e CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml visionpilot:si \
+  #     'source /ws/install/setup.bash && python3 /ws/si/si_stop_gate.py \
+  #      --fault-at $T --window 30 --max-latency-ms 700'
+  # SI_GATE_FAULT_AT is per run (the epoch second the fault is injected), so
+  # it cannot be baked in here. Set it and restart just this service right at
+  # `x5h-ces2027-demo.sh fault ...`, e.g.:
+  #   SI_GATE_FAULT_AT=$(date +%s) docker compose up -d --no-deps si-gate
+  # SI_GATE_MAX_LATENCY_MS is route-dependent (gate D6's deviation): 700 for
+  # the `kill` fault route (the firmware trips the stop 0.5 s after the last
+  # heartbeat, plus one 0.15 s cycle), the spec's 200 for the `channel` route
+  # (no staleness wait there). Default here is the `kill` figure; override to
+  # 200 for a channel-route run.
   si-gate:
     image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
     container_name: ces-si-gate
@@ -86,7 +99,10 @@ services:
       - CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml
     volumes:
       - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro
-    command: ["/bin/sh", "-c", "${SI_GATE_CMD:-echo si-gate: sibling plan has not shipped its si/ helpers on this host yet; sleep infinity}"]
+    command: >
+      bash -c "source /ws/install/setup.bash && python3 /ws/si/si_stop_gate.py
+      --fault-at ${SI_GATE_FAULT_AT:-0} --window ${SI_GATE_WINDOW:-30}
+      --max-latency-ms ${SI_GATE_MAX_LATENCY_MS:-700}"
     restart: "no"
 
   # The booth control script (scripts/x5h-ces2027-demo.sh). Its check/fault/

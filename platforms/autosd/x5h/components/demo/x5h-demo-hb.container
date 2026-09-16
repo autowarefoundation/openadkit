@@ -8,7 +8,7 @@ After=network-online.target
 # domain 2 for the CR52 to watch. Without the bridge it simply publishes
 # into a domain nobody on the CR52 side sees yet; it does not fail.
 After=x5h-demo-bridge.service
-# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+# Domain 2 exists only over tap0 (rpmsg-eth), which the cr52 and demo roles both bring up.
 ConditionKernelCommandLine=x5h.role=demo
 
 [Install]

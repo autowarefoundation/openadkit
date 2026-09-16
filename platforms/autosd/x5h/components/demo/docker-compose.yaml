@@ -1,7 +1,8 @@
 # CES 2027 demo stack for the companion host (rog-amd). Everything here runs
 # in a container so the demo is portable off that one host: `docker compose
 # -f docker-compose.yaml up -d` brings up the CARLA server and the CARLA <->
-# ROS 2 bridge; the board side (the demo role's five Quadlet units, see
+# ROS 2 bridge; the board side (the demo role's four Quadlet container units
+# plus one plain systemd unit, see
 # ../../README.md "CES 2027 demo role") is separate and reached over ssh by
 # scripts/x5h-ces2027-demo.sh, not by this file.
 #
@@ -28,6 +29,8 @@ services:
     ipc: host
     init: true
     runtime: nvidia
+    # Needs the NVIDIA container runtime on the host: `docker info` must
+    # list `nvidia` among its Runtimes, or this service fails to start.
     deploy:
       resources:
         reservations:

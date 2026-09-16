@@ -313,12 +313,24 @@ def start(
         [
             "up",
             "--detach",
+            "--pull",
+            "never",
+            "--remove-orphans",
+            *services,
+        ],
+    )
+    save_runtime(deployment, selection)
+    compose_run(
+        deployment,
+        selection,
+        [
+            "up",
+            "--detach",
             "--wait",
             "--wait-timeout",
             str(selection.wait_timeout),
             "--pull",
             "never",
-            "--remove-orphans",
             *services,
         ],
     )

@@ -283,7 +283,6 @@ def main() -> int:
             raise OpenADKitError(conflict)
         data.install_data(deployment, selection, args.force)
         compose.start(deployment, selection, args.pull, configured_services)
-        compose.save_runtime(deployment, selection)
         print_run_next_steps(deployment, selection)
         return 0
 
@@ -307,13 +306,17 @@ def main() -> int:
             file=sys.stderr,
         )
         role = None
-    if saved is None and args.command == "stop":
-        if compose.running_names([deployment.name]):
-            print(
-                f"note: {deployment.name} is running without readable runtime "
-                "state; stopping by project name",
-                file=sys.stderr,
+    if saved is None and compose.running_names([deployment.name]):
+        if args.command != "stop":
+            raise OpenADKitError(
+                f"{deployment.name} is running but its saved runtime state is "
+                "missing or unreadable; stop it before status or logs"
             )
+        print(
+            f"note: {deployment.name} is running without readable runtime "
+            "state; stopping by project name",
+            file=sys.stderr,
+        )
     selection = deployment.select(
         kit, ros_distro, gpu, role=role, operational=True
     )

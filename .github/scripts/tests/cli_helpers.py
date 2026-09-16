@@ -228,6 +228,7 @@ def fake_docker(
     configured="app\n",
     daemon_returncode=0,
     config_returncode=0,
+    wait_returncode=0,
     runtimes='{"nvidia": {}}',
     compose_ls="[]",
 ):
@@ -254,6 +255,8 @@ def fake_docker(
         f"printf '%b' {json.dumps(configured)}; fi\n"
         'if [[ "$*" == *"config --quiet"* ]]; then '
         f"exit {config_returncode}; fi\n"
+        'if [[ "$*" == *"up --detach --wait"* ]]; then '
+        f"exit {wait_returncode}; fi\n"
         "exit 0\n",
     )
     return bin_dir, calls

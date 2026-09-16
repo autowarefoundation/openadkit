@@ -236,7 +236,12 @@ def test_run_orders_render_daemon_pull_and_up(tmp_path):
     text = calls.read_text()
     assert text.index("config --quiet") < text.index("|info")
     assert text.index("|info") < text.index("pull --policy missing")
-    assert text.index("pull --policy missing") < text.index("up --detach --wait")
+    assert text.index("pull --policy missing") < text.index(
+        "up --detach --pull never --remove-orphans"
+    )
+    assert text.index("up --detach --pull never --remove-orphans") < text.index(
+        "up --detach --wait"
+    )
 
 
 @pytest.mark.parametrize(
@@ -250,9 +255,8 @@ def test_run_pull_policy_is_explicit_for_up(tmp_path, policy, expects_pull):
     assert result.returncode == 0, result.stderr
     text = calls.read_text()
     assert ("pull --policy" in text) is expects_pull
-    assert (
-        "up --detach --wait --wait-timeout 30 --pull never --remove-orphans app" in text
-    )
+    assert "up --detach --pull never --remove-orphans app" in text
+    assert "up --detach --wait --wait-timeout 30 --pull never app" in text
 
 
 def test_run_resets_declared_one_shot_services(tmp_path):
@@ -839,6 +843,37 @@ def test_run_live_state_guard(
     else:
         assert expected_message in result.stderr
         assert_no_container_mutation(calls)
+
+
+def test_wait_timeout_still_records_runtime_role(tmp_path):
+    root, deployment = runtime_tree(tmp_path, manifest=role_manifest())
+    bin_dir, calls = fake_docker(tmp_path, wait_returncode=1)
+    result = run_cli(
+        root,
+        ["run", "example", "--role", "secondary", "--pull", "never"],
+        env=docker_env(bin_dir, ROLE_TOKEN="token"),
+    )
+    assert result.returncode != 0
+    assert "up --detach --wait" in calls.read_text()
+    saved = json.loads((deployment / ".cache" / "runtime.json").read_text())
+    assert saved["role"] == "secondary"
+    calls.write_text("")
+    result = run_cli(root, ["status", "example"], env=docker_env(bin_dir))
+    assert result.returncode == 0, result.stderr
+    assert "compose.secondary.yaml" in calls.read_text()
+
+
+def test_status_and_logs_refuse_live_project_without_runtime_state(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
+    bin_dir, calls = fake_docker(tmp_path, compose_ls=RUNNING_PROJECT)
+    for command in (["status", "example"], ["logs", "example"]):
+        calls.write_text("")
+        result = run_cli(root, command, env=docker_env(bin_dir))
+        assert result.returncode == 1, result.stderr
+        assert "saved runtime state is missing or unreadable" in result.stderr
+        text = calls.read_text()
+        assert " ps" not in text
+        assert " logs" not in text
 
 
 def test_vanished_saved_role_stops_by_project_name(tmp_path):

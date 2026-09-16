@@ -122,4 +122,5 @@ the allowlist is not authentication.
   (`up` again). Switching roles or omitting `--role` while a role stack is
   live is refused: stop the project first.
 - If runtime state is missing or unreadable while the project is live, `run`
-  refuses and `stop` still removes the project by name.
+  refuses, `status` and `logs` refuse rather than using the single-host
+  compose view, and `stop` still removes the project by name.

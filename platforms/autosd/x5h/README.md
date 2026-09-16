@@ -1069,7 +1069,7 @@ itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
 - `X5H_DEMO_UP units=<n>`: `x5h-demo-up.sh` at boot. All five units started (or `X5H_DEMO_UP_FAIL reason=<unit|quadlet>`).
 - `RPMSG_LISTEN_PASS n=<n> gaps=<n>`: `rpmsg-ping -l` on the board. The CR52 heartbeat arrived on `rpmsg-si` with consecutive sequence numbers.
 - `VP_NPU_PASS frames=<n> wall_avg_ms=<ms> wall_max_ms=<ms>`: `vp-npu-gate.sh`, gate D5.
-- `SI_STOP_PASS`: the stop gate on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1.
+- `SI_STOP_PASS`: `si_stop_gate.py` on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1 within the latency budget.
 - `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=5 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together (or `X5H_CES_DEMO_FAIL reason=<slug>`).
 - `DEMO_ROLE_PASS role=demo carveout=0x5da00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact and the CR52 carveout relocated.
 
@@ -1102,14 +1102,13 @@ the operator (or the `demo` container) needs.
 
 | Gate | Pass criteria | Deviation |
 | --- | --- | --- |
-| D1 (sub-gate D1a) | The board boots the `demo` role with the NPU device tree intact and the CR52 carveout relocated to `0x5da00000` (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). | None. |
-| D5 | VisionPilot runs under 30 ms end to end on the NPU while the CR52 runs (`vp-npu-gate.sh`, marker `VP_NPU_PASS`). | None. |
-| D6 | The CR52-authored stop is proven three times: twice by `kill`, once by the `channel` route (marker `SI_STOP_PASS`). | The latency threshold depends on the route. `kill` gets 700 ms: the firmware trips the stop 0.5 s after the last heartbeat, plus one 0.15 s cycle. `channel` keeps the spec's 200 ms, because that latch needs no staleness wait. |
-| D7 | Two power cycles. | None. |
-
-D2 to D4 are left out of this table. This task's brief did not carry their pass criteria.
-Rather than guess, this section documents only the gates it had sourced material for. See
-the plan's own gate table for D2 to D4.
+| D1 (role boot) | Board 1 boots role `demo`. `remoteproc0` reaches `running`. `uio2` exists. `cmemdrv` logs all four regions with unchanged base and size. `/proc/iomem` shows the 2 MiB reservation at `0x5da00000` (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). Pass: all true in one boot, twice. | None. |
+| D2 (payload) | One 1400-byte DDS sample crosses `tap0` unfragmented. `tcpdump` on the rog-amd side of the bridge shows one frame. Pass: zero `DATA_FRAG`. | None. |
+| D3 (channel) | The second RPMsg endpoint binds on Linux, and the CR52 heartbeat arrives at 1 Hz for 10 minutes (`rpmsg-ping -l`, marker `RPMSG_LISTEN_PASS`). Pass: 600 of 600. | None. |
+| D4 (lap) | VisionPilot drives the Town04 ring one full lap unaided, cross-track error under 1.0 m. Pass: one lap, no lane departure. | Runs on rog-amd with no board involved, so it can proceed in parallel with D1 to D3. |
+| D5 (NPU) | VisionPilot end to end under 30 ms on the NPU while the CR52 runs its idle loop (`vp-npu-gate.sh`, marker `VP_NPU_PASS`). Pass: 396 of 396 frames. | None. |
+| D6 (stop) | Fault injected at a fixed point. The CR52-authored `control_cmd` appears within the latency budget. The vehicle stops in lane (`si_stop_gate.py`, marker `SI_STOP_PASS`). Pass: twice in a row, stop distance recorded. | The spec's figure is 200 ms. That holds for the `channel` route, where the latch needs no staleness. The `kill` route's threshold is 700 ms instead. The firmware trips the stop 0.5 s after the last heartbeat, then adds one 0.15 s cycle. |
+| D7 (cold boot) | Power cycle board 1. The whole stack comes up with no operator action (`x5h-demo-up.sh`, marker `X5H_DEMO_UP`). Pass: twice. | None. |
 
 ## Troubleshooting
 

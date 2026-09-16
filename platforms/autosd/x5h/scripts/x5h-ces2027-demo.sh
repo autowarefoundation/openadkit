@@ -25,14 +25,27 @@ case "$cmd" in
     [ -f "$CARLA_PKG/ces2027-package-sha.txt" ] || fail no_package_sha
     sha=$(cat "$CARLA_PKG/ces2027-package-sha.txt")
     [ -f "$VP_SI/route.env" ] || fail no_route
-    # shellcheck source=/dev/null
-    . "$VP_SI/route.env"
-    states=$($SSH "$BOARD" "systemctl is-active $UNITS") || true
+    # route.env is data, never code: sourcing it would let a syntax error, an
+    # unset-variable reference, or a bare `exit` hijack this script's own
+    # control flow (observed: a syntax error made an earlier version of this
+    # script print a false X5H_CES_DEMO_READY with spawn=?). Read the one
+    # value needed with sed instead, and reject anything that does not look
+    # like exactly one well-formed assignment.
+    spawn=$(sed -n 's/^SPAWN_INDEX=\([0-9]\{1,\}\)$/\1/p' "$VP_SI/route.env" | head -n 1)
+    [ -n "$spawn" ] || fail bad_route
+    states=$($SSH "$BOARD" "systemctl is-active $UNITS")
+    # A transport failure (no ssh binary, connection refused, a dropped
+    # connection mid-output) shows up here as fewer than 5 lines, including
+    # zero. That must be reported as its own reason: sending the operator to
+    # check the board's units when the real problem is the network wastes
+    # the minutes a booth doesn't have.
+    n_lines=$(grep -c '.' <<<"$states")
+    [ "$n_lines" -eq 5 ] || fail ssh_failed
     n=$(grep -c '^active$' <<<"$states")
     [ "$n" -eq 5 ] || fail unit_inactive
     hb=$($SSH "$BOARD" 'journalctl -u x5h-si-link -n 1 --no-pager -o cat') || true
     seq=$(sed -n 's/.*hb seq=\([0-9]*\).*/\1/p' <<<"$hb"); [ -n "$seq" ] || fail no_heartbeat
-    echo "X5H_CES_DEMO_READY sha=$sha spawn=${SPAWN_INDEX:-?} units=$n hb=$seq" ;;
+    echo "X5H_CES_DEMO_READY sha=$sha spawn=$spawn units=$n hb=$seq" ;;
   run)
     # Bringing carla-server/bridge/si-gate up is compose's job, not this
     # script's: printing the two commands keeps the booth operator off

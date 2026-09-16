@@ -1,6 +1,6 @@
 # Quickstart
 
-From zero to a running Autoware planning simulation in about 10 minutes. No GPU or source checkout is required.
+From zero to a running Autoware planning simulation in about 10 minutes. No GPU is required.
 
 ```mermaid
 flowchart LR
@@ -13,6 +13,15 @@ flowchart LR
 - A web browser - the visualizer runs in it, no display server needed
 
 ## 1. Get Open AD Kit
+
+--8<-- "includes/first-release-note.md"
+
+=== "Source checkout"
+
+    ```bash
+    git clone https://github.com/autowarefoundation/openadkit.git
+    cd openadkit
+    ```
 
 === "Release bundle"
 
@@ -29,13 +38,6 @@ flowchart LR
     printf '%s  %s\n' "$EXPECTED" "openadkit-${VERSION}.tar.gz" | sha256sum --check -
     tar -xzf "openadkit-${VERSION}.tar.gz"
     cd "openadkit-${VERSION}"
-    ```
-
-=== "Source checkout"
-
-    ```bash
-    git clone https://github.com/autowarefoundation/openadkit.git
-    cd openadkit
     ```
 
 The release bundle contains only the runtime entry point and deployment assets.

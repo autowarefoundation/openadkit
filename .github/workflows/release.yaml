@@ -369,4 +369,6 @@ jobs:
       contents: write
     uses: ./.github/workflows/deploy-docs.yaml
     with:
-      source_ref: ${{ inputs.version }}
+      # Caller SHA on main, not the promoted build tag. The tag can predate
+      # build-docs, and publishing that tree would overwrite newer main docs.
+      source_ref: ${{ github.sha }}

@@ -68,7 +68,7 @@ provide authentication or encryption.
 6. [**Control**](components/planning-control.md) converts that trajectory into throttle, brake, and steering commands.
 7. [**Vehicle System**](components/vehicle-system.md) bridges those commands to the actual vehicle or simulator.
 
-A **deployment** combines the shared base services with task-specific overrides. Planning Simulation uses the base map, planning, vehicle, system, control, simulator, API, and visualizer services; Logging Simulation adds sensing, perception, and localization for recorded sensor data. For the full picture, see [Components](components/index.md) and [Deployment](deployment/index.md).
+A **deployment** combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. For the full picture, see [Components](components/index.md) and [Deployment](deployment/index.md).
 
 ## Related
 

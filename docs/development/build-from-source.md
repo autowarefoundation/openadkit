@@ -77,24 +77,21 @@ touch autoware/src/middleware/external/.keep
 # 5. Build the universe-common base intermediate (~2 hours)
 docker buildx bake -f components/docker-bake.hcl universe-common
 
-# 6. Build and tag all component images (~2 hours)
+# 6. Build and tag the planning-simulation images (~2 hours)
 ARCH=$(uname -m)
 case "$ARCH" in
   x86_64|amd64) ARCH=amd64 ;;
   aarch64|arm64) ARCH=arm64 ;;
 esac
 docker buildx bake -f components/docker-bake.hcl \
-  --set sensing-perception.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-${ARCH}-humble \
   --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping-${ARCH}-humble \
   --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control-${ARCH}-humble \
   --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system-${ARCH}-humble \
   --set api.tags=ghcr.io/autowarefoundation/openadkit:api-${ARCH}-humble \
   --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer-${ARCH}-humble \
   --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator-${ARCH}-humble \
-  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-amd64-humble \
-  --set sensing-perception-cuda.tags=ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda-amd64-humble \
   --load \
-  component
+  planning
 
 # 7. Override image tags as needed, then start a deployment
 ./openadkit run planning-simulation
@@ -105,8 +102,9 @@ Bake only populates the BuildKit cache). Repository-mode `./openadkit` injects
 `<prefix>:<target>-<arch>-<ros-distro>` (for example
 `planning-control-amd64-humble`). Local tags must match that name, or set the
 `*_IMAGE` variables in `config.local.env`. For Jazzy, build with
-`ROS_DISTRO=jazzy` and use `-jazzy` suffixes. `carla-interface` and
-`sensing-perception-cuda` are amd64-only.
+`ROS_DISTRO=jazzy` and use `-jazzy` suffixes. Group `planning` matches this
+walkthrough on amd64 and arm64. Group `component` also builds
+`carla-interface` and `sensing-perception-cuda`, which are amd64-only.
 
 ### Build Targets (Reference)
 
@@ -183,7 +181,7 @@ The release workflow (`.github/workflows/release.yaml`) has seven jobs that run 
 4. **prepare-github-release** — Creates a workflow-owned draft, or verifies an existing published release against the complete metadata, notes, target SHA, and assets.
 5. **release-images** — Promotes immutable image tags, rechecks the latest-stable policy, then updates mutable aliases only if the policy is unchanged.
 6. **release-github** — Revalidates the exact draft release ID and publishes it after image promotion succeeds.
-7. **deploy-docs** — Publishes documentation from the exact release tag when the release updates stable aliases.
+7. **deploy-docs** — Publishes documentation from the release workflow revision on `main` when the release updates stable aliases.
 
 ```mermaid
 flowchart LR

@@ -7,6 +7,7 @@ on:
     paths:
       - mkdocs.yaml
       - openadkit
+      - openadkit.json
       - "cli/**"
       - docs/macros.py
       - .github/image-inventory.json
@@ -48,8 +49,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          # Release calls supply their exact tag; manual runs always use main.
-          # Pushes already check out the triggering main commit by default.
+          # Release calls pass the caller SHA on main so build-docs and the
+          # site match current main, not the promoted build tag. Manual runs
+          # always use main. Pushes check out the triggering commit by default.
           ref: ${{ inputs.source_ref || (github.event_name == 'workflow_dispatch' && github.event.repository.default_branch) || '' }}
 
       - name: Build docs

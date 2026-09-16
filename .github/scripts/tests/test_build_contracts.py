@@ -298,14 +298,19 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
     assert '"docs/.pages"' in DOCS_WORKFLOW
     assert '"docs/**/.pages"' in DOCS_WORKFLOW
     assert '"cli/**"' in DOCS_WORKFLOW
+    assert "openadkit.json" in DOCS_WORKFLOW
     assert "openadkit.d" not in DOCS_WORKFLOW
     preview = (ROOT / ".github/workflows/pr-preview.yaml").read_text()
     assert '"cli/**"' in preview
+    assert "openadkit.json" in preview
     assert "openadkit.d" not in preview
     assert '"docs/.pages"' in preview
     assert '"docs/**/.pages"' in preview
     assert "'docs/.pages'" in LINT_WORKFLOW
     assert "'docs/**/.pages'" in LINT_WORKFLOW
+    release = (ROOT / ".github/workflows/release.yaml").read_text()
+    assert "source_ref: ${{ github.sha }}" in release
+    assert "source_ref: ${{ inputs.version }}" not in release
 
 
 def test_capture_metadata_uses_retrying_registry_lookup():

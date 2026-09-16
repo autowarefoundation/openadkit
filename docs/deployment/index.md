@@ -18,9 +18,9 @@ standalone source-checkout deployment.
 ## Base and Overlay Model
 
 Planning, Scenario, Logging, and CARLA Simulation include the shared
-`deployments/base/docker-compose.yaml`. The base defines map, planning, vehicle,
-system, control, simulator, API, and visualizer services; each deployment adds
-only its delta.
+`deployments/base/docker-compose.yaml`. The base defines map-check, map,
+planning, vehicle, system, control, API, and visualizer services. Planning and
+scenario overlays add the dummy simulator; each deployment adds only its delta.
 
 Each curated deployment carries a `deployment.json` manifest and one complete
 `config.env` for Compose interpolation. Operate it from the source checkout or

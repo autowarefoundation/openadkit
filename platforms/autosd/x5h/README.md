@@ -1046,6 +1046,71 @@ Site values — server IP, export paths, the `ip=` kernel argument, and the DTB 
 live in `x5h-work/HANDOFF.md` on the operator's machine and are never committed to this
 repo.
 
+## CES 2027 demo role (`demo`)
+
+The `demo` boot role runs two things in one boot: VisionPilot on the NPU, and the Safety
+Island on the CR52. Together they drive a CARLA-fed booth demo. See [selfboot.md](selfboot.md),
+"Roles", for the role itself. `x5h-demo.service` (`scripts/x5h-demo-up.sh`) starts five
+Quadlet units at boot. When the Quadlet generator did not run, it regenerates the units
+itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
+
+### The five units
+
+| Unit | Role |
+| --- | --- |
+| `x5h-si-link.service` | Talks to the CR52 over the `rpmsg-si` channel. Logs its heartbeat. Injects the fault on `SIGUSR1` (`SIGUSR2` clears it). |
+| `x5h-demo-bridge.service` | The `domain_bridge` container. It joins DDS domain 1 (VisionPilot, host network) to domain 2 (the CR52, over `tap0`). [component-stack.md](component-stack.md) covers the bridge mechanics it shares with the MRM demo. |
+| `x5h-demo-restamp.service` | `control_restamp.py`. Republishes the CR52's `control_cmd_raw` as `control_cmd`, stamped with domain 1's clock instead of the CR52's own uptime. |
+| `x5h-demo-hb.service` | Turns every VisionPilot throttle command into `/safety_island/vp_heartbeat` for the CR52 to watch. |
+| `x5h-vp.service` | VisionPilot itself, on the NPU. Reads the CARLA camera feed over ROS 2. |
+
+### The six markers
+
+- `X5H_DEMO_UP units=<n>`: `x5h-demo-up.sh` at boot. All five units started (or `X5H_DEMO_UP_FAIL reason=<unit|quadlet>`).
+- `RPMSG_LISTEN_PASS n=<n> gaps=<n>`: `rpmsg-ping -l` on the board. The CR52 heartbeat arrived on `rpmsg-si` with consecutive sequence numbers.
+- `VP_NPU_PASS frames=<n> wall_avg_ms=<ms> wall_max_ms=<ms>`: `vp-npu-gate.sh`, gate D5.
+- `SI_STOP_PASS`: the stop gate on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1.
+- `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=5 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together (or `X5H_CES_DEMO_FAIL reason=<slug>`).
+- `DEMO_ROLE_PASS role=demo carveout=0x5da00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact and the CR52 carveout relocated.
+
+### Running the demo
+
+The companion-host half is a Docker Compose stack, `components/demo/docker-compose.yaml`.
+It declares four services.
+
+- `carla-server`: the CARLA simulator, GPU-reserved.
+- `bridge` and `si-gate`: the sibling vision_pilot plan's `visionpilot:si` image, on DDS domain 1.
+- `demo`: an idle container carrying `scripts/x5h-ces2027-demo.sh` and an ssh client.
+
+Start the stack with `docker compose -f components/demo/docker-compose.yaml up -d`. Every
+host path is an env var with a `$HOME`-relative default. The booth script itself needs only
+`ssh` to the board:
+
+```
+x5h-ces2027-demo.sh check                 # ready? prints the READY/FAIL marker above
+x5h-ces2027-demo.sh run                   # prints the compose + board commands to bring the stack up
+x5h-ces2027-demo.sh fault kill|channel    # the demo moment
+x5h-ces2027-demo.sh reset                 # VisionPilot back, fault cleared
+```
+
+`run` does not shell out to `docker` itself. That choice avoids mounting the host's
+`/var/run/docker.sock` into the `demo` container just to start its own compose siblings.
+Bringing the stack up is `docker compose`'s job. This script only prints the two commands
+the operator (or the `demo` container) needs.
+
+### Gates
+
+| Gate | Pass criteria | Deviation |
+| --- | --- | --- |
+| D1 (sub-gate D1a) | The board boots the `demo` role with the NPU device tree intact and the CR52 carveout relocated to `0x5da00000` (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). | None. |
+| D5 | VisionPilot runs under 30 ms end to end on the NPU while the CR52 runs (`vp-npu-gate.sh`, marker `VP_NPU_PASS`). | None. |
+| D6 | The CR52-authored stop is proven three times: twice by `kill`, once by the `channel` route (marker `SI_STOP_PASS`). | The latency threshold depends on the route. `kill` gets 700 ms: the firmware trips the stop 0.5 s after the last heartbeat, plus one 0.15 s cycle. `channel` keeps the spec's 200 ms, because that latch needs no staleness wait. |
+| D7 | Two power cycles. | None. |
+
+D2 to D4 are left out of this table. This task's brief did not carry their pass criteria.
+Rather than guess, this section documents only the gates it had sourced material for. See
+the plan's own gate table for D2 to D4.
+
 ## Troubleshooting
 
 (findings recorded as discovered)

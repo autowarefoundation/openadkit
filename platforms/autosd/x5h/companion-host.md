@@ -106,13 +106,13 @@ each is staged from (`boards/x5h1.vars`, `boards/x5h2.vars`).
 
 | | Board 1 `192.168.0.20` | Board 2 `192.168.0.21` |
 |---|---|---|
-| Default role | `npu` | `npu` |
-| Available roles | `cr52`, `npu`, `demo` | `cr52`, `npu`, `demo`, `yocto` |
+| Default role | `dev` | `dev` |
+| Available roles | `demo`, `dev` | `demo`, `dev`, `yocto` |
 | `HAS_YOCTO` | `0` | `1` |
 | Hostname | `autosd-x5h` | `autosd-x5h-2` (`yocto-x5h-2` in the `yocto` role) |
 | LUN 1 (AutoSD) | `x5h-boot` 1 GiB / `x5h-root` 12 GiB / `autosd-store` 19 GiB btrfs, PARTUUID `…5e01/02/03` | identical |
 | LUN 2 | `yocto-boot` 1 GiB (empty) / `yocto-root` 8 GiB (empty) / `npu-work` rest, PARTUUID `…5e11/12/13` | same map, Yocto partitions populated |
-| `x5h-boot` contents | `Image-autosd`, both dtbs, `x5h-env.txt`, `x5h-role.txt` | identical |
+| `x5h-boot` contents | `Image-autosd`, all three dtbs, `x5h-env.txt`, `x5h-role.txt` | identical |
 | CR52 slot | `actuation_x5h.elf` | identical (its silence remains the open escalation) |
 | Bootloader | Stage 2 AI-package chain, DRAM ECC off | identical |
 | Access | admin + dev + ext grants | admin only |
@@ -130,7 +130,7 @@ Two consequences worth stating plainly:
   therefore reachable by every root login on board 1. That is accepted, and
   the Tailscale ACL below is deliberately unchanged.
 - **Board 2 is not the Yocto appliance any more.** Its default personality is
-  AutoSD in the `npu` role, like board 1; Yocto survives as a third role on
+  AutoSD in the `dev` role, like board 1; Yocto survives as a third role on
   its second LUN, for vendor-kernel reproduction and vendor reports.
 
 ## 1. Base packages and tailnet
@@ -818,13 +818,13 @@ already ends in a reset:
 
 ```sh
 ssh root@192.168.0.20 x5h-role                  # current= and next=
-ssh root@192.168.0.20 x5h-role set cr52 --reboot
+ssh root@192.168.0.20 x5h-role set demo --reboot
 # wait, then
 ssh root@192.168.0.20 'cat /run/x5h/role; sh /usr/sbin/selfboot-smoke.sh'
-ssh root@192.168.0.20 x5h-role set npu --reboot  # leave it in the default role
+ssh root@192.168.0.20 x5h-role set dev --reboot  # leave it in the default role
 ```
 
-The role is sticky, so a board left in `cr52` stays there through every
+The role is sticky, so a board left in `demo` stays there through every
 reboot, panic and watchdog reset until someone sets it back.
 
 Comparing `/proc/sys/kernel/random/boot_id` either side of the reset is a
@@ -861,9 +861,9 @@ wrong by days. Correlate against the companion's clock, not the board's.
 ## Related
 
 - [UFS self-boot](selfboot.md) — why the board no longer depends on this
-  host, the rescue commands that still do, the four boot roles, and the
+  host, the rescue commands that still do, the three boot roles, and the
   `stage-board.sh` sequence that runs on this host.
-- [NPU bring-up](npu-bringup.md) covers the `npu` role's container contract,
+- [NPU bring-up](npu-bringup.md) covers the NPU container contract,
   which is what board 1's external developers consume.
 - [CR52 slot update](cr52-slot-update.md) — the remote firmware workflow
   this host makes reachable.

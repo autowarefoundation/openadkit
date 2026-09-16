@@ -1,0 +1,13 @@
+[Unit]
+Description=X5H CES 2027 demo stack bring-up
+ConditionKernelCommandLine=x5h.role=demo
+After=x5h-npu.service cr52-remoteproc.service rpmsg-eth.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/x5h-demo-up.sh
+
+[Install]
+WantedBy=multi-user.target

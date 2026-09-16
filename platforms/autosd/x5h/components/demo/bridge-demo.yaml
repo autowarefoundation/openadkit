@@ -1,0 +1,22 @@
+# CES 2027 demo topic list for domain_bridge (domain 1 = bench LAN, domain 2 =
+# the CR52 over rpmsg-eth). Every 1 -> 2 sample fits one 1500-byte frame:
+# Odometry ~750 B, SteeringReport 24 B, Float64Stamped 24 B.
+name: safety_island_demo_bridge
+topics:
+  control/trajectory_follower/control_cmd:
+    type: autoware_control_msgs/msg/Control
+    from_domain: 2
+    to_domain: 1
+    remap: control/trajectory_follower/control_cmd_raw
+  vehicle/status/steering_status:
+    type: autoware_vehicle_msgs/msg/SteeringReport
+    from_domain: 1
+    to_domain: 2
+  localization/kinematic_state:
+    type: nav_msgs/msg/Odometry
+    from_domain: 1
+    to_domain: 2
+  safety_island/vp_heartbeat:
+    type: tier4_debug_msgs/msg/Float64Stamped
+    from_domain: 1
+    to_domain: 2

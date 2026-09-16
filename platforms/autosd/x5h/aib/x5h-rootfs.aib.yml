@@ -221,6 +221,13 @@ content:
       path: /usr/sbin/ort-rootfs.containerfile
     - source_path: ../scripts/ort-rootfs.containerignore
       path: /usr/sbin/ort-rootfs.containerignore
+    # --- demo role: CES 2027 single-ECU stack (issue #120, this milestone) --
+    - source_path: ../config/x5h-si-link.service
+      path: /etc/systemd/system/x5h-si-link.service
+    - source_path: ../scripts/x5h-demo-up.sh
+      path: /usr/sbin/x5h-demo-up.sh
+    - source_path: ../config/x5h-demo.service
+      path: /etc/systemd/system/x5h-demo.service
     # --- role-independent: container store, watchdog, manifest -------------
     - source_path: ../config/var-lib-containers.mount
       path: /etc/systemd/system/var-lib-containers.mount
@@ -323,6 +330,8 @@ content:
       path: /etc/containers/systemd/awf-oak-x5h.env
     - source_path: ../components/bridge/bridge-config.yaml
       path: /etc/containers/systemd/bridge-config.yaml
+    - source_path: ../components/demo/bridge-demo.yaml
+      path: /etc/containers/systemd/bridge-demo.yaml
     # EVERY mounted asset lands FLAT in /etc/containers/systemd/<basename>,
     # whatever subdirectory the repository keeps it in: launch/, nodes/ and
     # scenario/ group these files for human readers and have no meaning on
@@ -337,12 +346,28 @@ content:
       path: /etc/containers/systemd/control.launch.xml
     - source_path: ../components/nodes/control_restamp.py
       path: /etc/containers/systemd/control_restamp.py
+    - source_path: ../components/demo/cyclonedds-x5h-demo.xml
+      path: /etc/containers/systemd/cyclonedds-x5h-demo.xml
     - source_path: ../components/cyclonedds-x5h.xml
       path: /etc/containers/systemd/cyclonedds-x5h.xml
     - source_path: ../components/scenario/mrm-scenario.yaml
       path: /etc/containers/systemd/mrm-scenario.yaml
     - source_path: ../components/nodes/traj_relay.py
       path: /etc/containers/systemd/traj_relay.py
+    - source_path: ../components/demo/vision_pilot.conf
+      path: /etc/containers/systemd/vision_pilot.conf
+    - source_path: ../components/demo/vision_pilot_ros2.conf
+      path: /etc/containers/systemd/vision_pilot_ros2.conf
+    - source_path: ../components/nodes/vp_heartbeat.py
+      path: /etc/containers/systemd/vp_heartbeat.py
+    - source_path: ../components/demo/x5h-demo-bridge.container
+      path: /etc/containers/systemd/x5h-demo-bridge.container
+    - source_path: ../components/demo/x5h-demo-hb.container
+      path: /etc/containers/systemd/x5h-demo-hb.container
+    - source_path: ../components/demo/x5h-demo-restamp.container
+      path: /etc/containers/systemd/x5h-demo-restamp.container
+    - source_path: ../components/demo/x5h-vp.container
+      path: /etc/containers/systemd/x5h-vp.container
     # /var/lib/awf/scenario-sim{,/map} -- the scenario working directory
     # awf-oak-autoware and awf-oak-simulator mount, and the directory the
     # map is staged into -- are created at boot by systemd-tmpfiles rather
@@ -464,6 +489,8 @@ content:
     - path: /usr/sbin/x5h-stack-smoke.sh
       mode: "0755"
     - path: /usr/sbin/demo-role-smoke.sh
+      mode: "0755"
+    - path: /usr/sbin/x5h-demo-up.sh
       mode: "0755"
 
 auth:

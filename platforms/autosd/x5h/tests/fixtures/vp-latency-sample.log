@@ -1,0 +1,12 @@
+[MergedBackend] Offload gate PASSED — 1 nodes on the NPU (required at least 1)
+[MergedBackend] Offload gate PASSED — 1 nodes on the NPU (required at least 1)
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.1 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.4 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=23.9 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=25.0 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.2 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.8 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.0 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.6 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.3 ms  41 fps
+Latency  pre=1.8 ms  merged=22.3 ms  wall=24.5 ms  41 fps

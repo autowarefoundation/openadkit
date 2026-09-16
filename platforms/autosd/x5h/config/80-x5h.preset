@@ -41,8 +41,8 @@
 #
 # x5h-demo.service is the only demo-role unit that needs a preset line.
 # It gates on x5h.role=demo and its ExecStart (x5h-demo-up.sh) starts the
-# other four demo units itself, in order -- x5h-si-link.service is a plain
-# unit with no other enable path, and the three demo .container units are
+# other five demo units itself, in order -- x5h-si-link.service is a plain
+# unit with no other enable path, and the four demo .container units are
 # Quadlet-generated and would self-enable via their own [Install] section
 # regardless of this file (see the Quadlet note above), so the script's
 # `systemctl start` on them is a deterministic no-op when they are already

@@ -8,7 +8,7 @@ After=network-online.target
 # /control/trajectory_follower/control_cmd with domain 1's clock in all
 # three stamps. Without the bridge it simply sees nothing; it does not fail.
 After=x5h-demo-bridge.service
-# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+# Domain 2 exists only over tap0 (rpmsg-eth), which the cr52 and demo roles both bring up.
 ConditionKernelCommandLine=x5h.role=demo
 
 [Install]

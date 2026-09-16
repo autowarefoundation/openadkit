@@ -17,7 +17,7 @@ After=rpmsg-eth.service
 # at a host unit rather than at another container. No container unit here
 # requires or wants another one; see awf-oak-autoware.container for why
 # that rule exists and what breaks when it is relaxed.
-# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+# Domain 2 exists only over tap0 (rpmsg-eth), which the cr52 and demo roles both bring up.
 ConditionKernelCommandLine=x5h.role=demo
 
 [Install]

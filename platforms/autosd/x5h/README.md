@@ -1050,9 +1050,9 @@ repo.
 
 The `demo` boot role runs two things in one boot: VisionPilot on the NPU, and the Safety
 Island on the CR52. Together they drive a CARLA-fed booth demo. See [selfboot.md](selfboot.md),
-"Roles", for the role itself. `x5h-demo.service` (`scripts/x5h-demo-up.sh`) starts five
-Quadlet units at boot. When the Quadlet generator did not run, it regenerates the units
-itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
+"Roles", for the role itself. `x5h-demo.service` (`scripts/x5h-demo-up.sh`) starts four
+Quadlet container units plus one plain systemd unit at boot. When the Quadlet generator did
+not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
 
 ### The five units
 
@@ -1078,7 +1078,10 @@ itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
 The companion-host half is a Docker Compose stack, `components/demo/docker-compose.yaml`.
 It declares four services.
 
-- `carla-server`: the CARLA simulator, GPU-reserved.
+- `carla-server`: the CARLA simulator, GPU-reserved. The host needs the NVIDIA Container
+  Toolkit installed from NVIDIA's own repository (Ubuntu's default apt sources do not carry
+  it, so a plain `apt install nvidia-container-toolkit` fails with a package-not-found
+  error). Confirm it with `docker info`: it must list `nvidia` under Runtimes.
 - `bridge` and `si-gate`: the sibling vision_pilot plan's `visionpilot:si` image, on DDS domain 1.
 - `demo`: an idle container carrying `scripts/x5h-ces2027-demo.sh` and an ssh client.
 
@@ -1104,7 +1107,7 @@ the operator (or the `demo` container) needs.
 | --- | --- | --- |
 | D1 (role boot) | Board 1 boots role `demo`. `remoteproc0` reaches `running`. `uio2` exists. `cmemdrv` logs all four regions with unchanged base and size. `/proc/iomem` shows the 2 MiB reservation at `0x5da00000` (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). Pass: all true in one boot, twice. | None. |
 | D2 (payload) | One 1400-byte DDS sample crosses `tap0` unfragmented. `tcpdump` on the rog-amd side of the bridge shows one frame. Pass: zero `DATA_FRAG`. | None. |
-| D3 (channel) | The second RPMsg endpoint binds on Linux, and the CR52 heartbeat arrives at 1 Hz for 10 minutes (`rpmsg-ping -l`, marker `RPMSG_LISTEN_PASS`). Pass: 600 of 600. | None. |
+| D3 (channel) | The second RPMsg endpoint binds on Linux, and the CR52 heartbeat arrives at 1 Hz for 10 minutes (`rpmsg-ping -l`, marker `RPMSG_LISTEN_PASS`). Pass: 600 of 600 (`listen_loop` accepts `n_hb >= seconds - 2`, so 598 of 600 also passes). | None. |
 | D4 (lap) | VisionPilot drives the Town04 ring one full lap unaided, cross-track error under 1.0 m. Pass: one lap, no lane departure. | Runs on rog-amd with no board involved, so it can proceed in parallel with D1 to D3. |
 | D5 (NPU) | VisionPilot end to end under 30 ms on the NPU while the CR52 runs its idle loop (`vp-npu-gate.sh`, marker `VP_NPU_PASS`). Pass: 396 of 396 frames. | None. |
 | D6 (stop) | Fault injected at a fixed point. The CR52-authored `control_cmd` appears within the latency budget. The vehicle stops in lane (`si_stop_gate.py`, marker `SI_STOP_PASS`). Pass: twice in a row, stop distance recorded. | The spec's figure is 200 ms. That holds for the `channel` route, where the latch needs no staleness. The `kill` route's threshold is 700 ms instead. The firmware trips the stop 0.5 s after the last heartbeat, then adds one 0.15 s cycle. |

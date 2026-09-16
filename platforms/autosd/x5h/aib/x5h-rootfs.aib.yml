@@ -228,6 +228,11 @@ content:
       path: /usr/sbin/x5h-demo-up.sh
     - source_path: ../config/x5h-demo.service
       path: /etc/systemd/system/x5h-demo.service
+    # Gate D5's instrument (see README.md, "CES 2027 demo role"): its default
+    # log source is `podman logs x5h-vp`, so it only runs on the board and
+    # has to ship in the image rather than be hand-copied on.
+    - source_path: ../scripts/vp-npu-gate.sh
+      path: /usr/sbin/vp-npu-gate.sh
     # --- role-independent: container store, watchdog, manifest -------------
     - source_path: ../config/var-lib-containers.mount
       path: /etc/systemd/system/var-lib-containers.mount
@@ -491,6 +496,8 @@ content:
     - path: /usr/sbin/demo-role-smoke.sh
       mode: "0755"
     - path: /usr/sbin/x5h-demo-up.sh
+      mode: "0755"
+    - path: /usr/sbin/vp-npu-gate.sh
       mode: "0755"
 
 auth:

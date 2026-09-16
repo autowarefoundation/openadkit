@@ -25,12 +25,12 @@ NPU=/opt/npu
 ART=${1:-}; RUNS=${2:-20}
 fail() { echo "NPU_CONTRACT_FAIL reason=$1"; exit 1; }
 [ -n "$ART" ] || fail bad_args
-# The demo role boots the same NPU regions as the npu role, on top of the
-# relocated CR52 carveout, so the contract this script proves holds there too.
-# Refusing demo would refuse the one role that exists to run the NPU.
+# demo and dev boot the identical derived tree, so the NPU regions this
+# contract depends on are present under both. Refusing either would refuse
+# the roles that exist to run the NPU.
 role=$(cat /run/x5h/role 2>/dev/null)
 case "$role" in
-    npu|demo) ;;
+    demo|dev) ;;
     *) fail "wrong_role role=$role" ;;
 esac
 systemctl is-active --quiet x5h-npu.service || fail npu_not_ready

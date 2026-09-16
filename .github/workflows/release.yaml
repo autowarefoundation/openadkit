@@ -101,6 +101,7 @@ jobs:
             .github/scripts/install-compose.sh
             .github/scripts/package_release_bundles.sh
             .github/scripts/release_plan.py
+            .github/scripts/validation_matrix.py
 
       - name: Verify packager revision
         id: packager

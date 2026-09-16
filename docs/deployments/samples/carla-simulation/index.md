@@ -38,6 +38,11 @@ Open the visualizer at `https://localhost:6080/vnc.html` (accept the
 self-signed certificate). Use `REMOTE_PASSWORD` from `config.env`. In RViz:
 set **2D Goal Pose**, wait for planning, click **Auto**.
 
+## Split-host
+
+Run Autoware on one GPU host and CARLA on another with `--role`; see
+[Split-host simulation (Zenoh)](../split-host.md).
+
 ## Stop
 
 ```bash

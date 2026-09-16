@@ -1,0 +1,54 @@
+# Zenoh bridge fragment for split-host deployments.
+#
+# The CLI appends this file (via --file) only for role views, after the
+# deployment's service file. The default single-host graph never includes it.
+# The role view also injects ZENOH_CONFIG_PATH pointing at the deployment's
+# config/zenoh.json5; `-c` below must match the mounted target path.
+#
+# Host networking is required so the bridge can reach the LAN listen address
+# and so its DDS participant shares the host Cyclone environment. DDS stays
+# local: runtime.env restricts Cyclone to `lo`, and ROS_LOCALHOST_ONLY pins
+# DDS discovery to this host. Only Zenoh traffic crosses the LAN.
+services:
+  zenoh-bridge:
+    image: ${ZENOH_BRIDGE_IMAGE:-eclipse/zenoh-bridge-ros2dds:1.10.1@sha256:74fae6a9d4f449c53d1ee6f0faaca97d01c1e68dfcafd785b657f01907157d22}
+    container_name: autoware-zenoh-bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    # Runtime env (RMW_IMPLEMENTATION, ROS_DOMAIN_ID, CYCLONEDDS_URI,
+    # CYCLONEDDS_NETWORK_INTERFACE=lo). Without the URI the interface pin is a
+    # no-op and DDS would leak onto the LAN. Absolute paths: this file is passed
+    # with --file, where relative paths would resolve against the deployment
+    # project directory instead of deployments/base.
+    env_file:
+      - ${ZENOH_BASE_DIR}/runtime.env
+    environment:
+      - ROS_LOCALHOST_ONLY=1
+      # Interpolated from the CLI env files (config.env/config.local.env).
+      # Empty defaults keep `stop`/`ps`/`logs` parseable; the wrapper below
+      # fails only when a listen endpoint is actually required.
+      - ZENOH_LISTEN=${ZENOH_LISTEN:-}
+      - ZENOH_PEER=${ZENOH_PEER:-}
+    volumes:
+      - ${ZENOH_BASE_DIR}/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      # Workload allowlist. ZENOH_CONFIG_PATH is injected by the CLI as an
+      # absolute path; relative binds would resolve under the project directory.
+      - ${ZENOH_CONFIG_PATH}:/config/zenoh.json5:ro
+    # The image entrypoint is /entrypoint.sh (Alpine ash) exec'ing
+    # /zenoh-bridge-ros2dds, which is not on PATH. Replace it with a wrapper
+    # that turns the environment into argv for the binary.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -z "$${ZENOH_LISTEN:-}" ]; then
+          echo "zenoh-bridge: ZENOH_LISTEN is required (tcp/<this-host-lan-ip>:7447)" >&2
+          exit 1
+        fi
+        set -- -l "$$ZENOH_LISTEN" -c /config/zenoh.json5
+        if [ -n "$${ZENOH_PEER:-}" ]; then
+          set -- "$$@" -e "$$ZENOH_PEER"
+        fi
+        echo "zenoh-bridge: listening on $$ZENOH_LISTEN"
+        exec /zenoh-bridge-ros2dds "$$@"

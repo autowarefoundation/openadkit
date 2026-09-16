@@ -58,6 +58,14 @@ def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> N
         )
 
 
+def add_role_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--role",
+        metavar="ROLE",
+        help="split-host role from this deployment's manifest (omit for single host)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = OpenADKitParser(
         prog="openadkit",
@@ -83,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
         "validate", help="validate a deployment without starting it"
     )
     add_run_arguments(validate)
+    add_role_argument(validate)
 
     fetch = subparsers.add_parser("fetch", help="download deployment data")
     add_run_arguments(fetch, gpu=False)
@@ -94,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = subparsers.add_parser("run", help="fetch data and start a deployment")
     add_run_arguments(run)
+    add_role_argument(run)
     run.add_argument(
         "--pull",
         choices=("missing", "always", "never"),
@@ -253,6 +263,7 @@ def main() -> int:
             kit,
             args.ros_distro,
             getattr(args, "gpu", False),
+            role=getattr(args, "role", None),
             require_gpu=args.command != "fetch",
         )
         if args.command == "fetch":
@@ -267,6 +278,9 @@ def main() -> int:
             return 0
 
         compose.check_daemon(selection)
+        conflict = compose.live_state_conflict(deployment, selection)
+        if conflict:
+            raise OpenADKitError(conflict)
         data.install_data(deployment, selection, args.force)
         compose.start(deployment, selection, args.pull, configured_services)
         compose.save_runtime(deployment, selection)
@@ -286,8 +300,23 @@ def main() -> int:
     deployment = get_deployment(root, kit, args.deployment)
     warn_if_modified(root, deployment, kit)
     saved = compose.load_runtime(deployment)
-    ros_distro, gpu = saved if saved else (None, False)
-    selection = deployment.select(kit, ros_distro, gpu, operational=True)
+    ros_distro, gpu, role = saved if saved else (None, False, None)
+    if role is not None and not deployment.has_role(role):
+        print(
+            f"warning: saved role {role} is no longer defined; using the default view",
+            file=sys.stderr,
+        )
+        role = None
+    if saved is None and args.command == "stop":
+        if compose.running_names([deployment.name]):
+            print(
+                f"note: {deployment.name} is running without readable runtime "
+                "state; stopping by project name",
+                file=sys.stderr,
+            )
+    selection = deployment.select(
+        kit, ros_distro, gpu, role=role, operational=True
+    )
     if args.command == "status":
         compose.status(deployment, selection)
     elif args.command == "logs":

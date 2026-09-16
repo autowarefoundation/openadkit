@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 from pathlib import Path
 import re
-import sys
 from types import ModuleType
 from typing import Any
+
+import validation_matrix
 
 
 CARLA_INTERFACE_ENV = "CARLA_INTERFACE_IMAGE"
@@ -38,19 +38,7 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def load_runtime(source_root: Path) -> ModuleType:
-    module_path = source_root / "cli/manifest.py"
-    if not module_path.is_file():
-        fail(f"could not load runtime manifest module: {module_path}")
-    spec = importlib.util.spec_from_file_location("openadkit_release_manifest", module_path)
-    if spec is None or spec.loader is None:
-        fail(f"could not load runtime manifest module: {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    try:
-        spec.loader.exec_module(module)
-    except (OSError, ImportError) as error:
-        fail(f"could not load runtime manifest module: {module_path}: {error}")
-    return module
+    return validation_matrix.load_runtime(source_root)
 
 
 def require_string(value: Any, name: str) -> str:
@@ -67,7 +55,6 @@ def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
     deployments: dict[str, dict[str, str]] = {}
     shared_names: set[str] = set()
     distros: set[str] = set()
-    validation: list[dict[str, Any]] = []
     for name in sorted(kit.deployments):
         deployment = runtime.get_deployment(source_root, kit, name)
         deployments[name] = {
@@ -75,22 +62,11 @@ def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
             "checksum": runtime.deployment_checksum(deployment.directory),
         }
         shared_names.update(deployment.shared)
-        gpu = deployment.requirements["gpu"]
-        for distro in deployment.requirements["rosDistros"]:
-            distros.add(distro)
-            if gpu in ("none", "optional"):
-                validation.append(
-                    {"deployment": name, "gpu": False, "rosDistro": distro}
-                )
-            if gpu in ("required", "optional"):
-                validation.append(
-                    {"deployment": name, "gpu": True, "rosDistro": distro}
-                )
+        distros.update(deployment.requirements["rosDistros"])
 
+    validation = validation_matrix.validation_cells(runtime, source_root, kit)
     if not distros:
         fail("release deployments do not declare any ROS distros")
-    if not validation:
-        fail("release deployments do not produce any validation cases")
     if not shared_names:
         fail("release deployments do not declare shared assets")
     for name in sorted(shared_names):
@@ -98,7 +74,6 @@ def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
         if not shared_dir.is_dir():
             fail(f"missing shared deployment assets: {name}")
 
-    validation.sort(key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"]))
     return {
         "kit": kit,
         "deployments": deployments,

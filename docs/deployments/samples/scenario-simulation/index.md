@@ -37,6 +37,11 @@ Edit `config.env`:
 Custom scenarios must use the Kashiwanoha map unless you also change `MAP_PATH`
 and map filenames consistently.
 
+## Split-host
+
+Run Autoware on one host and the TIER IV runner on another with `--role`; see
+[Split-host simulation (Zenoh)](../split-host.md).
+
 ## Stop
 
 ```bash

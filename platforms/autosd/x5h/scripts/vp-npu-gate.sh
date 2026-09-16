@@ -11,6 +11,11 @@ while [ $# -gt 0 ]; do case "$1" in
   --frames)
     [ $# -ge 2 ] || bad_args
     [[ $2 =~ ^[0-9]+$ ]] || bad_args
+    # 0 is not a real requirement (the gate is "N consecutive frames under
+    # budget") and the averaging below divides by the frame count it counts,
+    # so reject it up front instead of letting an all-zero run hit that
+    # division with no marker.
+    [ "$2" -gt 0 ] || bad_args
     FRAMES=$2; shift 2 ;;
   --max-wall-ms)
     [ $# -ge 2 ] || bad_args

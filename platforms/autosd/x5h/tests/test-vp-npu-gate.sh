@@ -40,4 +40,9 @@ exact "$out" 'VP_NPU_FAIL reason=bad_args' bad_max_wall_ms_reason
 out=$(bash "$s" --frames) && fail missing_value_accepted
 exact "$out" 'VP_NPU_FAIL reason=bad_args' missing_value_reason
 
+# --frames 0 is not a real requirement, and used to divide by zero with no
+# marker at all when the log had zero Latency lines. Reject it up front.
+out=$(bash "$s" --frames 0 --log "$fx") && fail zero_frames_accepted
+exact "$out" 'VP_NPU_FAIL reason=bad_args' zero_frames_reason
+
 echo "TEST_PASS $name"

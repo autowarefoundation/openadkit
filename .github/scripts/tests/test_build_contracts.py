@@ -26,7 +26,6 @@ REGISTRY_CONTEXT_RESOLVER = (
     ROOT / ".github/scripts/resolve_registry_contexts.sh"
 ).read_text()
 CAPTURE_METADATA = (ROOT / ".github/scripts/capture_build_metadata.sh").read_text()
-ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
 def manifest_index():
@@ -369,15 +368,10 @@ def test_carla_compose_uses_gpu_sensing_image():
     assert "image: ${SENSING_PERCEPTION_IMAGE" not in carla
 
 
-def test_lint_validates_standalone_zenoh_compose():
-    assert "cd deployments/zenoh-bridge && docker compose --env-file config.env config -q" in (
-        LINT_WORKFLOW
-    )
-
-
 def test_zenoh_stays_off_cli_inventory():
     inventory = (ROOT / "openadkit.json").read_text()
     assert '"zenoh-bridge"' not in inventory
+    assert not (ROOT / "deployments/zenoh-bridge").exists()
 
 
 def test_zenoh_fragment_is_digest_pinned_and_uses_wrapper():
@@ -551,20 +545,6 @@ def test_default_views_render_without_zenoh_environment():
         assert result.returncode == 0, result.stderr
         services = json.loads(result.stdout)["services"]
         assert "zenoh-bridge" not in services
-
-
-def test_zenoh_cloud_bridge_is_internal_only():
-    cloud_bridge = ZENOH_COMPOSE.split("\n  cloud_zenoh_bridge:", 1)[1].split(
-        "\n  cloud_zenoh_ready:", 1
-    )[0]
-    assert "ports:" not in cloud_bridge
-    assert "-l tcp/0.0.0.0:7448" in cloud_bridge
-    assert re.search(
-        r"cloud_zenoh_ready:.*?depends_on:\s+cloud_zenoh_bridge:\s+"
-        r"condition: service_started",
-        ZENOH_COMPOSE,
-        flags=re.DOTALL,
-    )
 
 
 def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):

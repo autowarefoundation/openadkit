@@ -111,9 +111,8 @@ Each workload ships its Zenoh allowlist in
 `deployments/<workload>/config/zenoh.json5`, mounted into the bridge for
 role views. Entries are full-name regular expressions, not globs. Both
 hosts use the same file: either side can own an endpoint. Review the list
-before routing anything new; the workload pages and the
-[Zenoh bridge demo](../demos/zenoh-bridge/index.md) cover the standalone
-edge/cloud demo, which is a different topology.
+before routing anything new, and keep the host boundary on the lab LAN:
+the allowlist is not authentication.
 
 ## Lifecycle notes
 

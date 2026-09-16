@@ -132,11 +132,11 @@ EOF
     fi
 
     # Start NoVNC. Under network_mode: host (base deployments) bind to
-    # loopback so noVNC is not exposed on every interface. Under bridge
-    # networking (zenoh-bridge) set WEBSOCKIFY_BIND=0.0.0.0 so Docker's port
-    # forwarding can reach websockify from the bridge interface; the host-side
-    # port mapping (127.0.0.1:6081:6080) still restricts external access to
-    # loopback. The VNC server is always loopback-only (see -localhost above).
+    # loopback so noVNC is not exposed on every interface. When a deployment
+    # puts the container behind bridge networking with a host port mapping, set
+    # WEBSOCKIFY_BIND=0.0.0.0 so Docker's port forwarding can reach websockify
+    # from the bridge interface, and keep the published port bound to
+    # 127.0.0.1. The VNC server is always loopback-only (see -localhost above).
     echo "Starting NoVNC..."
     local websck_bind="${WEBSOCKIFY_BIND:-127.0.0.1}"
     websockify --web=/usr/share/novnc/ \

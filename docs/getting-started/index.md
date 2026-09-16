@@ -43,8 +43,8 @@
     ```
 
     Logging Simulation GPU mode is `./openadkit run logging-simulation --gpu`.
-    Zenoh is a standalone demo: `./openadkit fetch scenario-simulation`, then
-    `deployments/zenoh-bridge/cloud.sh` / `edge.sh`.
+    Split-host simulation runs Autoware and the simulator on two machines with
+    `--role`; see [Split-host simulation](../deployments/samples/split-host.md).
 
 ## Next Steps
 

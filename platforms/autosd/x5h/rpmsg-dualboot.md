@@ -418,9 +418,11 @@ now, and a board with no ELF staged yet reports
 `CR52_RPROC_SKIP reason=no_firmware` and exits 0 rather than failing.
 
 `rpmsg-eth.service` remains deliberately absent from `80-x5h.preset`, which is a
-standing ruling and not an oversight. It is still reached on a normal `cr52`
-boot, because `awf-oak-bridge.container` carries `Requires=rpmsg-eth.service`
-and pulls it up.
+standing ruling and not an oversight. It is reached whenever a stack that
+needs the link starts, because both bridges carry
+`Requires=rpmsg-eth.service` and pull it up. Note that this no longer happens
+at boot on its own under `dev`: the `awf-oak-*` units carry no `[Install]`
+section, so nothing starts them until you do.
 
 ### Smoke
 

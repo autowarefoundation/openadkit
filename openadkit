@@ -43,8 +43,8 @@ Usage: openadkit upgrade
 
 Upgrades an installed release to the latest stable Open AD Kit release. The
 previous version is kept under the install destination for rollback with
-`openadkit install --version vX.Y.Z`. Source checkouts update with git pull or
-git checkout instead.
+`openadkit install --version vX.Y.Z --force`; the kept directory must be
+replaced. Source checkouts update with git pull or git checkout instead.
 EOF
 }
 

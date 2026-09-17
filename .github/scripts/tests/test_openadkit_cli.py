@@ -655,6 +655,36 @@ def test_standalone_upgrade_reinstalls_after_rollback(tmp_path):
     assert (home / ".local/bin/openadkit").resolve() == destination / "openadkit-v1.3.0/openadkit"
 
 
+def test_standalone_rollback_to_kept_version_requires_force(tmp_path):
+    home, destination, bin_dir = install_standalone(tmp_path, "v1.3.0")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.4.0")
+    upgrade = run_installed_upgrade(home, destination, "v1.3.0", latest_bin)
+    assert upgrade.returncode == 0, upgrade.stderr
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.resolve() == destination / "openadkit-v1.4.0/openadkit"
+    assert (destination / "openadkit-v1.3.0").is_dir()
+
+    command = [
+        str(ENTRYPOINT),
+        "install",
+        "--version",
+        "v1.3.0",
+        "--destination",
+        str(destination),
+    ]
+    env = os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    denied = subprocess.run(command, env=env, text=True, capture_output=True)
+    assert denied.returncode != 0
+    assert "already exists; rerun with --force" in denied.stderr
+    assert launcher.resolve() == destination / "openadkit-v1.4.0/openadkit"
+
+    forced = subprocess.run(command + ["--force"], env=env, text=True, capture_output=True)
+    assert forced.returncode == 0, forced.stderr
+    assert launcher.resolve() == destination / "openadkit-v1.3.0/openadkit"
+
+
 def test_standalone_upgrade_requires_the_active_installation(tmp_path):
     home, destination, bin_dir = install_standalone(tmp_path, "v1.2.3")
     launcher = home / ".local/bin/openadkit"

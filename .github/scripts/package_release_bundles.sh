@@ -53,6 +53,22 @@ if symlink=$(find "${bundle_root}" -type l -print -quit) && [ -n "${symlink}" ];
   exit 1
 fi
 
+# The installer asset and the bundle entrypoint come from the packager
+# revision, not from the promoted build being released. A promoted build can
+# predate the install/upgrade launcher while release notes and docs advertise
+# those commands for every release.
+installer_dir=${INSTALLER_SOURCE_DIR:-$(cd -- "${script_dir}/../.." && pwd -P)}
+installer="${installer_dir}/openadkit"
+[[ -x $installer ]] || {
+  echo "Expected an executable installer at ${installer}" >&2
+  exit 1
+}
+"$installer" install --help >/dev/null 2>&1 || {
+  echo "Installer ${installer} does not support 'install'; update the packager revision" >&2
+  exit 1
+}
+cp -a "$installer" "${bundle_root}/openadkit"
+
 python3 "${planner}" \
   --verify \
   --source-root "${bundle_root}" \
@@ -60,7 +76,7 @@ python3 "${planner}" \
   --context-output "${bundle_root}/openadkit.json"
 
 (cd "${bundle_root}" && ./openadkit list)
-cp -a "${source_dir}/openadkit" dist/openadkit
+cp -a "$installer" dist/openadkit
 
 while IFS=$'\t' read -r deployment ros_distro gpu; do
   validate_args=(./openadkit validate "${deployment}" --ros-distro "${ros_distro}")

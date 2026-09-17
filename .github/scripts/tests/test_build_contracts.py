@@ -309,8 +309,10 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
     assert "'docs/.pages'" in LINT_WORKFLOW
     assert "'docs/**/.pages'" in LINT_WORKFLOW
     release = (ROOT / ".github/workflows/release.yaml").read_text()
-    assert "source_ref: ${{ github.sha }}" in release
+    assert "source_ref: ${{ github.event.repository.default_branch }}" in release
+    assert "source_ref: ${{ github.sha }}" not in release
     assert "source_ref: ${{ inputs.version }}" not in release
+    assert "INSTALLER_SOURCE_DIR: ${{ github.workspace }}" in release
     preview_deploy = (ROOT / ".github/workflows/pr-preview-deploy.yaml").read_text()
     shared_pages = (
         "group: gh-pages\n"

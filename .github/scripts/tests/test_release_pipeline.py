@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tarfile
 
@@ -801,7 +802,7 @@ def test_release_plan_rejects_incomplete_or_duplicate_runtime_images(tmp_path, c
     assert case in result.stderr
 
 
-def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
+def packager_env(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     calls = tmp_path / "docker-calls"
@@ -842,15 +843,21 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         "STABLE_RELEASE": "true",
         "GITHUB_REPOSITORY": "example/repo",
     }
-    command = [
-        "bash",
-        "-c",
-        'umask "$1"; exec bash "$2"',
-        "bash",
-        "022",
-        str(PACKAGER),
-    ]
-    subprocess.run(command, cwd=tmp_path, env=env, check=True)
+    return env, calls
+
+
+def run_packager(tmp_path, env, *, umask="022"):
+    subprocess.run(
+        ["bash", "-c", 'umask "$1"; exec bash "$2"', "bash", umask, str(PACKAGER)],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+    )
+
+
+def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
+    env, calls = packager_env(tmp_path)
+    run_packager(tmp_path, env)
     asset = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
     assert sorted(path.name for path in (tmp_path / "dist").iterdir()) == ["openadkit", asset.name]
     first_asset = hashlib.sha256(asset.read_bytes()).hexdigest()
@@ -909,8 +916,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert "docker-compose.gpu.yaml" in docker_calls
 
     (tmp_path / "dist/stale.tar.gz").write_bytes(b"stale")
-    command[-2] = "077"
-    subprocess.run(command, cwd=tmp_path, env=env, check=True)
+    run_packager(tmp_path, env, umask="077")
     assert hashlib.sha256(asset.read_bytes()).hexdigest() == first_asset
     assert hashlib.sha256((tmp_path / "release-plan.json").read_bytes()).hexdigest() == first_plan
     assert sorted(path.name for path in (tmp_path / "dist").iterdir()) == ["openadkit", asset.name]
@@ -938,6 +944,44 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert f"| `openadkit` | `{installer_sha256}` |" in notes
     assert f"releases/download/{VERSION}/openadkit" in notes
     assert f"install --version {VERSION}" in notes
+
+
+def test_release_installer_and_bundle_entrypoint_come_from_the_packager(tmp_path):
+    env, _ = packager_env(tmp_path)
+    promoted = tmp_path / "promoted"
+    promoted.mkdir()
+    shutil.copy2(ROOT / "openadkit.json", promoted / "openadkit.json")
+    shutil.copytree(ROOT / "cli", promoted / "cli")
+    shutil.copytree(ROOT / "deployments", promoted / "deployments")
+    stale = promoted / "openadkit"
+    stale.write_text("#!/usr/bin/env bash\necho stale promoted build\n")
+    stale.chmod(0o755)
+
+    run_packager(tmp_path, env | {"SOURCE_DIR": str(promoted)})
+
+    launcher = (ROOT / "openadkit").read_bytes()
+    assert (tmp_path / "dist/openadkit").read_bytes() == launcher
+    asset = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
+    with tarfile.open(asset) as archive:
+        member = archive.extractfile(f"openadkit-{VERSION}/openadkit")
+        assert member is not None
+        assert member.read() == launcher
+
+
+def test_release_packager_requires_an_install_capable_launcher(tmp_path):
+    env, _ = packager_env(tmp_path)
+    stale = tmp_path / "stale"
+    stale.mkdir()
+    launcher = stale / "openadkit"
+    launcher.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'exec python3 "$(dirname -- "$0")/cli/main.py" "$@"\n'
+    )
+    launcher.chmod(0o755)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        run_packager(tmp_path, env | {"INSTALLER_SOURCE_DIR": str(stale)})
 
 
 def test_release_scripts_do_not_hardcode_product_catalog():

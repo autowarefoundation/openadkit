@@ -28,6 +28,7 @@ on:
   workflow_call:
     inputs:
       source_ref:
+        description: Git ref (branch or SHA) to build the site from
         required: true
         type: string
 
@@ -44,9 +45,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          # Release calls pass the caller SHA on main so build-docs and the
-          # site match current main, not the promoted build tag. Manual runs
-          # always use main. Pushes check out the triggering commit by default.
+          # Release calls pass the default branch so the build tracks main at
+          # deployment time instead of the dispatch-time SHA. Manual runs also
+          # use main. Pushes check out the triggering commit by default.
           ref: ${{ inputs.source_ref || (github.event_name == 'workflow_dispatch' && github.event.repository.default_branch) || '' }}
 
       - name: Build docs
@@ -67,7 +68,9 @@ jobs:
     # Serialize gh-pages writers across production and PR previews. queue: max
     # keeps a pending production deploy when another preview/close is queued;
     # default queue: single would cancel that pending run. Builds stay off this
-    # lane. JamesIves uses force: false, so a parallel push is a non-fast-forward.
+    # lane. JamesIves with force: false rebases a deployment onto the current
+    # branch head rather than rejecting an older tree, so the concurrency lane
+    # must only ever carry current builds.
     concurrency:
       group: gh-pages
       cancel-in-progress: false

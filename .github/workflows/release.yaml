@@ -98,6 +98,7 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
+            /openadkit
             .github/scripts/install-compose.sh
             .github/scripts/package_release_bundles.sh
             .github/scripts/release_plan.py
@@ -148,6 +149,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           PACKAGER_SHA: ${{ steps.packager.outputs.packager_sha }}
+          INSTALLER_SOURCE_DIR: ${{ github.workspace }}
           DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
@@ -370,6 +372,7 @@ jobs:
       contents: write
     uses: ./.github/workflows/deploy-docs.yaml
     with:
-      # Caller SHA on main, not the promoted build tag. The tag can predate
-      # build-docs, and publishing that tree would overwrite newer main docs.
-      source_ref: ${{ github.sha }}
+      # Default branch, not the dispatch-time SHA or the promoted build tag:
+      # the release can outlive main advancing, and publishing an older tree
+      # would overwrite the newer docs already on gh-pages.
+      source_ref: ${{ github.event.repository.default_branch }}

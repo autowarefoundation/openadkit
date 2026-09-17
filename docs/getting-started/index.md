@@ -160,16 +160,15 @@ openadkit upgrade
 
 The new release is verified, installed alongside the old one, and the
 `openadkit` launcher is repointed. The previous version is kept in the install
-destination (by default `~/.local/share/openadkit/`), so you can roll back or
-pin a version explicitly:
+destination (by default `~/.local/share/openadkit/`), so you can roll back:
 
 ```bash
-openadkit install --version vOLD
+openadkit install --version vOLD --force
 ```
 
-`openadkit install --version vX.Y.Z` also switches to a specific release;
-reinstalling the same version needs `--force`. Source checkouts update with
-`git pull` or `git checkout` instead.
+`--force` replaces the kept version directory. To switch to a version that is
+not installed, omit `--force`. Source checkouts update with `git pull` or
+`git checkout` instead.
 
 ## Runtime Controls
 

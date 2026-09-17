@@ -94,9 +94,9 @@ def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
     command = ["docker", "compose", "--project-name", deployment.project]
     for env_file in deployment.env_files:
         command.extend(("--env-file", str(env_file)))
-    for compose_file in deployment.compose_files(selection.gpu):
+    for compose_file in selection.files:
         command.extend(("--file", str(compose_file)))
-    for profile in deployment.compose["profiles"]:
+    for profile in selection.profiles:
         command.extend(("--profile", profile))
     return command
 
@@ -188,20 +188,17 @@ def save_runtime(deployment: Deployment, selection: Selection) -> None:
     path = _runtime_state_path(deployment)
     if path.is_symlink() or (path.exists() and not path.is_file()):
         raise OpenADKitError(f"unsafe runtime state path: {path}")
-    path.write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "rosDistro": selection.ros_distro,
-                "gpu": selection.gpu,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    state: dict[str, object] = {
+        "schemaVersion": 1,
+        "rosDistro": selection.ros_distro,
+        "gpu": selection.gpu,
+    }
+    if selection.role is not None:
+        state["role"] = selection.role
+    path.write_text(json.dumps(state) + "\n", encoding="utf-8")
 
 
-def load_runtime(deployment: Deployment) -> tuple[str, bool] | None:
+def load_runtime(deployment: Deployment) -> tuple[str, bool, str | None] | None:
     path = _runtime_state_path(deployment)
     if path.is_symlink() or not path.is_file():
         return None
@@ -213,9 +210,33 @@ def load_runtime(deployment: Deployment) -> tuple[str, bool] | None:
         return None
     ros_distro = value.get("rosDistro")
     gpu = value.get("gpu")
+    role = value.get("role")
     if not isinstance(ros_distro, str) or not ros_distro or not isinstance(gpu, bool):
         return None
-    return ros_distro, gpu
+    if role is not None and (not isinstance(role, str) or not role):
+        return None
+    return ros_distro, gpu, role
+
+
+def live_state_conflict(deployment: Deployment, selection: Selection) -> str | None:
+    if not running_names([deployment.name]):
+        return None
+    saved = load_runtime(deployment)
+    if saved is None:
+        return (
+            f"{deployment.name} is running but its saved runtime state is missing "
+            "or unreadable; stop it before starting a new view"
+        )
+    saved_role = saved[2]
+    if saved_role != selection.role:
+        saved_label = saved_role or "single-host"
+        requested_label = selection.role or "single-host"
+        return (
+            f"{deployment.name} is already running as {saved_label}; "
+            f"stop it with ./openadkit stop {deployment.name} "
+            f"before starting {requested_label}"
+        )
+    return None
 
 
 def render(deployment: Deployment, selection: Selection) -> set[str]:
@@ -226,7 +247,7 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
         .stdout.splitlines()
     )
     declared = set(selection.services)
-    declared.update(deployment.compose["resetServices"])
+    declared.update(selection.reset_services)
     unknown = sorted(declared - configured)
     if unknown:
         raise OpenADKitError(
@@ -279,7 +300,7 @@ def start(
         compose_run(deployment, selection, ["stop", *excluded])
         compose_run(deployment, selection, ["rm", "--force", *excluded])
 
-    for service in deployment.compose["resetServices"]:
+    for service in selection.reset_services:
         compose_run(
             deployment,
             selection,
@@ -292,12 +313,24 @@ def start(
         [
             "up",
             "--detach",
-            "--wait",
-            "--wait-timeout",
-            str(deployment.compose["waitTimeout"]),
             "--pull",
             "never",
             "--remove-orphans",
+            *services,
+        ],
+    )
+    save_runtime(deployment, selection)
+    compose_run(
+        deployment,
+        selection,
+        [
+            "up",
+            "--detach",
+            "--wait",
+            "--wait-timeout",
+            str(selection.wait_timeout),
+            "--pull",
+            "never",
             *services,
         ],
     )

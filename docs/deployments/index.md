@@ -20,8 +20,7 @@ passes it to Compose; you do not need to invoke `docker compose` directly.
 Compose via `--env-file`.
 
 Fetch maps/rosbags with `./openadkit fetch <name>` or `./openadkit run <name>`
-(see [Getting Started](../getting-started/index.md)). Zenoh is a standalone
-demo: fetch `scenario-simulation`, then use `cloud.sh` / `edge.sh`.
+(see [Getting Started](../getting-started/index.md)).
 
 ## Samples
 
@@ -32,8 +31,5 @@ Recommended for **learning and development**.
 - [Scenario Simulation](samples/scenario-simulation/index.md) — `deployments/scenario-simulation/`
 - [Logging Simulation](samples/logging-simulation/index.md) — `deployments/logging-simulation/`
 
-## Demos
-
-Use-case specific topologies.
-
-- [Zenoh Bridge](demos/zenoh-bridge/index.md) — `deployments/zenoh-bridge/` (edge/cloud remote viz + teleop)
+[Split-host simulation](samples/split-host.md) (`--role` over Zenoh) is
+documented but unreleased until the two-host runtime gates land.

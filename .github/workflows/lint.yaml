@@ -94,18 +94,28 @@ jobs:
       - name: Validate Docker Compose files
         # `docker compose config -q` parses, interpolates, and schema-validates
         # each documented stack with its sample env file. It does not pull images.
+        # The cell list comes from the deployment manifests through the same
+        # enumerator release_plan.py uses; role cells carry a --role argument.
+        # Dummy Zenoh endpoints satisfy role requirement checks only.
         run: |
           set -euo pipefail
-          for ros_distro in humble jazzy; do
-            for deployment in planning-simulation scenario-simulation logging-simulation; do
-              ./openadkit validate "${deployment}" --ros-distro "${ros_distro}"
-            done
-            ./openadkit validate logging-simulation \
-              --ros-distro "${ros_distro}" --gpu
-          done
-          ./openadkit validate carla-simulation --gpu --ros-distro humble
           export REMOTE_PASSWORD="${REMOTE_PASSWORD:-ci-validate}"
-          ( cd deployments/zenoh-bridge && docker compose --env-file config.env config -q )
+          export ZENOH_LISTEN="tcp/127.0.0.1:7447"
+          export ZENOH_PEER="tcp/127.0.0.1:7447"
+          # Capture the matrix first: `set -e` does not see a process
+          # substitution's exit status, so an enumerator failure must abort here
+          # instead of silently validating zero cells.
+          matrix=$(python3 .github/scripts/validation_matrix.py --source-root .)
+          while IFS=$'\t' read -r deployment ros_distro gpu role; do
+            validate_args=(./openadkit validate "${deployment}" --ros-distro "${ros_distro}")
+            if [ "${gpu}" = true ]; then
+              validate_args+=(--gpu)
+            fi
+            if [ -n "${role}" ]; then
+              validate_args+=(--role "${role}")
+            fi
+            "${validate_args[@]}"
+          done <<< "${matrix}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3

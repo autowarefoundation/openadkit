@@ -1,7 +1,10 @@
 import io
 import json
+import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import sys
 
 import pytest
@@ -23,7 +26,6 @@ REGISTRY_CONTEXT_RESOLVER = (
     ROOT / ".github/scripts/resolve_registry_contexts.sh"
 ).read_text()
 CAPTURE_METADATA = (ROOT / ".github/scripts/capture_build_metadata.sh").read_text()
-ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
 def manifest_index():
@@ -357,36 +359,235 @@ def test_logging_universe_image_has_compose_default():
 
 
 def test_carla_compose_uses_gpu_sensing_image():
-    carla = (ROOT / "deployments/carla-simulation/docker-compose.yaml").read_text()
+    carla = (
+        ROOT / "deployments/carla-simulation/services.autoware.yaml"
+    ).read_text()
     env = (ROOT / "deployments/carla-simulation/config.env").read_text()
     assert "SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda" in carla
     assert "SENSING_PERCEPTION_GPU_IMAGE=" not in env
     assert "image: ${SENSING_PERCEPTION_IMAGE" not in carla
 
 
-def test_lint_validates_standalone_zenoh_compose():
-    assert "cd deployments/zenoh-bridge && docker compose --env-file config.env config -q" in (
-        LINT_WORKFLOW
-    )
-
-
 def test_zenoh_stays_off_cli_inventory():
     inventory = (ROOT / "openadkit.json").read_text()
     assert '"zenoh-bridge"' not in inventory
+    assert not (ROOT / "deployments/zenoh-bridge").exists()
 
 
-def test_zenoh_cloud_bridge_is_internal_only():
-    cloud_bridge = ZENOH_COMPOSE.split("\n  cloud_zenoh_bridge:", 1)[1].split(
-        "\n  cloud_zenoh_ready:", 1
-    )[0]
-    assert "ports:" not in cloud_bridge
-    assert "-l tcp/0.0.0.0:7448" in cloud_bridge
-    assert re.search(
-        r"cloud_zenoh_ready:.*?depends_on:\s+cloud_zenoh_bridge:\s+"
-        r"condition: service_started",
-        ZENOH_COMPOSE,
-        flags=re.DOTALL,
+def test_zenoh_fragment_is_digest_pinned_and_uses_wrapper():
+    fragment = (ROOT / "deployments/base/compose.zenoh.yaml").read_text()
+    assert "eclipse/zenoh-bridge-ros2dds:" in fragment
+    assert re.search(r"@sha256:[0-9a-f]{64}", fragment)
+    assert "network_mode: host" in fragment
+    assert "ROS_LOCALHOST_ONLY=1" in fragment
+    assert 'entrypoint: ["/bin/sh", "-c"]' in fragment
+    assert "exec /zenoh-bridge-ros2dds" in fragment
+    assert "-l " in fragment and "-c /config/zenoh.json5" in fragment
+    # Absolute paths: this file is passed with --file, so relative paths would
+    # resolve against the deployment project directory.
+    assert "${ZENOH_BASE_DIR}/runtime.env" in fragment
+    assert "${ZENOH_BASE_DIR}/cyclonedds.xml" in fragment
+    assert "${ZENOH_CONFIG_PATH}:/config/zenoh.json5:ro" in fragment
+    # Container-shell expansion must survive Compose interpolation.
+    assert '"$${ZENOH_LISTEN:-}"' in fragment
+    assert '"$${ZENOH_PEER:-}"' in fragment
+    # Missing listen endpoint must fail, and empty peer must not add -e.
+    assert "ZENOH_LISTEN is required" in fragment
+    assert "USE_SIM_TIME" not in fragment
+
+
+def load_zenoh_allowlist(directory):
+    # JSON5 without a dependency: slice the two lists out of the file. Entries
+    # are quoted full-name regexes, so an exact quoted match is enough.
+    text = (directory / "config" / "zenoh.json5").read_text()
+
+    def section(name):
+        start = text.index(f"      {name}: [")
+        end = text.index("],", start)
+        return text[start:end]
+
+    return {"publishers": section("publishers"), "subscribers": section("subscribers")}
+
+
+def test_zenoh_allowlists_route_cross_host_topics():
+    routes = {
+        "scenario-simulation": [
+            "/perception/obstacle_segmentation/pointcloud",
+            "/perception/object_recognition/detection/objects",
+            "/perception/occupancy_grid_map/map",
+        ],
+        "carla-simulation": [
+            "/localization/kinematic_state",
+            "/initialpose",
+            "/sensing/lidar/top/pointcloud_before_sync",
+        ],
+    }
+    for name, topics in routes.items():
+        allow = load_zenoh_allowlist(ROOT / "deployments" / name)
+        for topic in topics:
+            assert f'"{topic}"' in allow["publishers"], (name, topic)
+            assert f'"{topic}"' in allow["subscribers"], (name, topic)
+
+
+def test_split_host_deployments_keep_two_service_files():
+    for name in ("scenario-simulation", "carla-simulation"):
+        directory = ROOT / "deployments" / name
+        default = (directory / "docker-compose.yaml").read_text()
+        assert "compose.zenoh.yaml" not in default
+        assert "zenoh" not in default
+        manifest = json.loads((directory / "deployment.json").read_text())
+        roles = manifest["compose"]["roles"]
+        assert all(
+            view["files"] == [f"services.{role}.yaml"]
+            for role, view in roles.items()
+        )
+        for view in roles.values():
+            for relative in view["files"]:
+                assert (directory / relative).is_file()
+        # The Zenoh fragment is shared and attached by the CLI, not copied here.
+        assert not (directory / "compose.autoware.yaml").exists()
+        for stale in ("compose.autoware.yaml", "compose.carla.yaml", "compose.scenario.yaml"):
+            assert not (directory / stale).exists()
+        assert (directory / "config" / "zenoh.json5").is_file()
+    fragment = ROOT / "deployments/base/compose.zenoh.yaml"
+    assert fragment.is_file()
+
+
+def _compose_available():
+    if shutil.which("docker") is None:
+        return False
+    probe = subprocess.run(
+        ["docker", "compose", "version"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
+    return probe.returncode == 0
+
+
+COMPOSE_AVAILABLE = _compose_available()
+
+
+def compose_config(directory, files, *, env=None):
+    command = ["docker", "compose", "--env-file", "config.env"]
+    for name in files:
+        command.extend(("--file", name))
+    command.extend(("config", "--format", "json"))
+    process_env = os.environ.copy()
+    if env:
+        process_env.update(env)
+    result = subprocess.run(
+        command,
+        cwd=directory,
+        env=process_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def role_compose_env(directory):
+    return {
+        "ZENOH_LISTEN": "tcp/127.0.0.1:7447",
+        "ZENOH_PEER": "tcp/127.0.0.1:7447",
+        "ZENOH_BASE_DIR": str(ROOT / "deployments/base"),
+        "ZENOH_CONFIG_PATH": str(directory / "config/zenoh.json5"),
+    }
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is unavailable")
+def test_real_compose_views_keep_default_and_role_graphs_isolated():
+    scenario = ROOT / "deployments/scenario-simulation"
+    env = role_compose_env(scenario)
+    default = compose_config(scenario, ["docker-compose.yaml"])
+    assert "zenoh-bridge" not in default["services"]
+    assert {"scenario_simulator", "map", "planning"} <= set(default["services"])
+    default_sim = default["services"]["scenario_simulator"]
+    assert default_sim.get("environment", {}).get("WAIT_FOR_POINTCLOUD_MAP") == "1"
+    autoware = compose_config(
+        scenario, ["services.autoware.yaml", "../base/compose.zenoh.yaml"], env=env
+    )
+    assert "zenoh-bridge" in autoware["services"]
+    assert "scenario_simulator" not in autoware["services"]
+    assert sorted(autoware["services"]["map"]["depends_on"]) == ["map-check"]
+    sources = {volume["source"] for volume in autoware["services"]["zenoh-bridge"]["volumes"]}
+    assert str(ROOT / "deployments/base/cyclonedds.xml") in sources
+    assert str(scenario / "config/zenoh.json5") in sources
+    simulator = compose_config(
+        scenario, ["services.scenario.yaml", "../base/compose.zenoh.yaml"], env=env
+    )
+    assert set(simulator["services"]) == {"scenario_simulator", "zenoh-bridge"}
+    role_sim = simulator["services"]["scenario_simulator"]
+    assert "pid" not in role_sim
+    assert role_sim.get("environment", {}).get("WAIT_FOR_POINTCLOUD_MAP") != "1"
+    default_cmd = default_sim.get("command")
+    default_text = default_cmd if isinstance(default_cmd, str) else "\n".join(default_cmd)
+    role_cmd = role_sim.get("command")
+    role_text = role_cmd if isinstance(role_cmd, str) else "\n".join(role_cmd)
+    assert "wait_for_topic /map/pointcloud_map" in default_text
+    assert "wait_for_topic /map/pointcloud_map" in role_text
+
+    carla = ROOT / "deployments/carla-simulation"
+    env = role_compose_env(carla)
+    default = compose_config(carla, ["docker-compose.yaml"])
+    assert "zenoh-bridge" not in default["services"]
+    assert {"carla", "carla-interface", "map", "planning"} <= set(default["services"])
+    autoware = compose_config(
+        carla, ["services.autoware.yaml", "../base/compose.zenoh.yaml"], env=env
+    )
+    assert "zenoh-bridge" in autoware["services"]
+    assert not {"carla", "carla-interface"} & set(autoware["services"])
+    assert "carla-interface" not in autoware["services"]["vehicle"].get(
+        "depends_on", {}
+    )
+    carla_role = compose_config(
+        carla, ["services.carla.yaml", "../base/compose.zenoh.yaml"], env=env
+    )
+    assert set(carla_role["services"]) == {
+        "carla",
+        "carla-interface",
+        "carla-map-loader",
+        "zenoh-bridge",
+    }
+    assert sorted(carla_role["services"]["carla-interface"]["depends_on"]) == [
+        "carla",
+        "carla-map-loader",
+    ]
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is unavailable")
+def test_default_views_render_without_zenoh_environment():
+    cleaned = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith("ZENOH_")
+    }
+    for name in ("scenario-simulation", "carla-simulation"):
+        directory = ROOT / "deployments" / name
+        command = [
+            "docker",
+            "compose",
+            "--env-file",
+            "config.env",
+            "--file",
+            "docker-compose.yaml",
+            "config",
+            "--format",
+            "json",
+        ]
+        result = subprocess.run(
+            command,
+            cwd=directory,
+            env=cleaned,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        services = json.loads(result.stdout)["services"]
+        assert "zenoh-bridge" not in services
 
 
 def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):

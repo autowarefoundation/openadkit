@@ -9,7 +9,21 @@
     "profiles": [],
     "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer", "scenario_simulator"],
     "resetServices": ["map-check", "scenario_simulator"],
-    "waitTimeout": 420
+    "waitTimeout": 420,
+    "roles": {
+      "autoware": {
+        "files": ["services.autoware.yaml"],
+        "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer", "zenoh-bridge"],
+        "resetServices": ["map-check"],
+        "requiredEnv": ["ZENOH_LISTEN"]
+      },
+      "scenario": {
+        "files": ["services.scenario.yaml"],
+        "services": ["scenario_simulator", "zenoh-bridge"],
+        "resetServices": ["scenario_simulator"],
+        "requiredEnv": ["ZENOH_LISTEN", "ZENOH_PEER"]
+      }
+    }
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],

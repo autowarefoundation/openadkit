@@ -1,0 +1,143 @@
+# Autoware-side services for CARLA simulation.
+#
+# Shared by the single-host entry point (docker-compose.yaml, which restores
+# the carla-interface edges) and the `--role autoware` view (this file plus
+# deployments/base/compose.zenoh.yaml, attached by the CLI). Includes the
+# deployment base so the Autoware stack exists in both views. No service here
+# depends on a CARLA service: the sim-local edges are added back only by the
+# default entry file.
+include:
+  - ../base/docker-compose.yaml
+
+services:
+  # Override base services with CARLA-specific changes.
+  system:
+    command: >
+      ros2 launch autoware_launch tier4_system_component.launch.xml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
+      launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
+      launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
+      sensor_model:=${SENSOR_MODEL}
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+
+  planning:
+    depends_on:
+      - map
+      - localization
+      - perception
+      - system
+
+  api:
+    depends_on:
+      - map
+      - system
+
+  visualizer:
+    container_name: autoware-e2e-visualizer
+    runtime: nvidia
+    env_file:
+      - ../base/runtime.env
+    environment:
+      - RVIZ_CONFIG=${RVIZ_CONFIG}
+      - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
+      - RVIZ_GPU=auto
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    depends_on:
+      - map
+      - api
+      - planning
+      - control
+
+  # CARLA sensor stack. The only dependency removed here is on
+  # carla-interface; the default entry point adds it back.
+  sensing:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    container_name: autoware-sensing
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    runtime: nvidia
+    env_file:
+      - ../base/runtime.env
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    depends_on:
+      - map
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_sensing_component.launch.xml
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_SENSING}
+      launch_sensing_driver:=${LAUNCH_SENSING_DRIVER}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  perception:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    container_name: autoware-perception
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    runtime: nvidia
+    env_file:
+      - ../base/runtime.env
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ${DATA_PATH}:/autoware_data:rw
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    depends_on:
+      - map
+      - sensing
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_perception_component.launch.xml
+      data_path:=/autoware_data
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
+      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
+      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
+      perception_mode:=${PERCEPTION_MODE}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_empty_dynamic_object_publisher:=${AUTOWARE_E2E_EMPTY_OBJECTS}
+      use_sim_time:=${USE_SIM_TIME}
+      use_traffic_light_recognition:=${AUTOWARE_E2E_USE_TRAFFIC_LIGHT_RECOGNITION}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  localization:
+    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
+    container_name: autoware-localization
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../base/runtime.env
+    volumes:
+      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    depends_on:
+      - map
+      - sensing
+      - perception
+      - system
+    command: >
+      ros2 launch autoware_launch tier4_localization_component.launch.xml
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

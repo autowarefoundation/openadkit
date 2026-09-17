@@ -42,12 +42,35 @@ def manifest_validation_matrix():
             (ROOT / kit["deployments"][name]["path"] / "deployment.json").read_text()
         )
         gpu = manifest["requirements"]["gpu"]
+        roles = [""] + sorted((manifest["compose"].get("roles") or {}).keys())
         for distro in manifest["requirements"]["rosDistros"]:
-            if gpu in ("none", "optional"):
-                rows.append({"deployment": name, "gpu": False, "rosDistro": distro})
-            if gpu in ("required", "optional"):
-                rows.append({"deployment": name, "gpu": True, "rosDistro": distro})
-    rows.sort(key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"]))
+            for role in roles:
+                if gpu in ("none", "optional"):
+                    rows.append(
+                        {
+                            "deployment": name,
+                            "gpu": False,
+                            "rosDistro": distro,
+                            "role": role,
+                        }
+                    )
+                if gpu in ("required", "optional"):
+                    rows.append(
+                        {
+                            "deployment": name,
+                            "gpu": True,
+                            "rosDistro": distro,
+                            "role": role,
+                        }
+                    )
+    rows.sort(
+        key=lambda row: (
+            row["deployment"],
+            row["rosDistro"],
+            row["gpu"],
+            row["role"],
+        )
+    )
     return rows
 
 
@@ -444,163 +467,30 @@ def test_publish_rejects_changed_draft_asset(tmp_path):
     assert not (tmp_path / "patched").exists()
 
 
-def test_registry_auth_failure_never_mutates_image_tags(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls = tmp_path / "docker-calls"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\n"
-        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        f'  if [[ "$4" == *"-{BUILD_TAG}" ]]; then printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit; fi\n'
-        f'  if [[ "$4" == *"-{VERSION}" ]]; then echo "ERROR: $4: not found" >&2; exit 1; fi\n'
-        '  echo "401 Unauthorized" >&2; exit 1\n'
-        'fi\n'
-        "exit 1\n",
-    )
-    executable(bin_dir / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' v9.8.7\n")
-    (tmp_path / "release-plan.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "release": {
-                    "version": VERSION,
-                    "defaultRosDistro": "humble",
-                    "stable": True,
-                    "publishLatestAliases": True,
-                },
-                "images": [
-                    {
-                        "repo": "ghcr.io/example/openadkit",
-                        "rosDistro": "humble",
-                        "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": ["ghcr.io/example/openadkit:api-humble"],
-                    }
-                ]
-            }
-        )
-    )
-    env = os.environ | {
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
-        "GITHUB_REPOSITORY": "example/repo",
-        "REGISTRY_LOOKUP_RETRY_DELAY_SECONDS": "0",
-    }
-    result = subprocess.run(["bash", str(PROMOTER)], cwd=tmp_path, env=env)
-    assert result.returncode != 0
-    assert all("imagetools create" not in call for call in calls.read_text().splitlines())
+DIGEST_JSON = json.dumps({"manifest": {"digest": DIGEST}})
 
 
-def test_failed_version_tag_never_updates_stable_aliases(tmp_path):
+def promotion_tools(tmp_path, docker_script, *, gh_version=VERSION, extra_tools=()):
     bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls = tmp_path / "docker-calls"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        f'  if [[ "$4" == *"-{BUILD_TAG}" ]]; then printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit; fi\n'
-        '  echo "ERROR: $4: not found" >&2; exit 1\n'
-        'fi\n'
-        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
-        "exit 1\n",
-    )
-    executable(bin_dir / "sleep", "#!/usr/bin/env bash\nexit 0\n")
-    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {VERSION}\n")
-    (tmp_path / "release-plan.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "release": {
-                    "version": VERSION,
-                    "defaultRosDistro": "humble",
-                    "stable": True,
-                    "publishLatestAliases": True,
-                },
-                "images": [
-                    {
-                        "repo": "ghcr.io/example/openadkit",
-                        "rosDistro": "humble",
-                        "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": ["ghcr.io/example/openadkit:api-humble"],
-                    }
-                ]
-            }
-        )
-    )
+    bin_dir.mkdir(exist_ok=True)
+    executable(bin_dir / "docker", "#!/usr/bin/env bash\n" + docker_script)
+    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {gh_version}\n")
+    for name, content in extra_tools:
+        executable(bin_dir / name, content)
+    return bin_dir
+
+
+def run_promoter(tmp_path, bin_dir, *, extra_env=None):
     env = os.environ | {
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "GITHUB_REPOSITORY": "example/repo",
         "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
     }
-    result = subprocess.run(["bash", str(PROMOTER)], cwd=tmp_path, env=env)
-    assert result.returncode != 0
-    assert all(f"-{VERSION}" in call for call in calls.read_text().splitlines())
-
-
-def test_stable_promotion_consumes_planned_version_and_aliases(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    promoted = tmp_path / "promoted"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        '  ref="$4"\n'
-        f'  if [[ "$ref" == *"-{BUILD_TAG}" ]] || grep -Fxq "$ref" "$PROMOTED" 2>/dev/null; then\n'
-        f'    printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit\n'
-        '  fi\n'
-        '  echo "ERROR: $ref: not found" >&2; exit 1\n'
-        'fi\n'
-        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then printf \'%s\\n\' "$5" >> "$PROMOTED"; exit; fi\n'
-        'exit 2\n',
+    if extra_env:
+        env |= extra_env
+    return subprocess.run(
+        ["bash", str(PROMOTER)], cwd=tmp_path, env=env, text=True, capture_output=True
     )
-    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {VERSION}\n")
-    (tmp_path / "release-plan.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "release": {
-                    "version": VERSION,
-                    "defaultRosDistro": "humble",
-                    "stable": True,
-                    "publishLatestAliases": True,
-                },
-                "images": [
-                    {
-                        "repo": "ghcr.io/example/openadkit",
-                        "rosDistro": "humble",
-                        "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": ["ghcr.io/example/openadkit:api-humble"],
-                    }
-                ],
-            }
-        )
-    )
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "PROMOTED": str(promoted),
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert promoted.read_text().splitlines() == [
-        f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-        "ghcr.io/example/openadkit:api-humble",
-    ]
 
 
 def write_promotion_plan(tmp_path, *, publish_latest=True, aliases=None):
@@ -631,38 +521,99 @@ def write_promotion_plan(tmp_path, *, publish_latest=True, aliases=None):
     )
 
 
-def test_older_stable_does_not_update_aliases(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    promoted = tmp_path / "promoted"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
+def promote_docker_script(*, fail_latest_create=False):
+    create = (
+        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then\n'
+        + (
+            '  if [[ "$5" == *"-latest" ]]; then echo "create failed" >&2; exit 1; fi\n'
+            if fail_latest_create
+            else ""
+        )
+        + '  printf \'%s\\n\' "$5" >> "$PROMOTED"; exit\n'
+        + "fi\n"
+    )
+    return (
+        "set -euo pipefail\n"
         'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
         '  ref="$4"\n'
         f'  if [[ "$ref" == *"-{BUILD_TAG}" ]] || grep -Fxq "$ref" "$PROMOTED" 2>/dev/null; then\n'
-        f'    printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit\n'
-        '  fi\n'
+        f'    printf \'%s\\n\' \'{DIGEST_JSON}\'; exit\n'
+        "  fi\n"
         '  echo "ERROR: $ref: not found" >&2; exit 1\n'
-        'fi\n'
-        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then printf \'%s\\n\' "$5" >> "$PROMOTED"; exit; fi\n'
-        'exit 2\n',
+        "fi\n" + create + "exit 2\n"
     )
-    executable(bin_dir / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' v9.9.0\n")
+
+
+def auth_failure_docker_script(calls):
+    return (
+        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
+        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
+        f'  if [[ "$4" == *"-{BUILD_TAG}" ]]; then printf \'%s\\n\' \'{DIGEST_JSON}\'; exit; fi\n'
+        f'  if [[ "$4" == *"-{VERSION}" ]]; then echo "ERROR: $4: not found" >&2; exit 1; fi\n'
+        '  echo "401 Unauthorized" >&2; exit 1\n'
+        "fi\n"
+        "exit 1\n"
+    )
+
+
+def stuck_docker_script(calls):
+    return f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\nexit 1\n'
+
+
+def unstamped_docker_script(calls):
+    return (
+        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
+        f'  if [[ "$4" == *"-{BUILD_TAG}" ]]; then printf \'%s\\n\' \'{DIGEST_JSON}\'; exit; fi\n'
+        '  echo "ERROR: $4: not found" >&2; exit 1\n'
+        "fi\n"
+        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
+        "exit 1\n"
+    )
+
+
+def test_registry_auth_failure_never_mutates_image_tags(tmp_path):
+    calls = tmp_path / "docker-calls"
+    bin_dir = promotion_tools(tmp_path, auth_failure_docker_script(calls))
+    write_promotion_plan(tmp_path)
+    result = run_promoter(
+        tmp_path, bin_dir, extra_env={"REGISTRY_LOOKUP_RETRY_DELAY_SECONDS": "0"}
+    )
+    assert result.returncode != 0
+    assert not calls.exists() or all(
+        "imagetools create" not in call for call in calls.read_text().splitlines()
+    )
+
+
+def test_failed_version_tag_never_updates_stable_aliases(tmp_path):
+    calls = tmp_path / "docker-calls"
+    bin_dir = promotion_tools(
+        tmp_path,
+        unstamped_docker_script(calls),
+        extra_tools=[("sleep", "#!/usr/bin/env bash\nexit 0\n")],
+    )
+    write_promotion_plan(tmp_path)
+    result = run_promoter(tmp_path, bin_dir)
+    assert result.returncode != 0
+    assert all(f"-{VERSION}" in call for call in calls.read_text().splitlines())
+
+
+def test_stable_promotion_consumes_planned_version_and_aliases(tmp_path):
+    promoted = tmp_path / "promoted"
+    bin_dir = promotion_tools(tmp_path, promote_docker_script())
+    write_promotion_plan(tmp_path)
+    result = run_promoter(tmp_path, bin_dir, extra_env={"PROMOTED": str(promoted)})
+    assert result.returncode == 0, result.stderr
+    assert promoted.read_text().splitlines() == [
+        f"ghcr.io/example/openadkit:api-humble-{VERSION}",
+        "ghcr.io/example/openadkit:api-humble",
+    ]
+
+
+def test_older_stable_does_not_update_aliases(tmp_path):
+    promoted = tmp_path / "promoted"
+    bin_dir = promotion_tools(tmp_path, promote_docker_script(), gh_version="v9.9.0")
     write_promotion_plan(tmp_path, publish_latest=False)
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "PROMOTED": str(promoted),
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
-    )
+    result = run_promoter(tmp_path, bin_dir, extra_env={"PROMOTED": str(promoted)})
     assert result.returncode == 0, result.stderr
     assert promoted.read_text().splitlines() == [
         f"ghcr.io/example/openadkit:api-humble-{VERSION}"
@@ -670,29 +621,10 @@ def test_older_stable_does_not_update_aliases(tmp_path):
 
 
 def test_alias_policy_mismatch_aborts_before_mutation(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
     calls = tmp_path / "docker-calls"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\n"
-        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
-        "exit 1\n",
-    )
-    executable(bin_dir / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' v9.9.0\n")
+    bin_dir = promotion_tools(tmp_path, stuck_docker_script(calls), gh_version="v9.9.0")
     write_promotion_plan(tmp_path, publish_latest=True)
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
-    )
+    result = run_promoter(tmp_path, bin_dir)
     assert result.returncode != 0
     assert "Latest alias policy changed" in result.stderr
     assert not calls.exists() or all(
@@ -701,27 +633,12 @@ def test_alias_policy_mismatch_aborts_before_mutation(tmp_path):
 
 
 def test_alias_loop_reports_unconverged_and_continues(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
     promoted = tmp_path / "promoted"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        '  ref="$4"\n'
-        f'  if [[ "$ref" == *"-{BUILD_TAG}" ]] || grep -Fxq "$ref" "$PROMOTED" 2>/dev/null; then\n'
-        f'    printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit\n'
-        '  fi\n'
-        '  echo "ERROR: $ref: not found" >&2; exit 1\n'
-        'fi\n'
-        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then\n'
-        '  if [[ "$5" == *"-latest" ]]; then echo "create failed" >&2; exit 1; fi\n'
-        '  printf \'%s\\n\' "$5" >> "$PROMOTED"; exit\n'
-        'fi\n'
-        'exit 2\n',
+    bin_dir = promotion_tools(
+        tmp_path,
+        promote_docker_script(fail_latest_create=True),
+        extra_tools=[("sleep", "#!/usr/bin/env bash\nexit 0\n")],
     )
-    executable(bin_dir / "sleep", "#!/usr/bin/env bash\nexit 0\n")
-    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {VERSION}\n")
     write_promotion_plan(
         tmp_path,
         aliases=[
@@ -729,19 +646,7 @@ def test_alias_loop_reports_unconverged_and_continues(tmp_path):
             "ghcr.io/example/openadkit:api-humble-latest",
         ],
     )
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "PROMOTED": str(promoted),
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
-    )
+    result = run_promoter(tmp_path, bin_dir, extra_env={"PROMOTED": str(promoted)})
     assert result.returncode != 0
     assert "Unconverged aliases: ghcr.io/example/openadkit:api-humble-latest" in result.stderr
     assert promoted.read_text().splitlines() == [
@@ -802,7 +707,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         "#!/usr/bin/env bash\n"
         f'printf "%s|%s\\n" "${{ROS_DISTRO:-}}" "$*" >> {json.dumps(str(calls))}\n'
         'if [[ "$*" == *"config --services"* ]]; then\n'
-        "  printf '%s\\n' map map-check planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario_simulator carla carla-interface carla-map-loader\n"
+        "  printf '%s\\n' map map-check planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario_simulator carla carla-interface carla-map-loader zenoh-bridge\n"
         "fi\n"
         "exit 0\n",
     )

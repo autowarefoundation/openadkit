@@ -10,6 +10,11 @@ export PYTHONDONTWRITEBYTECODE=1
 : "${STABLE_RELEASE:?STABLE_RELEASE is required}"
 : "${PUBLISH_LATEST_ALIASES:?PUBLISH_LATEST_ALIASES is required}"
 
+# Split-host role views require Zenoh endpoints. These dummies only render and
+# validate the Compose graphs; they never start a bridge.
+export ZENOH_LISTEN="${ZENOH_LISTEN:-tcp/127.0.0.1:7447}"
+export ZENOH_PEER="${ZENOH_PEER:-tcp/127.0.0.1:7447}"
+
 source_dir=${SOURCE_DIR:-src}
 build_metadata=${BUILD_METADATA_FILE:-release-input/build/build-metadata.json}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -61,13 +66,16 @@ python3 "${planner}" \
 
 (cd "${bundle_root}" && ./openadkit list)
 
-while IFS=$'\t' read -r deployment ros_distro gpu; do
+while IFS=$'\t' read -r deployment ros_distro gpu role; do
   validate_args=(./openadkit validate "${deployment}" --ros-distro "${ros_distro}")
   if [ "${gpu}" = true ]; then
     validate_args+=(--gpu)
   fi
+  if [ -n "${role}" ]; then
+    validate_args+=(--role "${role}")
+  fi
   (cd "${bundle_root}" && "${validate_args[@]}")
-done < <(jq -r '.bundle.validation[] | [.deployment, .rosDistro, (.gpu | tostring)] | @tsv' "${plan_file}")
+done < <(jq -r '.bundle.validation[] | [.deployment, .rosDistro, (.gpu | tostring), .role] | @tsv' "${plan_file}")
 
 if cache=$(find "${bundle_root}" \( -type d -name __pycache__ -o -type f -name '*.pyc' \) -print -quit) \
   && [ -n "${cache}" ]; then

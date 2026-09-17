@@ -602,6 +602,7 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     if not isinstance(data, list):
         raise OpenADKitError("data must be an array")
     names: set[str] = set()
+    destinations: set[str] = set()
     for index, resource in enumerate(data):
         where = f"data[{index}]"
         if not isinstance(resource, dict):
@@ -616,6 +617,11 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
         if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
             raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
+        if resource["destinationEnv"] in destinations:
+            raise OpenADKitError(
+                f"duplicate data destination environment: {resource['destinationEnv']}"
+            )
+        destinations.add(resource["destinationEnv"])
         if "gpu" in resource and not isinstance(resource["gpu"], bool):
             raise OpenADKitError(f"{where}.gpu must be a boolean")
         if "roles" in resource:

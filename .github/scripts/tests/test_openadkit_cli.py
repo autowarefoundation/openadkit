@@ -916,6 +916,22 @@ def test_role_data_applicability_skips_other_roles(tmp_path):
     assert "MAP_PATH is required" in result.stderr
 
 
+def test_role_scoped_data_cannot_share_a_destination(tmp_path):
+    manifest = role_manifest()
+    manifest["data"] = [
+        files_resource(
+            name="primary-map", destination_env="MAP_PATH", roles=["primary"]
+        ),
+        files_resource(
+            name="secondary-map", destination_env="MAP_PATH", roles=["secondary"]
+        ),
+    ]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    assert "duplicate data destination environment: MAP_PATH" in run_cli(
+        root, ["list"]
+    ).stdout
+
+
 def test_role_schema_errors_are_reported(tmp_path):
     unknown = role_manifest()
     unknown["compose"]["roles"]["primary"]["image"] = "busybox"

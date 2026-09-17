@@ -396,6 +396,39 @@ def test_zenoh_fragment_is_digest_pinned_and_uses_wrapper():
     assert "USE_SIM_TIME" not in fragment
 
 
+def load_zenoh_allowlist(directory):
+    # JSON5 without a dependency: slice the two lists out of the file. Entries
+    # are quoted full-name regexes, so an exact quoted match is enough.
+    text = (directory / "config" / "zenoh.json5").read_text()
+
+    def section(name):
+        start = text.index(f"      {name}: [")
+        end = text.index("],", start)
+        return text[start:end]
+
+    return {"publishers": section("publishers"), "subscribers": section("subscribers")}
+
+
+def test_zenoh_allowlists_route_cross_host_topics():
+    routes = {
+        "scenario-simulation": [
+            "/perception/obstacle_segmentation/pointcloud",
+            "/perception/object_recognition/detection/objects",
+            "/perception/occupancy_grid_map/map",
+        ],
+        "carla-simulation": [
+            "/localization/kinematic_state",
+            "/initialpose",
+            "/sensing/lidar/top/pointcloud_before_sync",
+        ],
+    }
+    for name, topics in routes.items():
+        allow = load_zenoh_allowlist(ROOT / "deployments" / name)
+        for topic in topics:
+            assert f'"{topic}"' in allow["publishers"], (name, topic)
+            assert f'"{topic}"' in allow["subscribers"], (name, topic)
+
+
 def test_split_host_deployments_keep_two_service_files():
     for name in ("scenario-simulation", "carla-simulation"):
         directory = ROOT / "deployments" / name

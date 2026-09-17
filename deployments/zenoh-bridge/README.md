@@ -1,7 +1,7 @@
 # Zenoh Bridge
 
 Bridges Autoware data from edge to cloud for remote visualization and control.
-See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/)
+See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/)
 for topology, configuration, and teleoperation.
 
 From the source root, prepare the Kashiwanoha map, then start the standalone

@@ -19,5 +19,5 @@ It provides:
 - Lightweight sensor mappings for constrained hosts
 - Launch file: `autoware_carla_interface.launch.xml`
 
-See the [CARLA Simulation deployment](../deployment/carla-simulation/index.md)
+See the [CARLA Simulation deployment](../deployments/carla-simulation/index.md)
 for `openadkit run carla-simulation --gpu`.

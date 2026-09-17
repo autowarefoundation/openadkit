@@ -84,11 +84,11 @@ shared `deployments/base/runtime.env` is loaded inside containers via
 The same command surface is included in the release bundle. Use
 `deployments/<name>/config.local.env` for local overrides.
 
-For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployment/zenoh-bridge/).
+For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/).
 
 ### Releasing
 
-Use the `release.yaml` workflow (GitHub Actions) to promote a build to a release. See the workflow input descriptions for details.
+Use the `release.yaml` workflow (GitHub Actions) to promote a build to a release. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
 
 ## DCO Requirement
 

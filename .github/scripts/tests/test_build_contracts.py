@@ -313,6 +313,11 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
     assert "source_ref: ${{ github.sha }}" not in release
     assert "source_ref: ${{ inputs.version }}" not in release
     assert "INSTALLER_SOURCE_DIR: ${{ github.workspace }}" in release
+    assert "must match openadkit.json defaultRosDistro" in release
+    validate_job = release.split("\n  validate:\n", 1)[1].split(
+        "\n  package-bundles:", 1
+    )[0]
+    assert "openadkit.json" in validate_job
     preview_deploy = (ROOT / ".github/workflows/pr-preview-deploy.yaml").read_text()
     shared_pages = (
         "group: gh-pages\n"
@@ -329,6 +334,12 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
     macros = (ROOT / "docs/macros.py").read_text()
     assert 'kit["imagePrefixComponent"]' in macros
     assert 'REGISTRY = "ghcr.io/autowarefoundation/openadkit"' not in macros
+
+
+def test_docs_use_plural_deployments_path():
+    assert (ROOT / "docs/deployments/index.md").is_file()
+    assert not (ROOT / "docs/deployment").exists()
+    assert ": deployment/" not in (ROOT / "mkdocs.yaml").read_text()
 
 
 def test_capture_metadata_uses_retrying_registry_lookup():

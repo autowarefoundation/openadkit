@@ -64,14 +64,13 @@ plugins:
       on_error_fail: true
   - redirects:
       redirect_maps:
-        deployments/samples/planning-simulation/index.md: deployment/planning-simulation/index.md
-        deployments/samples/scenario-simulation/index.md: deployment/scenario-simulation/index.md
-        deployments/samples/logging-simulation/index.md: deployment/logging-simulation/index.md
-        deployments/samples/carla-simulation/index.md: deployment/carla-simulation/index.md
-        deployments/demos/zenoh-bridge/index.md: deployment/zenoh-bridge/index.md
-        deployments/samples/index.md: deployment/index.md
-        deployments/demos/index.md: deployment/index.md
-        deployments/index.md: deployment/index.md
+        deployments/samples/planning-simulation/index.md: deployments/planning-simulation/index.md
+        deployments/samples/scenario-simulation/index.md: deployments/scenario-simulation/index.md
+        deployments/samples/logging-simulation/index.md: deployments/logging-simulation/index.md
+        deployments/samples/carla-simulation/index.md: deployments/carla-simulation/index.md
+        deployments/demos/zenoh-bridge/index.md: deployments/zenoh-bridge/index.md
+        deployments/samples/index.md: deployments/index.md
+        deployments/demos/index.md: deployments/index.md
         contributing/index.md: development/contributing.md
         hardware/index.md: platforms/hardware/index.md
         tools/index.md: development/index.md

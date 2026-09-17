@@ -4,7 +4,7 @@ This directory contains deployment configurations for Open AD Kit.
 
 ## Quick Links
 
-For **complete documentation**, operational steps, and troubleshooting, see the [Open AD Kit Documentation Site](https://autowarefoundation.github.io/openadkit/deployment/).
+For **complete documentation**, operational steps, and troubleshooting, see the [Open AD Kit Documentation Site](https://autowarefoundation.github.io/openadkit/deployments/).
 
 ## Available Deployments
 

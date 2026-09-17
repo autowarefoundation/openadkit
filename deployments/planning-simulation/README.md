@@ -1,7 +1,7 @@
 # Planning Simulation
 
 Runs the Autoware planning and control stack with a pre-recorded point cloud
-map. See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/planning-simulation/)
+map. See the [canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/)
 for configuration and troubleshooting.
 
 ```bash

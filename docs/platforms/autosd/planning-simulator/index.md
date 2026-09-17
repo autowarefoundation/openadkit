@@ -22,7 +22,7 @@ Runnable assets live under [`platforms/autosd/planning-simulator/`](https://gith
     - `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime`
 
     For the modular Docker Compose stack with browser RViz2, use
-    [Planning Simulation](../../../deployment/planning-simulation/index.md).
+    [Planning Simulation](../../../deployments/planning-simulation/index.md).
 
 ## Prerequisites
 
@@ -84,11 +84,11 @@ Once all services are running, you can:
 - Observe the Autoware planning stack responding to the scenario simulator environment via service logs
 - Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware
 
-For a Docker Compose equivalent with a browser-accessible RViz2 visualizer, see the [Planning Simulation deployment](../../../deployment/planning-simulation/index.md).
+For a Docker Compose equivalent with a browser-accessible RViz2 visualizer, see the [Planning Simulation deployment](../../../deployments/planning-simulation/index.md).
 
 ## Related
 
 - [AutoSD Platform Overview](../index.md)
-- [Planning Simulation deployment](../../../deployment/planning-simulation/index.md)
-- [Open AD Kit Deployments](../../../deployment/index.md)
+- [Planning Simulation deployment](../../../deployments/planning-simulation/index.md)
+- [Open AD Kit Deployments](../../../deployments/index.md)
 - [Components Overview](../../../components/index.md)

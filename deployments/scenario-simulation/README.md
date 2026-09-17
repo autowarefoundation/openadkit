@@ -1,7 +1,7 @@
 # Scenario Simulation
 
 Runs TIER IV Scenario Simulator workflows. See the
-[canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/scenario-simulation/)
+[canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/)
 for configuration and troubleshooting.
 
 ```bash

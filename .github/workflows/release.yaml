@@ -14,7 +14,7 @@ on:
         description: 'Build tag to promote (e.g. 123456789-1)'
         required: true
       default_ros_distro:
-        description: 'ROS distro to use for bare tag aliases'
+        description: 'ROS distro for bare tag aliases; must match openadkit.json defaultRosDistro'
         required: false
         type: choice
         options:
@@ -53,6 +53,7 @@ jobs:
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
             .github/scripts/validate_release.sh
+            openadkit.json
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3

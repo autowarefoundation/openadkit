@@ -2,7 +2,7 @@
 
 Replays recorded sensor data through the Autoware sensing, perception, and
 localization stack. Install the host dependencies as described in the
-[canonical documentation](https://autowarefoundation.github.io/openadkit/deployment/logging-simulation/)
+[canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/)
 before starting.
 
 ```bash

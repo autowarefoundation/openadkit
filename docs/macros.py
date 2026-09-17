@@ -1,6 +1,8 @@
 """mkdocs-macros module — single-source repeated reference facts.
 
-The registry prefix and default ROS distro title come from openadkit.json. The
+The registry prefix and default ROS distro title come from openadkit.json — the
+same manifest validate_release.sh checks the release default_ros_distro input
+against, so the published docs cannot contradict the bare tag aliases. The
 component image table is generated from the catalog
 (.github/image-inventory.json) so the docs cannot drift from what CI builds.
 

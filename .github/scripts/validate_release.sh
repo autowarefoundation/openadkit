@@ -48,6 +48,27 @@ validate_inputs() {
   esac
 }
 
+# Docs and the CLI are generated from openadkit.json, so the release must agree
+# with it. A mismatched default would publish bare tag aliases the docs call
+# the wrong distro, and a mismatched prefix would push images the manifest
+# does not name.
+validate_manifest_consistency() {
+  local manifest manifest_distro manifest_registry
+
+  manifest="${script_dir}/../../openadkit.json"
+  [ -f "${manifest}" ] || fail "Product manifest not found at ${manifest}"
+  manifest_distro=$(jq -r '.defaultRosDistro // empty' "${manifest}")
+  [ -n "${manifest_distro}" ] \
+    || fail "Product manifest ${manifest} does not declare defaultRosDistro"
+  [ "${DEFAULT_ROS_DISTRO:-humble}" = "${manifest_distro}" ] \
+    || fail "default_ros_distro '${DEFAULT_ROS_DISTRO:-humble}' must match openadkit.json defaultRosDistro '${manifest_distro}'; update the manifest before releasing"
+  manifest_registry=$(jq -r '.imagePrefixComponent // empty' "${manifest}")
+  [ -n "${manifest_registry}" ] \
+    || fail "Product manifest ${manifest} does not declare imagePrefixComponent"
+  [ "${IMAGE_PREFIX_COMPONENT}" = "${manifest_registry}" ] \
+    || fail "IMAGE_PREFIX_COMPONENT '${IMAGE_PREFIX_COMPONENT}' must match openadkit.json imagePrefixComponent '${manifest_registry}'"
+}
+
 resolve_latest_alias_policy() {
   local current_policy
 
@@ -454,6 +475,7 @@ write_outputs() {
 
 main() {
   validate_inputs
+  validate_manifest_consistency
   resolve_latest_alias_policy
   validate_build_run
   download_build_metadata

@@ -194,6 +194,55 @@ def test_release_rules_reject_unsupported_autoware_refs(
     assert result.returncode != 0
 
 
+def run_manifest_consistency(tmp_path, *, distro=None, registry=None):
+    manifest = json.loads((ROOT / "openadkit.json").read_text())
+    env = os.environ | {
+        "BUILD_TAG": BUILD_TAG,
+        "VERSION": VERSION,
+        "GH_TOKEN": "test",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
+        "IMAGE_PREFIX_COMPONENT": registry or manifest["imagePrefixComponent"],
+        "DEFAULT_ROS_DISTRO": distro or manifest["defaultRosDistro"],
+    }
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; validate_manifest_consistency',
+            "bash",
+            str(VALIDATOR),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+
+def test_manifest_consistency_accepts_release_inputs_matching_manifest(tmp_path):
+    result = run_manifest_consistency(tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_manifest_consistency_rejects_distro_that_contradicts_manifest(tmp_path):
+    manifest_distro = json.loads((ROOT / "openadkit.json").read_text())[
+        "defaultRosDistro"
+    ]
+    other_distro = "jazzy" if manifest_distro == "humble" else "humble"
+    result = run_manifest_consistency(tmp_path, distro=other_distro)
+    assert result.returncode != 0
+    assert "must match openadkit.json defaultRosDistro" in result.stderr
+
+
+def test_manifest_consistency_rejects_registry_that_contradicts_manifest(tmp_path):
+    result = run_manifest_consistency(tmp_path, registry="ghcr.io/example/openadkit")
+    assert result.returncode != 0
+    assert "must match openadkit.json imagePrefixComponent" in result.stderr
+
+
 def test_registry_lookup_retries_and_classifies_failures(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

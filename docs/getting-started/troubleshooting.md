@@ -67,4 +67,4 @@ Recovery depends on the deployment:
 
 - [Getting Started](index.md) — Quick start guide
 - [Container Images & Versioning](container-images.md) — Tag schema and version policy
-- [Deployments](../deployment/index.md) — Self-contained deployments
+- [Deployments](../deployments/index.md) — Self-contained deployments

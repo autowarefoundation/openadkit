@@ -207,19 +207,20 @@ Before any image is tagged, the `validate` job (`.github/scripts/validate_releas
 | 1 | **Version format** | `vX.Y.Z` for stable, `vX.Y.Z-prerelease` for pre-release |
 | 2 | **Build tag format** | Must match `RUN_ID-RUN_ATTEMPT` |
 | 3 | **Source branch** | Release must run from `main` |
-| 4 | **Alias policy** | If a newer stable release already exists, latest aliases won't be updated |
-| 5 | **Build provenance** | The build tag must reference a completed, successful `build-all-images` run on `main` |
-| 6 | **Build age** | Build must be less than 90 days old |
-| 7 | **Scan results** | A passing `scan-images` run must exist for the build; scan metadata is validated against the build metadata |
-| 8 | **Metadata schema** | 15+ fields in `build-metadata.json` are validated (types, formats, SHA256 lengths) |
-| 9 | **File integrity** | SHA256 of `autoware-lock.repos`, `image-inventory.json`, and `upstream-images.json` must match the metadata |
-| 10 | **Autoware revision** | Stable releases require an exact Autoware release tag matching the base version; pre-releases also accept a full SHA |
-| 11 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build; no missing or extra images |
-| 12 | **Upstream coverage** | Every required Autoware base is recorded and consumed as an immutable manifest digest |
-| 13 | **Scan coverage** | Every image digest and platform must have a scan result |
-| 14 | **Registry integrity** | Build images must still exist in GHCR with matching digests; confirmed missing tags are distinguished from retried transient and fail-closed registry errors |
+| 4 | **Manifest consistency** | `default_ros_distro` and the component image prefix must match `openadkit.json` |
+| 5 | **Alias policy** | If a newer stable release already exists, latest aliases won't be updated |
+| 6 | **Build provenance** | The build tag must reference a completed, successful `build-all-images` run on `main` |
+| 7 | **Build age** | Build must be less than 90 days old |
+| 8 | **Scan results** | A passing `scan-images` run must exist for the build; scan metadata is validated against the build metadata |
+| 9 | **Metadata schema** | 15+ fields in `build-metadata.json` are validated (types, formats, SHA256 lengths) |
+| 10 | **File integrity** | SHA256 of `autoware-lock.repos`, `image-inventory.json`, and `upstream-images.json` must match the metadata |
+| 11 | **Autoware revision** | Stable releases require an exact Autoware release tag matching the base version; pre-releases also accept a full SHA |
+| 12 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build; no missing or extra images |
+| 13 | **Upstream coverage** | Every required Autoware base is recorded and consumed as an immutable manifest digest |
+| 14 | **Scan coverage** | Every image digest and platform must have a scan result |
+| 15 | **Registry integrity** | Build images must still exist in GHCR with matching digests; confirmed missing tags are distinguished from retried transient and fail-closed registry errors |
 
-If all 14 gates pass, the workflow proceeds to tag promotion.
+If all 15 gates pass, the workflow proceeds to tag promotion.
 
 #### Tag Promotion
 

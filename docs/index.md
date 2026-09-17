@@ -32,7 +32,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 <h3>Deployment</h3>
 <p>Ready-to-run deployments for simulation and AD stacks.</p>
-<a href="deployment/" class="md-button">View Deployment</a>
+<a href="deployments/" class="md-button">View Deployment</a>
 </div>
 
 <div class="oak-card oak-nav-card" markdown="1">

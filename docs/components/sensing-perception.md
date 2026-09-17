@@ -25,7 +25,7 @@ understanding into one build target.
 inference on NVIDIA GPUs. It is published for amd64 only and requires NVIDIA
 Container Toolkit. Deployments that use it today:
 
-- [Logging Simulation](../deployment/logging-simulation/index.md) GPU overlay
+- [Logging Simulation](../deployments/logging-simulation/index.md) GPU overlay
   (`docker-compose.gpu.yaml`; CLI `--gpu` injects `SENSING_PERCEPTION_GPU_IMAGE`)
-- [CARLA Simulation](../deployment/carla-simulation/index.md) (`--gpu`; Compose
+- [CARLA Simulation](../deployments/carla-simulation/index.md) (`--gpu`; Compose
   defaults to `sensing-perception-cuda`, override in `config.local.env`)

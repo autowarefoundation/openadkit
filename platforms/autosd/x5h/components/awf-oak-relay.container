@@ -9,6 +9,8 @@ After=network-online.target
 # needs the bridge to start nor breaks without it; the bridge is what
 # carries _ds into domain 2, remapped back to the real name.
 After=awf-oak-bridge.service awf-oak-autoware.service
+# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+ConditionKernelCommandLine=x5h.role=cr52
 
 [Install]
 WantedBy=default.target

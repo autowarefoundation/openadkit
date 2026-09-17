@@ -35,6 +35,23 @@ case "$(uname -r)" in
 *-autosd*) REBUILT=1 ;;
 *) REBUILT= ;;
 esac
+# Effective netavark firewall driver, read rather than assumed.
+#
+# This used to be assumed, and the assumption went stale: 60-nftables.conf was
+# once staged only alongside the rebuilt kernel, so "BSP kernel" implied
+# firewall_driver="none". It is now installed unconditionally by the aib image
+# manifest, and stage-nfs-rootfs.sh extracts that same tar, so the NFS rescue
+# root carries it under BOTH kernels. A BSP-kernel boot therefore now runs with
+# a driver its kernel has no CONFIG_NF_TABLES for.
+#
+# The drop-ins are concatenated in glob (sort) order and the LAST assignment
+# wins, which is exactly netavark's own precedence, so this reproduces what
+# netavark will resolve without duplicating its config parser.
+FWDRV="$(cat /etc/containers/containers.conf.d/*.conf 2>/dev/null \
+    | sed -n 's/^[[:space:]]*firewall_driver[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' | tail -1)"
+# The marker it feeds is emitted after the mode dispatch below, not here: an
+# invalid or missing mode must still print a bare `usage:` line and NOTHING
+# with a SMOKE_ prefix, since there is no valid $MODE to prefix one with.
 # Created up front, same reason as gate-guest.sh -- an exported rootfs
 # with no kernel package may not carry this directory, and mounting onto a
 # nonexistent mountpoint should fail as a clear SMOKE_*_MOUNT_FAIL below, not
@@ -138,6 +155,16 @@ esac
 # boot-time unit succeeds there and leaves healthy state behind.
 rm -rf /run/containers/storage
 
+if [ -z "$REBUILT" ] && [ "$FWDRV" = "nftables" ]; then
+    # Informational, never fatal: this script grades the container store, and
+    # refusing to run here would withhold that answer over a firewall-config
+    # mismatch. But an operator who sees SMOKE_<mode>_NET_FAIL below on a BSP
+    # rescue boot needs this line, because the store may be perfectly healthy
+    # and the network verdict still red -- and the fix is a containers.conf.d
+    # question, not a podman0/veth one.
+    echo "SMOKE_${MODE}_FIREWALL_DRIVER_UNRUNNABLE driver=$FWDRV kernel=$(uname -r) (this kernel has no CONFIG_NF_TABLES; a red NET verdict below is expected of the firewall config, not of the store)"
+fi
+
 # From here on, record failures in FAIL instead of exiting immediately, so
 # every run reaches exactly one terminal marker -- SMOKE_<mode>_PASS or
 # SMOKE_<mode>_FAIL -- and the tmpfs cleanup below always runs.
@@ -171,18 +198,29 @@ if [ -z "$FAIL" ]; then
     podman run -d --name web -p 8080:80 "$BB" \
         sh -c 'echo ok > /tmp/index.html && exec httpd -f -p 80 -h /tmp'
     # Port-published attempt. On the BSP kernel this stays INFORMATIONAL
-    # ONLY and must never set FAIL: this is GATE5's first attempt, and the
-    # green gate run's own timeline proved it dead under
-    # firewall_driver=none (what 50-x5h.conf ships) -- the port-published
-    # container started with veth0 forwarding, the poll ran ~78s with zero
-    # successful curls, and only the direct-container-IP fallback below
-    # succeeded. netavark's "none" driver is a no-op for setup_port_forward
-    # -- no DNAT rule is ever installed, so 127.0.0.1:8080 is unreachable by
-    # construction, not by anything wrong with this store or this board.
-    # On the rebuilt kernel it is the opposite: 60-nftables.conf switches
-    # netavark to the nftables driver, which DOES install the DNAT rule, so
-    # a dead published port there is a real regression and this check is
-    # decisive (see the REBUILT branch below).
+    # ONLY and must never set FAIL -- but READ WHY, because the original
+    # reason is no longer the true one.
+    #
+    # It used to be: this is GATE5's first attempt, and the green gate run's
+    # own timeline proved it dead under firewall_driver=none (what 50-x5h.conf
+    # shipped and, on a BSP-kernel boot, what was in effect) -- the
+    # port-published container started with veth0 forwarding, the poll ran ~78s
+    # with zero successful curls, and only the direct-container-IP fallback
+    # below succeeded. netavark's "none" driver is a no-op for
+    # setup_port_forward, so 127.0.0.1:8080 was unreachable by construction.
+    #
+    # That premise is gone: 60-nftables.conf now ships in the image, so a
+    # BSP-kernel boot resolves firewall_driver="nftables" on a kernel with no
+    # CONFIG_NF_TABLES (see FWDRV above). The DECISION is unchanged and still
+    # correct -- a dead published port on the BSP kernel says nothing about the
+    # container store this script grades -- but the reason is now "the selected
+    # driver cannot run on this kernel at all", not "the selected driver
+    # deliberately installs no DNAT rule". Do not promote this check to
+    # decisive on BSP on the strength of the old wording.
+    #
+    # On the rebuilt kernel nothing changed: the nftables driver DOES install
+    # the DNAT rule there, so a dead published port is a real regression and
+    # this check is decisive (see the REBUILT branch below).
     # Poll rather than a fixed sleep, same reason gate-guest.sh polls: a
     # short fixed window would misreport a merely-slow start as broken, and
     # the board is slower than the CI runner the gate ran on.

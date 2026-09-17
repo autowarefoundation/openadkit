@@ -1,3 +1,0 @@
-bootcmd_yocto=tftp 0x9e680000 Image && tftp 0x9e600000 r8a78000-ironhide-uio.dtb && booti 0x9e680000 - 0x9e600000
-bootargs_autosd_ufs=pd_ignore_unused clk_ignore_unused root=PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02 rootwait rw ip=192.168.0.20::192.168.0.1:255.255.255.0:autosd-x5h:tsn5:none enforcing=0
-bootcmd_autosd_ufs=ufs init; scsi rescan; ext4load scsi 2:1 ${kernel_addr_r} Image-autosd; ext4load scsi 2:1 ${fdt_addr_r} r8a78000-ironhide-uio-autosd.dtb; setenv bootargs ${bootargs_autosd_ufs}; booti ${kernel_addr_r} - ${fdt_addr_r}

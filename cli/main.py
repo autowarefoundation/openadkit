@@ -65,14 +65,22 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  ./openadkit setup --verify\n"
-            "  ./openadkit list\n"
-            "  ./openadkit run planning-simulation\n"
-            "  ./openadkit run logging-simulation --gpu\n"
-            "  ./openadkit stop planning-simulation"
+            "  openadkit install --version vX.Y.Z\n"
+            "  openadkit upgrade\n"
+            "  openadkit setup --verify\n"
+            "  openadkit list\n"
+            "  openadkit run planning-simulation\n"
+            "  openadkit run logging-simulation --gpu\n"
+            "  openadkit stop planning-simulation"
         ),
     )
     subparsers = parser.add_subparsers(dest="command", parser_class=OpenADKitParser)
+    subparsers.add_parser(
+        "install", help="downloads and installs a release bundle"
+    )
+    subparsers.add_parser(
+        "upgrade", help="upgrades an installed release to the latest stable version"
+    )
     subparsers.add_parser(
         "setup", help="installs Ubuntu host dependencies"
     )
@@ -174,7 +182,7 @@ def list_deployments(root, kit, names: list[str] | None = None) -> int:
 def require_deployment_name(command: str, extra: str = "") -> None:
     print("error: deployment name required", file=sys.stderr)
     suffix = f" {extra}" if extra else ""
-    print(f"usage: ./openadkit {command} <deployment>{suffix}", file=sys.stderr)
+    print(f"usage: openadkit {command} <deployment>{suffix}", file=sys.stderr)
     print(file=sys.stderr)
 
 
@@ -217,7 +225,7 @@ def print_run_next_steps(deployment, selection) -> None:
     if "visualizer" in selection.services:
         print("visualizer: https://localhost:6080/vnc.html")
         print("password: REMOTE_PASSWORD in config.env")
-    print(f"stop with: ./openadkit stop {deployment.name}")
+    print(f"stop with: openadkit stop {deployment.name}")
 
 
 def main() -> int:
@@ -226,11 +234,13 @@ def main() -> int:
     if not args.command:
         parser.print_help()
         return 2
-    if args.command == "setup":
-        print(
-            "error: run: ./openadkit setup [--gpu] [--verify]",
-            file=sys.stderr,
-        )
+    if args.command in ("install", "upgrade", "setup"):
+        usage = {
+            "install": "openadkit install [--version vX.Y.Z] [--destination DIRECTORY] [--force]",
+            "upgrade": "openadkit upgrade",
+            "setup": "openadkit setup [--gpu] [--verify]",
+        }[args.command]
+        print(f"error: run: {usage}", file=sys.stderr)
         return 2
 
     root = root_path()

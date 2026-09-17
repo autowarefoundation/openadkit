@@ -163,6 +163,7 @@ jobs:
           name: release-bundles-${{ inputs.build_tag }}
           path: |
             release-plan.json
+            dist/openadkit
             dist/openadkit-${{ inputs.version }}.tar.gz
           if-no-files-found: error
           retention-days: 7

@@ -60,6 +60,7 @@ python3 "${planner}" \
   --context-output "${bundle_root}/openadkit.json"
 
 (cd "${bundle_root}" && ./openadkit list)
+cp -a "${source_dir}/openadkit" dist/openadkit
 
 while IFS=$'\t' read -r deployment ros_distro gpu; do
   validate_args=(./openadkit validate "${deployment}" --ros-distro "${ros_distro}")

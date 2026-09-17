@@ -2,17 +2,48 @@
 
 From zero to a running Autoware planning simulation in about 10 minutes. No GPU is required.
 
-```mermaid
-flowchart LR
-    A[Download or clone] --> B[Setup] --> C[Run] --> D[Drive]
-```
+<nav class="oak-quickstart" aria-label="Quickstart steps">
+  <ol>
+    <li>
+      <a href="#get-open-ad-kit">
+        <span class="oak-quickstart__number">1</span>
+        <span><strong>Get the kit</strong><small>Download or clone</small></span>
+      </a>
+    </li>
+    <li>
+      <a href="#set-up-the-host">
+        <span class="oak-quickstart__number">2</span>
+        <span><strong>Set up the host</strong><small>Configure dependencies</small></span>
+      </a>
+    </li>
+    <li>
+      <a href="#run-planning-simulation">
+        <span class="oak-quickstart__number">3</span>
+        <span><strong>Run simulation</strong><small>Start planning</small></span>
+      </a>
+    </li>
+    <li>
+      <a href="#open-the-visualizer">
+        <span class="oak-quickstart__number">4</span>
+        <span><strong>Open visualizer</strong><small>Inspect the output</small></span>
+      </a>
+    </li>
+    <li>
+      <a href="#drive">
+        <span class="oak-quickstart__number">5</span>
+        <span><strong>Drive</strong><small>Set a route</small></span>
+      </a>
+    </li>
+  </ol>
+</nav>
 
 ## Prerequisites
 
 - **Ubuntu 22.04 (Jammy) or 24.04 (Noble)** with `sudo` access
+- `curl` for the release installer; `python3` and `tar` are preinstalled on supported Ubuntu releases
 - A web browser - the visualizer runs in it, no display server needed
 
-## 1. Get Open AD Kit
+## 1. Get Open AD Kit {: #get-open-ad-kit }
 
 --8<-- "includes/first-release-note.md"
 
@@ -25,8 +56,26 @@ flowchart LR
 
 === "Release bundle"
 
-    Resolve the latest version, download the runtime bundle and metadata, then
-    verify its checksum:
+    Download the latest release. The command verifies the release bundle before
+    installing it to `~/.local/share/openadkit` and makes `openadkit` available
+    from `~/.local/bin`.
+
+    ```bash
+    curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \
+      | bash -s -- install
+    ```
+
+    If `~/.local/bin` is not on your `PATH`, the installer prints the command to
+    add it. For a reproducible install, replace `latest` with a release version
+    and pass the same version to `install`:
+
+    ```bash
+    curl -fsSL https://github.com/autowarefoundation/openadkit/releases/download/vX.Y.Z/openadkit \
+      | bash -s -- install --version vX.Y.Z
+    ```
+
+    To inspect the bundle before running anything, download and verify it
+    manually against the release metadata:
 
     ```bash
     VERSION=$(curl -fsSL \
@@ -40,13 +89,20 @@ flowchart LR
     cd "openadkit-${VERSION}"
     ```
 
+    The extracted bundle is the same runtime; run it with `./openadkit` from the
+    extracted directory.
+
 The release bundle contains only the runtime entry point and deployment assets.
 A source checkout also contains `components/`, CI, tests, and development tools.
 
-## 2. Set Up the Host
+## 2. Set Up the Host {: #set-up-the-host }
+
+After a release install, these commands work from any directory. For a source
+checkout, prefix them with `./` (for example `./openadkit`) and run them from
+the repository root.
 
 ```bash
-./openadkit setup --verify
+openadkit setup --verify
 ```
 
 Run setup as your normal user. It requests `sudo` only for host changes. CPU is
@@ -55,10 +111,10 @@ OpenGL/Vulkan libraries needed for CARLA.
 
 --8<-- "includes/docker-group-activation.md"
 
-## 3. Run Planning Simulation
+## 3. Run Planning Simulation {: #run-planning-simulation }
 
 ```bash
-./openadkit run planning-simulation
+openadkit run planning-simulation
 ```
 
 Add `--ros-distro jazzy` to select Jazzy. Humble is the default in both source
@@ -68,7 +124,7 @@ checkouts and release bundles.
 Compose readiness, and verifies the running deployment. A verification failure
 leaves the containers running so their logs remain available.
 
-## 4. Open the Visualizer
+## 4. Open the Visualizer {: #open-the-visualizer }
 
 Wait about 10 seconds for the containers to initialize, then open:
 
@@ -86,7 +142,7 @@ ssh -L 8080:localhost:6080 <user>@<host>
 
 Then open `https://localhost:8080/vnc.html` locally.
 
-## 5. Drive
+## 5. Drive {: #drive }
 
 In RViz2, follow the [Autoware planning simulation instructions](https://autowarefoundation.github.io/autoware-documentation/main/demos/planning-sim/lane-driving/#2-set-an-initial-pose-for-the-ego-vehicle) to:
 
@@ -94,12 +150,33 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 2. Set a **goal pose** on the map
 3. Watch the vehicle plan and drive the route
 
+## Upgrading
+
+An installed release upgrades to the latest stable version with:
+
+```bash
+openadkit upgrade
+```
+
+The new release is verified, installed alongside the old one, and the
+`openadkit` launcher is repointed. The previous version is kept in the install
+destination (by default `~/.local/share/openadkit/`), so you can roll back or
+pin a version explicitly:
+
+```bash
+openadkit install --version vOLD
+```
+
+`openadkit install --version vX.Y.Z` also switches to a specific release;
+reinstalling the same version needs `--force`. Source checkouts update with
+`git pull` or `git checkout` instead.
+
 ## Runtime Controls
 
 ```bash
-./openadkit status planning-simulation
-./openadkit logs planning-simulation --follow
-./openadkit stop planning-simulation
+openadkit status planning-simulation
+openadkit logs planning-simulation --follow
+openadkit stop planning-simulation
 ```
 
 Use `deployments/<name>/config.local.env` for host-specific settings. Source

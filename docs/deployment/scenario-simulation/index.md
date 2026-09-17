@@ -10,14 +10,15 @@ host.
 
 ## Setup
 
+--8<-- "includes/cli-command-context.md"
+
 ```bash
-./openadkit setup --verify
+openadkit setup --verify
 ```
 
 --8<-- "includes/docker-group-activation.md"
 
-Run commands from the extracted release bundle or source checkout root. The
-entry point downloads the Kashiwanoha map automatically.
+The entry point downloads the Kashiwanoha map automatically.
 
 ## Configuration
 
@@ -43,8 +44,8 @@ values.
 ## Run
 
 ```bash
-./openadkit run scenario-simulation
-./openadkit logs scenario-simulation --follow
+openadkit run scenario-simulation
+openadkit logs scenario-simulation --follow
 ```
 
 Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
@@ -59,10 +60,10 @@ overridden.
 ## Stop and Recover
 
 ```bash
-./openadkit stop scenario-simulation
+openadkit stop scenario-simulation
 ```
 
 Parameter overrides live in `config/mrm_handler.param.yaml` and
 `config/default_adapi.param.yaml`. To replace missing map data, run
-`./openadkit fetch scenario-simulation --force`. For common issues, see
+`openadkit fetch scenario-simulation --force`. For common issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

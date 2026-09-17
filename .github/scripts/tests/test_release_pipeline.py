@@ -249,12 +249,16 @@ def release_assets():
         {"id": 102, "name": "release-metadata.json"},
         {"id": 103, "name": "autoware-lock.repos"},
         {"id": 104, "name": "upstream-images.json"},
-        {"id": 105, "name": f"openadkit-{VERSION}.tar.gz"},
+        {"id": 105, "name": "openadkit"},
+        {"id": 106, "name": f"openadkit-{VERSION}.tar.gz"},
     ]
 
 
 def release_workspace(tmp_path):
     (tmp_path / "dist").mkdir()
+    launcher = tmp_path / "dist/openadkit"
+    launcher.write_text("#!/usr/bin/env bash\n")
+    launcher.chmod(0o755)
     bundle = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
     bundle.write_bytes(b"bundle")
     build = tmp_path / "release-input/build"
@@ -284,6 +288,7 @@ def release_workspace(tmp_path):
                         "name": "upstream-images.json",
                         "path": "release-input/build/upstream-images.json",
                     },
+                    {"name": "openadkit", "path": "dist/openadkit"},
                     {
                         "name": bundle.name,
                         "path": f"dist/{bundle.name}",
@@ -297,6 +302,7 @@ def release_workspace(tmp_path):
         tmp_path / "release-metadata.json",
         build / "autoware-lock.repos",
         build / "upstream-images.json",
+        launcher,
         bundle,
     ]
     manifest = "".join(
@@ -321,6 +327,7 @@ def fake_gh_environment(tmp_path, listed, refreshed=None):
         "release-metadata.json": tmp_path / "release-metadata.json",
         "autoware-lock.repos": tmp_path / "release-input/build/autoware-lock.repos",
         "upstream-images.json": tmp_path / "release-input/build/upstream-images.json",
+        "openadkit": tmp_path / "dist/openadkit",
         f"openadkit-{VERSION}.tar.gz": tmp_path / f"dist/openadkit-{VERSION}.tar.gz",
     }
     for asset in state.get("assets", []):
@@ -433,7 +440,7 @@ def test_publish_rejects_changed_draft_asset(tmp_path):
     release_workspace(tmp_path)
     owned = release_record(assets=release_assets())
     env, _ = fake_gh_environment(tmp_path, owned)
-    (tmp_path / "responses/asset-105").write_bytes(b"replaced bundle")
+    (tmp_path / "responses/asset-106").write_bytes(b"replaced bundle")
     env |= {
         "RELEASE_ID": "42",
         "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
@@ -757,6 +764,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert plan["bundle"]["asset"] == f"openadkit-{VERSION}.tar.gz"
     assert plan["bundle"]["root"] == f"openadkit-{VERSION}"
     assert plan["bundle"]["runtime"] == ["openadkit", "openadkit.json", "cli"]
+    assert {asset["name"] for asset in plan["githubAssets"]} >= {"openadkit", plan["bundle"]["asset"]}
     assert plan["bundle"]["shared"] == ["base"]
     assert plan["bundle"]["deployments"] == sorted(
         json.loads((ROOT / "openadkit.json").read_text())["deployments"]
@@ -832,6 +840,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         "DEFAULT_ROS_DISTRO": "jazzy",
         "PUBLISH_LATEST_ALIASES": "true",
         "STABLE_RELEASE": "true",
+        "GITHUB_REPOSITORY": "example/repo",
     }
     command = [
         "bash",
@@ -843,7 +852,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     ]
     subprocess.run(command, cwd=tmp_path, env=env, check=True)
     asset = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
-    assert [path.name for path in (tmp_path / "dist").iterdir()] == [asset.name]
+    assert sorted(path.name for path in (tmp_path / "dist").iterdir()) == ["openadkit", asset.name]
     first_asset = hashlib.sha256(asset.read_bytes()).hexdigest()
     first_plan = hashlib.sha256((tmp_path / "release-plan.json").read_bytes()).hexdigest()
 
@@ -876,6 +885,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     }
     assert bundled_deployments == expected_deployments
     assert not (root / "install.sh").exists()
+    assert (tmp_path / "dist/openadkit").read_bytes() == (ROOT / "openadkit").read_bytes()
     listed = subprocess.run(
         [str(root / "openadkit"), "list"],
         cwd=root,
@@ -903,7 +913,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     subprocess.run(command, cwd=tmp_path, env=env, check=True)
     assert hashlib.sha256(asset.read_bytes()).hexdigest() == first_asset
     assert hashlib.sha256((tmp_path / "release-plan.json").read_bytes()).hexdigest() == first_plan
-    assert [path.name for path in (tmp_path / "dist").iterdir()] == [asset.name]
+    assert sorted(path.name for path in (tmp_path / "dist").iterdir()) == ["openadkit", asset.name]
 
     scan = tmp_path / "release-input/scan"
     scan.mkdir()
@@ -922,6 +932,12 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     notes = (tmp_path / "release-notes.md").read_text()
     assert "## Open AD Kit Bundle" in notes
     assert notes.count(asset.name) == 1
+    installer_asset = tmp_path / "dist/openadkit"
+    installer_sha256 = hashlib.sha256(installer_asset.read_bytes()).hexdigest()
+    assert "## Install" in notes
+    assert f"| `openadkit` | `{installer_sha256}` |" in notes
+    assert f"releases/download/{VERSION}/openadkit" in notes
+    assert f"install --version {VERSION}" in notes
 
 
 def test_release_scripts_do_not_hardcode_product_catalog():

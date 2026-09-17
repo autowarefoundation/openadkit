@@ -6,11 +6,11 @@ selected by this deployment.
 
 ## Run
 
-From an extracted release bundle or source checkout root:
+--8<-- "includes/cli-command-context.md"
 
 ```bash
-./openadkit setup --verify
-./openadkit run planning-simulation
+openadkit setup --verify
+openadkit run planning-simulation
 ```
 
 Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
@@ -31,13 +31,13 @@ for the RViz workflow.
 ## Stop and Recover
 
 ```bash
-./openadkit status planning-simulation
-./openadkit logs planning-simulation --follow
-./openadkit stop planning-simulation
+openadkit status planning-simulation
+openadkit logs planning-simulation --follow
+openadkit stop planning-simulation
 ```
 
 Put local overrides in
 `deployments/planning-simulation/config.local.env`. To replace missing or
-incomplete map data, run `./openadkit fetch planning-simulation --force`. For
+incomplete map data, run `openadkit fetch planning-simulation --force`. For
 common Docker and visualizer issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

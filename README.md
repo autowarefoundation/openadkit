@@ -17,6 +17,20 @@ stacks more predictably.
 
 ## Quickstart
 
+Install the latest release on Ubuntu 22.04 or 24.04:
+
+```bash
+curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \
+  | bash -s -- install
+# Add the launcher to this shell if the installer reported ~/.local/bin is missing.
+export PATH="$HOME/.local/bin:$PATH"
+openadkit setup --verify
+# Start a new login session if setup changed Docker group membership.
+openadkit run planning-simulation
+```
+
+Or work from a source checkout:
+
 ```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
@@ -27,10 +41,10 @@ cd openadkit
 
 Open the noVNC visualizer at `https://localhost:6080/vnc.html` (password: `openadkit`; accept the self-signed certificate warning).
 
-The same `./openadkit` entry point ships in the version-matched release bundle.
-It prepares deployment data, pulls missing images, starts the stack, and verifies
-readiness. For release download and checksum instructions, runtime controls, and
-other deployments, see the
+The same entry point ships in the version-matched release bundle and in source
+checkouts. It prepares deployment data, pulls missing images, starts the stack,
+and verifies readiness. For install options, manual checksum verification,
+runtime controls, and other deployments, see the
 [documentation site](https://autowarefoundation.github.io/openadkit/).
 
 ## Deployments

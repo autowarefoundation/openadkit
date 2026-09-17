@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import os
 import platform
@@ -7,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import zipfile
@@ -33,6 +35,64 @@ def executable(path, content):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     path.chmod(0o755)
+
+
+def gnu_bundle(path, root_name, files):
+    staging = path.parent / f"{path.name}.staging"
+    if staging.exists():
+        shutil.rmtree(staging)
+    root = staging / root_name
+    root.mkdir(parents=True)
+    for relative, payload in files.items():
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+        if relative == "openadkit":
+            destination.chmod(0o755)
+    subprocess.run(
+        [
+            "tar",
+            "--format=gnu",
+            "--sort=name",
+            "-C",
+            str(staging),
+            "-czf",
+            str(path),
+            root_name,
+        ],
+        check=True,
+    )
+    shutil.rmtree(staging)
+
+
+def fake_release_curl(bin_dir, release, bundle_name):
+    executable(
+        bin_dir / "curl",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "target=\nurl=\n"
+        "while (($#)); do\n"
+        '  if [[ "$1" == "-o" ]]; then target=$2; shift 2; continue; fi\n'
+        '  [[ "$1" == http* ]] && url=$1\n'
+        "  shift\n"
+        "done\n"
+        'case "$url" in\n'
+        f'  *release-metadata.json) cp {json.dumps(str(release / "release-metadata.json"))} "$target" ;;\n'
+        f'  *{bundle_name}) cp {json.dumps(str(release / bundle_name))} "$target" ;;\n'
+        '  *) exit 2 ;;\n'
+        "esac\n",
+    )
+
+
+def write_release_metadata(release, version, bundle_name, digest):
+    (release / "release-metadata.json").write_text(
+        json.dumps(
+            {
+                "openadkit_version": version,
+                "bundles": [{"name": bundle_name, "sha256": digest}],
+            }
+        )
+    )
 
 
 def minimal_manifest(name="example", *, data=None):
@@ -203,6 +263,8 @@ def test_command_surface_is_exact():
         [str(ENTRYPOINT), "--help"], text=True, capture_output=True, check=True
     )
     for command in (
+        "install",
+        "upgrade",
         "setup",
         "list",
         "version",
@@ -214,7 +276,7 @@ def test_command_surface_is_exact():
         "stop",
     ):
         assert command in result.stdout
-    for command in ("verify", "down", "install", "build"):
+    for command in ("verify", "down", "build"):
         assert f"  {command} " not in result.stdout
     unknown = subprocess.run(
         [str(ENTRYPOINT), "data"], text=True, capture_output=True
@@ -228,6 +290,456 @@ def test_repo_and_release_use_the_same_entrypoint(tmp_path):
     assert (repo / "openadkit").read_bytes() == (release / "openadkit").read_bytes()
     assert run_cli(repo, ["version"]).stdout.startswith("Open AD Kit development")
     assert run_cli(release, ["version"]).stdout.startswith("Open AD Kit v1.2.3")
+
+
+def finish_release(tmp_path, release, version, bundle_name, bundle, *, digest=None):
+    write_release_metadata(
+        release,
+        version,
+        bundle_name,
+        digest
+        if digest is not None
+        else hashlib.sha256(bundle.read_bytes()).hexdigest(),
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    fake_release_curl(bin_dir, release, bundle_name)
+    return bin_dir
+
+
+def standalone_release(tmp_path, version="v1.2.3", files=None, *, digest=None):
+    release = tmp_path / "release"
+    release.mkdir()
+    root_name = f"openadkit-{version}"
+    bundle_name = f"{root_name}.tar.gz"
+    bundle = release / bundle_name
+    if files is None:
+        files = {
+            "openadkit": ENTRYPOINT.read_bytes(),
+            "openadkit.json": json.dumps(
+                {"schemaVersion": 1, "kind": "release", "version": version}
+            ).encode(),
+            "cli/main.py": b'print("ok")\n',
+        }
+    gnu_bundle(bundle, root_name, files)
+    bin_dir = finish_release(
+        tmp_path, release, version, bundle_name, bundle, digest=digest
+    )
+    return release, bin_dir
+
+
+def raw_bundle(tmp_path, version, entries):
+    release = tmp_path / "release"
+    release.mkdir()
+    root_name = f"openadkit-{version}"
+    bundle_name = f"{root_name}.tar.gz"
+    bundle = release / bundle_name
+    with tarfile.open(bundle, "w:gz") as archive:
+        for entry in entries:
+            info = tarfile.TarInfo(f"{root_name}/{entry['name']}")
+            if entry["type"] == tarfile.SYMTYPE:
+                info.type = tarfile.SYMTYPE
+                info.linkname = entry["target"]
+                archive.addfile(info)
+                continue
+            payload = entry["payload"]
+            info.size = len(payload)
+            info.mode = 0o755
+            archive.addfile(info, io.BytesIO(payload))
+    bin_dir = finish_release(tmp_path, release, version, bundle_name, bundle)
+    return release, bin_dir
+
+
+def test_standalone_install_verifies_bundle_and_installs_launcher(tmp_path):
+    _, bin_dir = standalone_release(tmp_path)
+    home = tmp_path / "home"
+    destination = home / "kit"
+    result = subprocess.run(
+        [str(ENTRYPOINT), "install", "--destination", str(destination)],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    installed = destination / "openadkit-v1.2.3/openadkit"
+    assert installed.is_file()
+    assert os.access(installed, os.X_OK)
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.is_symlink()
+    assert launcher.resolve() == installed
+    assert f"Add {home / '.local/bin'} to PATH" in result.stdout
+    assert f"Next: {launcher} setup --verify" in result.stdout
+    launched = subprocess.run(
+        [str(launcher)],
+        env=os.environ | {"HOME": str(home), "PATH": os.environ["PATH"]},
+        text=True,
+        capture_output=True,
+    )
+    assert launched.returncode == 0, launched.stderr
+    assert launched.stdout.strip() == "ok"
+
+
+def test_standalone_install_reports_path_guidance(tmp_path):
+    _, bin_dir = standalone_release(tmp_path)
+    home = tmp_path / "home"
+    launcher_dir = home / ".local/bin"
+    launcher_dir.mkdir(parents=True)
+    result = subprocess.run(
+        [str(ENTRYPOINT), "install", "--destination", str(home / "kit")],
+        env=os.environ
+        | {
+            "HOME": str(home),
+            "PATH": f"{launcher_dir}:{bin_dir}:{os.environ['PATH']}",
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Next: openadkit setup --verify" in result.stdout
+    assert "Add " not in result.stdout
+
+
+def test_standalone_install_accepts_prerelease_and_stdin(tmp_path):
+    version = "v1.2.3-rc.1"
+    _, bin_dir = standalone_release(
+        tmp_path,
+        version=version,
+        files={"openadkit": b"#!/usr/bin/env bash\necho installed runtime\n"},
+    )
+    home = tmp_path / "home"
+    destination = home / "kit"
+    result = subprocess.run(
+        ["bash", "-s", "--", "install", "--version", version, "--destination", str(destination)],
+        input=ENTRYPOINT.read_text(),
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "BASH_SOURCE" not in result.stderr
+    assert (destination / f"openadkit-{version}" / "openadkit").is_file()
+
+
+def test_standalone_install_accepts_hyphenated_prerelease(tmp_path):
+    version = "v1.2.3-rc-1"
+    _, bin_dir = standalone_release(tmp_path, version=version)
+    home = tmp_path / "home"
+    result = subprocess.run(
+        [
+            str(ENTRYPOINT),
+            "install",
+            "--version",
+            version,
+            "--destination",
+            str(home / "kit"),
+        ],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (home / "kit" / f"openadkit-{version}" / "openadkit").is_file()
+
+
+def test_standalone_install_rejects_checksum_mismatch_and_cleans_up(tmp_path):
+    _, bin_dir = standalone_release(
+        tmp_path, files={"openadkit": b"#!/usr/bin/env bash\nexit 0\n"}, digest="0" * 64
+    )
+    home = tmp_path / "home"
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    result = subprocess.run(
+        [str(ENTRYPOINT), "install", "--destination", str(home / "kit")],
+        env=os.environ
+        | {
+            "HOME": str(home),
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "TMPDIR": str(scratch),
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "checksum verification failed" in result.stderr
+    assert not (home / "kit").exists()
+    assert list(scratch.iterdir()) == []
+
+
+def test_standalone_install_rejects_metadata_version_mismatch(tmp_path):
+    _, bin_dir = standalone_release(tmp_path, version="v1.2.3")
+    home = tmp_path / "home"
+    result = subprocess.run(
+        [
+            str(ENTRYPOINT),
+            "install",
+            "--version",
+            "v9.9.9",
+            "--destination",
+            str(home / "kit"),
+        ],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "release metadata is for v1.2.3, expected v9.9.9" in result.stderr
+    assert not (home / "kit").exists()
+
+
+def test_standalone_install_requires_force_to_replace(tmp_path):
+    _, bin_dir = standalone_release(tmp_path)
+    home = tmp_path / "home"
+    destination = home / "kit"
+    env = os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    command = [str(ENTRYPOINT), "install", "--destination", str(destination)]
+    first = subprocess.run(command, env=env, text=True, capture_output=True)
+    assert first.returncode == 0, first.stderr
+    root = destination / "openadkit-v1.2.3"
+    (root / "stale").write_text("stale")
+    replaced = subprocess.run(command, env=env, text=True, capture_output=True)
+    assert replaced.returncode != 0
+    assert "already exists; rerun with --force" in replaced.stderr
+    assert (root / "stale").is_file()
+    forced = subprocess.run(
+        [*command, "--force"], env=env, text=True, capture_output=True
+    )
+    assert forced.returncode == 0, forced.stderr
+    assert not (root / "stale").exists()
+    assert (root / "openadkit").is_file()
+
+
+def test_standalone_install_restores_previous_version_when_swap_fails(tmp_path):
+    _, bin_dir = standalone_release(tmp_path)
+    home = tmp_path / "home"
+    destination = home / "kit"
+    env = os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    command = [str(ENTRYPOINT), "install", "--destination", str(destination)]
+    first = subprocess.run(command, env=env, text=True, capture_output=True)
+    assert first.returncode == 0, first.stderr
+    root = destination / "openadkit-v1.2.3"
+    (root / "marker").write_text("previous")
+    real_mv = shutil.which("mv")
+    executable(
+        bin_dir / "mv",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f'target={json.dumps(str(root))}\n'
+        'if [[ $# -eq 2 && "$2" == "$target" && "$1" == *".openadkit-stage."* ]]; then\n'
+        '  exit 1\n'
+        "fi\n"
+        f'exec {real_mv} "$@"\n',
+    )
+    failed = subprocess.run(
+        [*command, "--force"], env=env, text=True, capture_output=True
+    )
+    assert failed.returncode != 0
+    assert "could not replace" in failed.stderr
+    assert (root / "marker").read_text() == "previous"
+    assert (root / "openadkit").is_file()
+    leftovers = [
+        path.name
+        for path in destination.iterdir()
+        if path.name.startswith((".openadkit-stage.", ".openadkit-old."))
+    ]
+    assert leftovers == []
+
+
+def install_standalone(tmp_path, version):
+    base = tmp_path / f"install-{version}"
+    base.mkdir()
+    _, bin_dir = standalone_release(base, version=version)
+    home = tmp_path / "home"
+    destination = home / "kit"
+    result = subprocess.run(
+        [
+            str(ENTRYPOINT),
+            "install",
+            "--version",
+            version,
+            "--destination",
+            str(destination),
+        ],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    return home, destination, bin_dir
+
+
+def run_installed_upgrade(home, destination, version, bin_dir):
+    return subprocess.run(
+        [str(destination / f"openadkit-{version}" / "openadkit"), "upgrade"],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+
+
+def test_standalone_upgrade_installs_newest_release(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.3.0")
+    result = run_installed_upgrade(home, destination, "v1.2.3", latest_bin)
+    assert result.returncode == 0, result.stderr
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.resolve() == destination / "openadkit-v1.3.0/openadkit"
+    assert (destination / "openadkit-v1.2.3/openadkit").is_file()
+    assert "Upgraded v1.2.3 -> v1.3.0" in result.stdout
+    assert "Next:" not in result.stdout
+
+
+def test_standalone_upgrade_reports_up_to_date(tmp_path):
+    home, destination, bin_dir = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    before = launcher.resolve()
+    result = run_installed_upgrade(home, destination, "v1.2.3", bin_dir)
+    assert result.returncode == 0, result.stderr
+    assert "up to date: v1.2.3" in result.stdout
+    assert launcher.resolve() == before
+
+
+@pytest.mark.parametrize(
+    ("current", "latest"),
+    (
+        ("v1.3.0", "v1.2.3"),
+        ("v1.4.0-rc.1", "v1.3.0"),
+    ),
+)
+def test_standalone_upgrade_never_downgrades(tmp_path, current, latest):
+    home, destination, _ = install_standalone(tmp_path, current)
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version=latest)
+    result = run_installed_upgrade(home, destination, current, latest_bin)
+    assert result.returncode == 0, result.stderr
+    assert "nothing to upgrade" in result.stdout
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.resolve() == destination / f"openadkit-{current}/openadkit"
+
+
+def test_standalone_upgrade_promotes_prerelease_to_stable(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.3.0-rc.1")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.3.0")
+    result = run_installed_upgrade(home, destination, "v1.3.0-rc.1", latest_bin)
+    assert result.returncode == 0, result.stderr
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.resolve() == destination / "openadkit-v1.3.0/openadkit"
+
+
+def test_standalone_upgrade_reinstalls_after_rollback(tmp_path):
+    home, destination, latest_bin = install_standalone(tmp_path, "v1.3.0")
+    older = tmp_path / "older"
+    older.mkdir()
+    _, older_bin = standalone_release(older, version="v1.2.3")
+    rollback = subprocess.run(
+        [
+            str(ENTRYPOINT),
+            "install",
+            "--version",
+            "v1.2.3",
+            "--destination",
+            str(destination),
+        ],
+        env=os.environ | {"HOME": str(home), "PATH": f"{older_bin}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert rollback.returncode == 0, rollback.stderr
+    assert (home / ".local/bin/openadkit").resolve() == destination / "openadkit-v1.2.3/openadkit"
+    result = run_installed_upgrade(home, destination, "v1.2.3", latest_bin)
+    assert result.returncode == 0, result.stderr
+    assert (home / ".local/bin/openadkit").resolve() == destination / "openadkit-v1.3.0/openadkit"
+
+
+def test_standalone_upgrade_requires_the_active_installation(tmp_path):
+    home, destination, bin_dir = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    before = launcher.resolve()
+    base = tmp_path / "manual"
+    base.mkdir()
+    release, _ = standalone_release(base, version="v1.3.0")
+    extracted = tmp_path / "manual-extract"
+    with tarfile.open(release / "openadkit-v1.3.0.tar.gz") as archive:
+        archive.extractall(extracted, filter="data")
+    result = subprocess.run(
+        [str(extracted / "openadkit-v1.3.0" / "openadkit"), "upgrade"],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "active installation" in result.stderr
+    assert launcher.resolve() == before
+
+
+def test_standalone_upgrade_rejects_repository_checkout(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = subprocess.run(
+        [str(root / "openadkit"), "upgrade"],
+        cwd=root,
+        env=os.environ | {"HOME": str(tmp_path / "home")},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "update a source checkout with git pull" in result.stderr
+
+
+def test_standalone_upgrade_requires_an_install(tmp_path):
+    result = subprocess.run(
+        ["bash", "-s", "--", "upgrade"],
+        input=ENTRYPOINT.read_text(),
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "Open AD Kit is not installed" in result.stderr
+
+
+def test_standalone_install_rejects_symlink_bundle(tmp_path):
+    _, bin_dir = raw_bundle(
+        tmp_path,
+        "v1.2.3",
+        (
+            {"name": "openadkit", "type": tarfile.REGTYPE, "payload": ENTRYPOINT.read_bytes()},
+            {"name": "evil-link", "type": tarfile.SYMTYPE, "target": "/etc/passwd"},
+        ),
+    )
+    home = tmp_path / "home"
+    result = subprocess.run(
+        [str(ENTRYPOINT), "install", "--destination", str(home / "kit")],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "unsupported bundle member: openadkit-v1.2.3/evil-link" in result.stderr
+    assert not (home / "kit").exists()
+
+
+def test_standalone_install_rejects_parent_traversal_bundle(tmp_path):
+    _, bin_dir = raw_bundle(
+        tmp_path,
+        "v1.2.3",
+        (
+            {"name": "openadkit", "type": tarfile.REGTYPE, "payload": ENTRYPOINT.read_bytes()},
+            {"name": "../escape", "type": tarfile.REGTYPE, "payload": b"escape"},
+        ),
+    )
+    home = tmp_path / "home"
+    result = subprocess.run(
+        [str(ENTRYPOINT), "install", "--destination", str(home / "kit")],
+        env=os.environ | {"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "unsafe bundle member: openadkit-v1.2.3/../escape" in result.stderr
+    assert not (home / "kit").exists()
 
 
 def test_list_uses_bundle_inventory_and_ignores_unlisted_deployments(tmp_path):
@@ -269,7 +781,7 @@ def test_catalog_command_without_deployment_lists_available(tmp_path, command):
     result = run_cli(root, [command])
     assert result.returncode == 2
     assert "error: deployment name required" in result.stderr
-    assert f"./openadkit {command} <deployment>" in result.stderr
+    assert f"openadkit {command} <deployment>" in result.stderr
     assert re.search(
         r"example\s+source\s+none\s+Test deployment", result.stdout
     )
@@ -313,7 +825,7 @@ def test_runtime_command_without_deployment_lists_running(tmp_path, command):
     )
     assert result.returncode == 2
     assert "error: deployment name required" in result.stderr
-    assert f"./openadkit {command} <deployment>" in result.stderr
+    assert f"openadkit {command} <deployment>" in result.stderr
     assert re.search(
         r"example\s+source\s+none\s+Test deployment", result.stdout
     )
@@ -332,7 +844,7 @@ def test_logs_follow_without_deployment_requires_name(tmp_path):
     )
     assert result.returncode == 2
     assert "error: deployment name required" in result.stderr
-    assert "./openadkit logs <deployment> --follow" in result.stderr
+    assert "openadkit logs <deployment> --follow" in result.stderr
     assert re.search(
         r"example\s+source\s+none\s+Test deployment", result.stdout
     )

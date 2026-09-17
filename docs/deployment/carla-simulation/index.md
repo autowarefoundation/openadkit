@@ -17,22 +17,24 @@ and is not validated on Ubuntu 24.04.
 
 ## Setup
 
+--8<-- "includes/cli-command-context.md"
+
 Install Docker and the NVIDIA toolkit once:
 
 ```bash
-./openadkit setup --gpu --verify
+openadkit setup --gpu --verify
 ```
 
 --8<-- "includes/docker-group-activation.md"
 
-CARLA is a curated CLI deployment in both source checkouts and the release
-bundle. It is Humble-only and requires `--gpu`. Setup configures NVIDIA and the
-DDS UDP buffers; `run` downloads the Town01 map.
+CARLA is a curated CLI deployment in both installed and source-checkout
+runtimes. It is Humble-only and requires `--gpu`. Setup configures NVIDIA and
+the DDS UDP buffers; `run` downloads the Town01 map.
 
 ## Run
 
 ```bash
-./openadkit run carla-simulation --gpu
+openadkit run carla-simulation --gpu
 ```
 
 `run` checksum-validates the Town01 assets, starts CARLA and the modular stack,
@@ -49,7 +51,7 @@ Set a goal with **2D Goal Pose** and select **Auto** in RViz2.
 ## Stop
 
 ```bash
-./openadkit stop carla-simulation
+openadkit stop carla-simulation
 ```
 
 If autonomous mode is unavailable, inspect `/system/command_mode/availability`

@@ -23,16 +23,17 @@ planning, vehicle, system, control, API, and visualizer services. Planning and
 scenario overlays add the dummy simulator; each deployment adds only its delta.
 
 Each curated deployment carries a `deployment.json` manifest and one complete
-`config.env` for Compose interpolation. Operate it from the source checkout or
-release bundle root:
+`config.env` for Compose interpolation.
+
+--8<-- "includes/cli-command-context.md"
 
 ```bash
-./openadkit list
-./openadkit validate planning-simulation
-./openadkit run planning-simulation
-./openadkit status planning-simulation
-./openadkit logs planning-simulation --follow
-./openadkit stop planning-simulation
+openadkit list
+openadkit validate planning-simulation
+openadkit run planning-simulation
+openadkit status planning-simulation
+openadkit logs planning-simulation --follow
+openadkit stop planning-simulation
 ```
 
 Add `--ros-distro jazzy` to select Jazzy; Humble is the default. CARLA is

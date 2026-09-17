@@ -281,6 +281,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
                 "name": "upstream-images.json",
                 "path": "release-input/build/upstream-images.json",
             },
+            {"name": "openadkit", "path": "dist/openadkit"},
             {"name": asset_name, "path": f"dist/{asset_name}"},
         ],
         "images": sorted(

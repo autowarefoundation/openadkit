@@ -37,7 +37,7 @@ Create `deployments/<your-deployment>/` with a Compose file, complete
 }
 ```
 
-Without an inventory entry, `./openadkit run your-deployment` fails with
+Without an inventory entry, `openadkit run your-deployment` fails with
 `unknown deployment`. Direct Compose remains available. The base's
 `runtime.env` is loaded inside containers and should contain only ROS/DDS
 runtime values. See [Deployments](index.md) for the operator model.
@@ -93,14 +93,14 @@ With host networking, open the visualizer at
 
 ## Operate
 
-From the source checkout or release bundle root:
+--8<-- "includes/cli-command-context.md"
 
 ```bash
-./openadkit validate your-deployment
-./openadkit run your-deployment
-./openadkit status your-deployment
-./openadkit logs your-deployment --follow
-./openadkit stop your-deployment
+openadkit validate your-deployment
+openadkit run your-deployment
+openadkit status your-deployment
+openadkit logs your-deployment --follow
+openadkit stop your-deployment
 ```
 
 See [Logging Simulation](logging-simulation/index.md) for a GPU overlay and

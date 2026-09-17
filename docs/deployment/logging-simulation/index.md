@@ -7,13 +7,13 @@ but substantially slower.
 
 ## Setup
 
-From an extracted release bundle or source checkout root:
+--8<-- "includes/cli-command-context.md"
 
 ```bash
-./openadkit setup --verify
+openadkit setup --verify
 ```
 
-Use `./openadkit setup --gpu --verify` to install and verify the NVIDIA
+Use `openadkit setup --gpu --verify` to install and verify the NVIDIA
 Container Toolkit. GPU mode downloads the pinned CenterPoint models into
 `~/autoware_data/lidar_centerpoint`; CPU mode uses clustering and does not
 select those models.
@@ -27,13 +27,13 @@ complete than with a full recording.
 ## Start the Stack
 
 ```bash
-./openadkit run logging-simulation
+openadkit run logging-simulation
 ```
 
 For NVIDIA acceleration:
 
 ```bash
-./openadkit run logging-simulation --gpu
+openadkit run logging-simulation --gpu
 ```
 
 The CUDA image is amd64-only.
@@ -52,13 +52,13 @@ before starting.
 ## Stop and Recover
 
 ```bash
-./openadkit status logging-simulation
-./openadkit logs logging-simulation --follow
-./openadkit stop logging-simulation
+openadkit status logging-simulation
+openadkit logs logging-simulation --follow
+openadkit stop logging-simulation
 ```
 
 The rosbag service uses a digest-pinned upstream `autoware:universe` image in a
 release. Put local overrides in
 `deployments/logging-simulation/config.local.env`. To replace missing sample
-data, run `./openadkit fetch logging-simulation --force`. For common issues, see
+data, run `openadkit fetch logging-simulation --force`. For common issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

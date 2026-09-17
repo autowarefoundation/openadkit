@@ -1,39 +1,50 @@
-# Deployments
+# Deployment
 
-A **deployment** is a running instance of Open AD Kit, a specific combination of Autoware components configured to achieve a particular task, such as a simulation or a full autonomous driving stack.
+A deployment combines Open AD Kit images, environment files, and Docker Compose
+configuration for a specific task.
 
-Runnable Compose assets live under `deployments/<name>/` in the repository.
-Each directory has a short README that points here for the full guide.
+| Deployment | Purpose | Topology | GPU |
+|------------|---------|----------|-----|
+| [Planning Simulation](planning-simulation/index.md) | Plan and follow a route on a demo map | Single host | No |
+| [Scenario Simulation](scenario-simulation/index.md) | Execute predefined traffic scenarios | Single host | No |
+| [Logging Simulation](logging-simulation/index.md) | Replay sensor data through sensing, perception, and localization | Single host | Recommended |
+| [CARLA Simulation](carla-simulation/index.md) | Drive a CARLA ego vehicle in closed loop | Single host | Required |
+| [Zenoh Bridge](zenoh-bridge/index.md) | Separate edge compute from visualization and control | Single Compose project | Varies |
 
-Start curated samples with the CLI:
+New users should start with Planning Simulation. The CLI and release bundle
+support Planning, Scenario, Logging, and CARLA Simulation. Zenoh remains a
+standalone source-checkout deployment.
+
+## Base and Overlay Model
+
+Planning, Scenario, Logging, and CARLA Simulation include the shared
+`deployments/base/docker-compose.yaml`. The base defines map-check, map,
+planning, vehicle, system, control, API, and visualizer services. Planning and
+scenario overlays add the dummy simulator; each deployment adds only its delta.
+
+Each curated deployment carries a `deployment.json` manifest and one complete
+`config.env` for Compose interpolation.
+
+--8<-- "includes/cli-command-context.md"
 
 ```bash
-./openadkit list
-./openadkit run planning-simulation
+openadkit list
+openadkit validate planning-simulation
+openadkit run planning-simulation
+openadkit status planning-simulation
+openadkit logs planning-simulation --follow
+openadkit stop planning-simulation
 ```
 
-Shared base: `deployments/base/` (`docker-compose.yaml` + `runtime.env` for
-container ROS/DDS). Each deployment has one complete `config.env`. The CLI
-passes it to Compose; you do not need to invoke `docker compose` directly.
+Add `--ros-distro jazzy` to select Jazzy; Humble is the default. CARLA is
+Humble-only and requires `--gpu`. The release bundle vendors the curated
+deployments and shared base. Local settings belong in ignored
+`config.local.env`; release component images remain pinned. The base's
+`runtime.env` is loaded inside containers via `env_file:`.
 
-`runtime.env` is loaded by services via `env_file:`; `config.env` is loaded by
-Compose via `--env-file`.
+Zenoh does not have a runtime manifest. Use its source-checkout launcher
+scripts documented on its deployment page.
 
-Fetch maps/rosbags with `./openadkit fetch <name>` or `./openadkit run <name>`
-(see [Getting Started](../getting-started/index.md)). Zenoh is a standalone
-demo: fetch `scenario-simulation`, then use `cloud.sh` / `edge.sh`.
-
-## Samples
-
-Recommended for **learning and development**.
-
-- [CARLA Simulation](samples/carla-simulation/index.md) — `deployments/carla-simulation/`
-- [Planning Simulation](samples/planning-simulation/index.md) — `deployments/planning-simulation/`
-- [Scenario Simulation](samples/scenario-simulation/index.md) — `deployments/scenario-simulation/`
-- [Logging Simulation](samples/logging-simulation/index.md) — `deployments/logging-simulation/`
-
-## Demos
-
-Use-case specific topologies.
-
-- [Zenoh Bridge](demos/zenoh-bridge/index.md) — `deployments/zenoh-bridge/` (edge/cloud remote viz + teleop)
+See [Custom Deployment](custom-deployment.md) to compose a different stack and
+[Container Images & Versioning](../getting-started/container-images.md) for tag
+selection.

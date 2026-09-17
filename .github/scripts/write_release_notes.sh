@@ -2,6 +2,8 @@
 # Write release metadata and notes from the immutable release plan.
 set -euo pipefail
 
+: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
+
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
 jq -e '
   . as $plan
@@ -28,9 +30,14 @@ PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
 bundle_name=$(jq -r '.bundle.asset' "${plan_file}")
 bundle_root=$(jq -r '.bundle.root' "${plan_file}")
 bundle="dist/${bundle_name}"
+installer="dist/openadkit"
 
 [ -f "${bundle}" ] || {
   echo "Expected release bundle is missing: ${bundle}" >&2
+  exit 1
+}
+[ -f "${installer}" ] || {
+  echo "Expected release installer is missing: ${installer}" >&2
   exit 1
 }
 mapfile -t archives < <(find dist -maxdepth 1 -type f -name '*.tar.gz' -printf '%f\n' | sort)
@@ -47,6 +54,7 @@ jq -S '.releaseContext' "${plan_file}" >"${temporary}/plan-context.json"
 cmp "${temporary}/plan-context.json" "${temporary}/bundle-context.json"
 
 bundle_sha256=$(sha256sum "${bundle}" | cut -d ' ' -f1)
+installer_sha256=$(sha256sum "${installer}" | cut -d ' ' -f1)
 plan_sha256=$(sha256sum "${plan_file}" | cut -d ' ' -f1)
 jq \
   --arg version "${VERSION}" \
@@ -114,6 +122,16 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
   echo "| Asset | SHA256 |"
   echo "|-------|--------|"
   printf '%s\n' "| \`${bundle_name}\` | \`${bundle_sha256}\` |"
+  printf '%s\n' "| \`openadkit\` | \`${installer_sha256}\` |"
+  echo ""
+  echo "## Install"
+  echo ""
+  echo "The versionless \`openadkit\` asset is the installer for this release:"
+  echo ""
+  echo '```bash'
+  echo "curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${VERSION}/openadkit \\"
+  echo "  | bash -s -- install --version ${VERSION}"
+  echo '```'
   echo ""
   echo "## Images"
   while IFS=$'\t' read -r release_ref digest; do

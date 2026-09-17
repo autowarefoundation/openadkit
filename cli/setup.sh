@@ -5,12 +5,13 @@ INSTALL_GPU=false
 RUN_VERIFY=false
 TARGET_USER=${SUDO_USER:-$(id -un)}
 FORCE_DOCKER_INSTALL=${OPENADKIT_CI_FORCE_DOCKER_INSTALL:-false}
+DOCKER_GROUP_ADDED=false
 
 log() { printf '[openadkit] %s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 if [[ ${1:-} != setup ]]; then
-  fail "setup helper must be invoked through ./openadkit setup"
+  fail "setup helper must be invoked through openadkit setup"
 fi
 shift
 while (($#)); do
@@ -19,7 +20,7 @@ while (($#)); do
     --verify) RUN_VERIFY=true ;;
     -h|--help)
       cat <<'EOF'
-Usage: ./openadkit setup [--gpu] [--verify]
+Usage: openadkit setup [--gpu] [--verify]
 
 Installs the Ubuntu host dependencies needed to run Open AD Kit.
 EOF
@@ -31,7 +32,7 @@ EOF
 done
 
 if [[ $EUID -eq 0 ]]; then
-  fail "run ./openadkit setup as your normal user; it requests sudo when needed"
+  fail "run openadkit setup as your normal user; it requests sudo when needed"
 fi
 if [[ $FORCE_DOCKER_INSTALL == true && ${CI:-false} != true ]]; then
   fail "OPENADKIT_CI_FORCE_DOCKER_INSTALL is restricted to disposable CI hosts"
@@ -99,6 +100,7 @@ ensure_docker_group() {
   fi
   sudo groupadd docker 2>/dev/null || true
   sudo usermod -aG docker "$TARGET_USER"
+  DOCKER_GROUP_ADDED=true
 }
 
 docker_run() {
@@ -295,6 +297,9 @@ if [[ $RUN_VERIFY == true ]]; then
 fi
 
 log "setup completed"
-if ! docker info >/dev/null 2>&1; then
+if [[ $DOCKER_GROUP_ADDED == true ]]; then
+  log "Docker group membership was added for ${TARGET_USER}"
+  log "run 'newgrp docker' to start a shell with the new membership, then run Open AD Kit"
+elif ! docker info >/dev/null 2>&1; then
   log "log out and back in, or run 'newgrp docker', to activate Docker group membership"
 fi

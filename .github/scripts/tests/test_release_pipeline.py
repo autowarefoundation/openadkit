@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tarfile
 
@@ -193,6 +194,55 @@ def test_release_rules_reject_unsupported_autoware_refs(
     assert result.returncode != 0
 
 
+def run_manifest_consistency(tmp_path, *, distro=None, registry=None):
+    manifest = json.loads((ROOT / "openadkit.json").read_text())
+    env = os.environ | {
+        "BUILD_TAG": BUILD_TAG,
+        "VERSION": VERSION,
+        "GH_TOKEN": "test",
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
+        "IMAGE_PREFIX_COMPONENT": registry or manifest["imagePrefixComponent"],
+        "DEFAULT_ROS_DISTRO": distro or manifest["defaultRosDistro"],
+    }
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; validate_manifest_consistency',
+            "bash",
+            str(VALIDATOR),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+
+def test_manifest_consistency_accepts_release_inputs_matching_manifest(tmp_path):
+    result = run_manifest_consistency(tmp_path)
+    assert result.returncode == 0, result.stderr
+
+
+def test_manifest_consistency_rejects_distro_that_contradicts_manifest(tmp_path):
+    manifest_distro = json.loads((ROOT / "openadkit.json").read_text())[
+        "defaultRosDistro"
+    ]
+    other_distro = "jazzy" if manifest_distro == "humble" else "humble"
+    result = run_manifest_consistency(tmp_path, distro=other_distro)
+    assert result.returncode != 0
+    assert "must match openadkit.json defaultRosDistro" in result.stderr
+
+
+def test_manifest_consistency_rejects_registry_that_contradicts_manifest(tmp_path):
+    result = run_manifest_consistency(tmp_path, registry="ghcr.io/example/openadkit")
+    assert result.returncode != 0
+    assert "must match openadkit.json imagePrefixComponent" in result.stderr
+
+
 def test_registry_lookup_retries_and_classifies_failures(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -249,12 +299,16 @@ def release_assets():
         {"id": 102, "name": "release-metadata.json"},
         {"id": 103, "name": "autoware-lock.repos"},
         {"id": 104, "name": "upstream-images.json"},
-        {"id": 105, "name": f"openadkit-{VERSION}.tar.gz"},
+        {"id": 105, "name": "openadkit"},
+        {"id": 106, "name": f"openadkit-{VERSION}.tar.gz"},
     ]
 
 
 def release_workspace(tmp_path):
     (tmp_path / "dist").mkdir()
+    launcher = tmp_path / "dist/openadkit"
+    launcher.write_text("#!/usr/bin/env bash\n")
+    launcher.chmod(0o755)
     bundle = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
     bundle.write_bytes(b"bundle")
     build = tmp_path / "release-input/build"
@@ -284,6 +338,7 @@ def release_workspace(tmp_path):
                         "name": "upstream-images.json",
                         "path": "release-input/build/upstream-images.json",
                     },
+                    {"name": "openadkit", "path": "dist/openadkit"},
                     {
                         "name": bundle.name,
                         "path": f"dist/{bundle.name}",
@@ -297,6 +352,7 @@ def release_workspace(tmp_path):
         tmp_path / "release-metadata.json",
         build / "autoware-lock.repos",
         build / "upstream-images.json",
+        launcher,
         bundle,
     ]
     manifest = "".join(
@@ -321,6 +377,7 @@ def fake_gh_environment(tmp_path, listed, refreshed=None):
         "release-metadata.json": tmp_path / "release-metadata.json",
         "autoware-lock.repos": tmp_path / "release-input/build/autoware-lock.repos",
         "upstream-images.json": tmp_path / "release-input/build/upstream-images.json",
+        "openadkit": tmp_path / "dist/openadkit",
         f"openadkit-{VERSION}.tar.gz": tmp_path / f"dist/openadkit-{VERSION}.tar.gz",
     }
     for asset in state.get("assets", []):
@@ -433,7 +490,7 @@ def test_publish_rejects_changed_draft_asset(tmp_path):
     release_workspace(tmp_path)
     owned = release_record(assets=release_assets())
     env, _ = fake_gh_environment(tmp_path, owned)
-    (tmp_path / "responses/asset-105").write_bytes(b"replaced bundle")
+    (tmp_path / "responses/asset-106").write_bytes(b"replaced bundle")
     env |= {
         "RELEASE_ID": "42",
         "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
@@ -757,6 +814,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert plan["bundle"]["asset"] == f"openadkit-{VERSION}.tar.gz"
     assert plan["bundle"]["root"] == f"openadkit-{VERSION}"
     assert plan["bundle"]["runtime"] == ["openadkit", "openadkit.json", "cli"]
+    assert {asset["name"] for asset in plan["githubAssets"]} >= {"openadkit", plan["bundle"]["asset"]}
     assert plan["bundle"]["shared"] == ["base"]
     assert plan["bundle"]["deployments"] == sorted(
         json.loads((ROOT / "openadkit.json").read_text())["deployments"]
@@ -793,7 +851,7 @@ def test_release_plan_rejects_incomplete_or_duplicate_runtime_images(tmp_path, c
     assert case in result.stderr
 
 
-def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
+def packager_env(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     calls = tmp_path / "docker-calls"
@@ -832,18 +890,25 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         "DEFAULT_ROS_DISTRO": "jazzy",
         "PUBLISH_LATEST_ALIASES": "true",
         "STABLE_RELEASE": "true",
+        "GITHUB_REPOSITORY": "example/repo",
     }
-    command = [
-        "bash",
-        "-c",
-        'umask "$1"; exec bash "$2"',
-        "bash",
-        "022",
-        str(PACKAGER),
-    ]
-    subprocess.run(command, cwd=tmp_path, env=env, check=True)
+    return env, calls
+
+
+def run_packager(tmp_path, env, *, umask="022"):
+    subprocess.run(
+        ["bash", "-c", 'umask "$1"; exec bash "$2"', "bash", umask, str(PACKAGER)],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+    )
+
+
+def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
+    env, calls = packager_env(tmp_path)
+    run_packager(tmp_path, env)
     asset = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
-    assert [path.name for path in (tmp_path / "dist").iterdir()] == [asset.name]
+    assert sorted(path.name for path in (tmp_path / "dist").iterdir()) == ["openadkit", asset.name]
     first_asset = hashlib.sha256(asset.read_bytes()).hexdigest()
     first_plan = hashlib.sha256((tmp_path / "release-plan.json").read_bytes()).hexdigest()
 
@@ -876,6 +941,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     }
     assert bundled_deployments == expected_deployments
     assert not (root / "install.sh").exists()
+    assert (tmp_path / "dist/openadkit").read_bytes() == (ROOT / "openadkit").read_bytes()
     listed = subprocess.run(
         [str(root / "openadkit"), "list"],
         cwd=root,
@@ -899,11 +965,10 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert "docker-compose.gpu.yaml" in docker_calls
 
     (tmp_path / "dist/stale.tar.gz").write_bytes(b"stale")
-    command[-2] = "077"
-    subprocess.run(command, cwd=tmp_path, env=env, check=True)
+    run_packager(tmp_path, env, umask="077")
     assert hashlib.sha256(asset.read_bytes()).hexdigest() == first_asset
     assert hashlib.sha256((tmp_path / "release-plan.json").read_bytes()).hexdigest() == first_plan
-    assert [path.name for path in (tmp_path / "dist").iterdir()] == [asset.name]
+    assert sorted(path.name for path in (tmp_path / "dist").iterdir()) == ["openadkit", asset.name]
 
     scan = tmp_path / "release-input/scan"
     scan.mkdir()
@@ -922,6 +987,50 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     notes = (tmp_path / "release-notes.md").read_text()
     assert "## Open AD Kit Bundle" in notes
     assert notes.count(asset.name) == 1
+    installer_asset = tmp_path / "dist/openadkit"
+    installer_sha256 = hashlib.sha256(installer_asset.read_bytes()).hexdigest()
+    assert "## Install" in notes
+    assert f"| `openadkit` | `{installer_sha256}` |" in notes
+    assert f"releases/download/{VERSION}/openadkit" in notes
+    assert f"install --version {VERSION}" in notes
+
+
+def test_release_installer_and_bundle_entrypoint_come_from_the_packager(tmp_path):
+    env, _ = packager_env(tmp_path)
+    promoted = tmp_path / "promoted"
+    promoted.mkdir()
+    shutil.copy2(ROOT / "openadkit.json", promoted / "openadkit.json")
+    shutil.copytree(ROOT / "cli", promoted / "cli")
+    shutil.copytree(ROOT / "deployments", promoted / "deployments")
+    stale = promoted / "openadkit"
+    stale.write_text("#!/usr/bin/env bash\necho stale promoted build\n")
+    stale.chmod(0o755)
+
+    run_packager(tmp_path, env | {"SOURCE_DIR": str(promoted)})
+
+    launcher = (ROOT / "openadkit").read_bytes()
+    assert (tmp_path / "dist/openadkit").read_bytes() == launcher
+    asset = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
+    with tarfile.open(asset) as archive:
+        member = archive.extractfile(f"openadkit-{VERSION}/openadkit")
+        assert member is not None
+        assert member.read() == launcher
+
+
+def test_release_packager_requires_an_install_capable_launcher(tmp_path):
+    env, _ = packager_env(tmp_path)
+    stale = tmp_path / "stale"
+    stale.mkdir()
+    launcher = stale / "openadkit"
+    launcher.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'exec python3 "$(dirname -- "$0")/cli/main.py" "$@"\n'
+    )
+    launcher.chmod(0o755)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        run_packager(tmp_path, env | {"INSTALLER_SOURCE_DIR": str(stale)})
 
 
 def test_release_scripts_do_not_hardcode_product_catalog():

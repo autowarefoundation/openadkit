@@ -297,6 +297,49 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
         assert path in LINT_WORKFLOW
     assert '"docs/.pages"' in DOCS_WORKFLOW
     assert '"docs/**/.pages"' in DOCS_WORKFLOW
+    assert '"cli/**"' in DOCS_WORKFLOW
+    assert "openadkit.json" in DOCS_WORKFLOW
+    assert "openadkit.d" not in DOCS_WORKFLOW
+    preview = (ROOT / ".github/workflows/pr-preview.yaml").read_text()
+    assert '"cli/**"' in preview
+    assert "openadkit.json" in preview
+    assert "openadkit.d" not in preview
+    assert '"docs/.pages"' in preview
+    assert '"docs/**/.pages"' in preview
+    assert "'docs/.pages'" in LINT_WORKFLOW
+    assert "'docs/**/.pages'" in LINT_WORKFLOW
+    release = (ROOT / ".github/workflows/release.yaml").read_text()
+    assert "source_ref: ${{ github.event.repository.default_branch }}" in release
+    assert "source_ref: ${{ github.sha }}" not in release
+    assert "source_ref: ${{ inputs.version }}" not in release
+    assert "INSTALLER_SOURCE_DIR: ${{ github.workspace }}" in release
+    assert "must match openadkit.json defaultRosDistro" in release
+    validate_job = release.split("\n  validate:\n", 1)[1].split(
+        "\n  package-bundles:", 1
+    )[0]
+    assert "openadkit.json" in validate_job
+    preview_deploy = (ROOT / ".github/workflows/pr-preview-deploy.yaml").read_text()
+    shared_pages = (
+        "group: gh-pages\n"
+        "      cancel-in-progress: false\n"
+        "      queue: max"
+    )
+    assert shared_pages in DOCS_WORKFLOW
+    assert DOCS_WORKFLOW.count(shared_pages) == 1
+    assert shared_pages in preview_deploy
+    assert preview_deploy.count(shared_pages) == 2
+    assert "group: preview-deploy-" not in preview_deploy
+    actionlint_config = (ROOT / ".github/actionlint.yaml").read_text()
+    assert 'unexpected key "queue" for "concurrency" section' in actionlint_config
+    macros = (ROOT / "docs/macros.py").read_text()
+    assert 'kit["imagePrefixComponent"]' in macros
+    assert 'REGISTRY = "ghcr.io/autowarefoundation/openadkit"' not in macros
+
+
+def test_docs_use_plural_deployments_path():
+    assert (ROOT / "docs/deployments/index.md").is_file()
+    assert not (ROOT / "docs/deployment").exists()
+    assert ": deployment/" not in (ROOT / "mkdocs.yaml").read_text()
 
 
 def test_capture_metadata_uses_retrying_registry_lookup():

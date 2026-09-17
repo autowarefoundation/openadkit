@@ -14,7 +14,7 @@ on:
         description: 'Build tag to promote (e.g. 123456789-1)'
         required: true
       default_ros_distro:
-        description: 'ROS distro to use for bare tag aliases'
+        description: 'ROS distro for bare tag aliases; must match openadkit.json defaultRosDistro'
         required: false
         type: choice
         options:
@@ -53,6 +53,7 @@ jobs:
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
             .github/scripts/validate_release.sh
+            openadkit.json
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -98,6 +99,7 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
+            /openadkit
             .github/scripts/install-compose.sh
             .github/scripts/package_release_bundles.sh
             .github/scripts/release_plan.py
@@ -148,6 +150,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           PACKAGER_SHA: ${{ steps.packager.outputs.packager_sha }}
+          INSTALLER_SOURCE_DIR: ${{ github.workspace }}
           DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
@@ -163,6 +166,7 @@ jobs:
           name: release-bundles-${{ inputs.build_tag }}
           path: |
             release-plan.json
+            dist/openadkit
             dist/openadkit-${{ inputs.version }}.tar.gz
           if-no-files-found: error
           retention-days: 7
@@ -361,3 +365,15 @@ jobs:
           RELEASE_PLAN_FILE: release-output/release-plan.json
         run: bash .github/scripts/manage_github_release.sh publish
         shell: bash
+
+  deploy-docs:
+    needs: [validate, release-github]
+    if: needs.validate.outputs.is_stable_release == 'true' && needs.validate.outputs.publish_latest_aliases == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/deploy-docs.yaml
+    with:
+      # Default branch, not the dispatch-time SHA or the promoted build tag:
+      # the release can outlive main advancing, and publishing an older tree
+      # would overwrite the newer docs already on gh-pages.
+      source_ref: ${{ github.event.repository.default_branch }}

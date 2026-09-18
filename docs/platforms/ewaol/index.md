@@ -20,10 +20,9 @@ EWAOL is delivered via the `meta-ewaol` Yocto layer and provides a container-nat
 
 ## Documentation
 
-For installation and runtime instructions, see the upstream SOAFEE documentation:
+For installation and runtime instructions, see the upstream project:
 
-- [meta-ewaol documentation](https://meta-ewaol.docs.soafee.io/)
-- [meta-ewaol source (GitLab)](https://gitlab.com/soafee/ewaol/meta-ewaol)
+- [meta-ewaol source and documentation (GitLab)](https://gitlab.com/soafee/ewaol/meta-ewaol)
 
 ## Related
 

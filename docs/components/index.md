@@ -117,5 +117,5 @@ naming scheme.
 
 - [Deployments](../deployments/index.md) — How to compose components into running systems
 - [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
-- [Roadmap](../roadmap.md) — Release ladder and focus areas
+- [Roadmap](../roadmap.md) — Development phases and focus areas
 - [Supported Platforms](../platforms/index.md) — Where to deploy

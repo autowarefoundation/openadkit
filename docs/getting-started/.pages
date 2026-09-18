@@ -1,4 +1,4 @@
 nav:
   - index.md
-  - Images & Versioning: container-images.md
+  - Container Images & Versioning: container-images.md
   - Troubleshooting: troubleshooting.md

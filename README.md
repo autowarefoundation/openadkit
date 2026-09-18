@@ -17,7 +17,8 @@ stacks more predictably.
 
 ## Quickstart
 
-Install the latest release on Ubuntu 22.04 or 24.04:
+Install the latest release on Ubuntu 22.04 or 24.04. Until the first stable
+release is published, use the source checkout below.
 
 ```bash
 curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \

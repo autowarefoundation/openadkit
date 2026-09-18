@@ -1,7 +1,7 @@
 # API
 
 The `api` image packages the
-[Autoware AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-interfaces/ad-api/)
+[Autoware AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/)
 used by fleet managers, HMIs, and scenario runners. It provides ROS 2 services
 and topics for:
 

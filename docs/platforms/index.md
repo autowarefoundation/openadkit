@@ -24,7 +24,7 @@ flowchart LR
 
 :material-server:{ .oak-card-icon }
 
-<h3>AutoSD</h3>
+<p class="oak-card-title" role="heading" aria-level="3">AutoSD</p>
 <p>Automotive Stream Distribution — the upstream preview of Red Hat In-Vehicle OS. Mixed-criticality containers with Podman, Quadlet, and BlueChi orchestration.</p>
 <a href="autosd/" class="md-button md-button--primary">View AutoSD Docs</a>
 </div>
@@ -33,7 +33,7 @@ flowchart LR
 
 :material-cloud-outline:{ .oak-card-icon }
 
-<h3>EWAOL</h3>
+<p class="oak-card-title" role="heading" aria-level="3">EWAOL</p>
 <p>Edge Workload Abstraction and Orchestration Layer — Arm's container-centric Yocto framework. Upstream SOAFEE reference, retained as background; not a committed Open AD Kit target.</p>
 <a href="ewaol/" class="md-button">View EWAOL Docs</a>
 </div>

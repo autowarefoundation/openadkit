@@ -21,7 +21,7 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 
 :material-view-module-outline:{ .oak-card-icon }
 
-<h3>Modular Components</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Modular Components</p>
 <p>Independent images for each stage of the AD pipeline. Deploy only what you need.</p>
 </div>
 
@@ -29,7 +29,7 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 
 :material-shield-half-full:{ .oak-card-icon }
 
-<h3>Mixed Criticality</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Mixed Criticality</p>
 <p>Separate workloads by criticality assumption across safety-qualified and standard hardware.</p>
 </div>
 
@@ -37,7 +37,7 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 
 :material-cloud-sync-outline:{ .oak-card-icon }
 
-<h3>Cloud Native</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Cloud Native</p>
 <p>Scale from simulation to the edge with Docker Compose, Docker Bake, and platform integrations.</p>
 </div>
 
@@ -45,7 +45,7 @@ Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packag
 
 :material-infinity:{ .oak-card-icon }
 
-<h3>Connected and Continuous</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Connected and Continuous</p>
 <p>CI/CD with GitHub Actions, optimized build caching, and containerized testing.</p>
 </div>
 
@@ -68,10 +68,10 @@ provide authentication or encryption.
 6. [**Control**](components/planning-control.md) converts that trajectory into throttle, brake, and steering commands.
 7. [**Vehicle System**](components/vehicle-system.md) bridges those commands to the actual vehicle or simulator.
 
-A **deployment** combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. For the full picture, see [Components](components/index.md) and [Deployment](deployments/index.md).
+A **deployment** combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. For the full picture, see [Components](components/index.md) and [Deployments](deployments/index.md).
 
 ## Related
 
 - [Getting Started](getting-started/index.md) — Set up your environment
-- [Deployment](deployments/index.md) — Run your first deployment
+- [Deployments](deployments/index.md) — Run your first deployment
 - [Platforms](platforms/index.md) — Choose a deployment target

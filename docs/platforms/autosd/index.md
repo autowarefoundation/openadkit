@@ -15,7 +15,7 @@ AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel
 
 :material-shield-check:{ .oak-card-icon }
 
-<h3>Mixed Criticality</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Mixed Criticality</p>
 <p>Separates safety-critical containers in the root partition from non-critical workloads in the QM partition using systemd, Eclipse BlueChi, and QM.</p>
 </div>
 
@@ -23,7 +23,7 @@ AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel
 
 :material-refresh-auto:{ .oak-card-icon }
 
-<h3>Atomic Updates</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Atomic Updates</p>
 <p>Immutable system images with OSTree and composefs enable A/B updates, rollback, and tamper-proofing. Bootc brings container-native OS lifecycle management.</p>
 </div>
 
@@ -31,7 +31,7 @@ AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel
 
 :material-clock-fast:{ .oak-card-icon }
 
-<h3>Real-Time Kernel</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Real-Time Kernel</p>
 <p>RT-optimized automotive kernel with deterministic scheduling for time-critical autonomous driving functions.</p>
 </div>
 
@@ -39,7 +39,7 @@ AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel
 
 :material-docker:{ .oak-card-icon }
 
-<h3>Container-Native</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Container-Native</p>
 <p>Built around Podman, Quadlet (systemd container units), and BlueChi orchestration. No Docker daemon required.</p>
 </div>
 

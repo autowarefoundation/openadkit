@@ -23,11 +23,8 @@ Run the CPU-based planning simulation on Ubuntu 22.04 or 24.04. No GPU is requir
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 ./openadkit setup --verify
-```
-
-If setup adds you to the Docker group, start a new login session or run `newgrp docker` before continuing.
-
-```bash
+# Run this if setup adds you to the Docker group, or start a new login session:
+newgrp docker
 ./openadkit run planning-simulation
 ```
 

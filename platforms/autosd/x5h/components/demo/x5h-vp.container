@@ -19,6 +19,17 @@ AddDevice=/dev/cmem_other1
 AddDevice=/dev/cmem_other2
 AddDevice=/dev/cmem_other3
 Volume=/opt/npu:/npu
+# The ARC programs the NPU driver loads to power the engine on. /opt/npu ships
+# one set at hostapp/binary/arc_prog_npus, and it is NOT the set this image's
+# Renesas runtime was built against: all twelve l1c*.bin differ by content.
+# With the wrong set the driver never reaches "Set programs and power on",
+# every inference returns RenesasBackendExecute failed, and VisionPilot dies
+# in its own offload gate with no mention of ARC programs at all. The matching
+# set is the one inside the vendor ORT rootfs, which is why npu-check-autosd.sh
+# passes on the same board, same artifacts and same devices while this failed.
+# Board-confirmed on board 2, 2026-09-18: with this line VisionPilot reaches
+# 12.9 ms NPU latency and 43 fps; without it, it restart-loops.
+Volume=/opt/npu/ort-rootfs/usr/local/lib/python3.11/site-packages/onnxruntime/nnac_portable_env/binary/arc_prog_npus:/npu/hostapp/binary/arc_prog_npus:ro
 # The NNX artifacts were compiled on a workstation and manifest.json records
 # the absolute path they were written to, which exists on no board. The
 # Renesas backend opens that exact path and dies with "fopen: No such file or

@@ -42,10 +42,6 @@ The CLI supports these curated deployments:
 - **[scenario-simulation](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/)** - Run scenario-based simulation workflows
 - **[carla-simulation](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/)** - Connect Autoware to CARLA simulation (Humble, amd64, GPU)
 
-The source checkout also contains a standalone Zenoh deployment:
-
-- **[zenoh-bridge](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/)** - Bridge isolated edge and visualization ROS domains in one Compose project
-
 ## Images and Releases
 
 Images are published to GitHub Container Registry.

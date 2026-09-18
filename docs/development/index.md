@@ -10,7 +10,7 @@ This section covers how to build Open AD Kit from source, contribute changes, an
 
 :material-hammer-wrench:{ .oak-card-icon }
 
-<h3>Build from Source</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Build from Source</p>
 <p>Instructions for building container images locally from the repository source.</p>
 <a href="build-from-source/" class="md-button">Build Guide</a>
 </div>
@@ -19,7 +19,7 @@ This section covers how to build Open AD Kit from source, contribute changes, an
 
 :material-source-branch:{ .oak-card-icon }
 
-<h3>Contributing</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Contributing</p>
 <p>Guidelines for submitting issues, proposing changes, and opening pull requests.</p>
 <a href="contributing/" class="md-button">Contribute</a>
 </div>

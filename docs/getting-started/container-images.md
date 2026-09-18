@@ -70,7 +70,7 @@ Each Open AD Kit release pins a specific upstream **Autoware semver meta-release
 - Stable Open AD Kit releases pin an Autoware `X.Y.Z` meta-release tag.
 Each release records its pinned Autoware version in the release notes.
 
-A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published release details are listed on the [Releases](../releases/index.md) page; how the tags are structured is in the [Tag Reference](#tag-reference) above.
+A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published releases are listed on [GitHub Releases](https://github.com/autowarefoundation/openadkit/releases); how the tags are structured is in the [Tag Reference](#tag-reference) above. See [Releases](../releases/index.md) for current status.
 
 ## ROS 2 Distro Support
 
@@ -110,6 +110,6 @@ Maintainer workflow steps are documented in the [Release Process](../development
 ## Related
 
 - [Quickstart](index.md) — Environment setup and first deployment
-- [Releases](../releases/index.md) — Published release details
+- [Releases](../releases/index.md) — Current release status
 - [Build from Source](../development/build-from-source.md) — Building images locally
 - [Troubleshooting](troubleshooting.md) — Common issues

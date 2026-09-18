@@ -6,6 +6,11 @@
   color: #fff;
 }
 
+[data-md-color-scheme="slate"] .md-banner {
+  background-color: #252545;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .md-banner a {
   color: #fff;
   text-decoration: none;
@@ -68,11 +73,25 @@
 .md-typeset a {
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, text-decoration-color 0.2s ease;
 }
 
 .md-typeset a:hover {
   border-bottom-color: var(--md-accent-fg-color);
+}
+
+.md-typeset p a:not(.md-button),
+.md-typeset li a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  text-decoration-color: currentColor;
+}
+
+.md-typeset p a:not(.md-button):hover,
+.md-typeset li a:hover {
+  border-bottom-color: transparent;
+  text-decoration-color: var(--md-accent-fg-color);
 }
 
 /* --------------------------------------------------------------------------
@@ -143,6 +162,14 @@
   vertical-align: top;
 }
 
+/* Keep identifiers and paths intact in table cells. `word-break: normal`
+   restores the longest token as the column's minimum width, so tables grow
+   (and the scrollwrap scrolls) instead of splitting tokens mid-word. */
+.md-typeset table:not([class]) code {
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
 .md-typeset table:not([class]) tr:last-child td {
   border-bottom: none;
 }
@@ -153,6 +180,14 @@
 
 .md-typeset table:not([class]) tbody tr:hover {
   background-color: rgba(79, 142, 247, 0.04);
+}
+
+.md-footer .md-copyright {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.md-typeset .highlight .c1 {
+  color: #5c6a75;
 }
 
 /* --------------------------------------------------------------------------
@@ -168,7 +203,7 @@
 
 .md-typeset code {
   border-radius: 3px;
-  padding: 0.15em 0.4em;
+  padding: 0.15em 0.3em;
   font-size: 0.9em;
 }
 
@@ -199,7 +234,7 @@
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #888;
+  color: #56636d;
   border-bottom: none;
   padding-bottom: 0;
 }
@@ -209,7 +244,7 @@
   flex-direction: column;
 }
 
-.oak-nav-grid .oak-nav-card p {
+.oak-nav-grid .oak-nav-card p:not(.oak-card-title) {
   flex-grow: 1;
 }
 
@@ -223,7 +258,7 @@
 }
 
 [data-md-color-scheme="slate"] .md-typeset h2.oak-eyebrow {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 @media screen and (max-width: 768px) {
@@ -309,9 +344,10 @@
   line-height: 1.3;
 }
 
-.oak-quickstart small {
+.md-typeset .oak-quickstart small {
   margin-top: 0.15rem;
-  color: #6b7780;
+  color: #4a5560;
+  opacity: 1;
   font-size: 0.72rem;
   line-height: 1.35;
 }
@@ -361,8 +397,8 @@
   color: rgba(255, 255, 255, 0.76);
 }
 
-[data-md-color-scheme="slate"] .oak-quickstart small {
-  color: rgba(255, 255, 255, 0.6);
+[data-md-color-scheme="slate"] .md-typeset .oak-quickstart small {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 @media screen and (max-width: 768px) {
@@ -416,10 +452,14 @@
   border-color: #d0d0d0;
 }
 
-.oak-card h3 {
+.oak-card h3,
+.oak-card .oak-card-title {
   margin-top: 0;
+  margin-bottom: 0.6em;
+  color: var(--md-default-fg-color);
   font-weight: 500;
   font-size: 1.05em;
+  line-height: 1.35;
 }
 
 .oak-card p {
@@ -442,10 +482,6 @@
   width: 1.6em;
   height: 1.6em;
   fill: var(--md-accent-fg-color);
-}
-
-.oak-card h3 .headerlink {
-  display: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -497,6 +533,7 @@
   font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
   line-height: 1.4;
   margin-right: 0.3em;
 }
@@ -557,12 +594,20 @@
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
+[data-md-color-scheme="slate"] .md-typeset .highlight .c1 {
+  color: rgba(255, 255, 255, 0.65);
+}
+
 [data-md-color-scheme="slate"] .md-typeset h4 {
   color: rgba(255, 255, 255, 0.6);
 }
 
 [data-md-color-scheme="slate"] .oak-card p {
   color: rgba(255, 255, 255, 0.72);
+}
+
+[data-md-color-scheme="slate"] .oak-card .oak-card-title {
+  color: var(--md-default-fg-color);
 }
 
 [data-md-color-scheme="slate"] .oak-component-item span {

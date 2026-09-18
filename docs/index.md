@@ -12,7 +12,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 :material-book-open-outline:{ .oak-card-icon }
 
-<h3>Overview</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Overview</p>
 <p>Learn what Open AD Kit is, why it exists, and how it relates to Autoware.</p>
 <a href="overview/" class="md-button">Read Overview</a>
 </div>
@@ -21,7 +21,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 :material-rocket-launch-outline:{ .oak-card-icon }
 
-<h3>Getting Started</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Getting Started</p>
 <p>Run a planning simulation in about 10 minutes — no build from source, no GPU required.</p>
 <a href="getting-started/" class="md-button md-button--primary">Start Here</a>
 </div>
@@ -30,16 +30,16 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 
 :material-rocket-outline:{ .oak-card-icon }
 
-<h3>Deployment</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Deployments</p>
 <p>Ready-to-run deployments for simulation and AD stacks.</p>
-<a href="deployments/" class="md-button">View Deployment</a>
+<a href="deployments/" class="md-button">View Deployments</a>
 </div>
 
 <div class="oak-card oak-nav-card" markdown="1">
 
 :material-source-branch:{ .oak-card-icon }
 
-<h3>Development</h3>
+<p class="oak-card-title" role="heading" aria-level="3">Development</p>
 <p>Build from source, contribute code, and help shape the future of Open AD Kit.</p>
 <a href="development/" class="md-button">Contribute</a>
 </div>

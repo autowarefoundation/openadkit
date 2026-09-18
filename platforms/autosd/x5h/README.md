@@ -1071,7 +1071,26 @@ not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recove
 - `VP_NPU_PASS frames=<n> wall_avg_ms=<ms> wall_max_ms=<ms>`: `vp-npu-gate.sh`, gate D5.
 - `SI_STOP_PASS`: `si_stop_gate.py` on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1 within the latency budget.
 - `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=5 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together (or `X5H_CES_DEMO_FAIL reason=<slug>`).
-- `DEMO_ROLE_PASS role=demo carveout=0x5da00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact and the CR52 carveout relocated.
+- `DEMO_ROLE_PASS role=demo carveout=0x5da00000 vdev=0x5dc00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact, the CR52 carveout relocated, and all four carveouts `cr52_1` lists present under the names remoteproc looks them up by.
+
+### The four CR52 carveouts
+
+The vendor NPU device tree drops every `cr52_*` reserved-memory node but leaves `cr52_1`'s `memory-region` pointing at phandle `0x10a`. `uboot/make-demo-dtb.sh` derives the demo tree from it. It adds the four nodes that `cr52_1` must list, in this order:
+
+| Node | Base | Size | What holds it |
+| --- | --- | --- | --- |
+| `cr52_ram1` | `0x5da00000` | 2 MiB | The firmware's `.resource_table`. |
+| `vdev0vring0` | `0x5dc00000` | `0x3000` | An rpmsg vring. `PAGE_ALIGN(vring_size(256, 4096))`. |
+| `vdev0vring1` | `0x5dc03000` | `0x3000` | The other vring. |
+| `vdev0buffer` | `0x5dc10000` | 1 MiB | The rpmsg buffer pool. 512 buffers times 2048 bytes. |
+
+The three `vdev0*` names are load bearing. `rcar_gen5_rproc_prepare` registers every `memory-region` phandle as a carveout named after the node. `rproc_alloc_vring` and `rproc_add_virtio_dev` then look carveouts up by exactly those names. If a name is missing, remoteproc allocates that window from `linux,cma@40000000` instead. No CR52 MPU region maps that address, because the BSP memory map expects Linux CMA at `0xa2600000`. The firmware takes a data abort in `rpmsg_init_vdev` the first time it touches the window. That was gate D1b on board 2 on 2026-09-17.
+
+A fixed device address in the firmware's own resource table does not pin the vrings instead. `rproc_alloc_vring` matches by name, not by address. With no IOMMU, `rproc_alloc_carveout` only warns that the allocation does not fit the request. It then writes the address it allocated back into the table. The firmware therefore publishes `FW_RSC_ADDR_ANY` and reads back whatever Linux chose.
+
+All four windows must sit inside one CR52 MPU region. The safety island maps `0x5da00000` for 4 MiB in `actuation_module/freertos_x5h/vendor_patched/system_rcar_gen5.c`. If you move a window in `make-demo-dtb.sh`, move that region with it.
+
+Every node carries `no-map`, and the derivation depends on it. `rcar_gen5_rproc_mem_alloc` maps a carveout with `ioremap_wc`. Arm64 refuses to `ioremap` memory that is in the linear map.
 
 ### Running the demo
 
@@ -1108,7 +1127,7 @@ the operator (or the `demo` container) needs.
 
 | Gate | Pass criteria | Deviation |
 | --- | --- | --- |
-| D1 (role boot) | Board 1 boots role `demo`. `remoteproc0` reaches `running`. `uio2` exists. `cmemdrv` logs all four regions with unchanged base and size. `/proc/iomem` shows the 2 MiB reservation at `0x5da00000` (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). Pass: all true in one boot, twice. | None. |
+| D1 (role boot) | Board 1 boots role `demo`. `remoteproc0` reaches `running`. `uio2` exists. `cmemdrv` logs all four regions with unchanged base and size. `/proc/iomem` shows the 2 MiB reservation at `0x5da00000` and the three `vdev0*` reservations above it (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). Pass: all true in one boot, twice. | None. |
 | D2 (payload) | One 1400-byte DDS sample crosses `tap0` unfragmented. `tcpdump` on the rog-amd side of the bridge shows one frame. Pass: zero `DATA_FRAG`. | None. |
 | D3 (channel) | The second RPMsg endpoint binds on Linux, and the CR52 heartbeat arrives at 1 Hz for 10 minutes (`rpmsg-ping -l`, marker `RPMSG_LISTEN_PASS`). Pass: 600 of 600 (`listen_loop` accepts `n_hb >= seconds - 2`, so 598 of 600 also passes). | None. |
 | D4 (lap) | VisionPilot drives the Town04 ring one full lap unaided, cross-track error under 1.0 m. Pass: one lap, no lane departure. | Runs on rog-amd with no board involved, so it can proceed in parallel with D1 to D3. |

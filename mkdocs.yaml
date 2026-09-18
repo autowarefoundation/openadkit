@@ -1,5 +1,5 @@
 site_name: Open AD Kit
-site_description: A modular, container-based distribution of Autoware for building autonomous driving systems — from development laptops to vehicle edge deployment.
+site_description: "The deployment layer for the Autoware ecosystem: building autonomous driving and ADAS systems from simulation to in-vehicle deployment."
 site_url: https://autowarefoundation.github.io/openadkit/
 repo_url: https://github.com/autowarefoundation/openadkit
 edit_uri: edit/main/docs/

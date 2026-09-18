@@ -1,7 +1,7 @@
 # Open AD Kit
 
 <p class="oak-hero-lead">
-A modular, container-based distribution of <a href="https://github.com/autowarefoundation/autoware">Autoware</a> for building autonomous driving systems from simulation and development through to in-vehicle deployment.
+The deployment layer for the <a href="https://github.com/autowarefoundation/autoware">Autoware</a> ecosystem, building autonomous driving and ADAS systems from simulation and development through to in-vehicle deployment.
 </p>
 
 ## Explore { .oak-eyebrow }
@@ -13,7 +13,7 @@ A modular, container-based distribution of <a href="https://github.com/autowaref
 :material-book-open-outline:{ .oak-card-icon }
 
 <p class="oak-card-title" role="heading" aria-level="3">Overview</p>
-<p>Learn what Open AD Kit is, why it exists, and how it relates to Autoware.</p>
+<p>Learn what Open AD Kit is, why it exists, and how it relates to the Autoware ecosystem.</p>
 <a href="overview/" class="md-button">Read Overview</a>
 </div>
 

@@ -60,7 +60,7 @@ The [documentation site](https://autowarefoundation.github.io/openadkit/) covers
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and validation steps.
 
-The [Open AD Kit Working Group](https://github.com/autowarefoundation/autoware-projects/wiki/Open-AD-Kit-Working-Group) is open to everyone and meets every Thursday at 13:00 UTC (16:00 TRT). [Add the meeting to Google Calendar](https://www.google.com/calendar/event?eid=YnY4dmJxZTVsM2h2cWE1cTJ2NmhtOWdwMzZfMjAyNjA5MjRUMTMwMDAwWiBhdXRvd2FyZS5vcmdfNmxvbDBobzVmdDAyMTdoOGM2MHBpMWZtMzBAZw) for joining details, and browse the [meeting archive](https://github.com/orgs/autowarefoundation/discussions?discussions_q=label%3Ameeting%3Aopenadkit-wg) for agendas and notes.
+The [Open AD Kit Working Group](https://github.com/autowarefoundation/autoware-projects/wiki/Open-AD-Kit-Working-Group) is open to everyone and meets every Thursday at 13:00 UTC. [Add the meeting to Google Calendar](https://www.google.com/calendar/event?eid=YnY4dmJxZTVsM2h2cWE1cTJ2NmhtOWdwMzZfMjAyNjA5MjRUMTMwMDAwWiBhdXRvd2FyZS5vcmdfNmxvbDBobzVmdDAyMTdoOGM2MHBpMWZtMzBAZw) for joining details, and browse the [meeting archive](https://github.com/orgs/autowarefoundation/discussions?discussions_q=label%3Ameeting%3Aopenadkit-wg) for agendas and notes.
 
 For questions and design discussions, join the [Autoware Discord](https://discord.gg/Q94UsPvReQ).
 

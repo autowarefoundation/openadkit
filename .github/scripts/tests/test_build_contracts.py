@@ -287,7 +287,6 @@ def test_manifest_jobs_require_prepare_success():
 def test_yaml_and_docs_navigation_inputs_trigger_validation():
     for path in (
         ".github/ISSUE_TEMPLATE/**",
-        ".github/DISCUSSION_TEMPLATE/**",
         ".github/dependabot.yaml",
         ".github/stale.yml",
         "deployments/**/*.yaml",

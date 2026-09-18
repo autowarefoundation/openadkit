@@ -3,9 +3,16 @@ rpmsg: virtio: raise the buffer size to 2048
 The X5H rpmsg-eth link carries Ethernet frames over RPMsg. With the
 default 512-byte buffer the netif MTU is 462 and every DDS sample above
 348 bytes fragments. 2048 fits a 1514-byte frame plus the 16-byte
-RPMsg header. 512 buffers times 2048 is 1 MiB, inside the 2 MiB cr52_1
-carveout the demo device tree reserves. The CR52 firmware sets the
+RPMsg header. 512 buffers times 2048 is 1 MiB, which the demo device
+tree reserves as the vdev0buffer carveout. The CR52 firmware sets the
 matching RPMSG_BUFFER_SIZE.
+
+That carveout is not optional, and an earlier version of this message
+was wrong to say the pool came from cr52_ram1. Without a node named
+vdev0buffer, rproc_add_virtio_dev() falls back to
+of_reserved_mem_device_init_by_idx() on memory-region index 0, which
+fails on a no-map node that carries no compatible. The pool then comes
+from linux,cma@40000000, which no CR52 MPU region maps.
 
 --- a/drivers/rpmsg/virtio_rpmsg_bus.c
 +++ b/drivers/rpmsg/virtio_rpmsg_bus.c

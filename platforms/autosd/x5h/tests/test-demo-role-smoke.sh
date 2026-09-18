@@ -27,9 +27,28 @@ good() {
     rm -rf "$tmp/g"; mkdir -p "$tmp/g/dt/reserved-memory/cr52_ram1@5da00000" "$tmp/g/dt/soc/cr52_1" "$tmp/g/uio/uio2" "$tmp/g/rproc"
     for r in 1400000000 1c00000000 64000000 8e400000; do mkdir -p "$tmp/g/dt/reserved-memory/linux,npu_region@$r"; done
     printf '\0\0\1\n' > "$tmp/g/dt/reserved-memory/cr52_ram1@5da00000/phandle"   # 0x0000010a
-    printf '\0\0\1\n' > "$tmp/g/dt/soc/cr52_1/memory-region"
+    # The three vdev carveouts. Their phandles are derived by make-demo-dtb.sh
+    # from the vendor tree's highest, so the fixture uses values well away from
+    # 0x10a (0x205 0x206 0x207, what the real tree yields today) and the script
+    # must judge them by their linkage, not by any constant.
+    for v in vdev0vring0@5dc00000:'\005' vdev0vring1@5dc03000:'\006' vdev0buffer@5dc10000:'\007'; do
+        mkdir -p "$tmp/g/dt/reserved-memory/${v%:*}"
+        printf '\0\0\2%b' "${v#*:}" > "$tmp/g/dt/reserved-memory/${v%:*}/phandle"
+    done
+    printf '\0\0\1\n\0\0\2\005\0\0\2\006\0\0\2\007' > "$tmp/g/dt/soc/cr52_1/memory-region"
     echo 'root=x x5h.role=demo' > "$tmp/g/cmdline"
-    printf '40000000-8affffff : System RAM\n  5da00000-5dbfffff : reserved\n' > "$tmp/g/iomem"
+    # The REAL /proc/iomem from board 2 after the fix, 2026-09-18, not an
+    # invented one. The kernel coalesces the three contiguous windows into a
+    # single reserved line, which is exactly what broke the first version of
+    # this gate, so the fixture has to carry that shape.
+    cat > "$tmp/g/iomem" <<'IOMEM'
+40000000-5d9fffff : System RAM
+  40000000-5d9fffff : reserved
+5da00000-5dc05fff : reserved
+5dc06000-5dc0ffff : System RAM
+5dc10000-5dd0ffff : reserved
+5dd10000-8affffff : System RAM
+IOMEM
     echo offline > "$tmp/g/rproc/state"
     write_big_dmesg
 }
@@ -39,8 +58,32 @@ run() { CMDLINE_FILE="$tmp/g/cmdline" IOMEM_FILE="$tmp/g/iomem" DT_ROOT="$tmp/g/
 for role in demo dev; do
     good; echo "root=x x5h.role=$role" > "$tmp/g/cmdline"
     out=$(run) || fail "good_tree_rejected_$role"
-    grep -q "^DEMO_ROLE_PASS role=$role carveout=0x5da00000 remoteproc=offline$" <<<"$out" || fail "no_pass_marker_$role"
+    grep -q "^DEMO_ROLE_PASS role=$role carveout=0x5da00000 vdev=0x5dc00000 remoteproc=offline$" <<<"$out" || fail "no_pass_marker_$role"
 done
+# Each vdev carveout, missing three ways. These are the checks gate D1a did not
+# have on 2026-09-17, when it passed a tree whose vrings remoteproc then
+# allocated from linux,cma@40000000 and the CR52 data-aborted on.
+while read -r vn vb; do
+    good; rm -r "$tmp/g/dt/reserved-memory/$vn@$vb"; out=$(run) && fail "missing_${vn}_accepted"
+    grep -q "reason=${vn}_node_missing" <<<"$out" || fail "${vn}_node_reason"
+    # A node whose phandle is not the one cr52_1 lists in that slot: the tree
+    # carries the window but nothing routes the core to it.
+    good; printf '\0\0\2\377' > "$tmp/g/dt/reserved-memory/$vn@$vb/phandle"; out=$(run) && fail "unlinked_${vn}_accepted"
+    grep -q "reason=${vn}_not_linked" <<<"$out" || fail "${vn}_link_reason"
+    # Drop every reserved line that covers this window. With coalescing the
+    # window has no line of its own, so the range holding it is what goes.
+    good; grep -v " : reserved$" "$tmp/g/iomem" > "$tmp/g/iomem.n"; mv "$tmp/g/iomem.n" "$tmp/g/iomem"
+    out=$(run) && fail "unreserved_${vn}_accepted"
+    grep -q "reason=.*_not_reserved" <<<"$out" || fail "${vn}_reservation_reason"
+done <<'EOF'
+vdev0vring0 5dc00000
+vdev0vring1 5dc03000
+vdev0buffer 5dc10000
+EOF
+# A tree carrying only cr52_ram1 -- exactly the 2026-09-17 tree -- is refused.
+good; for vn in vdev0vring0@5dc00000 vdev0vring1@5dc03000 vdev0buffer@5dc10000; do rm -r "$tmp/g/dt/reserved-memory/$vn"; done
+printf '\0\0\1\n' > "$tmp/g/dt/soc/cr52_1/memory-region"
+out=$(run) && fail pre_fix_tree_accepted
 # yocto, the two retired roles, and no role word at all are all refused.
 for bad in yocto cr52 npu; do
     good; echo "x5h.role=$bad" > "$tmp/g/cmdline"; out=$(run) && fail "${bad}_accepted"

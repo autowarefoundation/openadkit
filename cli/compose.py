@@ -130,7 +130,7 @@ def compose_capture(
 
 def require_docker() -> None:
     if not shutil.which("docker"):
-        raise OpenADKitError("Docker is unavailable. Run: ./openadkit setup")
+        raise OpenADKitError("Docker is unavailable. Run: openadkit setup")
 
 
 def _compose_ls_environment() -> dict[str, str]:

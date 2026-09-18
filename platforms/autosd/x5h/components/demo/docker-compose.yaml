@@ -72,6 +72,31 @@ services:
       carla_bridge.launch.py host:=127.0.0.1 port:=2000 rig_file:=/ws/config/carla10.json"
     restart: on-failure
 
+  # The camera compressor (gate D5). CARLA publishes 1280x720 bgra8, which is
+  # 3.69 MB per sample and 297 Mbit/s at 10 Hz, fragmenting into about 2800
+  # datagrams. The board reassembled none of them and VisionPilot sat at zero
+  # frames; a larger socket buffer did not help, because the wall is the byte
+  # count. This subscribes on loopback, where the raw size costs nothing, and
+  # publishes JPEG at about 159 KiB per frame for the board to decode with its
+  # x5h-image-republish unit. Both ends must agree on the compressed topic.
+  jpeg-bridge:
+    image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
+    container_name: ces-jpeg-bridge
+    network_mode: host
+    ipc: host
+    depends_on:
+      - bridge
+    environment:
+      - ROS_DOMAIN_ID=1
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml
+    volumes:
+      - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro
+    command: >
+      bash -c "source /ws/install/setup.bash && python3 /ws/si/jpeg_bridge.py
+      --quality ${JPEG_QUALITY:-85}"
+    restart: on-failure
+
   # The stop gate (gate D6): watches domain 1 for the CR52-authored stop.
   # Same image as the bridge. Command and args are the sibling plan's own
   # invocation:

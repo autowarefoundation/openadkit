@@ -373,6 +373,8 @@ content:
       path: /etc/containers/systemd/x5h-demo-restamp.container
     - source_path: ../components/demo/x5h-vp.container
       path: /etc/containers/systemd/x5h-vp.container
+    - source_path: ../components/demo/x5h-image-republish.container
+      path: /etc/containers/systemd/x5h-image-republish.container
     # /var/lib/awf/scenario-sim{,/map} -- the scenario working directory
     # awf-oak-autoware and awf-oak-simulator mount, and the directory the
     # map is staged into -- are created at boot by systemd-tmpfiles rather

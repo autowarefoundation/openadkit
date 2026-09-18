@@ -17,7 +17,6 @@ on:
       - '.github/DISCUSSION_TEMPLATE/**'
       - '.github/dependabot.yaml'
       - '.github/stale.yml'
-      - '.github/sync-files.yaml'
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/actions/**'
@@ -93,7 +92,6 @@ jobs:
             .github/DISCUSSION_TEMPLATE/ \
             .github/dependabot.yaml \
             .github/stale.yml \
-            .github/sync-files.yaml \
             deployments/ \
             platforms/ \
             mkdocs.yaml \

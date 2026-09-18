@@ -43,7 +43,7 @@ def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> N
     parser.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name from list; omit to list available",
+        help="curated deployment name; omit to print the catalog",
     )
     parser.add_argument(
         "--ros-distro",
@@ -175,7 +175,7 @@ def list_deployments(root, kit, names: list[str] | None = None) -> int:
             )
         except OpenADKitError as error:
             rows.append((name, "invalid", "", str(error).replace("\n", " ")))
-    _print_table(("NAME", "STATE", "GPU", "DESCRIPTION"), rows)
+    _print_table(("NAME", "KIND", "GPU", "DESCRIPTION"), rows)
     return 0
 
 
@@ -224,7 +224,7 @@ def print_run_next_steps(deployment, selection) -> None:
     print(f"running: {deployment.name}")
     if "visualizer" in selection.services:
         print("visualizer: https://localhost:6080/vnc.html")
-        print("password: REMOTE_PASSWORD in config.env")
+        print("password: REMOTE_PASSWORD (default openadkit; override in config.local.env)")
     print(f"stop with: openadkit stop {deployment.name}")
 
 

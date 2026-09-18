@@ -23,6 +23,9 @@ while (($#)); do
 Usage: openadkit setup [--gpu] [--verify]
 
 Installs the Ubuntu host dependencies needed to run Open AD Kit.
+
+  --gpu     also install the NVIDIA Container Toolkit and DDS UDP buffer sysctls
+  --verify  run hello-world (and GPU) checks after installing
 EOF
       exit 0
       ;;

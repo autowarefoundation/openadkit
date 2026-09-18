@@ -47,7 +47,7 @@ git ls-files '**/Dockerfile*' | xargs hadolint --config .hadolint.yaml
 yamllint -c .yamllint.yaml \
   .github/workflows/ .github/actions/ .github/ISSUE_TEMPLATE/ \
   .github/DISCUSSION_TEMPLATE/ .github/dependabot.yaml .github/stale.yml \
-  .github/sync-files.yaml deployments/ platforms/ mkdocs.yaml docs/
+  deployments/ platforms/ mkdocs.yaml docs/
 
 # Markdown
 npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'

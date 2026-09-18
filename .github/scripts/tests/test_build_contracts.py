@@ -290,7 +290,6 @@ def test_yaml_and_docs_navigation_inputs_trigger_validation():
         ".github/DISCUSSION_TEMPLATE/**",
         ".github/dependabot.yaml",
         ".github/stale.yml",
-        ".github/sync-files.yaml",
         "deployments/**/*.yaml",
         "platforms/**/*.yml",
     ):

@@ -19,6 +19,14 @@ AddDevice=/dev/cmem_other1
 AddDevice=/dev/cmem_other2
 AddDevice=/dev/cmem_other3
 Volume=/opt/npu:/npu
+# The NNX artifacts were compiled on a workstation and manifest.json records
+# the absolute path they were written to, which exists on no board. The
+# Renesas backend opens that exact path and dies with "fopen: No such file or
+# directory" followed by an Ort::Exception. Mapping the board's copy onto the
+# recorded path makes it resolve without editing vendor artifacts. Board-
+# confirmed on BOTH boards 2026-09-18. If the artifacts are ever recompiled,
+# check manifest.json and move this line with them.
+Volume=/opt/npu/perf/merged:/home/youtalk/src/openadkit/x5h-work/npu/merged:ro
 Volume=/etc/containers/systemd/vision_pilot.conf:/usr/share/visionpilot/config/vision_pilot.conf:ro,z
 Volume=/etc/containers/systemd/vision_pilot_ros2.conf:/usr/share/visionpilot/config/vision_pilot_ros2.conf:ro,z
 Volume=/etc/containers/systemd/cyclonedds-x5h-demo.xml:/etc/x5h/cyclonedds.xml:ro,z
@@ -26,6 +34,14 @@ Environment=ROS_DOMAIN_ID=1
 Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 Environment=CYCLONEDDS_URI=file:///etc/x5h/cyclonedds.xml
 Environment=QT_QPA_PLATFORM=offscreen
+# The image's own LD_LIBRARY_PATH is
+# /opt/ros/jazzy/lib:/usr/share/visionpilot/onnxruntime/lib, which omits the
+# architecture subdirectory where libddsc.so.0 lives. The entrypoint is
+# /usr/bin/VisionPilot directly, so nothing sources /opt/ros/jazzy/setup.bash
+# to add it. Without this line rmw_cyclonedds_cpp fails to load and the
+# container exits 1 immediately with "libddsc.so.0: cannot open shared object
+# file", restart-looping forever. Board-confirmed on BOTH boards 2026-09-18.
+Environment=LD_LIBRARY_PATH=/opt/ros/jazzy/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib:/usr/share/visionpilot/onnxruntime/lib
 Exec=--no-window
 
 [Service]

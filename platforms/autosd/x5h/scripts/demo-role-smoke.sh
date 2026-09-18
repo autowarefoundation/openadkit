@@ -19,7 +19,14 @@ IOMEM_FILE=${IOMEM_FILE:-/proc/iomem}
 DT_ROOT=${DT_ROOT:-/proc/device-tree}
 UIO_DIR=${UIO_DIR:-/sys/class/uio}
 RPROC_DIR=${RPROC_DIR:-/sys/class/remoteproc/remoteproc0}
-DMESG_CMD=${DMESG_CMD:-dmesg}
+# journalctl -k -b, NOT dmesg. The cmem probe lines this gate looks for are
+# printed at boot, and dmesg reads a ring buffer that WRAPS: on board 2 on
+# 2026-09-18, after about 10 hours of uptime and heavy container and DDS
+# traffic, the oldest surviving dmesg line was t+38008s and the gate reported
+# cmem_probe_missing on a board whose four cmem devices were all present. The
+# boot journal still held all four lines. A booth board is exactly the
+# long-uptime case, so dmesg makes this check expire silently.
+DMESG_CMD=${DMESG_CMD:-"journalctl -k -b --no-pager"}
 BASE=5da00000
 # 2 MiB. The end address is derived from the base and the size rather than
 # written out, so moving BASE alone cannot leave a reservation check that no
@@ -107,7 +114,7 @@ done
 # pipefail turns into a FAIL on the very invariant this check exists to
 # confirm is present. Board-confirmed 2026-09-14: 5/5 false failures on
 # board 1, 3/5 on board 2, on an otherwise healthy boot.
-dmesg_out=$("$DMESG_CMD")
+dmesg_out=$($DMESG_CMD)
 grep -q 'assigned reserved memory node linux,npu_region' <<<"$dmesg_out" || fail cmem_probe_missing
 state=$(cat "$RPROC_DIR/state" 2>/dev/null) || fail remoteproc_missing
 echo "DEMO_ROLE_PASS role=$role carveout=0x$BASE vdev=0x$VDEV_BASE remoteproc=$state"

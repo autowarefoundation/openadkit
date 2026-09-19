@@ -14,10 +14,8 @@ on:
       - '**/*.json5'
       - '.github/image-inventory.json'
       - '.github/ISSUE_TEMPLATE/**'
-      - '.github/DISCUSSION_TEMPLATE/**'
       - '.github/dependabot.yaml'
       - '.github/stale.yml'
-      - '.github/sync-files.yaml'
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/actions/**'
@@ -90,10 +88,8 @@ jobs:
             .github/workflows/ \
             .github/actions/ \
             .github/ISSUE_TEMPLATE/ \
-            .github/DISCUSSION_TEMPLATE/ \
             .github/dependabot.yaml \
             .github/stale.yml \
-            .github/sync-files.yaml \
             deployments/ \
             platforms/ \
             mkdocs.yaml \

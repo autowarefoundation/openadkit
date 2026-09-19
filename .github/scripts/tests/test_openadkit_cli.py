@@ -266,11 +266,13 @@ def test_command_surface_is_exact():
         "install",
         "upgrade",
         "setup",
+        "uninstall",
         "list",
         "version",
         "validate",
         "fetch",
         "run",
+        "clean",
         "status",
         "logs",
         "stop",
@@ -1776,36 +1778,37 @@ def test_empty_services_are_rejected(tmp_path):
     assert "compose.services must not be empty" in result.stdout
 
 
-def test_status_uses_last_run_gpu_selection(tmp_path):
+def test_operational_commands_ignore_previous_gpu_selection(tmp_path):
     manifest = minimal_manifest()
     manifest["requirements"]["gpu"] = "optional"
     manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
     path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
 
+    result = run_cli(root, ["run", "example", "--gpu", "--pull", "never"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    # Operational commands are stateless: run must not persist a selection.
+    assert not (deployment / ".cache").exists()
+
+    calls.write_text("")
     result = run_cli(root, ["status", "example"], env=path_env)
     assert result.returncode == 0, result.stderr
     assert "docker-compose.gpu.yaml" not in calls.read_text()
     assert calls.read_text().rstrip().endswith(" ps")
 
-    calls.write_text("")
-    result = run_cli(root, ["run", "example", "--gpu", "--pull", "never"], env=path_env)
-    assert result.returncode == 0, result.stderr
 
-    calls.write_text("")
+def test_operational_commands_work_when_release_lacks_default_distro_images(tmp_path):
+    root, _ = runtime_tree(tmp_path, release=True)
+    document = json.loads((root / "openadkit.json").read_text())
+    del document["images"]["humble"]
+    (root / "openadkit.json").write_text(json.dumps(document))
+    bin_dir, calls = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
     result = run_cli(root, ["status", "example"], env=path_env)
     assert result.returncode == 0, result.stderr
-    assert "docker-compose.gpu.yaml" in calls.read_text()
-
-    calls.write_text("")
-    result = run_cli(root, ["run", "example", "--pull", "never"], env=path_env)
-    assert result.returncode == 0, result.stderr
-
-    calls.write_text("")
-    result = run_cli(root, ["status", "example"], env=path_env)
-    assert result.returncode == 0, result.stderr
-    assert "docker-compose.gpu.yaml" not in calls.read_text()
+    assert calls.read_text().rstrip().endswith(" ps")
 
 
 def _host_architecture():
@@ -1878,3 +1881,450 @@ def test_carla_is_humble_only():
     )
     assert result.returncode != 0
     assert "does not support ROS distro jazzy" in result.stderr
+
+
+def test_validate_data_reports_missing_incomplete_and_ok(tmp_path):
+    resource = {
+        "name": "sample-map",
+        "kind": "files",
+        "destinationEnv": "MAP_PATH",
+        "files": [
+            {
+                "path": "lanelet2_map.osm",
+                "url": "http://example.invalid/lanelet2_map.osm",
+                "sha256": "0" * 64,
+            }
+        ],
+        "requiredFiles": ["lanelet2_map.osm"],
+    }
+    manifest = minimal_manifest(data=[resource])
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    target = root.parent / "home" / "data" / "example"
+
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "valid: example (humble, cpu)" in result.stdout
+    assert "data: sample-map missing" in result.stdout
+
+    target.mkdir(parents=True)
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: sample-map incomplete" in result.stdout
+
+    (target / "lanelet2_map.osm").write_text("map\n")
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "data: sample-map ok" in result.stdout
+
+    result = run_cli(root, ["validate", "example"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "data:" not in result.stdout
+
+
+def test_validate_data_respects_gpu_selection(tmp_path):
+    resources = [
+        {
+            "name": "cpu-model",
+            "kind": "files",
+            "destinationEnv": "MAP_PATH",
+            "files": [
+                {
+                    "path": "model.bin",
+                    "url": "http://example.invalid/model.bin",
+                    "sha256": "0" * 64,
+                }
+            ],
+            "requiredFiles": ["model.bin"],
+        },
+        {
+            "name": "gpu-model",
+            "kind": "files",
+            "destinationEnv": "GPU_MODEL_PATH",
+            "gpu": True,
+            "files": [
+                {
+                    "path": "model.onnx",
+                    "url": "http://example.invalid/model.onnx",
+                    "sha256": "1" * 64,
+                }
+            ],
+            "requiredFiles": ["model.onnx"],
+        },
+    ]
+    manifest = minimal_manifest(data=resources)
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: cpu-model missing" in result.stdout
+    assert "gpu-model" not in result.stdout
+
+    result = run_cli(root, ["validate", "example", "--data", "--gpu"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: gpu-model missing" in result.stdout
+
+
+def test_usage_errors_exit_with_code_two():
+    for command in ("install", "upgrade", "setup", "uninstall"):
+        result = subprocess.run(
+            [str(ENTRYPOINT), command, "--nope"],
+            text=True,
+            capture_output=True,
+        )
+        assert result.returncode == 2, (command, result.stderr)
+
+
+def test_version_flag_reports_bundle():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "--version"], text=True, capture_output=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("Open AD Kit ")
+
+
+def test_entrypoint_help_documents_handled_command_flags():
+    checks = {
+        "install": ("--version", "--destination", "--force"),
+        "upgrade": ("--check",),
+        "setup": ("--gpu", "--verify"),
+        "uninstall": ("--all",),
+    }
+    for command, flags in checks.items():
+        result = subprocess.run(
+            [str(ENTRYPOINT), command, "--help"],
+            text=True,
+            capture_output=True,
+        )
+        assert result.returncode == 0, (command, result.stderr)
+        for flag in flags:
+            assert flag in result.stdout, (command, flag)
+
+
+def test_capture_process_surfaces_command_stderr():
+    sys.path.insert(0, str(ROOT / "cli"))
+    import compose as openadkit_compose
+
+    with pytest.raises(openadkit_compose.OpenADKitError) as error:
+        openadkit_compose.capture_process(
+            ["bash", "-c", "echo 'boom detail' >&2; exit 3"]
+        )
+    assert "exit code 3" in str(error.value)
+    assert "boom detail" in str(error.value)
+
+
+def test_list_json_output(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["list", "--json"])
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "schemaVersion": 1,
+        "deployments": [
+            {
+                "name": "example",
+                "kind": "source",
+                "gpu": "none",
+                "description": "Test deployment",
+            }
+        ],
+    }
+
+
+def test_version_json_output(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["version", "--json"])
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["schemaVersion"] == 1
+    assert payload["bundle"] == "repository"
+    assert payload["version"] is None
+    assert payload["commit"] is None
+
+    release_root, _ = runtime_tree(tmp_path / "release", release=True)
+    result = run_cli(release_root, ["version", "--json"])
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["bundle"] == "release"
+    assert payload["version"] == "v1.2.3"
+    assert payload["commit"] is None
+
+
+def test_validate_json_output(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = run_cli(root, ["validate", "example", "--json"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "schemaVersion": 1,
+        "deployment": "example",
+        "manifestValid": True,
+        "rosDistro": "humble",
+        "gpu": False,
+        "dataValid": None,
+        "data": [],
+    }
+
+
+def test_validate_json_reports_missing_data(tmp_path):
+    resource = {
+        "name": "sample-map",
+        "kind": "files",
+        "destinationEnv": "MAP_PATH",
+        "files": [
+            {
+                "path": "lanelet2_map.osm",
+                "url": "http://example.invalid/lanelet2_map.osm",
+                "sha256": "0" * 64,
+            }
+        ],
+        "requiredFiles": ["lanelet2_map.osm"],
+    }
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=[resource]))
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = run_cli(root, ["validate", "example", "--data", "--json"], env=path_env)
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["dataValid"] is False
+    assert payload["data"] == [{"name": "sample-map", "status": "missing"}]
+
+
+def test_catalog_json_stays_parseable_without_deployment(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["validate", "--json"])
+    assert result.returncode == 2
+    payload = json.loads(result.stdout)
+    assert payload["deployments"][0]["name"] == "example"
+    assert "deployment name required" in result.stderr
+
+
+def run_installed_command(home, destination, version, bin_dir, *args):
+    env = os.environ | {"HOME": str(home)}
+    if bin_dir is not None:
+        env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+    return subprocess.run(
+        [str(destination / f"openadkit-{version}" / "openadkit"), *args],
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+
+def test_upgrade_check_reports_available_without_installing(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.3.0")
+    result = run_installed_command(
+        home, destination, "v1.2.3", latest_bin, "upgrade", "--check"
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Upgrade available: v1.2.3 -> v1.3.0" in result.stdout
+    assert not (destination / "openadkit-v1.3.0").exists()
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.resolve() == destination / "openadkit-v1.2.3/openadkit"
+
+
+def test_upgrade_check_reports_up_to_date(tmp_path):
+    home, destination, bin_dir = install_standalone(tmp_path, "v1.2.3")
+    result = run_installed_command(
+        home, destination, "v1.2.3", bin_dir, "upgrade", "--check"
+    )
+    assert result.returncode == 0, result.stderr
+    assert "up to date: v1.2.3" in result.stdout
+
+
+def test_uninstall_removes_active_release_and_launcher(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    result = run_installed_command(home, destination, "v1.2.3", None, "uninstall")
+    assert result.returncode == 0, result.stderr
+    assert not (destination / "openadkit-v1.2.3").exists()
+    assert not launcher.exists()
+
+
+def test_uninstall_all_removes_kept_releases(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.3.0")
+    upgrade = run_installed_upgrade(home, destination, "v1.2.3", latest_bin)
+    assert upgrade.returncode == 0, upgrade.stderr
+    assert (destination / "openadkit-v1.2.3").is_dir()
+
+    result = run_installed_command(home, destination, "v1.3.0", None, "uninstall", "--all")
+    assert result.returncode == 0, result.stderr
+    assert not (destination / "openadkit-v1.3.0").exists()
+    assert not (destination / "openadkit-v1.2.3").exists()
+    assert not (home / ".local/bin/openadkit").exists()
+
+
+def test_uninstall_rejects_non_symlink_launcher(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    launcher.unlink()
+    launcher.write_text("#!/usr/bin/env bash\nexit 0\n")
+    result = run_installed_command(home, destination, "v1.2.3", None, "uninstall")
+    assert result.returncode != 0
+    assert "refusing to remove non-symlink launcher" in result.stderr
+    assert (destination / "openadkit-v1.2.3/openadkit").is_file()
+
+
+def test_uninstall_rejects_foreign_launcher(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    release, _ = standalone_release(base, version="v1.3.0")
+    extracted = tmp_path / "manual-extract"
+    with tarfile.open(release / "openadkit-v1.3.0.tar.gz") as archive:
+        archive.extractall(extracted, filter="data")
+    result = subprocess.run(
+        [str(extracted / "openadkit-v1.3.0" / "openadkit"), "uninstall"],
+        env=os.environ | {"HOME": str(home), "PATH": os.environ["PATH"]},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "active installation is not" in result.stderr
+    assert (destination / "openadkit-v1.2.3").is_dir()
+
+
+def test_uninstall_rejects_repository_checkout(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = subprocess.run(
+        [str(root / "openadkit"), "uninstall"],
+        cwd=root,
+        env=os.environ | {"HOME": str(tmp_path / "home")},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "uninstall is for release installs" in result.stderr
+
+
+def test_uninstall_requires_an_install():
+    result = subprocess.run(
+        ["bash", "-s", "--", "uninstall"],
+        input=ENTRYPOINT.read_text(),
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "Open AD Kit is not installed" in result.stderr
+
+
+def _clean_manifest():
+    resources = [
+        {
+            "name": "sample-map",
+            "kind": "files",
+            "destinationEnv": "MAP_PATH",
+            "files": [
+                {
+                    "path": "lanelet2_map.osm",
+                    "url": "http://example.invalid/map",
+                    "sha256": "0" * 64,
+                }
+            ],
+            "requiredFiles": ["lanelet2_map.osm"],
+        },
+        {
+            "name": "gpu-model",
+            "kind": "files",
+            "destinationEnv": "GPU_MODEL_PATH",
+            "gpu": True,
+            "files": [
+                {
+                    "path": "model.onnx",
+                    "url": "http://example.invalid/model",
+                    "sha256": "1" * 64,
+                }
+            ],
+            "requiredFiles": ["model.onnx"],
+        },
+    ]
+    manifest = minimal_manifest(data=resources)
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    return manifest
+
+
+def test_clean_lists_and_removes_all_declared_data(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    map_dir = home / "data/example"
+    map_dir.mkdir(parents=True)
+    (map_dir / "lanelet2_map.osm").write_text("map\n")
+    gpu_dir = home / "data/gpu-model"
+    gpu_dir.mkdir(parents=True)
+    (gpu_dir / "model.onnx").write_text("model\n")
+
+    result = run_cli(root, ["clean", "example"])
+    assert result.returncode == 0, result.stderr
+    assert "sample-map: ok" in result.stdout
+    assert "gpu-model: ok" in result.stdout
+    assert map_dir.is_dir() and gpu_dir.is_dir()
+
+    result = run_cli(root, ["clean", "example", "--data"])
+    assert result.returncode == 0, result.stderr
+    assert f"removed data: {map_dir}" in result.stdout
+    assert f"removed data: {gpu_dir}" in result.stdout
+    assert not map_dir.exists()
+    assert not gpu_dir.exists()
+
+
+def test_clean_refuses_symlinked_data_target(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    outside = home / "real-data"
+    outside.mkdir(parents=True)
+    (outside / "lanelet2_map.osm").write_text("map\n")
+    (home / "data").mkdir(exist_ok=True)
+    link = home / "data/example"
+    link.symlink_to(outside)
+
+    result = run_cli(root, ["clean", "example", "--data"])
+    assert result.returncode != 0
+    assert "refusing to remove symlinked data" in result.stderr
+    assert link.is_symlink()
+    assert (outside / "lanelet2_map.osm").is_file()
+
+
+def test_clean_removes_file_target(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    (home / "data").mkdir(parents=True)
+    target = home / "data/example"
+    target.write_text("corrupted\n")
+
+    result = run_cli(root, ["clean", "example", "--data"])
+    assert result.returncode == 0, result.stderr
+    assert f"removed data: {target}" in result.stdout
+    assert not target.exists()
+
+
+def test_clean_without_deployment_prints_catalog(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["clean"])
+    assert result.returncode == 2
+    assert "error: deployment name required" in result.stderr
+    assert "openadkit clean <deployment> --data" in result.stderr
+    assert "example" in result.stdout

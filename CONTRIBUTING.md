@@ -4,9 +4,8 @@ Thank you for your interest in contributing to Open AD Kit. This project is part
 
 ## Quick Links
 
-- [Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and request features
-- [Discord](https://discord.gg/Q94UsPvReQ) — real-time discussion
-- [Discussions](https://github.com/autowarefoundation/openadkit/discussions) — design and Q&A
+- [Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and plan tasks
+- [Discord](https://discord.gg/Q94UsPvReQ) — questions, ideas, and design discussion
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## License
@@ -46,8 +45,8 @@ git ls-files '**/Dockerfile*' | xargs hadolint --config .hadolint.yaml
 # YAML files
 yamllint -c .yamllint.yaml \
   .github/workflows/ .github/actions/ .github/ISSUE_TEMPLATE/ \
-  .github/DISCUSSION_TEMPLATE/ .github/dependabot.yaml .github/stale.yml \
-  .github/sync-files.yaml deployments/ platforms/ mkdocs.yaml docs/
+  .github/dependabot.yaml .github/stale.yml \
+  deployments/ platforms/ mkdocs.yaml docs/
 
 # Markdown
 npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'

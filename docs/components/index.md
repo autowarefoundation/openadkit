@@ -1,6 +1,6 @@
 # Components
 
-Open AD Kit is a component-based project designed to run on a variety of platforms with containerized services. Each **Autoware function** remains independently deployable, while the published images group closely related functions together to keep the runtime layout simpler.
+Open AD Kit packages the Autoware stack as containerized services designed to run on a variety of platforms. Each **Autoware function** remains independently deployable, while the published images group closely related functions together to keep the runtime layout simpler.
 
 ## Architecture Overview
 
@@ -18,7 +18,7 @@ are documented in [Build from Source](../development/build-from-source.md).
 
 Autoware defines three formal interface categories that govern how components communicate:
 
-<div class="oak-component-grid">
+<div class="oak-component-grid oak-component-grid--three">
 
 <div class="oak-component-item">
 <strong>AD API</strong>
@@ -117,5 +117,5 @@ naming scheme.
 
 - [Deployments](../deployments/index.md) — How to compose components into running systems
 - [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
-- [Roadmap](../roadmap.md) — Release ladder and focus areas
+- [Roadmap](../roadmap.md) — Development phases and focus areas
 - [Supported Platforms](../platforms/index.md) — Where to deploy

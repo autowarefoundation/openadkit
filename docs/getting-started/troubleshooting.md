@@ -58,6 +58,10 @@ Recovery depends on the deployment:
 | `zenoh-bridge` | From the source root, run `./openadkit fetch scenario-simulation --force` to refresh its Kashiwanoha map. |
 | `carla-simulation` | Run `openadkit fetch carla-simulation --force` for the Town01 map. |
 
+To see what is missing before downloading anything, run
+`openadkit validate <deployment> --data`; it reports each data resource as
+`ok`, `missing`, or `incomplete`.
+
 ## Getting Help
 
 - [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues)

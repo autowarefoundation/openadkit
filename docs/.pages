@@ -3,7 +3,7 @@ nav:
     - index.md
     - Overview: overview.md
   - Getting Started: getting-started
-  - Deployment: deployments
+  - Deployments: deployments
   - Components: components
   - Platforms: platforms
   - Development: development

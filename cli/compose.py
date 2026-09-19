@@ -77,8 +77,11 @@ def capture_process(
             f"required command is not installed: {command[0]}"
         ) from error
     except subprocess.CalledProcessError as error:
+        detail = " ".join((error.stderr or "").split())
+        suffix = f": {detail}" if detail else ""
         raise OpenADKitError(
-            f"command failed with exit code {error.returncode}: {command[0]}"
+            f"command failed with exit code {error.returncode}: "
+            f"{command[0]}{suffix}"
         ) from error
 
 
@@ -130,7 +133,7 @@ def compose_capture(
 
 def require_docker() -> None:
     if not shutil.which("docker"):
-        raise OpenADKitError("Docker is unavailable. Run: ./openadkit setup")
+        raise OpenADKitError("Docker is unavailable. Run: openadkit setup")
 
 
 def _compose_ls_environment() -> dict[str, str]:
@@ -174,48 +177,6 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
         if key in wanted and state in LIVE_PROJECT_STATES:
             found.add(key)
     return [name for name in wanted if name in found]
-
-
-def _runtime_state_path(deployment: Deployment) -> Path:
-    return deployment.directory / ".cache" / "runtime.json"
-
-
-def save_runtime(deployment: Deployment, selection: Selection) -> None:
-    cache = deployment.directory / ".cache"
-    if cache.is_symlink() or (cache.exists() and not cache.is_dir()):
-        raise OpenADKitError(f"unsafe runtime cache path: {cache}")
-    cache.mkdir(exist_ok=True)
-    path = _runtime_state_path(deployment)
-    if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise OpenADKitError(f"unsafe runtime state path: {path}")
-    path.write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "rosDistro": selection.ros_distro,
-                "gpu": selection.gpu,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
-def load_runtime(deployment: Deployment) -> tuple[str, bool] | None:
-    path = _runtime_state_path(deployment)
-    if path.is_symlink() or not path.is_file():
-        return None
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(value, dict) or value.get("schemaVersion") != 1:
-        return None
-    ros_distro = value.get("rosDistro")
-    gpu = value.get("gpu")
-    if not isinstance(ros_distro, str) or not ros_distro or not isinstance(gpu, bool):
-        return None
-    return ros_distro, gpu
 
 
 def render(deployment: Deployment, selection: Selection) -> set[str]:

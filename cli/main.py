@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 
@@ -43,7 +44,7 @@ def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> N
     parser.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name from list; omit to list available",
+        help="curated deployment name; omit to print the catalog",
     )
     parser.add_argument(
         "--ros-distro",
@@ -74,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
             "  openadkit stop planning-simulation"
         ),
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        dest="show_version",
+        help="show version information and exit",
+    )
     subparsers = parser.add_subparsers(dest="command", parser_class=OpenADKitParser)
     subparsers.add_parser(
         "install", help="downloads and installs a release bundle"
@@ -84,13 +91,41 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "setup", help="installs Ubuntu host dependencies"
     )
-    subparsers.add_parser("list", help="list curated deployments")
-    subparsers.add_parser("version", help="show repository or release version")
+    subparsers.add_parser(
+        "uninstall", help="removes the installed release and its launcher"
+    )
+    list_parser = subparsers.add_parser("list", help="list curated deployments")
+    list_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="print machine-readable JSON",
+    )
+    version_parser = subparsers.add_parser(
+        "version", help="show repository or release version"
+    )
+    version_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="print machine-readable JSON",
+    )
 
     validate = subparsers.add_parser(
         "validate", help="validate a deployment without starting it"
     )
     add_run_arguments(validate)
+    validate.add_argument(
+        "--data",
+        action="store_true",
+        help="also check that the deployment's downloaded data is complete",
+    )
+    validate.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="print machine-readable JSON",
+    )
 
     fetch = subparsers.add_parser("fetch", help="download deployment data")
     add_run_arguments(fetch, gpu=False)
@@ -115,6 +150,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     for catalog in (validate, fetch, run):
         catalog.help_inventory = "catalog"
+
+    clean = subparsers.add_parser(
+        "clean", help="remove downloaded data for a deployment"
+    )
+    clean.add_argument(
+        "deployment",
+        nargs="?",
+        help="curated deployment name; omit to print the catalog",
+    )
+    clean.add_argument(
+        "--data",
+        action="store_true",
+        help="delete the deployment's downloaded data",
+    )
 
     status = subparsers.add_parser("status", help="show deployment status")
     status.add_argument(
@@ -156,26 +205,51 @@ def _print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
         )
 
 
-def list_deployments(root, kit, names: list[str] | None = None) -> int:
+def list_deployments(
+    root, kit, names: list[str] | None = None, *, json_output: bool = False
+) -> int:
     selected = list(kit.deployments if names is None else names)
     if not selected:
-        print("No deployments found.")
+        if json_output:
+            print(json.dumps({"schemaVersion": 1, "deployments": []}))
+        else:
+            print("No deployments found.")
         return 0
-    rows: list[tuple[str, ...]] = []
+    entries: list[dict[str, object]] = []
     for name in selected:
         try:
             deployment = get_deployment(root, kit, name)
-            rows.append(
-                (
-                    name,
-                    deployment_integrity(root, deployment, kit),
-                    deployment.requirements["gpu"],
-                    deployment.manifest["description"],
-                )
+            entries.append(
+                {
+                    "name": name,
+                    "kind": deployment_integrity(root, deployment, kit),
+                    "gpu": deployment.requirements["gpu"],
+                    "description": deployment.manifest["description"],
+                }
             )
         except OpenADKitError as error:
-            rows.append((name, "invalid", "", str(error).replace("\n", " ")))
-    _print_table(("NAME", "STATE", "GPU", "DESCRIPTION"), rows)
+            entries.append(
+                {
+                    "name": name,
+                    "kind": "invalid",
+                    "gpu": None,
+                    "description": None,
+                    "error": str(error).replace("\n", " "),
+                }
+            )
+    if json_output:
+        print(json.dumps({"schemaVersion": 1, "deployments": entries}))
+        return 0
+    rows = [
+        (
+            str(entry["name"]),
+            str(entry["kind"]),
+            "" if entry["gpu"] is None else str(entry["gpu"]),
+            str(entry.get("error") or entry.get("description") or ""),
+        )
+        for entry in entries
+    ]
+    _print_table(("NAME", "KIND", "GPU", "DESCRIPTION"), rows)
     return 0
 
 
@@ -195,10 +269,10 @@ def show_running(root, kit, command: str, running: list[str], *, extra: str = ""
     return 2
 
 
-def show_version(root, kit) -> int:
+def show_version(root, kit, *, json_output: bool = False) -> int:
     if kit.kind == "release":
-        print(f"Open AD Kit {kit.version or 'unknown'}")
-        print("bundle: release")
+        version = kit.version
+        commit = None
     else:
         result = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
@@ -206,8 +280,26 @@ def show_version(root, kit) -> int:
             text=True,
             check=False,
         )
+        version = None
+        commit = result.stdout.strip() or None
+    if json_output:
+        print(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "bundle": kit.kind,
+                    "version": version,
+                    "commit": commit,
+                }
+            )
+        )
+        return 0
+    if kit.kind == "release":
+        print(f"Open AD Kit {kit.version or 'unknown'}")
+        print("bundle: release")
+    else:
         print("Open AD Kit development")
-        print(f"commit: {result.stdout.strip() or 'unknown'}")
+        print(f"commit: {commit or 'unknown'}")
         print("bundle: repository")
     return 0
 
@@ -224,21 +316,26 @@ def print_run_next_steps(deployment, selection) -> None:
     print(f"running: {deployment.name}")
     if "visualizer" in selection.services:
         print("visualizer: https://localhost:6080/vnc.html")
-        print("password: REMOTE_PASSWORD in config.env")
+        print("password: REMOTE_PASSWORD (default openadkit; override in config.local.env)")
     print(f"stop with: openadkit stop {deployment.name}")
 
 
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.show_version:
+        root = root_path()
+        kit = load_kit(root)
+        return show_version(root, kit)
     if not args.command:
         parser.print_help()
         return 2
-    if args.command in ("install", "upgrade", "setup"):
+    if args.command in ("install", "upgrade", "setup", "uninstall"):
         usage = {
             "install": "openadkit install [--version vX.Y.Z] [--destination DIRECTORY] [--force]",
-            "upgrade": "openadkit upgrade",
+            "upgrade": "openadkit upgrade [--check]",
             "setup": "openadkit setup [--gpu] [--verify]",
+            "uninstall": "openadkit uninstall [--all]",
         }[args.command]
         print(f"error: run: {usage}", file=sys.stderr)
         return 2
@@ -247,14 +344,38 @@ def main() -> int:
     kit = load_kit(root)
 
     if args.command == "list":
-        return list_deployments(root, kit)
+        return list_deployments(root, kit, json_output=args.json_output)
     if args.command == "version":
-        return show_version(root, kit)
+        return show_version(root, kit, json_output=args.json_output)
+
+    if args.command == "clean":
+        if not args.deployment:
+            require_deployment_name("clean", "--data")
+            list_deployments(root, kit)
+            return 2
+        deployment = get_deployment(root, kit, args.deployment)
+        selection = deployment.select(kit, None, False, operational=True)
+        results = data.check_installed_data(
+            deployment, selection, include_gpu=True
+        )
+        if not args.data:
+            if not results:
+                print("no data resources declared")
+                return 0
+            for item in results:
+                print(
+                    f"{item['name']}: {item['status']} ({item['destination']})"
+                )
+            return 0
+        data.remove_installed_data(deployment, selection, include_gpu=True)
+        return 0
 
     if args.command in ("fetch", "validate", "run"):
         if not args.deployment:
             require_deployment_name(args.command)
-            list_deployments(root, kit)
+            list_deployments(
+                root, kit, json_output=getattr(args, "json_output", False)
+            )
             return 2
         deployment = get_deployment(root, kit, args.deployment)
         warn_if_modified(root, deployment, kit)
@@ -273,13 +394,53 @@ def main() -> int:
         configured_services = compose.render(deployment, selection)
         if args.command == "validate":
             mode = "gpu" if selection.gpu else "cpu"
-            print(f"valid: {deployment.name} ({selection.ros_distro}, {mode})")
+            results = (
+                data.check_installed_data(deployment, selection)
+                if args.data
+                else None
+            )
+            if args.json_output:
+                print(
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "deployment": deployment.name,
+                            "manifestValid": True,
+                            "rosDistro": selection.ros_distro,
+                            "gpu": selection.gpu,
+                            "dataValid": (
+                                None
+                                if results is None
+                                else all(item["status"] == "ok" for item in results)
+                            ),
+                            "data": [
+                                {"name": item["name"], "status": item["status"]}
+                                for item in results or []
+                            ],
+                        }
+                    )
+                )
+            else:
+                print(f"valid: {deployment.name} ({selection.ros_distro}, {mode})")
+                for item in results or []:
+                    print(
+                        f"data: {item['name']} {item['status']} "
+                        f"({item['destination']})"
+                    )
+            if results is not None and any(
+                item["status"] != "ok" for item in results
+            ):
+                print(
+                    "error: installed data is incomplete; run: "
+                    f"openadkit fetch {deployment.name} --force",
+                    file=sys.stderr,
+                )
+                return 1
             return 0
 
         compose.check_daemon(selection)
         data.install_data(deployment, selection, args.force)
         compose.start(deployment, selection, args.pull, configured_services)
-        compose.save_runtime(deployment, selection)
         print_run_next_steps(deployment, selection)
         return 0
 
@@ -295,9 +456,7 @@ def main() -> int:
         return show_running(root, kit, args.command, running, extra=extra)
     deployment = get_deployment(root, kit, args.deployment)
     warn_if_modified(root, deployment, kit)
-    saved = compose.load_runtime(deployment)
-    ros_distro, gpu = saved if saved else (None, False)
-    selection = deployment.select(kit, ros_distro, gpu, operational=True)
+    selection = deployment.select(kit, None, False, operational=True)
     if args.command == "status":
         compose.status(deployment, selection)
     elif args.command == "logs":

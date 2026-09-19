@@ -174,7 +174,7 @@ Before running the release pipeline, verify:
 
 The release workflow (`.github/workflows/release.yaml`) has seven jobs that run sequentially:
 
-1. **validate** — Downloads build metadata and scan results, then runs 14 validation gates before any images are tagged.
+1. **validate** — Downloads build metadata and scan results, then runs 15 validation gates before any images are tagged.
 2. **package-bundles** — Generates the immutable release plan and packages the
    unified Humble/Jazzy runtime bundle before any release state is published.
 3. **release-tag** — Creates or verifies the Git tag, failing closed on API errors or a conflicting commit.

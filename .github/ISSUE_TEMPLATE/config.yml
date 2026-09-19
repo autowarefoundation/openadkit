@@ -1,15 +1,5 @@
-# Config for discussion templates
-
 blank_issues_enabled: false
 contact_links:
-  - name: Question
-    url: https://github.com/autowarefoundation/openadkit/discussions/new?category=q-a
-    about: Ask a question
-
-  - name: Feature request
-    url: https://github.com/autowarefoundation/openadkit/discussions/new?category=feature-requests
-    about: Send a feature request
-
-  - name: Idea
-    url: https://github.com/autowarefoundation/openadkit/discussions/new?category=ideas
-    about: Post an idea
+  - name: Discord
+    url: https://discord.gg/Q94UsPvReQ
+    about: Questions, ideas, and design discussion

@@ -1,4 +1,4 @@
-# Deployment
+# Deployments
 
 A deployment combines Open AD Kit images, environment files, and Docker Compose
 configuration for a specific task.

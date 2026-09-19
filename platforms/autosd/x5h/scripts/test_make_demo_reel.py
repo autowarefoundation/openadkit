@@ -381,9 +381,20 @@ def test_clip_refuses_to_lose_the_fault(tmp_path):
     assert e.value.reason == "fault_uncovered"
 
 
-def test_the_built_in_cut_is_longer_than_three_minutes():
+def test_the_built_in_cut_runs_about_three_minutes():
     # The cut is a table meant to be tuned, but a cut nobody can sit through,
     # or one that is over before it explains anything, is a defect in the table
-    # rather than in the code. 20 fps, two 15 s cards.
-    n = len(m.timeline([m.Chapter(*c) for c in m.DEFAULT_CHAPTERS], fps=20)) + 2 * 15 * 20
-    assert 150 <= n / 20 <= 300
+    # rather than in the code. 20 fps, two 15 s cards, a 10 s card per chapter
+    # that has one.
+    chapters = [m.Chapter(*c) for c in m.DEFAULT_CHAPTERS]
+    n = (len(m.timeline(chapters, fps=20)) + 2 * 15 * 20
+         + 10 * 20 * sum(1 for c in chapters if c.intro))
+    assert 165 <= n / 20 <= 300
+
+
+def test_every_chapter_but_the_last_explains_itself():
+    # The explanation cards are the reason this reel is watchable by someone
+    # who has never seen the bench. Losing one to an edit would not fail
+    # anything else.
+    chapters = [m.Chapter(*c) for c in m.DEFAULT_CHAPTERS]
+    assert all(c.intro for c in chapters[:-1])

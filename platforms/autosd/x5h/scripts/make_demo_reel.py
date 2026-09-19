@@ -60,17 +60,40 @@ COUNT_TOLERANCE = 5
 # real material exists. --dry-run prints the resulting length, and a chapter
 # that reaches past the recorded material is clipped or dropped, with a note.
 #
-# This cut asks the recording for about 80 s of driving before the fault and
-# for the recorders to keep running about 55 s after it. Slower than 0.25x is
-# not worth asking for: the chase camera runs at 20 Hz, so at 0.25x each of its
-# frames already fills four output frames, and below that the pane visibly
-# steps instead of moving.
+# This cut asks the recording for about 70 s of driving before the fault, which
+# is DRIVE_S=70 in record-demo.sh. It asks for nothing after the gate's own 30 s
+# measuring window, because the bench recorders stop when run-d6.sh returns: a
+# chapter about the operator's reset would have no pictures in it.
+#
+# Slower than 0.25x is not worth asking for. The chase camera is capped by the
+# CARLA server's own 10 Hz step, so at 0.25x each of its frames already fills
+# eight output frames, and below that the pane visibly steps instead of moving.
+#
+# The explanation cards are what make this a 3 minute video rather than a 2
+# minute one. Padding the driving chapter would be the other way to get there,
+# and it would teach the viewer nothing.
 DEFAULT_CHAPTERS = [
-    ("normal driving: VisionPilot steers on the NPU", -75.0, -3.0, 1.0),
-    ("the fault: VisionPilot stops answering", -3.0, 1.0, 0.25),
-    ("the Safety Island brakes the car", 1.0, 11.0, 0.5),
-    ("the car is stopped", 11.0, 18.0, 1.0),
-    ("reset: VisionPilot is back", 22.0, 50.0, 1.0),
+    ("normal driving: VisionPilot steers on the NPU", -65.0, -3.0, 1.0, (
+        ("Top left: CARLA on the bench host, chasing the car.", 30),
+        ("Top right: what VisionPilot draws, rendered on the X5H board itself.", 30),
+        ("Bottom left: the CR52 Safety Island's own console.", 30),
+        ("Bottom right: the car's speed, and the commands it is given.", 30),
+        ("", 20),
+        ("The board has no clock the bench can read, so all four panes", 26),
+        ("are aligned on the fault instant, to within one rendered frame.", 26),
+    )),
+    ("the fault: VisionPilot stops answering", -3.0, 1.0, 0.25, (
+        ("VisionPilot sends the Safety Island a heartbeat over rpmsg.", 30),
+        ("The process is killed here. The heartbeat stops with it.", 30),
+        ("", 20),
+        ("Quarter speed from here, so the half second the CR52 waits", 26),
+        ("before it decides is long enough to watch.", 26),
+    )),
+    ("the Safety Island brakes the car", 1.0, 11.0, 0.5, (
+        ("The CR52 latches the stale heartbeat and takes the actuation path.", 30),
+        ("It commands a steady stop. Nothing on the Linux side is involved.", 30),
+    )),
+    ("the car is stopped", 11.0, 22.0, 1.0, ()),
 ]
 # Clipping a chapter shortens the reel. Clipping these two would remove the
 # event the reel exists to show, so they are refused instead.
@@ -91,6 +114,8 @@ class Chapter:
     t0: float
     t1: float
     speed: float
+    # Lines of an explanation card shown before the chapter, as (text, size).
+    intro: tuple = ()
 
 
 @dataclass
@@ -327,7 +352,7 @@ def clip_chapters(chapters, run):
             continue
         if (t0, t1) != (ch.t0, ch.t1):
             notes.append(f"clipped={ch.name!r} to {t0:.1f}..{t1:.1f}")
-        kept.append(Chapter(ch.name, t0, t1, ch.speed))
+        kept.append(Chapter(ch.name, t0, t1, ch.speed, ch.intro))
     if not kept:
         raise ReelError("nothing_covered")
     return kept, notes
@@ -515,6 +540,18 @@ def chapter_frames(run, chapters, fps):
     return frames
 
 
+def write_frames(sink, img, n):
+    """One picture, n times, straight down the pipe.
+
+    Rendering the whole reel into a list first is the obvious way to write this
+    and it does not fit in memory: three thousand output frames of 1920x1080
+    RGB is about 18 GB.
+    """
+    raw = img.tobytes()
+    for _ in range(n):
+        sink.write(raw)
+
+
 def parse_chapter(spec):
     parts = spec.split(":")
     if len(parts) != 4:
@@ -531,6 +568,8 @@ def main(argv=None):
     p.add_argument("--out", default="reel.mp4")
     p.add_argument("--fps", type=int, default=20)
     p.add_argument("--card-seconds", type=float, default=15.0)
+    p.add_argument("--intro-seconds", type=float, default=10.0,
+                   help="how long each chapter's explanation card is held")
     p.add_argument("--chapter", action="append", default=[],
                    help="NAME:T0:T1:SPEED, repeatable, replaces the built-in cut")
     p.add_argument("--dry-run", action="store_true",
@@ -545,7 +584,9 @@ def main(argv=None):
         check_console_covers(run.console,
                              run.fault_at + frames[0][0], run.fault_at + frames[-1][0])
         card_frames = int(a.card_seconds * a.fps)
-        total = len(frames) + 2 * card_frames
+        intro_frames = int(a.intro_seconds * a.fps)
+        total = (len(frames) + 2 * card_frames
+                 + intro_frames * sum(1 for ch in chapters if ch.intro))
         for note in notes:
             print(f"DEMO_REEL_CLIP {note}")
         if a.dry_run:
@@ -553,12 +594,13 @@ def main(argv=None):
                   f"chapters={len(chapters)}")
             return 0
         proc = subprocess.Popen(ffmpeg_argv(a.out, a.fps), stdin=subprocess.PIPE)
-        for img, n in ((title_card(run), card_frames),
-                       *[(render_frame(run, t, ch), 1) for t, ch in frames],
-                       (closing_card(run), card_frames)):
-            raw = img.tobytes()
-            for _ in range(n):
-                proc.stdin.write(raw)
+        write_frames(proc.stdin, title_card(run), card_frames)
+        for ch in chapters:
+            if ch.intro:
+                write_frames(proc.stdin, _card(list(ch.intro), ch.name), intro_frames)
+            for t in timeline([ch], a.fps):
+                write_frames(proc.stdin, render_frame(run, t, ch), 1)
+        write_frames(proc.stdin, closing_card(run), card_frames)
         proc.stdin.close()
         if proc.wait() != 0:
             raise ReelError("ffmpeg_failed", f"exit {proc.returncode}")

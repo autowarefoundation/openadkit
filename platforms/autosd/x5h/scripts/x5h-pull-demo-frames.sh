@@ -18,10 +18,14 @@
 # select the wrong lines with great confidence. The journal is sliced at the
 # last unit start instead, which is a position in the file rather than a time.
 #
-# tar over ssh rather than rsync: the AutoSD board image ships no rsync.
+# rsync, not tar over ssh. Board-checked on board 2, 2026-09-18: the AutoSD
+# board image ships rsync, cpio, gzip and xz, and ships NO tar, no scp, no
+# sftp-server and no python3. A tar pipeline dies there with "tar: command not
+# found" and an empty stream, which reads as an empty recording.
 set -uo pipefail
 BOARD="${X5H_BOARD:-root@192.168.0.20}"
 SSH="${SSH:-ssh}"
+RSYNC="${RSYNC:-rsync}"
 VIDEO_DIR="${X5H_VIDEO_DIR:-/opt/npu/video/hud}"
 UNIT=x5h-vp
 
@@ -55,8 +59,8 @@ printf '%s\n' "$journal" > "$hud/vp-journal.txt" || fail journal_unwritable
 frames=$(grep -c "Latency.*wall=" <<<"$journal")
 [ "$frames" -gt 0 ] || fail no_hud_frames
 
-"$SSH" "$BOARD" "tar -C $(dirname "$VIDEO_DIR") -cf - $(basename "$VIDEO_DIR")" \
-    | tar -C "$hud" --strip-components=1 -xf - || fail tar_failed
+"$RSYNC" -a --include='frame_*.png' --exclude='*' \
+    "$BOARD:$VIDEO_DIR/" "$hud/" || fail rsync_failed
 pngs=$(find "$hud" -name 'frame_*.png' -type f | wc -l)
 [ "$pngs" -gt 0 ] || fail no_pngs "$VIDEO_DIR"
 

@@ -17,11 +17,19 @@ cat > "$tmp/ssh" <<'EOF'
 # $1 is the board, $2 the remote command.
 case "$2" in
   journalctl*) cat "$JOURNAL" ;;
-  tar*) tar -C "$PNGDIR" -cf - hud ;;
   *) exit 1 ;;
 esac
 EOF
-chmod +x "$tmp/ssh"
+# The board ships rsync and no tar, so the pull is an rsync and the fake is a
+# local copy. $1 and $2 are the rsync flags, $3 the remote source, $4 the
+# destination.
+cat > "$tmp/rsync" <<'EOF'
+#!/bin/sh
+eval dst=\${$#}
+cp "$PNGDIR"/hud/*.png "$dst" 2>/dev/null
+exit 0
+EOF
+chmod +x "$tmp/ssh" "$tmp/rsync"
 
 latency='board podman[1]: [VP] Latency  pre=1.8 ms  wall=23.6 ms  42 fps'
 make_journal() {  # make_journal <starts> <frames-after-last-start>
@@ -41,7 +49,7 @@ make_pngs() {  # make_pngs <n>
 }
 run() {
     rm -rf "${tmp:?}/run"; mkdir -p "$tmp/run"
-    JOURNAL="$tmp/journal" PNGDIR="$tmp/board" SSH="$tmp/ssh" X5H_BOARD=fake \
+    JOURNAL="$tmp/journal" PNGDIR="$tmp/board" SSH="$tmp/ssh" RSYNC="$tmp/rsync" X5H_BOARD=fake \
         bash "$s" "$tmp/run"
 }
 
@@ -78,7 +86,7 @@ out=$(run) && fail count_mismatch_accepted
 case "$out" in DEMO_FRAMES_FAIL\ reason=frame_count*) ;; *) fail "count_reason out=$out" ;; esac
 
 # No run directory at all.
-out=$(JOURNAL="$tmp/journal" PNGDIR="$tmp/board" SSH="$tmp/ssh" X5H_BOARD=fake \
+out=$(JOURNAL="$tmp/journal" PNGDIR="$tmp/board" SSH="$tmp/ssh" RSYNC="$tmp/rsync" X5H_BOARD=fake \
     bash "$s" "$tmp/nope") && fail missing_dir_accepted
 case "$out" in DEMO_FRAMES_FAIL\ reason=no_run_dir*) ;; *) fail "dir_reason out=$out" ;; esac
 

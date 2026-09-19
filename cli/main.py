@@ -91,6 +91,11 @@ def build_parser() -> argparse.ArgumentParser:
         "validate", help="validate a deployment without starting it"
     )
     add_run_arguments(validate)
+    validate.add_argument(
+        "--data",
+        action="store_true",
+        help="also check that the deployment's downloaded data is complete",
+    )
 
     fetch = subparsers.add_parser("fetch", help="download deployment data")
     add_run_arguments(fetch, gpu=False)
@@ -274,6 +279,20 @@ def main() -> int:
         if args.command == "validate":
             mode = "gpu" if selection.gpu else "cpu"
             print(f"valid: {deployment.name} ({selection.ros_distro}, {mode})")
+            if args.data:
+                results = data.check_installed_data(deployment, selection)
+                for item in results:
+                    print(
+                        f"data: {item['name']} {item['status']} "
+                        f"({item['destination']})"
+                    )
+                if any(item["status"] != "ok" for item in results):
+                    print(
+                        "error: installed data is incomplete; run: "
+                        f"openadkit fetch {deployment.name} --force",
+                        file=sys.stderr,
+                    )
+                    return 1
             return 0
 
         compose.check_daemon(selection)

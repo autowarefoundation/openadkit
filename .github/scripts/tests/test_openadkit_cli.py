@@ -1879,3 +1879,93 @@ def test_carla_is_humble_only():
     )
     assert result.returncode != 0
     assert "does not support ROS distro jazzy" in result.stderr
+
+
+def test_validate_data_reports_missing_incomplete_and_ok(tmp_path):
+    resource = {
+        "name": "sample-map",
+        "kind": "files",
+        "destinationEnv": "MAP_PATH",
+        "files": [
+            {
+                "path": "lanelet2_map.osm",
+                "url": "http://example.invalid/lanelet2_map.osm",
+                "sha256": "0" * 64,
+            }
+        ],
+        "requiredFiles": ["lanelet2_map.osm"],
+    }
+    manifest = minimal_manifest(data=[resource])
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    target = root.parent / "home" / "data" / "example"
+
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "valid: example (humble, cpu)" in result.stdout
+    assert "data: sample-map missing" in result.stdout
+
+    target.mkdir(parents=True)
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: sample-map incomplete" in result.stdout
+
+    (target / "lanelet2_map.osm").write_text("map\n")
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "data: sample-map ok" in result.stdout
+
+    result = run_cli(root, ["validate", "example"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "data:" not in result.stdout
+
+
+def test_validate_data_respects_gpu_selection(tmp_path):
+    resources = [
+        {
+            "name": "cpu-model",
+            "kind": "files",
+            "destinationEnv": "MAP_PATH",
+            "files": [
+                {
+                    "path": "model.bin",
+                    "url": "http://example.invalid/model.bin",
+                    "sha256": "0" * 64,
+                }
+            ],
+            "requiredFiles": ["model.bin"],
+        },
+        {
+            "name": "gpu-model",
+            "kind": "files",
+            "destinationEnv": "GPU_MODEL_PATH",
+            "gpu": True,
+            "files": [
+                {
+                    "path": "model.onnx",
+                    "url": "http://example.invalid/model.onnx",
+                    "sha256": "1" * 64,
+                }
+            ],
+            "requiredFiles": ["model.onnx"],
+        },
+    ]
+    manifest = minimal_manifest(data=resources)
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: cpu-model missing" in result.stdout
+    assert "gpu-model" not in result.stdout
+
+    result = run_cli(root, ["validate", "example", "--data", "--gpu"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: gpu-model missing" in result.stdout

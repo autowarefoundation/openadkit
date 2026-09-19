@@ -191,6 +191,30 @@ def validate_destinations(
         resolve_destination(resource, selection)
 
 
+def check_installed_data(
+    deployment: Deployment,
+    selection: Selection,
+    *,
+    include_gpu: bool | None = None,
+) -> list[dict[str, Any]]:
+    """Report presence and completeness for each selected data resource."""
+    results: list[dict[str, Any]] = []
+    for resource in selected_resources(
+        deployment, selection, include_gpu=include_gpu
+    ):
+        target = resolve_destination(resource, selection)
+        if validate_dataset(target, resource["requiredFiles"]):
+            status = "ok"
+        elif target.exists() or target.is_symlink():
+            status = "incomplete"
+        else:
+            status = "missing"
+        results.append(
+            {"name": resource["name"], "destination": target, "status": status}
+        )
+    return results
+
+
 def validate_install_targets(
     deployment: Deployment,
     selection: Selection,

@@ -18,7 +18,7 @@ are documented in [Build from Source](../development/build-from-source.md).
 
 Autoware defines three formal interface categories that govern how components communicate:
 
-<div class="oak-component-grid">
+<div class="oak-component-grid oak-component-grid--three">
 
 <div class="oak-component-item">
 <strong>AD API</strong>

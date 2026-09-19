@@ -31,7 +31,7 @@ The deployment layer for the <a href="https://github.com/autowarefoundation/auto
 :material-rocket-outline:{ .oak-card-icon }
 
 <p class="oak-card-title" role="heading" aria-level="3">Deployments</p>
-<p>Ready-to-run deployments for simulation and AD stacks.</p>
+<p>Ready-to-run deployments for simulation and autonomous driving stacks.</p>
 <a href="deployments/" class="md-button">View Deployments</a>
 </div>
 

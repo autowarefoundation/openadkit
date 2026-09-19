@@ -74,15 +74,15 @@ A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, 
 
 ## ROS 2 Distro Support
 
-| Distro | Status at v2.0 |
+| Distro | Planned status at v2.0 |
 |--------|----------------|
 | **Humble** | Default, documented path. |
 | **Jazzy** | Built and published **in parallel** wherever the `amd64`+`arm64` matrix is green. |
 
-Each release bundle carries digest-pinned Humble and Jazzy component maps and
-selects one at runtime with `--ros-distro`. Humble remains the default. Distro
-support tracks the upstream ROS 2 lifecycle; a distro is supported by Open AD
-Kit only while it is supported upstream.
+The v2.0 release bundle will carry digest-pinned Humble and Jazzy component
+maps and select one at runtime with `--ros-distro`. Humble remains the default.
+Distro support tracks the upstream ROS 2 lifecycle; a distro is supported by
+Open AD Kit only while it is supported upstream.
 
 ## What "Supported" Means
 

@@ -1119,6 +1119,54 @@ x5h-ces2027-demo.sh reset                 # VisionPilot back, fault cleared
 Bringing the stack up is `docker compose`'s job. This script only prints the two commands
 the operator (or the `demo` container) needs.
 
+### Recording the demo reel
+
+The reel is one recording of the `kill` route, composed into a four-pane video of about
+three minutes. The four panes are the CARLA chase camera, VisionPilot's own HUD rendered on
+the board, the CR52 console, and the speed and command trace. The reel explains the demo.
+**It is not a gate** and it carries no gate number. It is recorded in its own run. The
+instruments it adds must never land on gate D5's 23.6 ms or gate D6's 700 ms budget.
+
+Design: `claude-memory/autowarefoundation/openadkit/specs/2026-09-18-ces2027-demo-reel-design.md`.
+
+**The board image has to be rebuilt first.** The demo image is built from
+`feat/x5h-carla-npu`, which carries no frame-recorder sink. On that image `record_dir` is
+read by nothing, and a recording run records silently nothing.
+`feat/x5h-carla-npu-recorder` is that ref with `feat/frame-recorder-sink` merged into it.
+Build it **on board 2**. The build context carries the vendor ORT library, which is NDA
+material and must never reach CI, CI logs or CI artifacts.
+
+```
+components/demo/prepare-vp-context.sh <ort-overlay> /tmp/vp-ctx
+podman build --platform linux/arm64 -f components/demo/visionpilot-x5h.containerfile \
+  --build-arg VP_REF=feat/x5h-carla-npu-recorder -t localhost/x5h-visionpilot:recording /tmp/vp-ctx
+```
+
+For the recording session only, stage `components/demo/vision_pilot.capture.conf` over
+`/etc/containers/systemd/vision_pilot.conf`. Point `x5h-vp.container` at the `:recording`
+tag, and empty `/opt/npu/video/hud`. Read the free space with `stat -f /opt/npu`, never
+with `df`. On this filesystem `df` reports 0 available while hundreds of megabytes are free
+to root. Budget about 1.5 GB.
+
+On the bench, with the `tio` capture of the CR52 console already running:
+
+```
+DRIVE_S=70 Simulation/CARLA/ROS2/si/record-demo.sh <carla-pkg>   # DEMO_REC_DONE streams=5 dir=<run>
+scripts/x5h-pull-demo-frames.sh <run>                            # DEMO_FRAMES_PULLED n=<frames>
+scripts/make_demo_reel.py <run> --dry-run                        # DEMO_REEL_PLAN frames=... seconds=...
+scripts/make_demo_reel.py <run> --out reel.mp4                   # DEMO_REEL_WRITTEN
+```
+
+`DRIVE_S=70` is what the built-in cut asks for. A shorter run is not wasted. The composer
+clips each chapter to the material that exists. It prints one `DEMO_REEL_CLIP` line per
+chapter it shortened or dropped, and it refuses outright when the fault is not covered.
+
+Put the shipped `vision_pilot.conf` back afterwards, so the next gate run measures the
+image the gates were passed on.
+
+**Before the file leaves the bench, watch it.** The console pane shows real firmware output.
+No Renesas path, SDK directory or firmware blob name stays legible on screen.
+
 ### Gates
 
 | Gate | Pass criteria | Deviation |

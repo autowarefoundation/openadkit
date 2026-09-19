@@ -2419,6 +2419,8 @@ not installed, omit <code>--force</code>. Source checkouts update with <code>git
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>uninstall<span class="w">          </span><span class="c1"># keep previously installed versions</span>
 openadkit<span class="w"> </span>uninstall<span class="w"> </span>--all<span class="w">    </span><span class="c1"># remove kept versions too</span>
 </code></pre></div>
+<p>Any <code>config.local.env</code> overrides inside the version directory are removed with
+it; downloaded data is kept.</p>
 <p>Downloaded data (maps, rosbag samples, and perception models) lives under
 <code>~/autoware_map</code> and <code>~/autoware_data</code> and is not removed by <code>uninstall</code>. Inspect
 what a deployment has installed and delete it with:</p>

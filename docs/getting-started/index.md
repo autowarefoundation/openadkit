@@ -152,7 +152,13 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 
 ## Upgrading
 
-Once a release is installed, it upgrades to the latest stable version with:
+Once a release is installed, check whether a newer stable version exists:
+
+```bash
+openadkit upgrade --check
+```
+
+Then upgrade to the latest stable version with:
 
 ```bash
 openadkit upgrade
@@ -170,6 +176,28 @@ openadkit install --version vOLD --force
 not installed, omit `--force`. Source checkouts update with `git pull` or
 `git checkout` instead.
 
+## Uninstall and Cleanup
+
+Remove the installed release and its launcher:
+
+```bash
+openadkit uninstall          # keep previously installed versions
+openadkit uninstall --all    # remove kept versions too
+```
+
+Downloaded data (maps, rosbag samples, and perception models) lives under
+`~/autoware_map` and `~/autoware_data` and is not removed by `uninstall`. Inspect
+what a deployment has installed and delete it with:
+
+```bash
+openadkit clean planning-simulation            # report only
+openadkit clean planning-simulation --data     # delete
+```
+
+Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
+shared with the standalone Zenoh bridge; if it is removed, restore it with
+`openadkit fetch scenario-simulation --force`.
+
 ## Runtime Controls
 
 ```bash
@@ -177,6 +205,17 @@ openadkit status planning-simulation
 openadkit logs planning-simulation --follow
 openadkit stop planning-simulation
 ```
+
+Check a deployment's configuration and downloaded data before running it:
+
+```bash
+openadkit validate planning-simulation --data
+```
+
+`--data` reports each data resource as `ok`, `missing`, or `incomplete` and
+fails when something is missing; without it, `validate` checks only the manifest
+and Compose configuration. `list`, `version`, and `validate` also accept
+`--json` for scripting.
 
 Use `deployments/<name>/config.local.env` for host-specific settings. Source
 checkouts also accept component image overrides there; release component refs

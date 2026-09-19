@@ -266,11 +266,13 @@ def test_command_surface_is_exact():
         "install",
         "upgrade",
         "setup",
+        "uninstall",
         "list",
         "version",
         "validate",
         "fetch",
         "run",
+        "clean",
         "status",
         "logs",
         "stop",
@@ -1972,7 +1974,7 @@ def test_validate_data_respects_gpu_selection(tmp_path):
 
 
 def test_usage_errors_exit_with_code_two():
-    for command in ("install", "upgrade", "setup"):
+    for command in ("install", "upgrade", "setup", "uninstall"):
         result = subprocess.run(
             [str(ENTRYPOINT), command, "--nope"],
             text=True,
@@ -1992,7 +1994,9 @@ def test_version_flag_reports_bundle():
 def test_entrypoint_help_documents_handled_command_flags():
     checks = {
         "install": ("--version", "--destination", "--force"),
+        "upgrade": ("--check",),
         "setup": ("--gpu", "--verify"),
+        "uninstall": ("--all",),
     }
     for command, flags in checks.items():
         result = subprocess.run(
@@ -2101,3 +2105,226 @@ def test_catalog_json_stays_parseable_without_deployment(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["deployments"][0]["name"] == "example"
     assert "deployment name required" in result.stderr
+
+
+def run_installed_command(home, destination, version, bin_dir, *args):
+    env = os.environ | {"HOME": str(home)}
+    if bin_dir is not None:
+        env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+    return subprocess.run(
+        [str(destination / f"openadkit-{version}" / "openadkit"), *args],
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+
+
+def test_upgrade_check_reports_available_without_installing(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.3.0")
+    result = run_installed_command(
+        home, destination, "v1.2.3", latest_bin, "upgrade", "--check"
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Upgrade available: v1.2.3 -> v1.3.0" in result.stdout
+    assert not (destination / "openadkit-v1.3.0").exists()
+    launcher = home / ".local/bin/openadkit"
+    assert launcher.resolve() == destination / "openadkit-v1.2.3/openadkit"
+
+
+def test_upgrade_check_reports_up_to_date(tmp_path):
+    home, destination, bin_dir = install_standalone(tmp_path, "v1.2.3")
+    result = run_installed_command(
+        home, destination, "v1.2.3", bin_dir, "upgrade", "--check"
+    )
+    assert result.returncode == 0, result.stderr
+    assert "up to date: v1.2.3" in result.stdout
+
+
+def test_uninstall_removes_active_release_and_launcher(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    result = run_installed_command(home, destination, "v1.2.3", None, "uninstall")
+    assert result.returncode == 0, result.stderr
+    assert not (destination / "openadkit-v1.2.3").exists()
+    assert not launcher.exists()
+
+
+def test_uninstall_all_removes_kept_releases(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    _, latest_bin = standalone_release(base, version="v1.3.0")
+    upgrade = run_installed_upgrade(home, destination, "v1.2.3", latest_bin)
+    assert upgrade.returncode == 0, upgrade.stderr
+    assert (destination / "openadkit-v1.2.3").is_dir()
+
+    result = run_installed_command(home, destination, "v1.3.0", None, "uninstall", "--all")
+    assert result.returncode == 0, result.stderr
+    assert not (destination / "openadkit-v1.3.0").exists()
+    assert not (destination / "openadkit-v1.2.3").exists()
+    assert not (home / ".local/bin/openadkit").exists()
+
+
+def test_uninstall_rejects_non_symlink_launcher(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    launcher.unlink()
+    launcher.write_text("#!/usr/bin/env bash\nexit 0\n")
+    result = run_installed_command(home, destination, "v1.2.3", None, "uninstall")
+    assert result.returncode != 0
+    assert "refusing to remove non-symlink launcher" in result.stderr
+    assert (destination / "openadkit-v1.2.3/openadkit").is_file()
+
+
+def test_uninstall_rejects_foreign_launcher(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    base = tmp_path / "latest"
+    base.mkdir()
+    release, _ = standalone_release(base, version="v1.3.0")
+    extracted = tmp_path / "manual-extract"
+    with tarfile.open(release / "openadkit-v1.3.0.tar.gz") as archive:
+        archive.extractall(extracted, filter="data")
+    result = subprocess.run(
+        [str(extracted / "openadkit-v1.3.0" / "openadkit"), "uninstall"],
+        env=os.environ | {"HOME": str(home), "PATH": os.environ["PATH"]},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "active installation is not" in result.stderr
+    assert (destination / "openadkit-v1.2.3").is_dir()
+
+
+def test_uninstall_rejects_repository_checkout(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = subprocess.run(
+        [str(root / "openadkit"), "uninstall"],
+        cwd=root,
+        env=os.environ | {"HOME": str(tmp_path / "home")},
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "uninstall is for release installs" in result.stderr
+
+
+def test_uninstall_requires_an_install():
+    result = subprocess.run(
+        ["bash", "-s", "--", "uninstall"],
+        input=ENTRYPOINT.read_text(),
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert "Open AD Kit is not installed" in result.stderr
+
+
+def _clean_manifest():
+    resources = [
+        {
+            "name": "sample-map",
+            "kind": "files",
+            "destinationEnv": "MAP_PATH",
+            "files": [
+                {
+                    "path": "lanelet2_map.osm",
+                    "url": "http://example.invalid/map",
+                    "sha256": "0" * 64,
+                }
+            ],
+            "requiredFiles": ["lanelet2_map.osm"],
+        },
+        {
+            "name": "gpu-model",
+            "kind": "files",
+            "destinationEnv": "GPU_MODEL_PATH",
+            "gpu": True,
+            "files": [
+                {
+                    "path": "model.onnx",
+                    "url": "http://example.invalid/model",
+                    "sha256": "1" * 64,
+                }
+            ],
+            "requiredFiles": ["model.onnx"],
+        },
+    ]
+    manifest = minimal_manifest(data=resources)
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    return manifest
+
+
+def test_clean_lists_and_removes_all_declared_data(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    map_dir = home / "data/example"
+    map_dir.mkdir(parents=True)
+    (map_dir / "lanelet2_map.osm").write_text("map\n")
+    gpu_dir = home / "data/gpu-model"
+    gpu_dir.mkdir(parents=True)
+    (gpu_dir / "model.onnx").write_text("model\n")
+
+    result = run_cli(root, ["clean", "example"])
+    assert result.returncode == 0, result.stderr
+    assert "sample-map: ok" in result.stdout
+    assert "gpu-model: ok" in result.stdout
+    assert map_dir.is_dir() and gpu_dir.is_dir()
+
+    result = run_cli(root, ["clean", "example", "--data"])
+    assert result.returncode == 0, result.stderr
+    assert f"removed data: {map_dir}" in result.stdout
+    assert f"removed data: {gpu_dir}" in result.stdout
+    assert not map_dir.exists()
+    assert not gpu_dir.exists()
+
+
+def test_clean_refuses_symlinked_data_target(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    outside = home / "real-data"
+    outside.mkdir(parents=True)
+    (outside / "lanelet2_map.osm").write_text("map\n")
+    (home / "data").mkdir(exist_ok=True)
+    link = home / "data/example"
+    link.symlink_to(outside)
+
+    result = run_cli(root, ["clean", "example", "--data"])
+    assert result.returncode != 0
+    assert "refusing to remove symlinked data" in result.stderr
+    assert link.is_symlink()
+    assert (outside / "lanelet2_map.osm").is_file()
+
+
+def test_clean_removes_file_target(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    (home / "data").mkdir(parents=True)
+    target = home / "data/example"
+    target.write_text("corrupted\n")
+
+    result = run_cli(root, ["clean", "example", "--data"])
+    assert result.returncode == 0, result.stderr
+    assert f"removed data: {target}" in result.stdout
+    assert not target.exists()
+
+
+def test_clean_without_deployment_prints_catalog(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["clean"])
+    assert result.returncode == 2
+    assert "error: deployment name required" in result.stderr
+    assert "openadkit clean <deployment> --data" in result.stderr
+    assert "example" in result.stdout

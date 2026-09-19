@@ -152,7 +152,7 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 
 ## Upgrading
 
-An installed release upgrades to the latest stable version with:
+Once a release is installed, it upgrades to the latest stable version with:
 
 ```bash
 openadkit upgrade

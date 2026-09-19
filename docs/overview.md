@@ -70,7 +70,7 @@ provide authentication or encryption.
 6. [**Control**](components/planning-control.md) converts that trajectory into throttle, brake, and steering commands.
 7. [**Vehicle System**](components/vehicle-system.md) bridges those commands to the actual vehicle or simulator.
 
-A **deployment** combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. For the full picture, see [Components](components/index.md) and [Deployments](deployments/index.md).
+A **deployment** combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. Autoware Safety Island integrates with the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services. For the full picture, see [Components](components/index.md) and [Deployments](deployments/index.md).
 
 ## Related
 

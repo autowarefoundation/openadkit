@@ -2,7 +2,7 @@
 
 Open AD Kit matures in four phases between May 2026 and May 2027, with a CES 2027 demo milestone.
 
-## Phases
+## Phases and Milestones
 
 | Phase | Status | Focus |
 |-------|--------|-------|

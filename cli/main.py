@@ -91,6 +91,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "setup", help="installs Ubuntu host dependencies"
     )
+    subparsers.add_parser(
+        "uninstall", help="removes the installed release and its launcher"
+    )
     list_parser = subparsers.add_parser("list", help="list curated deployments")
     list_parser.add_argument(
         "--json",
@@ -147,6 +150,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     for catalog in (validate, fetch, run):
         catalog.help_inventory = "catalog"
+
+    clean = subparsers.add_parser(
+        "clean", help="remove downloaded data for a deployment"
+    )
+    clean.add_argument(
+        "deployment",
+        nargs="?",
+        help="curated deployment name; omit to print the catalog",
+    )
+    clean.add_argument(
+        "--data",
+        action="store_true",
+        help="delete the deployment's downloaded data",
+    )
 
     status = subparsers.add_parser("status", help="show deployment status")
     status.add_argument(
@@ -313,11 +330,12 @@ def main() -> int:
     if not args.command:
         parser.print_help()
         return 2
-    if args.command in ("install", "upgrade", "setup"):
+    if args.command in ("install", "upgrade", "setup", "uninstall"):
         usage = {
             "install": "openadkit install [--version vX.Y.Z] [--destination DIRECTORY] [--force]",
-            "upgrade": "openadkit upgrade",
+            "upgrade": "openadkit upgrade [--check]",
             "setup": "openadkit setup [--gpu] [--verify]",
+            "uninstall": "openadkit uninstall [--all]",
         }[args.command]
         print(f"error: run: {usage}", file=sys.stderr)
         return 2
@@ -329,6 +347,28 @@ def main() -> int:
         return list_deployments(root, kit, json_output=args.json_output)
     if args.command == "version":
         return show_version(root, kit, json_output=args.json_output)
+
+    if args.command == "clean":
+        if not args.deployment:
+            require_deployment_name("clean", "--data")
+            list_deployments(root, kit)
+            return 2
+        deployment = get_deployment(root, kit, args.deployment)
+        selection = deployment.select(kit, None, False, operational=True)
+        results = data.check_installed_data(
+            deployment, selection, include_gpu=True
+        )
+        if not args.data:
+            if not results:
+                print("no data resources declared")
+                return 0
+            for item in results:
+                print(
+                    f"{item['name']}: {item['status']} ({item['destination']})"
+                )
+            return 0
+        data.remove_installed_data(deployment, selection, include_gpu=True)
+        return 0
 
     if args.command in ("fetch", "validate", "run"):
         if not args.deployment:

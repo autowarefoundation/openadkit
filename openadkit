@@ -40,12 +40,14 @@ EOF
 
 upgrade_usage() {
   cat <<'EOF'
-Usage: openadkit upgrade
+Usage: openadkit upgrade [--check]
 
 Upgrades an installed release to the latest stable Open AD Kit release. The
 previous version is kept under the install destination for rollback with
 `openadkit install --version vX.Y.Z --force`; the kept directory must be
 replaced. Source checkouts update with git pull or git checkout instead.
+
+  --check  report whether an upgrade is available without installing it
 EOF
 }
 
@@ -308,17 +310,22 @@ install_openadkit() {
 
 upgrade_openadkit() {
   local kit_fields kit_kind current_version destination relationship launcher_path
+  local check_only=false
 
-  if [[ ${1:-} == -h || ${1:-} == --help ]]; then
-    upgrade_usage
-    return 0
-  fi
-  (($# == 0)) || usage_fail "unknown upgrade option: $1"
+  while (($#)); do
+    case "$1" in
+      --check) check_only=true ;;
+      -h|--help)
+        upgrade_usage
+        return 0
+        ;;
+      *) usage_fail "unknown upgrade option: $1" ;;
+    esac
+    shift
+  done
 
   require_command curl
   require_command python3
-  require_command sha256sum
-  require_command tar
 
   [[ -f "$SCRIPT_DIR/openadkit.json" ]] \
     || fail 'Open AD Kit is not installed. Run: openadkit install'
@@ -377,12 +384,117 @@ PY
     *) fail "unexpected release version comparison: ${relationship}" ;;
   esac
 
+  if [[ $check_only == true ]]; then
+    printf 'Upgrade available: %s -> %s\n' "$current_version" "$RESOLVED_VERSION"
+    return 0
+  fi
+
+  require_command sha256sum
+  require_command tar
+
   # Force replacement so a version directory left behind by a rollback or a
   # previous install is re-verified and reinstalled instead of failing.
   install_resolved_release \
     "$RESOLVED_VERSION" "$RESOLVED_ARCHIVE" "$RESOLVED_SHA256" "$destination" true false
   printf 'Upgraded %s -> %s (previous version kept at %s)\n' \
     "$current_version" "$RESOLVED_VERSION" "${destination}/openadkit-${current_version}"
+}
+
+uninstall_usage() {
+  cat <<'EOF'
+Usage: openadkit uninstall [--all]
+
+Removes the active Open AD Kit release installation and its launcher.
+Downloaded data is not touched.
+
+  --all  also remove previously kept releases in the install destination
+
+Run `openadkit clean <deployment> --data` before uninstalling if you also
+want to delete downloaded data such as maps and perception models.
+EOF
+}
+
+uninstall_openadkit() {
+  local kit_fields kit_kind current_version active_root destination
+  local launcher_path candidate name
+  local all=false
+
+  while (($#)); do
+    case "$1" in
+      --all) all=true ;;
+      -h|--help)
+        uninstall_usage
+        return 0
+        ;;
+      *) usage_fail "unknown uninstall option: $1" ;;
+    esac
+    shift
+  done
+
+  [[ -f "$SCRIPT_DIR/openadkit.json" ]] \
+    || fail 'Open AD Kit is not installed. Run: openadkit install'
+  kit_fields=$(python3 - "$SCRIPT_DIR/openadkit.json" <<'PY'
+import json
+import sys
+
+try:
+    kit = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as error:
+    print(f"could not read installed release metadata: {error}", file=sys.stderr)
+    raise SystemExit(1)
+print(kit.get("kind", "unknown"), kit.get("version", ""), sep="\t")
+PY
+) || fail 'could not read the installed release metadata'
+  IFS=$'\t' read -r kit_kind current_version <<<"${kit_fields}"
+
+  case "$kit_kind" in
+    repository)
+      fail 'uninstall is for release installs; remove a source checkout with git'
+      ;;
+    release) ;;
+    *) fail "unrecognized Open AD Kit installation: ${SCRIPT_DIR}" ;;
+  esac
+  [[ $current_version =~ $OPENADKIT_VERSION_RE ]] \
+    || fail "could not read the installed release version: ${current_version:-unknown}"
+  active_root="$SCRIPT_DIR"
+  [[ $(basename -- "$active_root") == "openadkit-${current_version}" ]] \
+    || fail "installed release is not in a versioned directory: ${active_root}; use openadkit install --destination"
+
+  launcher_path="${HOME}/.local/bin/openadkit"
+  if [[ -e $launcher_path && ! -L $launcher_path ]]; then
+    fail "refusing to remove non-symlink launcher: ${launcher_path}"
+  fi
+  [[ -L $launcher_path ]] || fail 'Open AD Kit is not installed. Run: openadkit install'
+  [[ $(readlink -f -- "$launcher_path") == "${active_root}/openadkit" ]] \
+    || fail "the active installation is not ${active_root}; run openadkit uninstall through the installed launcher"
+
+  destination=$(dirname -- "$active_root")
+
+  log "removing ${active_root}"
+  rm -rf -- "$active_root"
+  rm -f -- "$launcher_path"
+
+  if [[ $all == true ]]; then
+    shopt -s nullglob
+    for candidate in "${destination}"/openadkit-v*; do
+      [[ -d $candidate && ! -L $candidate ]] || continue
+      name=$(basename -- "$candidate")
+      [[ $name =~ ^openadkit-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || continue
+      log "removing ${candidate}"
+      rm -rf -- "$candidate"
+    done
+    for candidate in "${destination}"/.openadkit-old.* "${destination}"/.openadkit-stage.*; do
+      [[ -d $candidate && ! -L $candidate ]] || continue
+      rm -rf -- "$candidate"
+    done
+    shopt -u nullglob
+  fi
+
+  if [[ -d $destination ]] && [[ -z $(ls -A -- "$destination") ]]; then
+    rmdir -- "$destination" 2>/dev/null || true
+  fi
+
+  log "uninstalled ${current_version}; downloaded data under ~/autoware_map and ~/autoware_data was kept"
 }
 
 if [[ ${1:-} == install ]]; then
@@ -398,6 +510,12 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "$SOURCE")")" && pwd -P)
 if [[ ${1:-} == upgrade ]]; then
   shift
   upgrade_openadkit "$@"
+  exit 0
+fi
+
+if [[ ${1:-} == uninstall ]]; then
+  shift
+  uninstall_openadkit "$@"
   exit 0
 fi
 

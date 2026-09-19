@@ -185,6 +185,9 @@ openadkit uninstall          # keep previously installed versions
 openadkit uninstall --all    # remove kept versions too
 ```
 
+Any `config.local.env` overrides inside the version directory are removed with
+it; downloaded data is kept.
+
 Downloaded data (maps, rosbag samples, and perception models) lives under
 `~/autoware_map` and `~/autoware_data` and is not removed by `uninstall`. Inspect
 what a deployment has installed and delete it with:

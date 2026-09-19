@@ -7,8 +7,10 @@
 #
 # Host networking is required so the bridge can reach the LAN listen address
 # and so its DDS participant shares the host Cyclone environment. DDS stays
-# local: runtime.env restricts Cyclone to `lo`, and ROS_LOCALHOST_ONLY pins
-# DDS discovery to this host. Only Zenoh traffic crosses the LAN.
+# local: runtime.env points CYCLONEDDS_URI at base/cyclonedds.xml, whose
+# <NetworkInterface> pins Cyclone to `lo`. Only Zenoh traffic crosses the LAN.
+# Do not add ROS_LOCALHOST_ONLY here: the plugin's discovery manager reuses the
+# same Cyclone config and rejects the duplicated `lo` selection at startup.
 services:
   zenoh-bridge:
     image: ${ZENOH_BRIDGE_IMAGE:-eclipse/zenoh-bridge-ros2dds:1.10.1@sha256:74fae6a9d4f449c53d1ee6f0faaca97d01c1e68dfcafd785b657f01907157d22}
@@ -24,7 +26,11 @@ services:
     env_file:
       - ${ZENOH_BASE_DIR}/runtime.env
     environment:
-      - ROS_LOCALHOST_ONLY=1
+      # Must match the ROS graph this bridge joins. Without it the plugin
+      # assumes iron and drops Humble discovery info (24-byte GIDs), leaving
+      # the Zenoh session up but routing no topics. The CLI injects the
+      # selected distro into the Compose environment.
+      - ROS_DISTRO=${ROS_DISTRO:-humble}
       # Interpolated from the CLI env files (config.env/config.local.env).
       # Empty defaults keep `stop`/`ps`/`logs` parseable; the wrapper below
       # fails only when a listen endpoint is actually required.

@@ -379,7 +379,11 @@ def test_zenoh_fragment_is_digest_pinned_and_uses_wrapper():
     assert "eclipse/zenoh-bridge-ros2dds:" in fragment
     assert re.search(r"@sha256:[0-9a-f]{64}", fragment)
     assert "network_mode: host" in fragment
-    assert "ROS_LOCALHOST_ONLY=1" in fragment
+    # The plugin must know the ROS graph's distro or it assumes iron and drops
+    # Humble discovery info; the explicit `lo` pin in cyclonedds.xml already
+    # isolates DDS, so ROS_LOCALHOST_ONLY would only duplicate the selection.
+    assert "ROS_DISTRO=${ROS_DISTRO:-humble}" in fragment
+    assert "- ROS_LOCALHOST_ONLY" not in fragment
     assert 'entrypoint: ["/bin/sh", "-c"]' in fragment
     assert "exec /zenoh-bridge-ros2dds" in fragment
     assert "-l " in fragment and "-c /config/zenoh.json5" in fragment

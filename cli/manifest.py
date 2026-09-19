@@ -322,6 +322,24 @@ class Deployment:
         require_gpu: bool = True,
     ) -> Selection:
         distro = ros_distro or current_context.default_ros_distro
+
+        # Operational commands (status/logs/stop) do not select images or
+        # profiles; they only need the deployment's Compose and env files.
+        # Skip requirement validation and component image injection so a
+        # missing default-distro image map can never block a stop.
+        if operational:
+            injections = {"ROS_DISTRO": distro}
+            injections.update(self.distro_environment.get(distro, {}))
+            environment = self.configuration_environment
+            environment.update(injections)
+            return Selection(
+                ros_distro=distro,
+                gpu=False,
+                services=tuple(self.compose["services"]),
+                injections=injections,
+                environment=environment,
+            )
+
         architecture = host_architecture()
         if architecture not in self.requirements["architectures"]:
             raise OpenADKitError(
@@ -335,7 +353,7 @@ class Deployment:
             )
 
         gpu_requirement = self.requirements["gpu"]
-        if not operational and require_gpu:
+        if require_gpu:
             if gpu_requirement == "required" and not gpu:
                 raise OpenADKitError(f"{self.name} requires --gpu")
             if gpu_requirement == "none" and gpu:

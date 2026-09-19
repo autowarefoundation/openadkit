@@ -1776,36 +1776,37 @@ def test_empty_services_are_rejected(tmp_path):
     assert "compose.services must not be empty" in result.stdout
 
 
-def test_status_uses_last_run_gpu_selection(tmp_path):
+def test_operational_commands_ignore_previous_gpu_selection(tmp_path):
     manifest = minimal_manifest()
     manifest["requirements"]["gpu"] = "optional"
     manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
     path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
 
+    result = run_cli(root, ["run", "example", "--gpu", "--pull", "never"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    # Operational commands are stateless: run must not persist a selection.
+    assert not (deployment / ".cache").exists()
+
+    calls.write_text("")
     result = run_cli(root, ["status", "example"], env=path_env)
     assert result.returncode == 0, result.stderr
     assert "docker-compose.gpu.yaml" not in calls.read_text()
     assert calls.read_text().rstrip().endswith(" ps")
 
-    calls.write_text("")
-    result = run_cli(root, ["run", "example", "--gpu", "--pull", "never"], env=path_env)
-    assert result.returncode == 0, result.stderr
 
-    calls.write_text("")
+def test_operational_commands_work_when_release_lacks_default_distro_images(tmp_path):
+    root, _ = runtime_tree(tmp_path, release=True)
+    document = json.loads((root / "openadkit.json").read_text())
+    del document["images"]["humble"]
+    (root / "openadkit.json").write_text(json.dumps(document))
+    bin_dir, calls = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
     result = run_cli(root, ["status", "example"], env=path_env)
     assert result.returncode == 0, result.stderr
-    assert "docker-compose.gpu.yaml" in calls.read_text()
-
-    calls.write_text("")
-    result = run_cli(root, ["run", "example", "--pull", "never"], env=path_env)
-    assert result.returncode == 0, result.stderr
-
-    calls.write_text("")
-    result = run_cli(root, ["status", "example"], env=path_env)
-    assert result.returncode == 0, result.stderr
-    assert "docker-compose.gpu.yaml" not in calls.read_text()
+    assert calls.read_text().rstrip().endswith(" ps")
 
 
 def _host_architecture():

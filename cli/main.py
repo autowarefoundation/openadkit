@@ -279,7 +279,6 @@ def main() -> int:
         compose.check_daemon(selection)
         data.install_data(deployment, selection, args.force)
         compose.start(deployment, selection, args.pull, configured_services)
-        compose.save_runtime(deployment, selection)
         print_run_next_steps(deployment, selection)
         return 0
 
@@ -295,9 +294,7 @@ def main() -> int:
         return show_running(root, kit, args.command, running, extra=extra)
     deployment = get_deployment(root, kit, args.deployment)
     warn_if_modified(root, deployment, kit)
-    saved = compose.load_runtime(deployment)
-    ros_distro, gpu = saved if saved else (None, False)
-    selection = deployment.select(kit, ros_distro, gpu, operational=True)
+    selection = deployment.select(kit, None, False, operational=True)
     if args.command == "status":
         compose.status(deployment, selection)
     elif args.command == "logs":

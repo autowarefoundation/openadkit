@@ -450,22 +450,30 @@ def trace_pane(run, t_rel, box):
     # The commanded acceleration lives on its own scale, so it is drawn as a
     # band rather than a second axis: the point is when it appears and how long
     # it lasts, not its exact value against the speed curve.
-    # Braking only. Every commanded acceleration used to be drawn here, so
-    # VisionPilot's own +1.5 m/s2 filled half the pane in orange under a legend
-    # that said "braking command", which claims a brake where there was none.
-    for t, acc in run.trace.get("ack_accel", []):
-        if t <= t_rel and acc < 0:
-            x, _ = xy(t, 0)
-            d.line([x, bottom, x, bottom - (bottom - top) * min(abs(acc) / 4.0, 1.0)],
-                   fill=(255, 140, 90), width=2)
-    for t, _ in run.trace.get("cr52_cmd", []):
-        if t <= t_rel:
-            x, _ = xy(t, 0)
-            d.line([x, top, x, bottom], fill=(255, 220, 90), width=1)
+    # Braking as one line that reads zero whenever nothing is braking. Filling
+    # the area under it drew a polygon straight across the gaps between braking
+    # samples, which invented a brake that lasted the whole run; drawing every
+    # commanded acceleration instead put VisionPilot's own +1.5 m/s2 under a
+    # legend reading "braking". Both were composed from a real run and both
+    # said something the run did not do.
+    brake = [(t, acc) for t, acc in run.trace.get("ack_accel", []) if t <= t_rel]
+    if len(brake) > 1:
+        pts = [(xy(t, 0)[0],
+                bottom - (bottom - top) * min(max(-acc, 0.0) / 4.0, 1.0))
+               for t, acc in brake]
+        d.line(pts, fill=(255, 140, 90), width=3)
+    # One line, at the first command the CR52 sent after the fault. The rest
+    # arrive at 20 Hz and say nothing the first one does not.
+    after = [t for t, _ in run.trace.get("cr52_cmd", []) if t >= 0.0 and t <= t_rel]
+    if after:
+        x, _ = xy(after[0], 0)
+        d.line([x, top, x, bottom], fill=(255, 220, 90), width=2)
+        d.text((x + 4, top + 22), f"CR52 +{after[0] * 1000:.0f} ms",
+               font=_font(15), fill=(255, 220, 90))
     x0, _ = xy(0.0, 0)
     d.line([x0, top, x0, bottom], fill=(220, 80, 80), width=2)
     d.text((x0 + 4, top + 4), "fault", font=_font(15), fill=(220, 80, 80))
-    return _label(pane, "ego speed, CR52 commands (yellow), braking command (orange)")
+    return _label(pane, "ego speed, first CR52 command (yellow), braking (orange)")
 
 
 def banner(run, t_rel, chapter):
@@ -487,8 +495,15 @@ def render_frame(run, t_rel, chapter):
     box = (PANE_W, PANE_H)
     chase = _label(_fit(run.chase[pick([t for t, _ in run.chase], bench)][1], box),
                    "CARLA, chase camera")
-    hud = _label(_fit(run.hud[pick(run.hud_times, bench)], box),
-                 "VisionPilot HUD, rendered on the X5H board")
+    # After the fault this pane is VisionPilot's LAST rendered frame, held. That
+    # is the truth of the kill route, but a bright, normal-looking HUD next to a
+    # braking car reads as a live picture. Dim it and say what it is.
+    hud_img = _fit(run.hud[pick(run.hud_times, bench)], box)
+    if t_rel > 0:
+        hud_img = Image.eval(hud_img, lambda v: v * 4 // 10)
+        hud = _label(hud_img, "VisionPilot HUD: the last frame it rendered before the kill")
+    else:
+        hud = _label(hud_img, "VisionPilot HUD, rendered on the X5H board")
     img.paste(chase, (0, BANNER_H))
     img.paste(hud, (PANE_W, BANNER_H))
     img.paste(console_pane(run, bench, box), (0, BANNER_H + PANE_H))

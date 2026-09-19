@@ -13,18 +13,18 @@ Omitting `--role` keeps today's single-host graph. One role per machine; two
 hosts (or two VMs) are required. On a single machine the two roles would share
 local DDS and bypass the bridge, so that is not the supported path.
 
-DDS stays local (`CYCLONEDDS_NETWORK_INTERFACE=lo` plus
-`ROS_LOCALHOST_ONLY=1` on the bridge). Only ROS traffic selected by the
+DDS stays local (`CYCLONEDDS_NETWORK_INTERFACE=lo`, applied by both the
+workload containers and the bridge). Only ROS traffic selected by the
 workload allowlist crosses Zenoh: simulation time, vehicle status and
 commands, transforms, ADAPI calls, and the enabled sensors. Map blobs, camera
 images, and the visualization/teleop traffic are not routed.
 
 !!! warning "Verification status"
-    Both role views are built and validated in CI (`docker compose config`).
-    The two-host runtime acceptance gates — full scenario closed loop, DDS
-    isolation, and CARLA throughput/latency — have not been recorded yet.
-    Treat split-host roles as unreleased until that evidence lands with the
-    release notes.
+    Both role views are rendered and validated in CI (`docker compose config`).
+    The scenario-simulation two-host closed loop has been exercised end to end
+    with the sample scenarios passing over the Zenoh bridge; DDS isolation and
+    CARLA throughput/latency still need recorded evidence. Treat split-host
+    roles as unreleased until the remaining gates land with the release notes.
 
 ## Prerequisites
 
@@ -113,6 +113,18 @@ role views. Entries are full-name regular expressions, not globs. Both
 hosts use the same file: either side can own an endpoint. Review the list
 before routing anything new, and keep the host boundary on the lab LAN:
 the allowlist is not authentication.
+
+The scenario allowlist carries the simple sensor simulator's
+`/sensing/imu/imu_data` because autonomous emergency braking and
+autonomous-mode availability on the Autoware host depend on it; without
+it the vehicle stays in `PLANNING` and the scenario times out.
+
+## Latency and timing
+
+Cross-host simulation is timing sensitive. With a large round-trip time the
+TF stream jitters and control nodes log transform or collision-detector
+warnings even when scenarios still pass. Keep both hosts on the same lab
+LAN; WAN and VPN links are best-effort and are not the supported setup.
 
 ## Lifecycle notes
 

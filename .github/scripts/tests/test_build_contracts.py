@@ -419,6 +419,7 @@ def test_zenoh_allowlists_route_cross_host_topics():
             "/perception/obstacle_segmentation/pointcloud",
             "/perception/object_recognition/detection/objects",
             "/perception/occupancy_grid_map/map",
+            "/sensing/imu/imu_data",
         ],
         "carla-simulation": [
             "/localization/kinematic_state",

@@ -2015,3 +2015,89 @@ def test_capture_process_surfaces_command_stderr():
         )
     assert "exit code 3" in str(error.value)
     assert "boom detail" in str(error.value)
+
+
+def test_list_json_output(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["list", "--json"])
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "schemaVersion": 1,
+        "deployments": [
+            {
+                "name": "example",
+                "kind": "source",
+                "gpu": "none",
+                "description": "Test deployment",
+            }
+        ],
+    }
+
+
+def test_version_json_output(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["version", "--json"])
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["schemaVersion"] == 1
+    assert payload["bundle"] == "repository"
+    assert payload["version"] is None
+    assert payload["commit"] is None
+
+    release_root, _ = runtime_tree(tmp_path / "release", release=True)
+    result = run_cli(release_root, ["version", "--json"])
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["bundle"] == "release"
+    assert payload["version"] == "v1.2.3"
+    assert payload["commit"] is None
+
+
+def test_validate_json_output(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = run_cli(root, ["validate", "example", "--json"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "schemaVersion": 1,
+        "deployment": "example",
+        "manifestValid": True,
+        "rosDistro": "humble",
+        "gpu": False,
+        "dataValid": None,
+        "data": [],
+    }
+
+
+def test_validate_json_reports_missing_data(tmp_path):
+    resource = {
+        "name": "sample-map",
+        "kind": "files",
+        "destinationEnv": "MAP_PATH",
+        "files": [
+            {
+                "path": "lanelet2_map.osm",
+                "url": "http://example.invalid/lanelet2_map.osm",
+                "sha256": "0" * 64,
+            }
+        ],
+        "requiredFiles": ["lanelet2_map.osm"],
+    }
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=[resource]))
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = run_cli(root, ["validate", "example", "--data", "--json"], env=path_env)
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["dataValid"] is False
+    assert payload["data"] == [{"name": "sample-map", "status": "missing"}]
+
+
+def test_catalog_json_stays_parseable_without_deployment(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    result = run_cli(root, ["validate", "--json"])
+    assert result.returncode == 2
+    payload = json.loads(result.stdout)
+    assert payload["deployments"][0]["name"] == "example"
+    assert "deployment name required" in result.stderr

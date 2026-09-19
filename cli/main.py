@@ -74,6 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
             "  openadkit stop planning-simulation"
         ),
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        dest="show_version",
+        help="show version information and exit",
+    )
     subparsers = parser.add_subparsers(dest="command", parser_class=OpenADKitParser)
     subparsers.add_parser(
         "install", help="downloads and installs a release bundle"
@@ -236,6 +242,10 @@ def print_run_next_steps(deployment, selection) -> None:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.show_version:
+        root = root_path()
+        kit = load_kit(root)
+        return show_version(root, kit)
     if not args.command:
         parser.print_help()
         return 2

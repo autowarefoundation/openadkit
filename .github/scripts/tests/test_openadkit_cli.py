@@ -1969,3 +1969,49 @@ def test_validate_data_respects_gpu_selection(tmp_path):
     result = run_cli(root, ["validate", "example", "--data", "--gpu"], env=path_env)
     assert result.returncode == 1, result.stdout
     assert "data: gpu-model missing" in result.stdout
+
+
+def test_usage_errors_exit_with_code_two():
+    for command in ("install", "upgrade", "setup"):
+        result = subprocess.run(
+            [str(ENTRYPOINT), command, "--nope"],
+            text=True,
+            capture_output=True,
+        )
+        assert result.returncode == 2, (command, result.stderr)
+
+
+def test_version_flag_reports_bundle():
+    result = subprocess.run(
+        [str(ENTRYPOINT), "--version"], text=True, capture_output=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("Open AD Kit ")
+
+
+def test_entrypoint_help_documents_handled_command_flags():
+    checks = {
+        "install": ("--version", "--destination", "--force"),
+        "setup": ("--gpu", "--verify"),
+    }
+    for command, flags in checks.items():
+        result = subprocess.run(
+            [str(ENTRYPOINT), command, "--help"],
+            text=True,
+            capture_output=True,
+        )
+        assert result.returncode == 0, (command, result.stderr)
+        for flag in flags:
+            assert flag in result.stdout, (command, flag)
+
+
+def test_capture_process_surfaces_command_stderr():
+    sys.path.insert(0, str(ROOT / "cli"))
+    import compose as openadkit_compose
+
+    with pytest.raises(openadkit_compose.OpenADKitError) as error:
+        openadkit_compose.capture_process(
+            ["bash", "-c", "echo 'boom detail' >&2; exit 3"]
+        )
+    assert "exit code 3" in str(error.value)
+    assert "boom detail" in str(error.value)

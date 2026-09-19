@@ -14,6 +14,7 @@ RESOLVED_ARCHIVE=
 RESOLVED_SHA256=
 
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
+usage_fail() { printf 'error: %s\n' "$*" >&2; exit 2; }
 log() { printf '[openadkit] %s\n' "$*"; }
 
 cleanup_install() {
@@ -272,25 +273,25 @@ install_openadkit() {
   while (($#)); do
     case "$1" in
       --version)
-        (($# >= 2)) || fail '--version requires a value'
+        (($# >= 2)) || usage_fail '--version requires a value'
         version=$2
         shift
         ;;
       --destination)
-        (($# >= 2)) || fail '--destination requires a value'
+        (($# >= 2)) || usage_fail '--destination requires a value'
         destination=$2
         shift
         ;;
       --force) force=true ;;
       -h|--help) install_usage; return 0 ;;
-      *) fail "unknown install option: $1" ;;
+      *) usage_fail "unknown install option: $1" ;;
     esac
     shift
   done
 
   [[ $version == latest || $version =~ $OPENADKIT_VERSION_RE ]] \
-    || fail "invalid release version: ${version}"
-  [[ $destination = /* ]] || fail '--destination must be an absolute path'
+    || usage_fail "invalid release version: ${version}"
+  [[ $destination = /* ]] || usage_fail '--destination must be an absolute path'
   require_command curl
   require_command python3
   require_command sha256sum
@@ -312,7 +313,7 @@ upgrade_openadkit() {
     upgrade_usage
     return 0
   fi
-  (($# == 0)) || fail "unknown upgrade option: $1"
+  (($# == 0)) || usage_fail "unknown upgrade option: $1"
 
   require_command curl
   require_command python3

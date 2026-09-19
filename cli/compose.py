@@ -77,8 +77,11 @@ def capture_process(
             f"required command is not installed: {command[0]}"
         ) from error
     except subprocess.CalledProcessError as error:
+        detail = " ".join((error.stderr or "").split())
+        suffix = f": {detail}" if detail else ""
         raise OpenADKitError(
-            f"command failed with exit code {error.returncode}: {command[0]}"
+            f"command failed with exit code {error.returncode}: "
+            f"{command[0]}{suffix}"
         ) from error
 
 

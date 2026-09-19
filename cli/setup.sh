@@ -9,9 +9,10 @@ DOCKER_GROUP_ADDED=false
 
 log() { printf '[openadkit] %s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
+usage_fail() { printf 'error: %s\n' "$*" >&2; exit 2; }
 
 if [[ ${1:-} != setup ]]; then
-  fail "setup helper must be invoked through openadkit setup"
+  usage_fail "setup helper must be invoked through openadkit setup"
 fi
 shift
 while (($#)); do
@@ -29,7 +30,7 @@ Installs the Ubuntu host dependencies needed to run Open AD Kit.
 EOF
       exit 0
       ;;
-    *) fail "unknown setup option: $1" ;;
+    *) usage_fail "unknown setup option: $1" ;;
   esac
   shift
 done

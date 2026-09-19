@@ -293,6 +293,17 @@ def test_load_run_refuses_a_rate_limited_journal(tmp_path):
     assert e.value.reason == "journal_suppressed"
 
 
+def test_load_run_drops_the_one_frame_the_kill_truncated(tmp_path):
+    # The sink writes the PNG, then VisionPilot prints that frame's Latency
+    # line. A kill between the two leaves exactly one PNG with no time.
+    run = make_run(tmp_path)
+    j = run / "hud" / "vp-journal.txt"
+    lines = j.read_text().splitlines()
+    j.write_text("\n".join(lines[:-1]) + "\n")
+    r = m.load_run(run)
+    assert len(r.hud) == len(r.hud_times) == 19
+
+
 def test_load_run_refuses_fewer_pngs_than_journal_frames(tmp_path):
     # The sink writes one PNG per rendered frame, so a shortfall means the pull
     # lost files. Composing anyway shifts every HUD frame by the difference.

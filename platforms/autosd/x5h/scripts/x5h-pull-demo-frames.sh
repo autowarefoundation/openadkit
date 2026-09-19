@@ -68,6 +68,12 @@ pngs=$(find "$hud" -name 'frame_*.png' -type f | wc -l)
 # whole basis of the mapping. A difference means the directory was not emptied
 # before the run, or the pull lost files; either way the reel would be built on
 # a shifted mapping that nothing downstream can detect.
-[ "$pngs" -eq "$frames" ] || fail frame_count "pngs=$pngs journal=$frames"
+#
+# Exactly one extra PNG is the exception, and it is what the kill route
+# produces: the sink writes the frame and VisionPilot is killed before it
+# prints that frame's Latency line. Board-measured 2026-09-18, pngs=396
+# journal=395. That last frame has no time, so the composer drops it.
+[ "$pngs" -eq "$frames" ] || [ "$pngs" -eq "$((frames + 1))" ] \
+    || fail frame_count "pngs=$pngs journal=$frames"
 
 echo "DEMO_FRAMES_PULLED n=$pngs dir=$hud"

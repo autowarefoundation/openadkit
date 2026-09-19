@@ -50,6 +50,8 @@ CONSOLE_LINES = 16
 # seconds is enough to catch a run that dropped input frames and short enough
 # that a late start does not read as a drop.
 PRE_WINDOW = 2.0
+# Seconds either side of the fault that the speed plot covers.
+PLOT_WINDOW_S = 15.0
 # A positional HUD-frame-to-journal-line mapping tolerates a small count
 # difference (a stream starting a frame early, the window edge) and nothing
 # more. Five frames is half a second of input at 10 Hz.
@@ -157,6 +159,11 @@ def read_index(path):
         raise ReelError("empty_index", str(path))
     return sorted(rows)
 
+
+# The CR52 console carries ANSI colour codes. Drawn literally they read as
+# "[0m[22:14:33.356]" and bury the firmware's own text, which is the evidence
+# this pane exists to show. Board-seen 2026-09-18.
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\[0m")
 
 # journalctl -o short-monotonic: "[  1234.567890] host unit[pid]: message".
 MONO = re.compile(r"^\[\s*(\d+\.\d+)\]")
@@ -297,6 +304,14 @@ def load_run(run_dir):
     run.hud = sorted(hud_dir.glob("frame_*.png"))
     if not run.hud:
         raise ReelError("no_hud_pngs", str(hud_dir))
+    # Exactly one extra PNG is what the kill route produces: the sink writes
+    # the frame and VisionPilot is killed before it prints that frame's
+    # Latency line. Board-measured 2026-09-18, 396 against 395. The frame has
+    # no time, so it is dropped rather than guessed at. Any other difference
+    # means the directory was not emptied or the pull lost files, and the
+    # positional mapping would be shifted everywhere with no symptom.
+    if len(run.hud) == len(run.hud_times) + 1:
+        run.hud = run.hud[:-1]
     if len(run.hud) != len(run.hud_times):
         raise ReelError("hud_png_count", f"pngs={len(run.hud)} frames={len(run.hud_times)}")
 
@@ -397,7 +412,7 @@ def console_pane(run, bench_time, box):
         # Drop the bench stamp: the banner already carries the time, and the
         # firmware's own text is what the viewer is being shown.
         _, _, text = ln.partition(" ")
-        d.text((10, y), text[:96], font=f, fill=(120, 230, 140))
+        d.text((10, y), ANSI.sub("", text)[:96], font=f, fill=(120, 230, 140))
         y += 20
     return _label(pane, "CR52 Safety Island console")
 
@@ -410,8 +425,14 @@ def trace_pane(run, t_rel, box):
     # The axis covers the whole trace and never moves. Deriving it from the
     # samples drawn so far rescales the plot on every output frame, which makes
     # a still car look like it is still slowing down.
+    # A window around the fault, not the whole trace. The run drives for over
+    # a minute and stops in nine seconds, so an axis covering all of it
+    # compresses the braking, which is the one thing this pane exists to show,
+    # into the last tenth of the width.
     every = [t for rows in run.trace.values() for t, _ in rows]
-    t_min, t_max = min(every), max(max(every), t_rel)
+    t_min = max(min(every), -PLOT_WINDOW_S)
+    t_max = min(max(every), PLOT_WINDOW_S)
+    t_max = max(t_max, t_rel)
     v_max = max(max(v for _, v in odom), 1.0) * 1.15
 
     def xy(t, v):
@@ -429,8 +450,11 @@ def trace_pane(run, t_rel, box):
     # The commanded acceleration lives on its own scale, so it is drawn as a
     # band rather than a second axis: the point is when it appears and how long
     # it lasts, not its exact value against the speed curve.
+    # Braking only. Every commanded acceleration used to be drawn here, so
+    # VisionPilot's own +1.5 m/s2 filled half the pane in orange under a legend
+    # that said "braking command", which claims a brake where there was none.
     for t, acc in run.trace.get("ack_accel", []):
-        if t <= t_rel:
+        if t <= t_rel and acc < 0:
             x, _ = xy(t, 0)
             d.line([x, bottom, x, bottom - (bottom - top) * min(abs(acc) / 4.0, 1.0)],
                    fill=(255, 140, 90), width=2)

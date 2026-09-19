@@ -2349,7 +2349,7 @@ provide authentication or encryption.</p>
 <li><a href="../components/planning-control/"><strong>Control</strong></a> converts that trajectory into throttle, brake, and steering commands.</li>
 <li><a href="../components/vehicle-system/"><strong>Vehicle System</strong></a> bridges those commands to the actual vehicle or simulator.</li>
 </ol>
-<p>A <strong>deployment</strong> combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. For the full picture, see <a href="../components/">Components</a> and <a href="../deployments/">Deployments</a>.</p>
+<p>A <strong>deployment</strong> combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. Autoware Safety Island integrates with the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services. For the full picture, see <a href="../components/">Components</a> and <a href="../deployments/">Deployments</a>.</p>
 <h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="../getting-started/">Getting Started</a> — Set up your environment</li>

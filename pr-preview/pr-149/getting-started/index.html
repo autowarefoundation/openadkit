@@ -2214,6 +2214,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#uninstall-and-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uninstall and Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#runtime-controls" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2306,7 +2317,7 @@
 <h2 id="get-open-ad-kit">1. Get Open AD Kit<a class="headerlink" href="#get-open-ad-kit" title="Permanent link">#</a></h2>
 <div class="admonition tip">
 <p class="admonition-title">Release bundles</p>
-<p>Each stable GitHub Release publishes a versionless <code>openadkit</code> installer and
+<p>Each stable GitHub Release will publish a versionless <code>openadkit</code> installer and
 one <code>openadkit-vX.Y.Z.tar.gz</code> containing the runtime entry point and the
 curated deployments (planning, logging, scenario, and CARLA). Zenoh stays a
 source-checkout workflow. Images and sample data are pulled on demand. Until
@@ -2389,7 +2400,10 @@ leaves the containers running so their logs remain available.</p>
 <li>Watch the vehicle plan and drive the route</li>
 </ol>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">#</a></h2>
-<p>An installed release upgrades to the latest stable version with:</p>
+<p>Once a release is installed, check whether a newer stable version exists:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade<span class="w"> </span>--check
+</code></pre></div>
+<p>Then upgrade to the latest stable version with:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade
 </code></pre></div>
 <p>The new release is verified, installed alongside the old one, and the
@@ -2400,11 +2414,32 @@ destination (by default <code>~/.local/share/openadkit/</code>), so you can roll
 <p><code>--force</code> replaces the kept version directory. To switch to a version that is
 not installed, omit <code>--force</code>. Source checkouts update with <code>git pull</code> or
 <code>git checkout</code> instead.</p>
+<h2 id="uninstall-and-cleanup">Uninstall and Cleanup<a class="headerlink" href="#uninstall-and-cleanup" title="Permanent link">#</a></h2>
+<p>Remove the installed release and its launcher:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>uninstall<span class="w">          </span><span class="c1"># keep previously installed versions</span>
+openadkit<span class="w"> </span>uninstall<span class="w"> </span>--all<span class="w">    </span><span class="c1"># remove kept versions too</span>
+</code></pre></div>
+<p>Downloaded data (maps, rosbag samples, and perception models) lives under
+<code>~/autoware_map</code> and <code>~/autoware_data</code> and is not removed by <code>uninstall</code>. Inspect
+what a deployment has installed and delete it with:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulation<span class="w">            </span><span class="c1"># report only</span>
+openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulation<span class="w"> </span>--data<span class="w">     </span><span class="c1"># delete</span>
+</code></pre></div>
+<p>Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
+shared with the standalone Zenoh bridge; if it is removed, restore it with
+<code>openadkit fetch scenario-simulation --force</code>.</p>
 <h2 id="runtime-controls">Runtime Controls<a class="headerlink" href="#runtime-controls" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>status<span class="w"> </span>planning-simulation
 openadkit<span class="w"> </span>logs<span class="w"> </span>planning-simulation<span class="w"> </span>--follow
 openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 </code></pre></div>
+<p>Check a deployment's configuration and downloaded data before running it:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>validate<span class="w"> </span>planning-simulation<span class="w"> </span>--data
+</code></pre></div>
+<p><code>--data</code> reports each data resource as <code>ok</code>, <code>missing</code>, or <code>incomplete</code> and
+fails when something is missing; without it, <code>validate</code> checks only the manifest
+and Compose configuration. <code>list</code>, <code>version</code>, and <code>validate</code> also accept
+<code>--json</code> for scripting.</p>
 <p>Use <code>deployments/&lt;name&gt;/config.local.env</code> for host-specific settings. Source
 checkouts also accept component image overrides there; release component refs
 remain pinned by the release context. The file is ignored by Git.</p>

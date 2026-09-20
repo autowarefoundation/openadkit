@@ -222,7 +222,7 @@ def remove_installed_data(
     include_gpu: bool | None = None,
 ) -> list[dict[str, Any]]:
     """Delete installed data targets and report what was removed."""
-    removed: list[dict[str, Any]] = []
+    targets: list[tuple[str, Path]] = []
     seen: set[Path] = set()
     for resource in selected_resources(
         deployment, selection, include_gpu=include_gpu
@@ -233,6 +233,10 @@ def remove_installed_data(
         seen.add(target)
         if target.is_symlink():
             raise OpenADKitError(f"refusing to remove symlinked data: {target}")
+        targets.append((resource["name"], target))
+
+    removed: list[dict[str, Any]] = []
+    for name, target in targets:
         if target.is_dir():
             shutil.rmtree(target)
         elif target.is_file():
@@ -240,7 +244,7 @@ def remove_installed_data(
         else:
             continue
         print(f"removed data: {target}")
-        removed.append({"name": resource["name"], "destination": target})
+        removed.append({"name": name, "destination": target})
     return removed
 
 

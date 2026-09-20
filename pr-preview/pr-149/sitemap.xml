@@ -9,43 +9,7 @@
          <lastmod>2026-09-20</lastmod>
     </url>
     <url>
-         <loc>https://autowarefoundation.github.io/openadkit/roadmap/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
          <loc>https://autowarefoundation.github.io/openadkit/components/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/api/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/carla-interface/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/localization-mapping/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/planning-control/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/sensing-perception/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/simulator/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/vehicle-system/</loc>
-         <lastmod>2026-09-20</lastmod>
-    </url>
-    <url>
-         <loc>https://autowarefoundation.github.io/openadkit/components/visualizer/</loc>
          <lastmod>2026-09-20</lastmod>
     </url>
     <url>
@@ -90,6 +54,10 @@
     </url>
     <url>
          <loc>https://autowarefoundation.github.io/openadkit/getting-started/</loc>
+         <lastmod>2026-09-20</lastmod>
+    </url>
+    <url>
+         <loc>https://autowarefoundation.github.io/openadkit/getting-started/cli/</loc>
          <lastmod>2026-09-20</lastmod>
     </url>
     <url>

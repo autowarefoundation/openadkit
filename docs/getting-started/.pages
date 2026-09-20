@@ -1,4 +1,5 @@
 nav:
   - index.md
+  - CLI & Maintenance: cli.md
   - Container Images & Versioning: container-images.md
   - Troubleshooting: troubleshooting.md

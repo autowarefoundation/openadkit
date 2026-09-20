@@ -83,16 +83,16 @@ Use `./edge.sh up -d --no-sim` to run Autoware without the scenario simulator.
 |-----|--------|
 | `W` / `S` | Throttle / brake |
 | `A` / `D` | Steer |
-| `Z` | Toggle auto/local control |
+| `Z` | Toggle the operation mode between `STOP` and the configured `operator_mode` (`REMOTE` by default) |
 | `X` / `C` / `V` | Drive / reverse / park |
 | `M` | Cycle drive mode |
-| `R` | Reset to the configured initial pose |
+| `R` | Cycle the configured initial-pose presets and seed the pose |
 | `Space` | Emergency stop or resume |
 | `Q` | Quit |
 
-For a fresh `--no-sim` session, press `R` to initialize the pose, `Z` to enter
-local control, choose a gear with `X` or `C`, select the drive mode with `M`,
-then use the movement keys.
+For a fresh `--no-sim` session, press `R` to cycle the initial-pose presets,
+`Z` to leave `STOP`, choose a gear with `X` or `C`, select the drive mode with
+`M`, then use the movement keys.
 
 ## Stop and Troubleshoot
 

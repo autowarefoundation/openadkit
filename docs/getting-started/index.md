@@ -150,91 +150,13 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 2. Set a **goal pose** on the map
 3. Watch the vehicle plan and drive the route
 
-## Upgrading
-
-Once a release is installed, check whether a newer stable version exists:
-
-```bash
-openadkit upgrade --check
-```
-
-Then upgrade to the latest stable version with:
-
-```bash
-openadkit upgrade
-```
-
-The new release is verified, installed alongside the old one, and the
-`openadkit` launcher is repointed. The previous version is kept in the install
-destination (by default `~/.local/share/openadkit/`), so you can roll back:
-
-```bash
-openadkit install --version vOLD --force
-```
-
-`--force` replaces the kept version directory. To switch to a version that is
-not installed, omit `--force`. Source checkouts update with `git pull` or
-`git checkout` instead.
-
-## Uninstall and Cleanup
-
-Remove the installed release and its launcher:
-
-```bash
-openadkit uninstall          # keep previously installed versions
-openadkit uninstall --all    # remove kept versions too
-```
-
-Any `config.local.env` overrides inside the version directory are removed with
-it; downloaded data is kept.
-
-Downloaded data (maps, rosbag samples, and perception models) lives under
-`~/autoware_map` and `~/autoware_data` and is not removed by `uninstall`. Inspect
-what a deployment has installed and delete it with:
-
-```bash
-openadkit clean planning-simulation            # report only
-openadkit clean planning-simulation --data     # delete
-```
-
-Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
-shared with the standalone Zenoh bridge; if it is removed, restore it with
-`openadkit fetch scenario-simulation --force`.
-
-## Runtime Controls
-
-```bash
-openadkit status planning-simulation
-openadkit logs planning-simulation --follow
-openadkit stop planning-simulation
-```
-
-Check a deployment's configuration and downloaded data before running it:
-
-```bash
-openadkit validate planning-simulation --data
-```
-
-`--data` reports each data resource as `ok`, `missing`, or `incomplete` and
-fails when something is missing; without it, `validate` checks only the manifest
-and Compose configuration. `list`, `version`, and `validate` also accept
-`--json` for scripting.
-
-Use `deployments/<name>/config.local.env` for host-specific settings. Source
-checkouts also accept component image overrides there; release component refs
-remain pinned by the release context. The file is ignored by Git.
-
-For source builds and local image development, use the separate
-[Build from Source](../development/build-from-source.md) workflow.
-
-If something goes wrong, see [Troubleshooting](troubleshooting.md).
-
 ## Next Steps
 
-**[Explore the other deployments](../deployments/index.md)** - curated scenario
-testing, rosbag replay, and CARLA, plus a standalone source-checkout workflow
-for distributed cloud-edge operation with Zenoh.
+**[Explore the other deployments](../deployments/index.md)** - scenario testing,
+rosbag replay, and CARLA, plus a standalone source-checkout workflow for
+distributed cloud-edge operation with Zenoh.
 
+- [CLI & Maintenance](cli.md) - Runtime controls, validation, upgrades, and cleanup
 - [Components](../components/index.md) - The architecture behind what you just ran
 - [Container Images & Versioning](container-images.md) - Tag schema and pinning guidance
 - [Custom Deployment](../deployments/custom-deployment.md) - Compose your own stack

@@ -5,7 +5,11 @@
 
 ## What is AutoSD?
 
-AutoSD is built on **CentOS Stream** with an automotive-specific kernel (`kernel-automotive`) and is the upstream, in-development preview of Red Hat's commercial **In-Vehicle OS (RHIVOS)**, which Red Hat positions for functional-safety use. It is the platform-specific deployment path for Open AD Kit in this repository.
+AutoSD is built on **CentOS Stream** with an automotive-specific kernel
+(`kernel-automotive`). It is the upstream, in-development preview of Red Hat's
+commercial **In-Vehicle OS (RHIVOS)**, which Red Hat positions for
+functional-safety use. In this repository, it is the platform-specific deployment
+path for Open AD Kit.
 
 ## Key Features for Autonomous Driving
 
@@ -59,20 +63,16 @@ such as `platforms/autosd/planning-simulator/`.
 
 - [Planning Simulator](planning-simulator/index.md): Platform demo that runs
   Autoware planning and TIER IV Scenario Simulator under Podman/Quadlet
+- [R-Car X5H](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/x5h):
+  AutoSD 10 rootfs for the R-Car X5H board, netbooted under the BSP or a rebuilt
+  AutoSD-aligned kernel and QEMU-gated before board bring-up
 
 ## Requirements
 
-### Using the Container Script (Recommended)
-
-- Docker or Podman
-- QEMU
-
-### Running Automotive Image Builder on the Host
-
-- RPM-based Linux distribution (Fedora, CentOS, or RHEL)
-- Automotive Image Builder
-- OSBuild
-- QEMU
+| Path | Needs |
+|------|-------|
+| Container script (recommended) | Docker or Podman, QEMU |
+| Automotive Image Builder on the host | RPM-based Linux (Fedora, CentOS, or RHEL), Automotive Image Builder, OSBuild, QEMU |
 
 ## Building an AutoSD Image
 
@@ -81,23 +81,25 @@ container. From a clone of this repository, `cd` into a use-case directory
 (for example `platforms/autosd/planning-simulator/`) before running the
 commands below.
 
-First, download the runner script:
+First, download the runner script and build the builder container:
 
 ```bash
-curl -L -o auto-image-builder.sh \
+curl -fL -o auto-image-builder.sh \
   "https://gitlab.com/CentOS/automotive/src/automotive-image-builder/-/raw/main/auto-image-builder.sh?ref_type=heads"
+chmod +x auto-image-builder.sh
+sudo bash ./auto-image-builder.sh build-builder --distro autosd10-sig
 ```
 
-Now build an image (requires sudo/root):
+Now build the image (requires sudo/root). The container image is the first
+positional argument and the bootable disk image the second:
 
 ```bash
 sudo bash ./auto-image-builder.sh build \
-  --distro autosd9 \
-  --mode image \
+  --distro autosd10-sig \
   --target qemu \
-  --export qcow2 \
   --define-file aib/vars.yml \
   aib/image.aib.yml \
+  localhost/awf-oak:latest \
   disk.qcow2
 ```
 
@@ -111,10 +113,10 @@ You can now use QEMU to run the image from a mounted QEMU disk.
 
 ## Running the Image
 
-If you have `automotive-image-runner` available:
+If you have `air` available:
 
 ```bash
-automotive-image-runner --nographic disk.qcow2
+air disk.qcow2
 ```
 
 Otherwise, use the following example QEMU command:
@@ -135,7 +137,10 @@ Otherwise, use the following example QEMU command:
 ```
 
 !!! note "Memory sizing"
-    The `-m 2G` value above is only enough to boot and explore the AutoSD OS image. Running the full Open AD Kit stack requires considerably more — see the [hardware requirements](../hardware/index.md) (16 GB minimum, 32 GB recommended) and raise `-m` accordingly. A concrete starting point is `-m 16384` (16 GB); for heavier workloads use `-m 32768` (32 GB).
+    `-m 2G` only boots and explores the AutoSD image. The full Open AD Kit stack
+    needs much more — see the [hardware requirements](../hardware/index.md)
+    (16 GB minimum, 32 GB recommended) — so raise `-m` accordingly: start at
+    `-m 16384`, or `-m 32768` for heavier workloads.
 
 ## Current demo vs target architecture
 
@@ -143,20 +148,21 @@ Otherwise, use the following example QEMU command:
     The in-repo [Planning Simulator](planning-simulator/index.md) path is a
     **platform demo**. It does **not** run the modular
     `ghcr.io/autowarefoundation/openadkit:*` component images used by Docker
-    Compose deployments. Automotive Image Builder pins:
+    Compose deployments. Automotive Image Builder pins two upstream images:
 
     - `ghcr.io/autowarefoundation/autoware:universe-0.45.1-amd64` → `localhost/autoware:latest`
     - `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime` → `localhost/scenario_simulator_v2:runtime`
 
     After boot, systemd runs two containers in one pod (`awf-oak-planning` and
-    `awf-oak-simulator`) plus a map extraction oneshot — not a full
-    map/planning/control/vehicle/api/visualizer component split, and not BlueChi
+    `awf-oak-simulator`) plus a map extraction oneshot. That is not the full
+    map/planning/control/vehicle/api/visualizer split, and not BlueChi
     multi-host orchestration.
 
 AutoSD's mixed-criticality features remain a natural **target** home for Open AD
-Kit's component model on production profiles (see the [roadmap](../../roadmap.md)):
+Kit's component model on production profiles (see
+[Releases & Roadmap](../../releases/index.md)):
 
-<div class="oak-component-grid">
+<div class="oak-component-grid oak-component-grid--four">
 
 <div class="oak-component-item">
 <strong>Root Partition</strong>
@@ -181,26 +187,27 @@ Kit's component model on production profiles (see the [roadmap](../../roadmap.md
 </div>
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph Today["Current demo (in repo)"]
-        M[awf-oak-map oneshot]
-        P[awf-oak-planning<br/>autoware:universe]
-        S[awf-oak-simulator<br/>scenario_simulator_v2]
-        M --> P
-        P --- S
+        direction TB
+        M[awf-oak-map oneshot] --> P[awf-oak-planning<br/>autoware:universe]
+        P --- S[awf-oak-simulator<br/>scenario_simulator_v2]
     end
 
     subgraph Target["Target mixed-criticality mapping"]
-        subgraph Root["Root Partition"]
+        direction TB
+        subgraph Root["Root partition"]
             R1[Planning]
             R2[Control]
             R3[Vehicle System]
         end
-        subgraph QM["QM Partition"]
+        subgraph QM["QM partition"]
             Q1[Visualizer]
             Q2[Simulator]
         end
     end
+
+    Today -.-> Target
 ```
 
 ## Related

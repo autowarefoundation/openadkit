@@ -37,8 +37,7 @@ openadkit run logging-simulation --gpu
 ```
 
 The CUDA image is amd64-only.
-Add `--ros-distro jazzy` to either run command to select Jazzy; Humble is the
-default.
+--8<-- "includes/ros-distro.md"
 
 --8<-- "includes/visualizer-remote-access.md"
 

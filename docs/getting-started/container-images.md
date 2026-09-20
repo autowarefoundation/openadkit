@@ -65,34 +65,47 @@ The Open AD Kit version is **independent of the Autoware version** it packages: 
 
 ## Relationship to Autoware
 
-Each Open AD Kit release pins a specific upstream **Autoware semver meta-release** and records it in the release:
+Each Open AD Kit release pins a specific upstream **Autoware semver meta-release**
+(an `X.Y.Z` tag) and records it in the release notes.
 
-- Stable Open AD Kit releases pin an Autoware `X.Y.Z` meta-release tag.
-Each release records its pinned Autoware version in the release notes.
-
-A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published releases are listed on [GitHub Releases](https://github.com/autowarefoundation/openadkit/releases); how the tags are structured is in the [Tag Reference](#tag-reference) above. See [Releases](../releases/index.md) for current status.
+A release pins, at minimum: the Open AD Kit version, the Autoware meta-release,
+the ROS 2 distro(s), and the published image tags and digests. Published releases
+are listed on
+[GitHub Releases](https://github.com/autowarefoundation/openadkit/releases); tag
+structure is described in the [Tag Reference](#tag-reference) above. See
+[Releases & Roadmap](../releases/index.md) for current status.
 
 ## ROS 2 Distro Support
 
-| Distro | Planned status at v2.0 |
-|--------|----------------|
+| Distro | Status |
+|--------|--------|
 | **Humble** | Default, documented path. |
 | **Jazzy** | Built and published **in parallel** wherever the `amd64`+`arm64` matrix is green. |
 
-The v2.0 release bundle will carry digest-pinned Humble and Jazzy component
-maps and select one at runtime with `--ros-distro`. Humble remains the default.
-Distro support tracks the upstream ROS 2 lifecycle; a distro is supported by
-Open AD Kit only while it is supported upstream.
+The release bundle carries digest-pinned Humble and Jazzy component maps and
+selects one at runtime with `--ros-distro`. Humble remains the default. Distro
+support tracks the upstream ROS 2 lifecycle; a distro is supported by Open AD
+Kit only while it is supported upstream.
 
 ## What "Supported" Means
 
-- **Releases** — The latest stable release is supported. Fixes (including security/CVE remediation) land in a new patch or minor release rather than being backported to older tags. Stable release tags are immutable; see [Choosing a Tag](#choosing-a-tag) for pinning guidance.
-- **Platforms** — Support is tiered (committed / experimental / best-effort / unsupported). A variant that does not pass its build/validation gate is dropped from the support matrix rather than shipped as if it worked. See [Supported Platforms](../platforms/index.md) for the current, honest matrix.
-- **No certification claims** — "Supported" refers to build, deployment, and validation in a non-certified environment. Open AD Kit makes no safety-certification, functional-safety, or production-readiness claims.
+- **Releases** — The latest stable release is supported. Fixes (including
+  security/CVE remediation) land in a new patch or minor release; older tags are
+  not backported. Stable release tags are immutable — see
+  [Choosing a Tag](#choosing-a-tag) for pinning guidance.
+- **Platforms** — Support is tiered: committed, experimental, best-effort, or
+  unsupported. A variant that fails its build or validation gate is dropped from
+  the matrix instead of being shipped as if it worked. See
+  [Supported Platforms](../platforms/index.md).
+- **No certification claims** — "Supported" means build, deployment, and
+  validation in a non-certified environment. Open AD Kit makes no
+  safety-certification, functional-safety, or production-readiness claims.
 
 ## How Releases Are Tagged
 
-Releases are promoted from existing CI builds rather than rebuilt at release time, so the exact images validated during CI are the images that ship. When a release workflow runs, each tag alias is created independently from the promoted image digest:
+Releases are promoted from existing CI builds rather than rebuilt, so the images
+validated in CI are the images that ship. Each tag alias is created independently
+from the promoted image digest:
 
 | Alias | Example | Condition |
 |-------|---------|-----------|
@@ -109,7 +122,8 @@ Maintainer workflow steps are documented in the [Release Process](../development
 
 ## Related
 
-- [Quickstart](index.md) — Environment setup and first deployment
-- [Releases](../releases/index.md) — Current release status
+- [Quickstart](index.md) — First run in about 10 minutes
+- [CLI & Maintenance](cli.md) — Runtime controls, upgrades, and cleanup
+- [Releases & Roadmap](../releases/index.md) — Release status and development phases
 - [Build from Source](../development/build-from-source.md) — Building images locally
 - [Troubleshooting](troubleshooting.md) — Common issues

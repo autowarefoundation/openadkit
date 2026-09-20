@@ -17,10 +17,11 @@ standalone source-checkout deployment.
 
 ## Base and Overlay Model
 
-Planning, Scenario, Logging, and CARLA Simulation include the shared
-`deployments/base/docker-compose.yaml`. The base defines map-check, map,
-planning, vehicle, system, control, API, and visualizer services. Planning and
-scenario overlays add the dummy simulator; each deployment adds only its delta.
+Planning, Scenario, Logging, and CARLA Simulation all include the shared
+`deployments/base/docker-compose.yaml`. The base defines the map-check, map,
+planning, vehicle, system, control, API, and visualizer services; each deployment
+overlay adds only its delta. Planning and Scenario Simulation add the dummy
+simulator.
 
 Each curated deployment carries a `deployment.json` manifest and one complete
 `config.env` for Compose interpolation.
@@ -36,11 +37,13 @@ openadkit logs planning-simulation --follow
 openadkit stop planning-simulation
 ```
 
-Add `--ros-distro jazzy` to select Jazzy; Humble is the default. CARLA is
-Humble-only and requires `--gpu`. The release bundle vendors the curated
-deployments and shared base. Local settings belong in ignored
-`config.local.env`; release component images remain pinned. The base's
-`runtime.env` is loaded inside containers via `env_file:`.
+Add `--ros-distro jazzy` to `validate`, `fetch`, or `run` to select Jazzy;
+Humble is the default. CARLA is Humble-only and requires `--gpu`. `status`,
+`logs`, and `stop` take neither flag — they read the running deployment.
+
+The release bundle vendors the curated deployments and shared base. Local
+settings belong in ignored `config.local.env`; release component images remain
+pinned. The base's `runtime.env` is loaded inside containers via `env_file:`.
 
 Zenoh does not have a runtime manifest. Use its source-checkout launcher
 scripts documented on its deployment page.

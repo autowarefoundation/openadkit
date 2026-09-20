@@ -13,7 +13,7 @@ openadkit setup --verify
 openadkit run planning-simulation
 ```
 
-Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
+--8<-- "includes/ros-distro.md"
 
 The entry point downloads and verifies the sample map, pulls missing images,
 starts the stack, and checks that its persistent services are running. Release

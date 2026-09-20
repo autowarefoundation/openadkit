@@ -9,10 +9,9 @@
 
 !!! note "Not a committed Open AD Kit target"
     EWAOL is retained as upstream SOAFEE background. Open AD Kit may explore
-    related Arm Automotive Solutions / RD-1 AE FVP paths later; there is no
-    committed in-repo target or validated deployment for those stacks today.
-    EWAOL-specific deployment assets are **not present** in this repository;
-    this page is a pointer to the upstream project only.
+    related Arm Automotive Solutions / RD-1 AE FVP paths later, but there is no
+    committed target or validated deployment today, and no EWAOL deployment
+    assets in this repository — this page points to the upstream project only.
 
 ## What is EWAOL?
 
@@ -22,7 +21,8 @@ EWAOL is delivered via the `meta-ewaol` Yocto layer and provides a container-nat
 
 For installation and runtime instructions, see the upstream project:
 
-- [meta-ewaol source and documentation (GitLab)](https://gitlab.com/soafee/ewaol/meta-ewaol)
+- [meta-ewaol source (GitLab, archived — read-only)](https://gitlab.com/soafee/ewaol/meta-ewaol)
+- [EWAOL documentation](https://ewaol.docs.arm.com/en/latest/) — development is now hosted by the SOAFEE SIG
 
 ## Related
 

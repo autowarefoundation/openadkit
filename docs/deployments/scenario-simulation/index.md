@@ -48,7 +48,7 @@ openadkit run scenario-simulation
 openadkit logs scenario-simulation --follow
 ```
 
-Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
+--8<-- "includes/ros-distro.md"
 
 Initialization takes about 90 seconds. The runner waits up to
 `SCENARIO_READY_TIMEOUT`, executes the scenario, and writes results to

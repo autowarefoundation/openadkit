@@ -38,9 +38,9 @@ Create `deployments/<your-deployment>/` with a Compose file, complete
 ```
 
 Without an inventory entry, `openadkit run your-deployment` fails with
-`unknown deployment`. Direct Compose remains available. The base's
-`runtime.env` is loaded inside containers and should contain only ROS/DDS
-runtime values. See [Deployments](index.md) for the operator model.
+`unknown deployment`; direct Compose still works. The base's `runtime.env` is
+loaded inside containers and should hold only ROS/DDS runtime values. See
+[Deployments](index.md) for the operator model.
 
 ## Core Patterns
 
@@ -73,20 +73,19 @@ services:
 Keep these invariants:
 
 - All services use the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID`.
-- Launch files are not always `tier4_<component>_component.launch.xml`. Match
-  the command used in the base or deployment compose, for example:
-  - map / planning / system / control / simulator: `tier4_*_component.launch.xml`
-    under `autoware_launch`
+- Launch files are not always `tier4_<component>_component.launch.xml`. Match the
+  command used in the base or deployment compose:
+  - map / planning / system / control / simulator: `tier4_*_component.launch.xml` under `autoware_launch`
   - vehicle: `tier4_vehicle_launch vehicle.launch.xml`
   - API: `tier4_autoware_api_component.launch.xml`
   - CARLA bridge: `autoware_carla_interface.launch.xml`
 - Do not override the visualizer command; its entrypoint starts noVNC and RViz2.
 - Add map, vehicle, system, simulator, and API services as required by the task.
-- Use `sensing-perception-cuda` only on amd64 hosts with NVIDIA Container
+- Use `sensing-perception-cuda` only on amd64 hosts with the NVIDIA Container
   Toolkit (Logging Simulation GPU overlay and CARLA default).
-- Prefer loopback-bound noVNC and a strong `REMOTE_PASSWORD` (source:
-  `config.local.env`). Do not expose the
-  visualizer on untrusted networks without TLS and a non-default password.
+- Keep noVNC loopback-bound and set a strong `REMOTE_PASSWORD` from
+  `config.local.env`. Do not expose the visualizer on untrusted networks without
+  TLS and a non-default password.
 
 With host networking, open the visualizer at
 `https://localhost:6080/vnc.html` and accept the self-signed certificate.

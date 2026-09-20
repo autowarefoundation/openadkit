@@ -10,8 +10,9 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 - Verify Docker Engine is running: `docker info`
 - Check that required ports are not already in use
-- Ensure the deployment has its `config.env` and `openadkit.json`. Put local
-  overrides in `config.local.env`, then run `openadkit validate <deployment>`.
+- Ensure the deployment has its `config.env` and `deployment.json` (the bundle
+  root has `openadkit.json`). Put local overrides in `config.local.env`, then run
+  `openadkit validate <deployment>`.
 
 ### Permission denied
 
@@ -29,11 +30,11 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 ### Perception is very slow or the GPU overlay does not start
 
-- The default sensing and perception image runs on CPU except where a deployment
-  selects `sensing-perception-cuda` (Logging Simulation GPU overlay;
-  CARLA Simulation by default). Install the NVIDIA Container Toolkit
-  (`openadkit setup --gpu` does this explicitly). The CUDA image requires a working NVIDIA
-  runtime and does not automatically fall back to CPU.
+- The default sensing and perception image runs on CPU.
+- A deployment selects `sensing-perception-cuda` instead: Logging Simulation
+  through its GPU overlay, CARLA Simulation by default.
+- The CUDA image needs a working NVIDIA runtime and does not fall back to CPU.
+  Install the NVIDIA Container Toolkit with `openadkit setup --gpu`.
 
 ## Deployment Issues
 
@@ -45,7 +46,9 @@ This page covers common issues and solutions when working with Open AD Kit.
 
 ### Port 6080 or 6081 already in use
 
-- Stop the conflicting service. Most deployments run the visualizer under `network_mode: host`, which binds the port directly — `ports:` mappings in `docker-compose.yaml` are ignored in that mode.
+- Stop the conflicting service. Most deployments run the visualizer under
+  `network_mode: host`, which binds the port directly; `ports:` mappings in
+  `docker-compose.yaml` are ignored in that mode.
 
 ### Sample data or artifacts `file not found`
 
@@ -54,13 +57,14 @@ Recovery depends on the deployment:
 | Deployment | Recover |
 |------------|---------|
 | `planning-simulation`, `scenario-simulation` | Run `openadkit fetch <deployment> --force`. Maps land under `~/autoware_map`. |
-| `logging-simulation` | Run `openadkit fetch logging-simulation --force` for the map and rosbag. GPU perception models remain under `~/autoware_data`. |
+| `logging-simulation` | Run `openadkit fetch logging-simulation --force` for the map and rosbag; the fetch also refreshes the CenterPoint models under `~/autoware_data/lidar_centerpoint`. |
 | `zenoh-bridge` | From the source root, run `./openadkit fetch scenario-simulation --force` to refresh its Kashiwanoha map. |
 | `carla-simulation` | Run `openadkit fetch carla-simulation --force` for the Town01 map. |
 
 To see what is missing before downloading anything, run
-`openadkit validate <deployment> --data`; it reports each data resource as
-`ok`, `missing`, or `incomplete`.
+`openadkit validate <deployment> --data` (for CARLA add `--gpu`:
+`openadkit validate carla-simulation --gpu --data`); it reports each data
+resource as `ok`, `missing`, or `incomplete`.
 
 ## Getting Help
 
@@ -69,6 +73,7 @@ To see what is missing before downloading anything, run
 
 ## Related
 
-- [Getting Started](index.md) — Quick start guide
+- [Quickstart](index.md) — First run in about 10 minutes
+- [CLI & Maintenance](cli.md) — Runtime controls, upgrades, and cleanup
 - [Container Images & Versioning](container-images.md) — Tag schema and version policy
-- [Deployments](../deployments/index.md) — Self-contained deployments
+- [Deployments](../deployments/index.md) — Per-deployment commands and configuration

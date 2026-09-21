@@ -1,0 +1,161 @@
+# CES 2027 demo stack for the companion host (rog-amd). Everything here runs
+# in a container so the demo is portable off that one host: `docker compose
+# -f docker-compose.yaml up -d` brings up the CARLA server and the CARLA <->
+# ROS 2 bridge; the board side (the demo role's four Quadlet container units
+# plus one plain systemd unit, see
+# ../../README.md "CES 2027 demo role") is separate and reached over ssh by
+# scripts/x5h-ces2027-demo.sh, not by this file.
+#
+# `visionpilot:si` (bridge, si-gate) and the CARLA package under CARLA_PKG
+# are both built/staged by the sibling vision_pilot plan, which has not
+# landed on this host yet — this file is written to parse and to describe
+# the intended shape, not to run end to end until that plan lands (see
+# scripts/x5h-ces2027-demo.sh's "check"/"run" for the host-reachable half).
+#
+# Every host path is an env var with a default under $HOME so the file works
+# unedited for the booth operator's own account; override any of them (or
+# use a .env file next to this one) for a different layout.
+services:
+  # The CARLA simulator. CARLA_PKG is an extracted CARLA release, mounted in
+  # rather than baked into the image, because the sibling plan owns both the
+  # package and which runtime image can execute it — CARLA_SERVER_IMAGE
+  # below is a placeholder default (the repo's existing pin from
+  # deployments/carla-simulation/docker-compose.yaml), not a claim about
+  # what that plan ships.
+  carla-server:
+    image: ${CARLA_SERVER_IMAGE:-carlasim/carla:0.9.16@sha256:aaf1df22702780ece072069e23d03c4879b002ae028c79744b09c4c7ddbae953}
+    container_name: ces-carla-server
+    network_mode: host
+    ipc: host
+    init: true
+    runtime: nvidia
+    # Needs the NVIDIA container runtime on the host: `docker info` must
+    # list `nvidia` among its Runtimes, or this service fails to start.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - ${CARLA_PKG:-${HOME}/carla-pkg}:/carla-pkg:ro
+    command: >
+      /bin/bash -c "cd /carla-pkg && ./CarlaUE4.sh -nosound -quality-level=Low
+      -carla-rpc-port=2000 -world-port=2000 -stdout -FullStdOutLogOutput"
+    ports:
+      - "2000:2000"
+    restart: on-failure
+
+  # The CARLA-to-ROS 2 bridge, on the demo's DDS domain 1. Reuses the
+  # sibling plan's visionpilot:si image (it already carries the ROS 2
+  # overlay and carla_bridge_bringup).
+  bridge:
+    image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
+    container_name: ces-bridge
+    network_mode: host
+    ipc: host
+    depends_on:
+      - carla-server
+    environment:
+      - ROS_DOMAIN_ID=1
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml
+      - CARLA_SPAWN_INDEX=${CARLA_SPAWN_INDEX:-0}
+    volumes:
+      - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro
+    command: >
+      bash -c "source /ws/install/setup.bash && ros2 launch carla_bridge_bringup
+      carla_bridge.launch.py host:=127.0.0.1 port:=2000 rig_file:=/ws/config/carla10.json"
+    restart: on-failure
+
+  # The camera compressor (gate D5). CARLA publishes 1280x720 bgra8, which is
+  # 3.69 MB per sample and 297 Mbit/s at 10 Hz, fragmenting into about 2800
+  # datagrams. The board reassembled none of them and VisionPilot sat at zero
+  # frames; a larger socket buffer did not help, because the wall is the byte
+  # count. This subscribes on loopback, where the raw size costs nothing, and
+  # publishes JPEG at about 159 KiB per frame for the board to decode with its
+  # x5h-image-republish unit. Both ends must agree on the compressed topic.
+  jpeg-bridge:
+    image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
+    container_name: ces-jpeg-bridge
+    network_mode: host
+    ipc: host
+    depends_on:
+      - bridge
+    environment:
+      - ROS_DOMAIN_ID=1
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml
+    volumes:
+      - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro
+    command: >
+      bash -c "source /ws/install/setup.bash && python3 /ws/si/jpeg_bridge.py
+      --quality ${JPEG_QUALITY:-85}"
+    restart: on-failure
+
+  # The stop gate (gate D6): watches domain 1 for the CR52-authored stop.
+  # Same image as the bridge. Command and args are the sibling plan's own
+  # invocation:
+  #   docker run --rm --net=host -e ROS_DOMAIN_ID=1 \
+  #     -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  #     -e CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml visionpilot:si \
+  #     'source /ws/install/setup.bash && python3 /ws/si/si_stop_gate.py \
+  #      --fault-at $T --window 30 --max-latency-ms 700'
+  # SI_GATE_FAULT_AT is per run (the epoch second the fault is injected), so
+  # it cannot be baked in here. Set it and restart just this service right at
+  # `x5h-ces2027-demo.sh fault ...`, e.g.:
+  #   SI_GATE_FAULT_AT=$(date +%s) docker compose up -d --no-deps si-gate
+  # SI_GATE_MAX_LATENCY_MS is route-dependent (gate D6's deviation): 700 for
+  # the `kill` fault route (the firmware trips the stop 0.5 s after the last
+  # heartbeat, plus one 0.15 s cycle), the spec's 200 for the `channel` route
+  # (no staleness wait there). Default here is the `kill` figure; override to
+  # 200 for a channel-route run.
+  si-gate:
+    image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
+    container_name: ces-si-gate
+    network_mode: host
+    ipc: host
+    depends_on:
+      - bridge
+    environment:
+      - ROS_DOMAIN_ID=1
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/si/cyclonedds-bench.xml
+    volumes:
+      - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro
+    command: >
+      bash -c "source /ws/install/setup.bash && python3 /ws/si/si_stop_gate.py
+      --fault-at ${SI_GATE_FAULT_AT:-0} --window ${SI_GATE_WINDOW:-30}
+      --max-latency-ms ${SI_GATE_MAX_LATENCY_MS:-700}"
+    restart: "no"
+
+  # The booth control script (scripts/x5h-ces2027-demo.sh). Its check/fault/
+  # reset only need ssh to the board, so this container carries an ssh
+  # client rather than the host's docker socket. It stays up idle; the
+  # operator runs `docker compose exec demo x5h-ces2027-demo.sh <cmd>`.
+  demo:
+    image: ${DEMO_IMAGE:-alpine:3.20}
+    container_name: ces-demo
+    network_mode: host
+    command: ["/bin/sh", "-c", "apk add --no-cache bash openssh-client >/dev/null && exec sleep infinity"]
+    environment:
+      - X5H_BOARD=${X5H_BOARD:-root@192.168.0.20}
+      - CARLA_PKG=/carla-pkg
+      - VP_SI=/ws/si
+      # This script is mounted alone here, with no sibling components/demo
+      # directory, so its own $0-relative default for the compose file path
+      # cannot resolve inside this container. ${PWD} is the host directory
+      # `docker compose` was run from; this is correct when that is
+      # components/demo (see README.md, "Running the demo"). Invoking
+      # compose from elsewhere: override COMPOSE_FILE explicitly.
+      - COMPOSE_FILE=${COMPOSE_FILE:-${PWD}/docker-compose.yaml}
+    volumes:
+      - ../../scripts/x5h-ces2027-demo.sh:/usr/local/bin/x5h-ces2027-demo.sh:ro
+      - ${VP_SI:-${HOME}/vp-ros2/si}:/ws/si:ro
+      - ${CARLA_PKG:-${HOME}/carla-pkg}:/carla-pkg:ro
+      - ${SSH_AUTH_DIR:-${HOME}/.ssh}:/root/.ssh:ro
+    restart: "no"

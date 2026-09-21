@@ -1,0 +1,64 @@
+[Unit]
+Description=VisionPilot on the X5H NPU (CES 2027 demo)
+ConditionKernelCommandLine=x5h.role=demo
+Requires=x5h-npu.service
+After=x5h-npu.service network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=x5h-vp
+Image=localhost/x5h-visionpilot:latest
+Pull=never
+Network=host
+PodmanArgs=--privileged
+AddDevice=/dev/uio2:/dev/npuc0
+AddDevice=/dev/uio3:/dev/npuc1
+AddDevice=/dev/cmem0
+AddDevice=/dev/cmem_other0
+AddDevice=/dev/cmem_other1
+AddDevice=/dev/cmem_other2
+AddDevice=/dev/cmem_other3
+Volume=/opt/npu:/npu
+# The ARC programs the NPU driver loads to power the engine on. /opt/npu ships
+# one set at hostapp/binary/arc_prog_npus, and it is NOT the set this image's
+# Renesas runtime was built against: all twelve l1c*.bin differ by content.
+# With the wrong set the driver never reaches "Set programs and power on",
+# every inference returns RenesasBackendExecute failed, and VisionPilot dies
+# in its own offload gate with no mention of ARC programs at all. The matching
+# set is the one inside the vendor ORT rootfs, which is why npu-check-autosd.sh
+# passes on the same board, same artifacts and same devices while this failed.
+# Board-confirmed on board 2, 2026-09-18: with this line VisionPilot reaches
+# 12.9 ms NPU latency and 43 fps; without it, it restart-loops.
+Volume=/opt/npu/ort-rootfs/usr/local/lib/python3.11/site-packages/onnxruntime/nnac_portable_env/binary/arc_prog_npus:/npu/hostapp/binary/arc_prog_npus:ro
+# The NNX artifacts were compiled on a workstation and manifest.json records
+# the absolute path they were written to, which exists on no board. The
+# Renesas backend opens that exact path and dies with "fopen: No such file or
+# directory" followed by an Ort::Exception. Mapping the board's copy onto the
+# recorded path makes it resolve without editing vendor artifacts. Board-
+# confirmed on BOTH boards 2026-09-18. If the artifacts are ever recompiled,
+# check manifest.json and move this line with them.
+Volume=/opt/npu/perf/merged:/home/youtalk/src/openadkit/x5h-work/npu/merged:ro
+Volume=/etc/containers/systemd/vision_pilot.conf:/usr/share/visionpilot/config/vision_pilot.conf:ro,z
+Volume=/etc/containers/systemd/vision_pilot_ros2.conf:/usr/share/visionpilot/config/vision_pilot_ros2.conf:ro,z
+Volume=/etc/containers/systemd/cyclonedds-x5h-demo.xml:/etc/x5h/cyclonedds.xml:ro,z
+Environment=ROS_DOMAIN_ID=1
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file:///etc/x5h/cyclonedds.xml
+Environment=QT_QPA_PLATFORM=offscreen
+# The image's own LD_LIBRARY_PATH is
+# /opt/ros/jazzy/lib:/usr/share/visionpilot/onnxruntime/lib, which omits the
+# architecture subdirectory where libddsc.so.0 lives. The entrypoint is
+# /usr/bin/VisionPilot directly, so nothing sources /opt/ros/jazzy/setup.bash
+# to add it. Without this line rmw_cyclonedds_cpp fails to load and the
+# container exits 1 immediately with "libddsc.so.0: cannot open shared object
+# file", restart-looping forever. Board-confirmed on BOTH boards 2026-09-18.
+Environment=LD_LIBRARY_PATH=/opt/ros/jazzy/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib:/usr/share/visionpilot/onnxruntime/lib
+Exec=--no-window
+
+[Service]
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+
+[Install]
+WantedBy=multi-user.target

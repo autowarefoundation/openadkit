@@ -1046,6 +1046,91 @@ Site values — server IP, export paths, the `ip=` kernel argument, and the DTB 
 live in `x5h-work/HANDOFF.md` on the operator's machine and are never committed to this
 repo.
 
+## CES 2027 demo role (`demo`)
+
+The `demo` boot role runs two things in one boot: VisionPilot on the NPU, and the Safety
+Island on the CR52. Together they drive a CARLA-fed booth demo. See [selfboot.md](selfboot.md),
+"Roles", for the role itself. `x5h-demo.service` (`scripts/x5h-demo-up.sh`) starts four
+Quadlet container units plus one plain systemd unit at boot. When the Quadlet generator did
+not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
+
+### The five units
+
+| Unit | Role |
+| --- | --- |
+| `x5h-si-link.service` | Talks to the CR52 over the `rpmsg-si` channel. Logs its heartbeat. Injects the fault on `SIGUSR1` (`SIGUSR2` clears it). |
+| `x5h-demo-bridge.service` | The `domain_bridge` container. It joins DDS domain 1 (VisionPilot, host network) to domain 2 (the CR52, over `tap0`). [component-stack.md](component-stack.md) covers the bridge mechanics it shares with the MRM demo. |
+| `x5h-demo-restamp.service` | `control_restamp.py`. Republishes the CR52's `control_cmd_raw` as `control_cmd`, stamped with domain 1's clock instead of the CR52's own uptime. |
+| `x5h-demo-hb.service` | Turns every VisionPilot throttle command into `/safety_island/vp_heartbeat` for the CR52 to watch. |
+| `x5h-vp.service` | VisionPilot itself, on the NPU. Reads the CARLA camera feed over ROS 2. |
+
+### The six markers
+
+- `X5H_DEMO_UP units=<n>`: `x5h-demo-up.sh` at boot. All five units started (or `X5H_DEMO_UP_FAIL reason=<unit|quadlet>`).
+- `RPMSG_LISTEN_PASS n=<n> gaps=<n>`: `rpmsg-ping -l` on the board. The CR52 heartbeat arrived on `rpmsg-si` with consecutive sequence numbers.
+- `VP_NPU_PASS frames=<n> wall_avg_ms=<ms> wall_max_ms=<ms>`: `vp-npu-gate.sh`, gate D5.
+- `SI_STOP_PASS`: `si_stop_gate.py` on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1 within the latency budget.
+- `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=5 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together (or `X5H_CES_DEMO_FAIL reason=<slug>`).
+- `DEMO_ROLE_PASS role=demo carveout=0x5da00000 vdev=0x5dc00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact, the CR52 carveout relocated, and all four carveouts `cr52_1` lists present under the names remoteproc looks them up by.
+
+### The four CR52 carveouts
+
+The vendor NPU device tree drops every `cr52_*` reserved-memory node but leaves `cr52_1`'s `memory-region` pointing at phandle `0x10a`. `uboot/make-demo-dtb.sh` derives the demo tree from it. Its header records the driver behavior behind each node. It adds the four nodes that `cr52_1` must list, in this order:
+
+| Node | Base | Size | What holds it |
+| --- | --- | --- | --- |
+| `cr52_ram1` | `0x5da00000` | 2 MiB | The firmware's `.resource_table`. |
+| `vdev0vring0` | `0x5dc00000` | `0x3000` | An rpmsg vring. `PAGE_ALIGN(vring_size(256, 4096))`. |
+| `vdev0vring1` | `0x5dc03000` | `0x3000` | The other vring. |
+| `vdev0buffer` | `0x5dc10000` | 1 MiB | The rpmsg buffer pool. 512 buffers times 2048 bytes. |
+
+The three `vdev0*` names are load bearing. `rcar_gen5_rproc_prepare` registers every `memory-region` phandle as a carveout named after the node. `rproc_alloc_vring` and `rproc_add_virtio_dev` then look carveouts up by exactly those names. If a name is missing, remoteproc allocates that window from `linux,cma@40000000` instead. No CR52 MPU region maps that address, because the BSP memory map expects Linux CMA at `0xa2600000`. The firmware takes a data abort in `rpmsg_init_vdev` the first time it touches the window. That was gate D1b on board 2 on 2026-09-17.
+
+All four windows must sit inside one CR52 MPU region. The safety island maps `0x5da00000` for 4 MiB in `actuation_module/freertos_x5h/vendor_patched/system_rcar_gen5.c`. If you move a window in `make-demo-dtb.sh`, move that region with it.
+
+### Running the demo
+
+The companion-host half is a Docker Compose stack, `components/demo/docker-compose.yaml`.
+It declares four services.
+
+- `carla-server`: the CARLA simulator, GPU-reserved. The host needs the NVIDIA Container
+  Toolkit installed from NVIDIA's own repository (Ubuntu's default apt sources do not carry
+  it, so a plain `apt install nvidia-container-toolkit` fails with a package-not-found
+  error). Confirm it with `docker info`: it must list `nvidia` under Runtimes.
+- `bridge` and `si-gate`: the sibling vision_pilot plan's `visionpilot:si` image, on DDS domain 1.
+- `demo`: an idle container carrying `scripts/x5h-ces2027-demo.sh` and an ssh client.
+
+Run `cd components/demo && docker compose up -d` to start the stack. Every host path is an
+env var with a `$HOME`-relative default. Run compose from `components/demo` and not from
+elsewhere: the `demo` container's `COMPOSE_FILE` default is built from that working
+directory, and `x5h-ces2027-demo.sh run` uses it to print the right compose command back to
+you. Running compose from another directory needs an explicit `COMPOSE_FILE` override. The
+booth script itself needs only `ssh` to the board:
+
+```
+x5h-ces2027-demo.sh check                 # ready? prints the READY/FAIL marker above
+x5h-ces2027-demo.sh run                   # prints the compose + board commands to bring the stack up
+x5h-ces2027-demo.sh fault kill|channel    # the demo moment
+x5h-ces2027-demo.sh reset                 # VisionPilot back, fault cleared
+```
+
+`run` does not shell out to `docker` itself. That choice avoids mounting the host's
+`/var/run/docker.sock` into the `demo` container just to start its own compose siblings.
+Bringing the stack up is `docker compose`'s job. This script only prints the two commands
+the operator (or the `demo` container) needs.
+
+### Gates
+
+| Gate | Pass criteria | Deviation |
+| --- | --- | --- |
+| D1 (role boot) | Board 1 boots role `demo`. `remoteproc0` reaches `running`. `uio2` exists. `cmemdrv` logs all four regions with unchanged base and size. `/proc/iomem` shows the 2 MiB reservation at `0x5da00000` and the three `vdev0*` reservations above it (`demo-role-smoke.sh`, marker `DEMO_ROLE_PASS`). Pass: all true in one boot, twice. | None. |
+| D2 (payload) | One 1400-byte DDS sample crosses `tap0` unfragmented. `tcpdump` on the rog-amd side of the bridge shows one frame. Pass: zero `DATA_FRAG`. | None. |
+| D3 (channel) | The second RPMsg endpoint binds on Linux, and the CR52 heartbeat arrives at 1 Hz for 10 minutes (`rpmsg-ping -l`, marker `RPMSG_LISTEN_PASS`). Pass: 600 of 600 (`listen_loop` accepts `n_hb >= seconds - 2`, so 598 of 600 also passes). | None. |
+| D4 (lap) | VisionPilot drives the Town04 ring one full lap unaided, cross-track error under 1.0 m. Pass: one lap, no lane departure. | Runs on rog-amd with no board involved, so it can proceed in parallel with D1 to D3. |
+| D5 (NPU) | VisionPilot end to end under 30 ms on the NPU while the CR52 runs its idle loop (`vp-npu-gate.sh`, marker `VP_NPU_PASS`). Pass: 396 of 396 frames. | None. |
+| D6 (stop) | Fault injected at a fixed point. The CR52-authored `control_cmd` appears within the latency budget. The vehicle stops in lane (`si_stop_gate.py`, marker `SI_STOP_PASS`). Pass: twice in a row, stop distance recorded. | The spec's figure is 200 ms. That holds for the `channel` route, where the latch needs no staleness. The `kill` route's threshold is 700 ms instead. The firmware trips the stop 0.5 s after the last heartbeat, then adds one 0.15 s cycle. |
+| D7 (cold boot) | Power cycle board 1. The whole stack comes up with no operator action (`x5h-demo-up.sh`, marker `X5H_DEMO_UP`). Pass: twice. | None. |
+
 ## Troubleshooting
 
 (findings recorded as discovered)

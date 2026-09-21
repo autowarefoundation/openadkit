@@ -14,8 +14,8 @@ openadkit stop planning-simulation
 ```
 
 Without a deployment name, `status`, `logs`, and `stop` list the running
-deployments. `openadkit run --pull always` refreshes images before starting, and
-`openadkit --version` prints the CLI version.
+deployments. `openadkit run <deployment> --pull always` refreshes images before
+starting, and `openadkit --version` prints the CLI version.
 
 ## Validate Before Running
 
@@ -23,9 +23,13 @@ deployments. `openadkit run --pull always` refreshes images before starting, and
 openadkit validate planning-simulation --data
 ```
 
-`--data` reports each data resource as `ok`, `missing`, or `incomplete`, and
-fails when any resource is missing or incomplete. Without it, `validate` checks
-the manifest, the declared data destinations, and the Compose configuration.
+`--data` reports each selected data resource as `ok`, `missing`, or `incomplete`,
+and fails when any reported resource is missing or incomplete. It uses the same
+GPU selection as `run`, so GPU-only resources are included only with `--gpu`.
+Logging Simulation's CenterPoint models are checked with
+`openadkit validate logging-simulation --gpu --data`. Without `--data`,
+`validate` checks the manifest, the declared data destinations, and the Compose
+configuration.
 `list`, `version`, and `validate` also accept `--json` for scripting.
 
 ## Local Overrides

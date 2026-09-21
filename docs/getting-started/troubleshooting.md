@@ -62,9 +62,11 @@ Recovery depends on the deployment:
 | `carla-simulation` | Run `openadkit fetch carla-simulation --force` for the Town01 map. |
 
 To see what is missing before downloading anything, run
-`openadkit validate <deployment> --data` (for CARLA add `--gpu`:
-`openadkit validate carla-simulation --gpu --data`); it reports each data
-resource as `ok`, `missing`, or `incomplete`.
+`openadkit validate <deployment> --data`. It reports each selected data resource
+as `ok`, `missing`, or `incomplete`, using the same GPU selection as `run`.
+Add `--gpu` for CARLA and for Logging Simulation CenterPoint:
+`openadkit validate carla-simulation --gpu --data` and
+`openadkit validate logging-simulation --gpu --data`.
 
 ## Getting Help
 

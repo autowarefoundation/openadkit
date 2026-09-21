@@ -175,10 +175,10 @@ MODE="${1:-stack}"
 ENVF=/etc/containers/systemd/awf-oak-x5h.env
 DDS_URI=file:///autoware/cyclonedds.xml
 # Frozen link constants, hoisted here rather than inlined at their point of
-# use, matching rpmsg-eth-smoke.sh. Do not retune: MTU 462 is sized to the
+# use, matching rpmsg-eth-smoke.sh. Do not retune: MTU 1500 is sized to the
 # CR52's RPMsg payload budget (see scripts/rpmsg-eth-ifup.sh) and PEER is
 # domain 2's single static peer in components/cyclonedds-x5h.xml.
-MTU=462
+MTU=1500
 # PEER has no code reference left: the tcpdump src-host filter that used to
 # be the only inline use of it is gone (see the domain-2 check below). It is
 # kept, and hoisted, because the CR52-origin argument below depends on this
@@ -211,7 +211,12 @@ CR52_TIMEOUT="${X5H_CR52_TIMEOUT:-150}"
 CORE_UNITS="awf-oak-autoware"
 # The bridged stack. awf-oak-relay and awf-oak-restamp are LOAD-BEARING, not
 # accessories: bridge-config.yaml routes the trajectory through traj_relay
-# (domain 2's MTU 462 cannot carry a full trajectory) and control_cmd back
+# (domain 2's MTU 1500 cannot carry a full trajectory: traj_relay.py records
+# one as about 170 points and about 15 kB. The relay downsamples to 13 points,
+# which serialize to 1172 bytes and so cross as a single datagram at MTU 1500,
+# where at 462 they had to fragment. The relay is still required for the full
+# trajectory; what changed is that its result now arrives whole) and
+# control_cmd back
 # through control_restamp (the CR52 stamps with its own uptime clock). With
 # either one down, a completely healthy board fails no_cr52_control_cmd: with
 # the relay down the CR52 never receives a trajectory it can carry, and with

@@ -33,7 +33,7 @@ options uio_pdrv_genirq of_id=generic-uio
 
 A `modprobe.d` drop-in is the right place for it precisely because the
 module is modprobe-loaded. The alternative — `uio_pdrv_genirq.of_id=` on the
-kernel command line — would mean editing `bootargs_autosd_ufs`, which is
+kernel command line — would mean editing the per-role `bootargs_*`, which are
 coupled to the self-boot PARTUUIDs in three places that must agree (see
 [selfboot.md](selfboot.md)); this needs none of that.
 
@@ -135,13 +135,16 @@ change it made outlives it, so put the node back by hand.
 Enabling UIO does not by itself make the NPU reachable. Three things are still
 missing, and none of them is fixed by this drop-in:
 
-- **The NPU's device-tree nodes are absent from the board's dtb.** The board
-  boots `r8a78000-ironhide-uio-autosd.dtb`, built from the public
-  `renesas-rcar/linux-bsp` tree pinned by `kernel/build-bsp-kernel.sh`. That
-  tree's UIO dtsi describes the ISP, IMR, VSPX, DSP, capture and RSIP blocks
-  but has no NPU node — only the NPU's SMMUs, disabled. The vendor SDK's own
-  UIO device-tree source does describe the NPU blocks as `generic-uio`; those
-  values are SDK material and stay out of this repository.
+- **The NPU's device-tree nodes are absent from the public dtb.**
+  `r8a78000-ironhide-uio-autosd.dtb`, built from the public
+  `renesas-rcar/linux-bsp` tree pinned by `kernel/build-bsp-kernel.sh`,
+  describes the ISP, IMR, VSPX, DSP, capture and RSIP blocks but has no NPU
+  node — only the NPU's SMMUs, disabled. The vendor SDK's own UIO
+  device-tree source does describe the NPU blocks as `generic-uio`; those
+  values are SDK material and stay out of this repository. No boot role
+  loads this blob any more: `demo` and `dev` boot the derived vendor tree
+  instead (see [selfboot.md](selfboot.md), "Roles"), and the public one
+  survives as the TFTP rescue's `dtb_file`.
 - **`/dev/cmem_other*`** — the contiguous-memory devices the runtime opens
   are served by an out-of-tree Renesas module, loaded once per boot. It is
   absent from the pinned kernel source and from this image's module tree, and

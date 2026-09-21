@@ -5,17 +5,18 @@
 # see config/rpmsg-eth.service for that split). Creates tap0 and brings it up
 # with the frozen link parameters for the CR52 bridge: address
 # 172.16.52.1/24, MAC
-# 02:5c:52:00:00:01, and, critically, MTU 462.
+# 02:5c:52:00:00:01, and, critically, MTU 1500.
 #
-# MTU 462 is NOT a tuning knob: max Ethernet frame on this link is 476 bytes
-# (462 payload + 14-byte Ethernet header), sized to the RPMsg payload budget
-# on the CR52 side (496 bytes, leaving headroom for the RPMsg header itself).
-# Bringing tap0 up at the kernel's default MTU (1500) would let the kernel
-# hand the daemon frames it cannot forward whole; rpmsg-eth.c drops those
-# (counted as dropped_oversize) rather than fragmenting them, so a wrong MTU
-# here means silent, oversize-triggered packet loss on the link, not a
-# crash. rpmsg-eth-smoke.sh asserts this MTU on the running interface so a
-# regression here is caught before it reaches ping-loss territory.
+# MTU 1500 is NOT a tuning knob: max Ethernet frame on this link is 1514 bytes
+# (1500 payload + 14-byte Ethernet header), sized to the RPMsg payload budget
+# on the CR52 side (2032 bytes: a 2048-byte buffer minus the 16-byte header).
+# tap0's MTU must never go above 1500: rpmsg-eth.c's frame ceiling is 1514
+# bytes, and a larger MTU would hand the daemon frames it cannot forward
+# whole. It drops those (counted as dropped_oversize) rather than
+# fragmenting them, so an MTU set too high here means silent,
+# oversize-triggered packet loss on the link, not a crash. rpmsg-eth-smoke.sh
+# asserts this MTU on the running interface so a regression here is caught
+# before it reaches ping-loss territory.
 #
 # The MAC is also a frozen constant, not cosmetic: without setting it, tap0
 # gets a kernel-random address that changes every time the persistent tap
@@ -48,4 +49,4 @@ IFACE="${1:-tap0}"
 ip tuntap add dev "$IFACE" mode tap 2>/dev/null || true
 ip addr replace 172.16.52.1/24 dev "$IFACE"
 ip link set "$IFACE" address 02:5c:52:00:00:01
-ip link set "$IFACE" mtu 462 up
+ip link set "$IFACE" mtu 1500 up

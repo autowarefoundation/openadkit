@@ -28,7 +28,7 @@ answered before board time.
   that gives the CR52 a normal Ethernet link to Linux.
 - [UFS self-boot](selfboot.md) — boot AutoSD unattended from the board's
   own storage, with both netboots kept as named rescue commands; the three
-  switchable boot roles (`cr52`, `npu`, `yocto`) and the `stage-board.sh`
+  boot roles (`demo`, `dev`, `yocto`) and the `stage-board.sh`
   staging sequence; also the reset semantics, including why a warm `reboot`
   restarts the CR52.
 - [CR52 slot update](cr52-slot-update.md) — replace the realtime firmware
@@ -113,15 +113,19 @@ answered before board time.
   values are filled at session time, not committed), plus `x5h-env.tmpl` and
   `render-env.sh`, one environment template rendered per board into the
   `x5h-env.txt` that `env import -t` reads off the boot partition. It defines
-  the three boot roles (`cr52`, `npu`, `yocto`) and keeps both netboot paths
-  as `rescue_autosd` / `rescue_yocto_nfs`. See
+  the three boot roles (`demo`, `dev`, `yocto`) and keeps both netboot
+  paths as `rescue_autosd` / `rescue_yocto_nfs`. See
   [selfboot.md](selfboot.md), "Roles"
 - `boards/`: `x5h1.vars` and `x5h2.vars`, holding the three variables (`BOARD_IP`,
   `BOARD_HOSTNAME`, `HAS_YOCTO`) that are the *only* intended difference
   between the two boards. `scripts/x5h-parity.sh` fails if a manifest diff
   shows anything else
 - `tests/`: host-side shell tests (no board, no root, no network).
-  `bash tests/run.sh` prints `ALL_TESTS_PASS`
+  `bash tests/run.sh` prints `ALL_TESTS_PASS`. When `KERNEL_SRC` is unset,
+  the runner skips `test-kernel-patches.sh` and prints `TEST_SKIP`. That
+  test needs a pristine copy of the pinned kernel tree. Export `KERNEL_SRC`
+  to run it. When `dtc` is absent, the runner skips `test-make-demo-dtb.sh`
+  the same way. Run that one inside the `dtc` container
 
 ## QEMU gate semantics
 

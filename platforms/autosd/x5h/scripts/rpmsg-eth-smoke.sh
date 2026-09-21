@@ -1,7 +1,7 @@
 #!/bin/sh
 # Board smoke test for rpmsg-eth.service: assert the CR52's rpmsg-eth
 # channel is on the rpmsg bus, tap0 is configured correctly (address, the
-# frozen MAC 02:5c:52:00:00:01 AND the frozen MTU 462), then round-trip
+# frozen MAC 02:5c:52:00:00:01 AND the frozen MTU 1500), then round-trip
 # ping the CR52 side (172.16.52.2) requiring 100% reply.
 #
 # Unlike rpmsg-smoke.sh this does not drive remoteproc itself: rpmsg-
@@ -12,7 +12,7 @@
 #
 # Markers on stdout (grep-able, one per line):
 #   RPMSG_ETH_PING_PASS
-#   RPMSG_ETH_PING_FAIL reason=<bad_args|no_channel|service_inactive|no_tap|no_carrier|no_ping|ping_loss>
+#   RPMSG_ETH_PING_FAIL reason=<bad_args|no_channel|service_inactive|no_tap|no_carrier|no_ping|ping_loss|big_frame_loss>
 #
 # -n skips the rpmsg-bus channel assertion, for bench runs with no board
 # attached (e.g. validating the tap0/ping plumbing against a manually
@@ -24,7 +24,7 @@ SERVICE=rpmsg-eth
 IFACE=tap0
 ADDR=172.16.52.1/24
 MAC=02:5c:52:00:00:01
-MTU=462
+MTU=1500
 PEER=172.16.52.2
 COUNT=20
 NOBOARD=0
@@ -76,13 +76,13 @@ if ! systemctl is-active --quiet "$SERVICE.service" 2>/dev/null; then
 fi
 
 # --- assert tap0 is up with the expected address, MAC and the frozen MTU --
-# MTU 462 is a frozen wire constant (max Ethernet frame 476 = 462 + the
+# MTU 1500 is a frozen wire constant (max Ethernet frame 1514 = 1500 + the
 # 14-byte Ethernet header, sized to the CR52 side's RPMsg payload budget --
 # see rpmsg-eth-ifup.sh). Checking it here, not just "is tap0 up", catches
-# an ifup regression that brings tap0 up at the kernel default (1500)
-# instead: the daemon would then silently drop oversize frames
-# (rpmsg-eth.c's dropped_oversize counter) rather than failing outright, so
-# nothing else in this smoke test would ever notice.
+# an ifup regression that sets tap0's MTU above 1500: the daemon would then
+# silently drop oversize frames (rpmsg-eth.c's dropped_oversize counter)
+# rather than failing outright, so nothing else in this smoke test would
+# ever notice.
 #
 # The MAC (02:5c:52:00:00:01) is likewise frozen -- see rpmsg-eth-ifup.sh
 # for why a kernel-random MAC is wrong even though ARP means it doesn't
@@ -154,5 +154,18 @@ if [ -z "$TX" ] || [ -z "$RX" ] || [ "$TX" -eq 0 ] || [ "$TX" != "$RX" ]; then
     echo "$OUT" >&2
     fail ping_loss
 fi
+
+# --- one full-size frame, which is the only check that catches MTU skew ----
+# Every assertion above passes on a board that runs this rootfs over an older
+# kernel: tap0 comes up at 1500 and small frames cross, but the kernel still
+# caps the RPMsg buffer at 512, so every large frame dies. Only a full-size
+# datagram sees that. 1472 bytes of payload plus the 28-byte IP and ICMP
+# headers is exactly one 1500-byte packet, and -M do forbids fragmenting it,
+# so a link that cannot carry the frame whole fails here instead of on the
+# board later.
+BIG="$(ping -c 1 -s 1472 -M do "$PEER" 2>&1)" || {
+    echo "$BIG" >&2
+    fail big_frame_loss
+}
 
 echo RPMSG_ETH_PING_PASS

@@ -63,17 +63,27 @@ done
 # Each vdev carveout, missing three ways. These are the checks gate D1a did not
 # have on 2026-09-17, when it passed a tree whose vrings remoteproc then
 # allocated from linux,cma@40000000 and the CR52 data-aborted on.
-while read -r vn vb; do
+while read -r vn vb vsize; do
     good; rm -r "$tmp/g/dt/reserved-memory/$vn@$vb"; out=$(run) && fail "missing_${vn}_accepted"
     grep -q "reason=${vn}_node_missing" <<<"$out" || fail "${vn}_node_reason"
     # A node whose phandle is not the one cr52_1 lists in that slot: the tree
     # carries the window but nothing routes the core to it.
     good; printf '\0\0\2\377' > "$tmp/g/dt/reserved-memory/$vn@$vb/phandle"; out=$(run) && fail "unlinked_${vn}_accepted"
     grep -q "reason=${vn}_not_linked" <<<"$out" || fail "${vn}_link_reason"
+    # The node and its linkage are right but the kernel never reserved the
+    # window, so remoteproc still allocates it from linux,cma@40000000. The
+    # fixture splits its reservation around this one window, leaving every
+    # earlier window covered, because a fixture that drops all reserved lines
+    # stops at carveout_not_reserved and never reaches this check.
+    good
+    { printf '%s-%x : reserved\n' 5da00000 $((0x$vb - 1))
+      printf '%x-%s : reserved\n' $((0x$vb + 0x$vsize)) 8affffff; } > "$tmp/g/iomem"
+    out=$(run) && fail "unreserved_${vn}_accepted"
+    grep -q "reason=${vn}_not_reserved" <<<"$out" || fail "${vn}_reservation_reason"
 done <<'EOF'
-vdev0vring0 5dc00000
-vdev0vring1 5dc03000
-vdev0buffer 5dc10000
+vdev0vring0 5dc00000 3000
+vdev0vring1 5dc03000 3000
+vdev0buffer 5dc10000 100000
 EOF
 # A tree carrying only cr52_ram1 -- exactly the 2026-09-17 tree -- is refused.
 good; for vn in vdev0vring0@5dc00000 vdev0vring1@5dc03000 vdev0buffer@5dc10000; do rm -r "$tmp/g/dt/reserved-memory/$vn"; done

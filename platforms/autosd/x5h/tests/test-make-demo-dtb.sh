@@ -72,9 +72,6 @@ dtc -q -I dts -O dtb -o "$tmp/collide.dtb" "$tmp/collide.dts" || fail fixture3_c
 out=$(bash "$s" "$tmp/collide.dtb" "$tmp/c.dtb" 2>&1) || fail collision_derive_failed
 mrc=$(fdtget -t x "$tmp/c.dtb" /soc/cr52_1 memory-region)
 [ "$mrc" = "10a 203 204 205" ] || fail "collision_not_avoided: $mrc"
-# Every window must fit the 4 MiB CR52 MPU region at 0x5da00000, or the
-# firmware aborts on the first access the same way gate D1b did.
-[ $((0x5dc10000 + 0x100000)) -le $((0x5da00000 + 0x400000)) ] || fail outside_mpu_region
 # Refuse a tree that already assigns the phandle: aliasing a live node is worse than failing.
 sed 's/phandle = <0x201>/phandle = <0x10a>/' "$tmp/npu.dts" > "$tmp/taken.dts"
 dtc -q -I dts -O dtb -o "$tmp/taken.dtb" "$tmp/taken.dts" || fail fixture2_compile

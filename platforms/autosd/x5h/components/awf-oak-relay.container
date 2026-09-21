@@ -9,19 +9,11 @@ After=network-online.target
 # needs the bridge to start nor breaks without it; the bridge is what
 # carries _ds into domain 2, remapped back to the real name.
 After=awf-oak-bridge.service awf-oak-autoware.service
-# Domain 2 exists only over tap0 (rpmsg-eth), which the demo and dev roles
-# both bring up. Gated to dev alone even so: this stack and the CES 2027
-# demo stack each bind domain 1 and domain 2 and each runs its own
-# domain_bridge, so the two must never run together. demo is the booth
-# boot and owns that pairing; this stack belongs to dev.
+# Domain 2 exists only over tap0 (rpmsg-eth). Gated to dev, the role that
+# owns this stack; see awf-oak-autoware.container for why demo is excluded.
 ConditionKernelCommandLine=x5h.role=dev
 
-# No [Install] section, deliberately, the same call awf-oak-simulator.container
-# makes and for a related reason. With one, Quadlet writes the
-# default.target.wants symlink itself and this unit comes up on every dev
-# boot. A dev boot has several possible workloads and the role cannot pick
-# among them, so the stack is started by hand:
-#   systemctl start awf-oak-autoware awf-oak-bridge awf-oak-relay awf-oak-restamp
+# No [Install] section, deliberately -- see awf-oak-autoware.container.
 
 [Container]
 # Host networking: domain 1 discovery is on the loopback path, which is

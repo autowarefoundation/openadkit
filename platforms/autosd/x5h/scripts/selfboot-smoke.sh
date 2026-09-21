@@ -11,9 +11,8 @@
 # restart oopsed rpmsg_char and left RPMsg dead until the next SoC reset. Under
 # the `oops=panic panic=10` bootargs every role now carries, that oops is a
 # reboot instead, so the line is gone. The per-role link check is
-# rpmsg-eth-smoke.sh (the CR52 link) and npu-contract-smoke.sh (the NPU), and
-# demo and dev both want both; this script only asserts that the role's own bring-up
-# units reached active.
+# rpmsg-eth-smoke.sh (the CR52 link) and npu-contract-smoke.sh (the NPU);
+# this script only asserts that the role's own bring-up units reached active.
 set -u
 
 ROOT_PARTUUID=7c94f5e2-9e2b-4c31-8f0a-1a2b3c4d5e02

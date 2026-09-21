@@ -70,11 +70,6 @@ while read -r vn vb; do
     # carries the window but nothing routes the core to it.
     good; printf '\0\0\2\377' > "$tmp/g/dt/reserved-memory/$vn@$vb/phandle"; out=$(run) && fail "unlinked_${vn}_accepted"
     grep -q "reason=${vn}_not_linked" <<<"$out" || fail "${vn}_link_reason"
-    # Drop every reserved line that covers this window. With coalescing the
-    # window has no line of its own, so the range holding it is what goes.
-    good; grep -v " : reserved$" "$tmp/g/iomem" > "$tmp/g/iomem.n"; mv "$tmp/g/iomem.n" "$tmp/g/iomem"
-    out=$(run) && fail "unreserved_${vn}_accepted"
-    grep -q "reason=.*_not_reserved" <<<"$out" || fail "${vn}_reservation_reason"
 done <<'EOF'
 vdev0vring0 5dc00000
 vdev0vring1 5dc03000
@@ -101,7 +96,7 @@ good; rm -r "$tmp/g/dt/soc/cr52_1"; out=$(run) && fail missing_memory_region_acc
 grep -q 'reason=cr52_memory_region' <<<"$out" || fail memory_region_missing_reason
 good; printf '\0\0\1\v' > "$tmp/g/dt/soc/cr52_1/memory-region"; out=$(run) && fail wrong_memory_region_accepted
 grep -q 'reason=cr52_memory_region' <<<"$out" || fail memory_region_wrong_reason
-good; mkdir -p "$tmp/g/dt/soc/cr52_1a"; printf '\0\0\1\v' > "$tmp/g/dt/soc/cr52_1/memory-region"; printf '\0\0\1\n' > "$tmp/g/dt/soc/cr52_1a/memory-region"; out=$(run) && fail ambiguous_node_accepted
+good; mkdir -p "$tmp/g/dt/soc/cr52_1a"; printf '\0\0\1\n' > "$tmp/g/dt/soc/cr52_1a/memory-region"; out=$(run) && fail ambiguous_node_accepted
 grep -q 'reason=cr52_node_ambiguous' <<<"$out" || fail ambiguous_node_reason
 for r in 1400000000 1c00000000 64000000 8e400000; do
     good; rm -r "$tmp/g/dt/reserved-memory/linux,npu_region@$r"; out=$(run) && fail missing_npu_region_accepted

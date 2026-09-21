@@ -15,8 +15,6 @@
 #             containers. Start the MRM stack or anything else by hand.
 #   yocto -- vendor kernel from the second LUN (boards with HAS_YOCTO=1 only)
 #
-# demo and dev differ only in which units start. Nothing about the memory map
-# changes between them, so switching costs a reboot but never a reflash.
 # See selfboot.md, "Roles".
 set -u
 BOOT_DIR=${X5H_BOOT_DIR:-}

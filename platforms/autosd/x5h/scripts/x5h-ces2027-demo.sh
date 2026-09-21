@@ -54,10 +54,6 @@ case "$cmd" in
     seq=$(sed -n 's/.*hb seq=\([0-9]*\).*/\1/p' <<<"$hb"); [ -n "$seq" ] || fail no_heartbeat
     echo "X5H_CES_DEMO_READY sha=$sha spawn=$spawn units=$n hb=$seq" ;;
   run)
-    # Bringing carla-server/bridge/si-gate up is compose's job, not this
-    # script's: printing the two commands keeps the booth operator off
-    # `docker` directly and this script out of needing the host's
-    # /var/run/docker.sock mounted into any container.
     if [ -z "$COMPOSE_FILE" ]; then
         d=$(cd "$(dirname "$0")/../components/demo" 2>/dev/null && pwd) || true
         [ -n "$d" ] || fail no_compose_file

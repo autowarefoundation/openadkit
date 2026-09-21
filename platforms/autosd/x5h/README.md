@@ -1075,7 +1075,7 @@ not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recove
 
 ### The four CR52 carveouts
 
-The vendor NPU device tree drops every `cr52_*` reserved-memory node but leaves `cr52_1`'s `memory-region` pointing at phandle `0x10a`. `uboot/make-demo-dtb.sh` derives the demo tree from it. It adds the four nodes that `cr52_1` must list, in this order:
+The vendor NPU device tree drops every `cr52_*` reserved-memory node but leaves `cr52_1`'s `memory-region` pointing at phandle `0x10a`. `uboot/make-demo-dtb.sh` derives the demo tree from it. Its header records the driver behavior behind each node. It adds the four nodes that `cr52_1` must list, in this order:
 
 | Node | Base | Size | What holds it |
 | --- | --- | --- | --- |
@@ -1086,11 +1086,7 @@ The vendor NPU device tree drops every `cr52_*` reserved-memory node but leaves 
 
 The three `vdev0*` names are load bearing. `rcar_gen5_rproc_prepare` registers every `memory-region` phandle as a carveout named after the node. `rproc_alloc_vring` and `rproc_add_virtio_dev` then look carveouts up by exactly those names. If a name is missing, remoteproc allocates that window from `linux,cma@40000000` instead. No CR52 MPU region maps that address, because the BSP memory map expects Linux CMA at `0xa2600000`. The firmware takes a data abort in `rpmsg_init_vdev` the first time it touches the window. That was gate D1b on board 2 on 2026-09-17.
 
-A fixed device address in the firmware's own resource table does not pin the vrings instead. `rproc_alloc_vring` matches by name, not by address. With no IOMMU, `rproc_alloc_carveout` only warns that the allocation does not fit the request. It then writes the address it allocated back into the table. The firmware therefore publishes `FW_RSC_ADDR_ANY` and reads back whatever Linux chose.
-
 All four windows must sit inside one CR52 MPU region. The safety island maps `0x5da00000` for 4 MiB in `actuation_module/freertos_x5h/vendor_patched/system_rcar_gen5.c`. If you move a window in `make-demo-dtb.sh`, move that region with it.
-
-Every node carries `no-map`, and the derivation depends on it. `rcar_gen5_rproc_mem_alloc` maps a carveout with `ioremap_wc`. Arm64 refuses to `ioremap` memory that is in the linear map.
 
 ### Running the demo
 

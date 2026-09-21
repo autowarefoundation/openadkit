@@ -312,6 +312,33 @@ def warn_if_modified(root, deployment, kit) -> None:
         )
 
 
+def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> None:
+    gaps = [item for item in results if item["status"] != "ok"]
+    if not gaps:
+        return
+    for item in gaps:
+        if item["recovery"] != "remove":
+            continue
+        print(
+            f"error: {item['name']} at {item['destination']} cannot be replaced "
+            "in place; remove it and run: "
+            f"openadkit fetch {deployment_name}",
+            file=sys.stderr,
+        )
+    if any(item["recovery"] == "fetch-force" for item in gaps):
+        print(
+            "error: installed data is incomplete; run: "
+            f"openadkit fetch {deployment_name} --force",
+            file=sys.stderr,
+        )
+    elif any(item["recovery"] == "fetch" for item in gaps):
+        print(
+            "error: installed data is missing; run: "
+            f"openadkit fetch {deployment_name}",
+            file=sys.stderr,
+        )
+
+
 def print_run_next_steps(deployment, selection) -> None:
     print(f"running: {deployment.name}")
     if "visualizer" in selection.services:
@@ -430,11 +457,7 @@ def main() -> int:
             if results is not None and any(
                 item["status"] != "ok" for item in results
             ):
-                print(
-                    "error: installed data is incomplete; run: "
-                    f"openadkit fetch {deployment.name} --force",
-                    file=sys.stderr,
-                )
+                report_data_gaps(deployment.name, results)
                 return 1
             return 0
 

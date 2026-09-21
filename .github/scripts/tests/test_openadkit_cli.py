@@ -1907,11 +1907,14 @@ def test_validate_data_reports_missing_incomplete_and_ok(tmp_path):
     assert result.returncode == 1, result.stdout
     assert "valid: example (humble, cpu)" in result.stdout
     assert "data: sample-map missing" in result.stdout
+    assert "openadkit fetch example" in result.stderr
+    assert "--force" not in result.stderr
 
     target.mkdir(parents=True)
     result = run_cli(root, ["validate", "example", "--data"], env=path_env)
     assert result.returncode == 1, result.stdout
     assert "data: sample-map incomplete" in result.stdout
+    assert "openadkit fetch example --force" in result.stderr
 
     (target / "lanelet2_map.osm").write_text("map\n")
     result = run_cli(root, ["validate", "example", "--data"], env=path_env)
@@ -1921,6 +1924,46 @@ def test_validate_data_reports_missing_incomplete_and_ok(tmp_path):
     result = run_cli(root, ["validate", "example"], env=path_env)
     assert result.returncode == 0, result.stderr
     assert "data:" not in result.stdout
+
+
+def test_validate_data_tells_operator_to_remove_nondirectory(tmp_path):
+    resource = {
+        "name": "sample-map",
+        "kind": "files",
+        "destinationEnv": "MAP_PATH",
+        "files": [
+            {
+                "path": "lanelet2_map.osm",
+                "url": "http://example.invalid/lanelet2_map.osm",
+                "sha256": "0" * 64,
+            }
+        ],
+        "requiredFiles": ["lanelet2_map.osm"],
+    }
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=[resource]))
+    bin_dir, _ = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    home = root.parent / "home"
+    (home / "data").mkdir(parents=True)
+    target = home / "data" / "example"
+    target.write_text("corrupted\n")
+
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert "data: sample-map incomplete" in result.stdout
+    assert f"{target} cannot be replaced in place" in result.stderr
+    assert "remove it and run: openadkit fetch example" in result.stderr
+    assert "--force" not in result.stderr
+
+    target.unlink()
+    outside = home / "real-data"
+    outside.mkdir()
+    target.symlink_to(outside)
+    result = run_cli(root, ["validate", "example", "--data"], env=path_env)
+    assert result.returncode == 1, result.stdout
+    assert f"{target} cannot be replaced in place" in result.stderr
+    assert "--force" not in result.stderr
+    assert target.is_symlink()
 
 
 def test_validate_data_respects_gpu_selection(tmp_path):

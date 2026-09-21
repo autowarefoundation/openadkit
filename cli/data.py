@@ -205,12 +205,24 @@ def check_installed_data(
         target = resolve_destination(resource, selection)
         if validate_dataset(target, resource["requiredFiles"]):
             status = "ok"
-        elif target.exists() or target.is_symlink():
+            recovery = None
+        elif target.is_symlink() or (target.exists() and not target.is_dir()):
+            # fetch --force refuses these; the operator has to remove them first.
             status = "incomplete"
+            recovery = "remove"
+        elif target.is_dir():
+            status = "incomplete"
+            recovery = "fetch-force"
         else:
             status = "missing"
+            recovery = "fetch"
         results.append(
-            {"name": resource["name"], "destination": target, "status": status}
+            {
+                "name": resource["name"],
+                "destination": target,
+                "status": status,
+                "recovery": recovery,
+            }
         )
     return results
 

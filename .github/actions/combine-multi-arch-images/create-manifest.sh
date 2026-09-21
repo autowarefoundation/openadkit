@@ -46,10 +46,19 @@ linux_image_digest() {
     printf '%s\n' "${digest}"
     return 0
   }
+  # A raw image manifest has no index entries. Accept it only when its
+  # config platform is linux/<arch>; the tag name is not evidence.
   digest=$(
-    jq -er '
+    jq -er --arg arch "${arch}" '
       if ((.manifest.manifests // []) | length) == 0
          and (.manifest.digest | type == "string" and test("^sha256:[0-9a-f]{64}$"))
+         and (
+           (.image.os == "linux" and .image.architecture == $arch)
+           or (
+             .manifest.platform.os == "linux"
+             and .manifest.platform.architecture == $arch
+           )
+         )
       then .manifest.digest
       else empty end
     ' <<<"${json}"

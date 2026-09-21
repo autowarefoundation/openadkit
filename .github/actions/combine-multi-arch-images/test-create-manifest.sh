@@ -8,9 +8,12 @@ trap 'rm -rf "${work}"' EXIT
 AMD64_IMAGE='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 ARM64_IMAGE='sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
 ATTESTATION='sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+RAW_IMAGE='sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
 
 # Stub `docker` on PATH: `inspect --format json` succeeds iff the ref is listed
-# in $PRESENT_REFS and emits an OCI index with linux/<arch> plus an attestation.
+# in $PRESENT_REFS. By default it emits an OCI index with linux/<arch> plus an
+# attestation. $SINGLE_MANIFEST emits a raw image whose config platform matches
+# the tag arch; $WRONG_PLATFORM emits a raw image of the other arch.
 # `create` records its args to $CREATE_LOG.
 cat > "${work}/docker" <<STUB
 #!/usr/bin/env bash
@@ -32,6 +35,20 @@ if [ "\${1:-} \${2:-} \${3:-}" = "buildx imagetools inspect" ]; then
     image_digest=${ARM64_IMAGE}
   else
     exit 1
+  fi
+  if grep -qxF "\$ref" "\${SINGLE_MANIFEST:-/dev/null}" 2>/dev/null; then
+    cat <<JSON
+{"manifest":{"digest":"${RAW_IMAGE}"},"image":{"os":"linux","architecture":"\${arch}"}}
+JSON
+    exit 0
+  fi
+  if grep -qxF "\$ref" "\${WRONG_PLATFORM:-/dev/null}" 2>/dev/null; then
+    wrong=arm64
+    if [[ "\${arch}" == arm64 ]]; then wrong=amd64; fi
+    cat <<JSON
+{"manifest":{"digest":"${RAW_IMAGE}"},"image":{"os":"linux","architecture":"\${wrong}"}}
+JSON
+    exit 0
   fi
   if grep -qxF "\$ref" "\${ATTESTATION_ONLY:-/dev/null}" 2>/dev/null; then
     cat <<JSON
@@ -55,7 +72,11 @@ export PATH="${work}:${PATH}"
 export CREATE_LOG="${work}/create.log"
 export PRESENT_REFS="${work}/present.txt"
 export ATTESTATION_ONLY="${work}/attestation-only.txt"
+export SINGLE_MANIFEST="${work}/single-manifest.txt"
+export WRONG_PLATFORM="${work}/wrong-platform.txt"
 : > "${ATTESTATION_ONLY}"
+: > "${SINGLE_MANIFEST}"
+: > "${WRONG_PLATFORM}"
 
 fail=0
 check() { if ! eval "$1"; then echo "FAIL: $1"; fail=1; fi; }
@@ -100,5 +121,24 @@ check "[ ${rc} -eq 1 ]"
 check "[ ! -s '${CREATE_LOG}' ]"
 check "grep -q 'no linux/amd64 image manifest' '${work}/out.txt'"
 : > "${ATTESTATION_ONLY}"
+
+# Case 5: raw linux/amd64 manifest -> create from that image digest
+printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${SINGLE_MANIFEST}"
+: > "${CREATE_LOG}"
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+check "[ ${rc} -eq 0 ]"
+check "grep -q 'ghcr.io/x/openadkit@${RAW_IMAGE}' '${CREATE_LOG}'"
+: > "${SINGLE_MANIFEST}"
+
+# Case 6: raw manifest of the other architecture -> fail closed, no create
+printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${WRONG_PLATFORM}"
+: > "${CREATE_LOG}"
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+check "[ ${rc} -eq 1 ]"
+check "[ ! -s '${CREATE_LOG}' ]"
+check "grep -q 'no linux/amd64 image manifest' '${work}/out.txt'"
+: > "${WRONG_PLATFORM}"
 
 if [ "${fail}" -eq 0 ]; then echo "create-manifest: ALL PASS"; else echo "create-manifest: TESTS FAILED"; cat "${work}/out.txt"; exit 1; fi

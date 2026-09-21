@@ -77,9 +77,3 @@ A **deployment** combines the shared base services with task-specific overlays. 
 | **Tag alias** | A moving image tag such as `planning-control-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |
 | **Digest pin** | An image reference by content hash (`@sha256:…`) instead of a tag, so the same image bits are always used. |
 | **Mixed criticality** | Running safety-critical and non-critical workloads in separate containers or partitions on the same hardware. |
-
-## Related
-
-- [Getting Started](getting-started/index.md) — Set up your environment
-- [Deployments](deployments/index.md) — Run your first deployment
-- [Platforms](platforms/index.md) — Choose a deployment target

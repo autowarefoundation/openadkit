@@ -25,9 +25,3 @@ This section covers how to build Open AD Kit from source, contribute changes, an
 </div>
 
 </div>
-
-## Related
-
-- [Getting Started](../getting-started/index.md) — Environment setup
-- [Components](../components/index.md) — Architecture overview
-- [GitHub Repository](https://github.com/autowarefoundation/openadkit)

@@ -23,8 +23,3 @@ For installation and runtime instructions, see the upstream project:
 
 - [meta-ewaol source (GitLab, archived — read-only)](https://gitlab.com/soafee/ewaol/meta-ewaol)
 - [EWAOL documentation](https://ewaol.docs.arm.com/en/latest/) — development is now hosted by the SOAFEE SIG
-
-## Related
-
-- [Supported Platforms overview](../index.md)
-- [AutoSD platform](../autosd/index.md)

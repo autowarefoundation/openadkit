@@ -209,9 +209,3 @@ flowchart LR
 
     Today -.-> Target
 ```
-
-## Related
-
-- [CentOS Automotive SIG Documentation](https://sigs.centos.org/automotive/latest/)
-- [AutoSD Features and Concepts](https://sigs.centos.org/automotive/latest/features-and-concepts/)
-- [Supported Platforms overview](../index.md)

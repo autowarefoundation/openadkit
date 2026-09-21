@@ -90,9 +90,3 @@ openadkit clean planning-simulation --data     # delete
 Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
 shared with the standalone Zenoh bridge; if it is removed, restore it with
 `openadkit fetch scenario-simulation --force`.
-
-## Related
-
-- [Quickstart](index.md) - First run in about 10 minutes
-- [Deployments](../deployments/index.md) - Per-deployment commands and configuration
-- [Troubleshooting](troubleshooting.md) - Common issues and fixes

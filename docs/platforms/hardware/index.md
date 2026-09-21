@@ -60,8 +60,3 @@ For running a full Autoware stack on a verified edge platform, the requirements 
 | NVIDIA Jetson Orin | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | JetPack 6 validation in progress. Not yet fully verified for production use. |
 | R-Car X5H (r8a78000 / ironhide) | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | AutoSD 10 board bring-up; QEMU-gated off-board, board smoke remains manual |
 | ADLINK ADM-AL30 | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | Arm64 edge platform; no validation evidence recorded in this repository |
-
-## Related
-
-- [Supported Platforms](../index.md) — Platform tiers and development hosts
-- [Quickstart](../../getting-started/index.md) — First run in about 10 minutes

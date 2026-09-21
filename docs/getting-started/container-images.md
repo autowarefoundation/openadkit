@@ -119,11 +119,3 @@ from the promoted image digest:
     Pre-release tags (e.g., `-rc.1`) are published but **do not update** latest stable aliases. This prevents prerelease images from being pulled by default aliases.
 
 Maintainer workflow steps are documented in the [Release Process](../development/build-from-source.md#release-process).
-
-## Related
-
-- [Quickstart](index.md) — First run in about 10 minutes
-- [CLI & Maintenance](cli.md) — Runtime controls, upgrades, and cleanup
-- [Releases & Roadmap](../releases/index.md) — Release status and development phases
-- [Build from Source](../development/build-from-source.md) — Building images locally
-- [Troubleshooting](troubleshooting.md) — Common issues

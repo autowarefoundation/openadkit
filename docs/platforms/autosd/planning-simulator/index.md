@@ -92,10 +92,3 @@ Once all services are running, you can:
 - Validate the AutoSD + Podman + Quadlet deployment path before moving to vehicle hardware
 
 For a Docker Compose equivalent with a browser-accessible RViz2 visualizer, see the [Planning Simulation deployment](../../../deployments/planning-simulation/index.md).
-
-## Related
-
-- [AutoSD Platform Overview](../index.md)
-- [Planning Simulation deployment](../../../deployments/planning-simulation/index.md)
-- [Open AD Kit Deployments](../../../deployments/index.md)
-- [Components Overview](../../../components/index.md)

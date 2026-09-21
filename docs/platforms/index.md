@@ -64,9 +64,3 @@ if it worked. Hardware rows use the badges on the [hardware page](hardware/index
 | Jazzy multi-arch matrix (where green) | **Best-effort** until sustained green promotion | Built in parallel; Humble remains the default documented path |
 | EWAOL | **Unsupported** | Upstream SOAFEE background only; no in-repo assets |
 | Hardware (ADLINK, AWS G5, Jetson, …) | See [Hardware](hardware/index.md) | Verified / Tests Ongoing badges; not a substitute for the tiers above |
-
-## Related
-
-- [Hardware requirements and tested platforms](hardware/index.md)
-- [Getting started guide](../getting-started/index.md)
-- [Container Images & Versioning](../getting-started/container-images.md)

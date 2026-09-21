@@ -197,10 +197,3 @@ builds. See [Container Images & Versioning](../getting-started/container-images.
 for the tag naming scheme.
 
 {{ component_table() }}
-
-## Related
-
-- [Deployments](../deployments/index.md) — How to compose components into running systems
-- [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
-- [Releases & Roadmap](../releases/index.md) — Release status and development phases
-- [Supported Platforms](../platforms/index.md) — Where to deploy

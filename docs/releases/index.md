@@ -29,9 +29,3 @@ demo milestone.
 | **CES 2027 demo** | <span class="oak-badge oak-badge--neutral">Milestone</span> | Flagship demo: Autoware Safety Island + CARLA |
 | **Trust Signals & Platform Profiles** | <span class="oak-badge oak-badge--neutral">Planned</span> | SBOM, provenance, cosign signing, vulnerability policy, AutoSD/Podman profiles, BlueChi |
 | **Full OTA Support** | <span class="oak-badge oak-badge--neutral">Planned</span> | Staged apply, health promotion, verified rollback, end-to-end closed loop |
-
-## Related
-
-- [Container Images & Versioning](../getting-started/container-images.md) — Tag schema and pinning guidance
-- [Getting Started](../getting-started/index.md) — Run Open AD Kit from a source checkout
-- [Supported Platforms](../platforms/index.md) — Deployment targets and their tiers

@@ -72,10 +72,3 @@ Add `--gpu` for CARLA and for Logging Simulation CenterPoint:
 
 - [GitHub Issues](https://github.com/autowarefoundation/openadkit/issues)
 - [Autoware Foundation Discord](https://discord.gg/Q94UsPvReQ)
-
-## Related
-
-- [Quickstart](index.md) — First run in about 10 minutes
-- [CLI & Maintenance](cli.md) — Runtime controls, upgrades, and cleanup
-- [Container Images & Versioning](container-images.md) — Tag schema and version policy
-- [Deployments](../deployments/index.md) — Per-deployment commands and configuration

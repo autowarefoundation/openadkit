@@ -279,9 +279,3 @@ These artifacts are the canonical reference for release validation:
 - **Scan metadata** — CVE scan results
 - **`.github/image-inventory.json`** — Canonical inventory of all published images and their tags
 - **`release-plan.json`** — Immutable release refs, aliases, asset inventory, deployment checksums, and dual-distro runtime context
-
-## Related
-
-- [Contributing](contributing.md) — How to submit your changes
-- [Components](../components/index.md) — Image contents and the build pipeline
-- [Container Images & Versioning](../getting-started/container-images.md) — Pulling pre-built images

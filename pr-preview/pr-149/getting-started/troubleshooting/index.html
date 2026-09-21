@@ -889,17 +889,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2214,17 +2203,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2326,20 +2304,15 @@ source checkout, prefix them with <code>./</code> and run them from the reposito
 </tbody>
 </table>
 <p>To see what is missing before downloading anything, run
-<code>openadkit validate &lt;deployment&gt; --data</code> (for CARLA add <code>--gpu</code>:
-<code>openadkit validate carla-simulation --gpu --data</code>); it reports each data
-resource as <code>ok</code>, <code>missing</code>, or <code>incomplete</code>.</p>
+<code>openadkit validate &lt;deployment&gt; --data</code>. It reports each selected data resource
+as <code>ok</code>, <code>missing</code>, or <code>incomplete</code>, using the same GPU selection as <code>run</code>.
+Add <code>--gpu</code> for CARLA and for Logging Simulation CenterPoint:
+<code>openadkit validate carla-simulation --gpu --data</code> and
+<code>openadkit validate logging-simulation --gpu --data</code>.</p>
 <h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">#</a></h2>
 <ul>
 <li><a href="https://github.com/autowarefoundation/openadkit/issues">GitHub Issues</a></li>
 <li><a href="https://discord.gg/Q94UsPvReQ">Autoware Foundation Discord</a></li>
-</ul>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
-<ul>
-<li><a href="../">Quickstart</a> — First run in about 10 minutes</li>
-<li><a href="../cli/">CLI &amp; Maintenance</a> — Runtime controls, upgrades, and cleanup</li>
-<li><a href="../container-images/">Container Images &amp; Versioning</a> — Tag schema and version policy</li>
-<li><a href="../../deployments/">Deployments</a> — Per-deployment commands and configuration</li>
 </ul>
 
 

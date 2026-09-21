@@ -749,17 +749,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2046,17 +2035,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#related" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2093,14 +2071,18 @@ openadkit<span class="w"> </span>logs<span class="w"> </span>planning-simulation
 openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 </code></pre></div>
 <p>Without a deployment name, <code>status</code>, <code>logs</code>, and <code>stop</code> list the running
-deployments. <code>openadkit run --pull always</code> refreshes images before starting, and
-<code>openadkit --version</code> prints the CLI version.</p>
+deployments. <code>openadkit run &lt;deployment&gt; --pull always</code> refreshes images before
+starting, and <code>openadkit --version</code> prints the CLI version.</p>
 <h2 id="validate-before-running">Validate Before Running<a class="headerlink" href="#validate-before-running" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>validate<span class="w"> </span>planning-simulation<span class="w"> </span>--data
 </code></pre></div>
-<p><code>--data</code> reports each data resource as <code>ok</code>, <code>missing</code>, or <code>incomplete</code>, and
-fails when any resource is missing or incomplete. Without it, <code>validate</code> checks
-the manifest, the declared data destinations, and the Compose configuration.
+<p><code>--data</code> reports each selected data resource as <code>ok</code>, <code>missing</code>, or <code>incomplete</code>,
+and fails when any reported resource is missing or incomplete. It uses the same
+GPU selection as <code>run</code>, so GPU-only resources are included only with <code>--gpu</code>.
+Logging Simulation's CenterPoint models are checked with
+<code>openadkit validate logging-simulation --gpu --data</code>. Without <code>--data</code>,
+<code>validate</code> checks the manifest, the declared data destinations, and the Compose
+configuration.
 <code>list</code>, <code>version</code>, and <code>validate</code> also accept <code>--json</code> for scripting.</p>
 <h2 id="local-overrides">Local Overrides<a class="headerlink" href="#local-overrides" title="Permanent link">#</a></h2>
 <p>Use <code>deployments/&lt;name&gt;/config.local.env</code> for host-specific settings. Source
@@ -2139,12 +2121,6 @@ openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulatio
 <p>Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
 shared with the standalone Zenoh bridge; if it is removed, restore it with
 <code>openadkit fetch scenario-simulation --force</code>.</p>
-<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">#</a></h2>
-<ul>
-<li><a href="../">Quickstart</a> - First run in about 10 minutes</li>
-<li><a href="../../deployments/">Deployments</a> - Per-deployment commands and configuration</li>
-<li><a href="../troubleshooting/">Troubleshooting</a> - Common issues and fixes</li>
-</ul>
 
 
 

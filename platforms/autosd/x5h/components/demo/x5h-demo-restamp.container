@@ -8,7 +8,6 @@ After=network-online.target
 # /control/trajectory_follower/control_cmd with domain 1's clock in all
 # three stamps. Without the bridge it simply sees nothing; it does not fail.
 After=x5h-demo-bridge.service
-# Domain 2 exists only over tap0 (rpmsg-eth), which the cr52 and demo roles both bring up.
 ConditionKernelCommandLine=x5h.role=demo
 
 [Install]
@@ -42,13 +41,7 @@ Volume=/etc/containers/systemd/control_restamp.py:/autoware/nodes/control_restam
 Exec=python3 /autoware/nodes/control_restamp.py
 
 [Service]
-# NOT redundant with the [Container] copy above. Quadlet renames
-# [Container] to [X-Container], which systemd ignores, so only THIS copy
-# reaches systemd -- and systemd is what expands ${...} in the generated
-# ExecStart. Without it Image=${AUTOWARE_IMAGE} expands to the empty string
-# and podman exits with "repository name must have at least one component".
-# Verify by parsing the generated [Service] section, not by grepping the
-# file for the key.
+# NOT redundant with the [Container] copy above -- see x5h-demo-bridge.container.
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env
 # Restart=on-failure is a deviation from run.yml's `restart: "no"`, recorded
 # as such in awf-oak-x5h.env. StartLimitIntervalSec is what makes it safe:

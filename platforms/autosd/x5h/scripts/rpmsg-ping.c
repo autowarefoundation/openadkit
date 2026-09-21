@@ -138,11 +138,7 @@ static void on_usr1(int s) { (void)s; g_fault_req = 1; }
 static void on_usr2(int s) { (void)s; g_fault_req = 2; }
 static void on_term(int s) { (void)s; g_stop = 1; }
 
-/*
- * Listens on an already-open endpoint for the rpmsg-si heartbeat. Writes
- * "hello\n" up front, then "fault=1\n" / "fault=0\n" on SIGUSR1 / SIGUSR2,
- * and logs every newline-terminated line the CR52 sends.
- */
+/* Listen mode; see the usage block at the top of this file. */
 static int listen_loop(int ept, int seconds)
 {
 	char acc[512]; size_t used = 0;

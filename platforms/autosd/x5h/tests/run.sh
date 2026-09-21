@@ -22,10 +22,7 @@ for t in "${tests[@]}"; do
         continue
     fi
     # test-make-demo-dtb needs dtc, and the derivation it covers runs inside a
-    # container for exactly that reason. The same argument applies: with no dtc
-    # the test cannot answer its question, so a TEST_FAIL would spend the
-    # vocabulary reserved for real defects on "did not run". The test file is
-    # unchanged and still fails loudly when it is run on its own.
+    # container for exactly that reason. Skipped on the same argument.
     if [ "$t" = test-make-demo-dtb.sh ] && ! command -v dtc >/dev/null 2>&1; then
         echo "TEST_SKIP test-make-demo-dtb reason=dtc_missing"
         continue

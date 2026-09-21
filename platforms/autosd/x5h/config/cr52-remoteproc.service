@@ -37,11 +37,10 @@ After=systemd-modules-load.service
 Wants=systemd-modules-load.service
 Before=rpmsg-eth.service
 ConditionPathExists=/sys/class/remoteproc/remoteproc0
-# demo and dev boot the identical derived device tree, so this unit belongs
-# under both. Repeated conditions of one type are ANDed by systemd, so each
-# role line carries a pipe after the equals sign to make it a triggering
-# condition: the unit runs when at least one triggering condition matches and the ConditionPathExists= above, a regular
-# condition, still applies.
+# Repeated conditions of one type are ANDed by systemd, so each role line
+# carries a pipe after the equals sign to make it a triggering condition: the
+# unit runs when at least one triggering condition matches and the
+# ConditionPathExists= above, a regular condition, still applies.
 ConditionKernelCommandLine=|x5h.role=demo
 ConditionKernelCommandLine=|x5h.role=dev
 

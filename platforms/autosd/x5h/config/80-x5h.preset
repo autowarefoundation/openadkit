@@ -12,11 +12,8 @@
 # lever over that set is the unit files, not this file.
 #
 # None of the five awf-oak-*.container units carries an [Install] section
-# any more, so none of them comes up on its own. That is the three-role
-# split doing its job: the MRM component stack and the CES demo stack each
-# bind domain 1 and domain 2 and each runs its own domain_bridge, so only
-# one of them may own a boot. demo starts the demo stack; on dev the MRM
-# stack is started by hand.
+# any more, so none of them comes up on its own. See selfboot.md, "Which
+# stack owns a boot", for why the role draws that line.
 #
 # rpmsg-eth.service IS installed by the manifest and is deliberately NOT
 # enabled here -- a standing human ruling. Its daemon binary

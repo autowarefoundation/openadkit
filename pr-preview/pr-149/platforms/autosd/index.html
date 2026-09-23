@@ -2067,8 +2067,8 @@ commands below.</p>
 chmod<span class="w"> </span>+x<span class="w"> </span>auto-image-builder.sh
 sudo<span class="w"> </span>bash<span class="w"> </span>./auto-image-builder.sh<span class="w"> </span>build-builder<span class="w"> </span>--distro<span class="w"> </span>autosd10-sig
 </code></pre></div>
-<p>Now build the image (requires sudo/root). The container image is the first
-positional argument and the bootable disk image the second:</p>
+<p>Now build the image (requires sudo/root). The positionals are the manifest,
+the container image, and the optional bootable disk image:</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>./auto-image-builder.sh<span class="w"> </span>build<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--distro<span class="w"> </span>autosd10-sig<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--target<span class="w"> </span>qemu<span class="w"> </span><span class="se">\</span>

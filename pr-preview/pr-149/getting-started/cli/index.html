@@ -2070,9 +2070,13 @@ source checkout, prefix them with <code>./</code> and run them from the reposito
 openadkit<span class="w"> </span>logs<span class="w"> </span>planning-simulation<span class="w"> </span>--follow
 openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 </code></pre></div>
-<p>Without a deployment name, <code>status</code>, <code>logs</code>, and <code>stop</code> list the running
-deployments. <code>openadkit run &lt;deployment&gt; --pull always</code> refreshes images before
-starting, and <code>openadkit --version</code> prints the CLI version.</p>
+<p><code>status</code>, <code>logs</code>, and <code>stop</code> need a deployment name. Without one, they exit 2
+when any deployment is running: stderr says the name is required, and stdout
+lists the running names as a hint. They do not show status, stream logs, or
+stop anything. When nothing is running they print <code>no running deployments</code> and
+exit 0. <code>openadkit logs --follow</code> without a name is always a usage error.
+<code>openadkit run &lt;deployment&gt; --pull always</code> refreshes images before starting,
+and <code>openadkit --version</code> prints the CLI version.</p>
 <h2 id="validate-before-running">Validate Before Running<a class="headerlink" href="#validate-before-running" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>validate<span class="w"> </span>planning-simulation<span class="w"> </span>--data
 </code></pre></div>
@@ -2108,8 +2112,11 @@ installed, omit <code>--force</code>. Source checkouts update with <code>git pul
 <code>git checkout</code> instead.</p>
 <h2 id="uninstall-and-cleanup">Uninstall and Cleanup<a class="headerlink" href="#uninstall-and-cleanup" title="Permanent link">#</a></h2>
 <p>Remove the installed release and its launcher (release installs only; remove a
-source checkout with Git):</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>uninstall<span class="w">          </span><span class="c1"># keep previously installed versions</span>
+source checkout with Git). Stop every running deployment first. <code>uninstall</code>
+refuses while an <code>openadkit-*</code> Compose project is still running, because it
+removes the launcher <code>openadkit stop</code> needs:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
+openadkit<span class="w"> </span>uninstall<span class="w">          </span><span class="c1"># keep previously installed versions</span>
 openadkit<span class="w"> </span>uninstall<span class="w"> </span>--all<span class="w">    </span><span class="c1"># remove kept versions too</span>
 </code></pre></div>
 <p>Any <code>config.local.env</code> overrides inside the version directory are removed with
@@ -2120,7 +2127,8 @@ what a deployment has installed and delete it with:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulation<span class="w">            </span><span class="c1"># report only</span>
 openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulation<span class="w"> </span>--data<span class="w">     </span><span class="c1"># delete</span>
 </code></pre></div>
-<p>Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
+<p><code>clean --data</code> refuses if that deployment is still running; stop it first.
+The Kashiwanoha map used by Scenario Simulation is
 shared with the standalone Zenoh bridge; if it is removed, restore it with
 <code>openadkit fetch scenario-simulation --force</code>.</p>
 

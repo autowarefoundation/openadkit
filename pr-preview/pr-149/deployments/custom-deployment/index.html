@@ -2067,7 +2067,7 @@ its Compose file defines the dependencies and deployment-specific overrides.</p>
 </tr>
 <tr>
 <td><code>config.gpu.env</code></td>
-<td>Required when <code>deployment.json</code> lists <code>gpuFiles</code>. Loaded after <code>config.env</code> for <code>openadkit --gpu</code>; override interpolations here instead of restating a shared service command.</td>
+<td>Required when <code>deployment.json</code> lists <code>gpuFiles</code>. Loaded after <code>config.env</code> for <code>openadkit validate &lt;deployment&gt; --gpu</code> and <code>openadkit run &lt;deployment&gt; --gpu</code>; override interpolations here instead of restating a shared service command.</td>
 </tr>
 <tr>
 <td><code>deployment.json</code></td>

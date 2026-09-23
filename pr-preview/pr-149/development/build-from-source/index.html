@@ -2356,34 +2356,24 @@ touch<span class="w"> </span>autoware/src/middleware/external/.keep
 <span class="c1"># 5. Build the universe-common base intermediate (~2 hours)</span>
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>universe-common
 
-<span class="c1"># 6. Build and tag the planning-simulation images (~2 hours)</span>
-<span class="nv">ARCH</span><span class="o">=</span><span class="k">$(</span>uname<span class="w"> </span>-m<span class="k">)</span>
-<span class="k">case</span><span class="w"> </span><span class="s2">"</span><span class="nv">$ARCH</span><span class="s2">"</span><span class="w"> </span><span class="k">in</span>
-<span class="w">  </span>x86_64<span class="p">|</span>amd64<span class="o">)</span><span class="w"> </span><span class="nv">ARCH</span><span class="o">=</span>amd64<span class="w"> </span><span class="p">;;</span>
-<span class="w">  </span>aarch64<span class="p">|</span>arm64<span class="o">)</span><span class="w"> </span><span class="nv">ARCH</span><span class="o">=</span>arm64<span class="w"> </span><span class="p">;;</span>
-<span class="k">esac</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>localization-mapping.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:localization-mapping-<span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span>-humble<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>planning-control.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:planning-control-<span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span>-humble<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>vehicle-system.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:vehicle-system-<span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span>-humble<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>api.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:api-<span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span>-humble<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>visualizer.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:visualizer-<span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span>-humble<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>simulator.tags<span class="o">=</span>ghcr.io/autowarefoundation/openadkit:simulator-<span class="si">${</span><span class="nv">ARCH</span><span class="si">}</span>-humble<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--load<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>planning
+<span class="c1"># 6. Build the planning-simulation images (~2 hours)</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>--load<span class="w"> </span>planning
 
-<span class="c1"># 7. Override image tags as needed, then start a deployment</span>
+<span class="c1"># 7. Start a deployment</span>
 ./openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation
 </code></pre></div>
 <p>What the flags and tags mean:</p>
 <ul>
 <li><code>--load</code> puts the images in the local Docker store. Without it, Bake only
   fills the BuildKit cache.</li>
-<li>Repository-mode <code>./openadkit</code> looks for
-  <code>&lt;prefix&gt;:&lt;target&gt;-&lt;arch&gt;-&lt;ros-distro&gt;</code> (for example
-  <code>planning-control-amd64-humble</code>). Local tags must match that name, or set the
-  <code>*_IMAGE</code> variables in <code>config.local.env</code>.</li>
-<li>For Jazzy, build with <code>ROS_DISTRO=jazzy</code> and use <code>-jazzy</code> suffixes.</li>
+<li>Local builds are tagged with the same
+  <code>&lt;prefix&gt;:&lt;target&gt;-&lt;arch&gt;-&lt;ros-distro&gt;</code> reference repository-mode
+  <code>./openadkit</code> looks up (for example <code>planning-control-amd64-humble</code>), so no
+  <code>--set</code> overrides are needed. The arch segment follows the build host; when
+  cross-building for another platform, set the tags with <code>--set</code>. To use
+  different tags, set the <code>*_IMAGE</code> variables in <code>config.local.env</code>.</li>
+<li>For Jazzy, build with <code>ROS_DISTRO=jazzy docker buildx bake ...</code> and run with
+  <code>./openadkit run --ros-distro jazzy ...</code>; the tag suffix follows the build.</li>
 <li>Group <code>planning</code> matches this walkthrough on amd64 and arm64. Group <code>component</code>
   also builds <code>carla-interface</code> and <code>sensing-perception-cuda</code>, which are
   amd64-only.</li>
@@ -2401,11 +2391,9 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component
 
 <span class="c1"># Build a single component</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--set<span class="w"> </span>sensing-perception.tags<span class="o">=</span>openadkit:sensing-perception<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--load<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>sensing-perception
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>--load<span class="w"> </span>sensing-perception
 </code></pre></div>
+<p>Override the tags of any target with <code>--set &lt;target&gt;.tags=...</code>.</p>
 <h3 id="build-variables">Build Variables<a class="headerlink" href="#build-variables" title="Permanent link">#</a></h3>
 <p>The Bake file exposes a few variables, overridable via environment variables:</p>
 <table>
@@ -2440,7 +2428,7 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Tags and contexts</p>
-<p>Local builds get <code>LOCAL_IMAGE</code>-based tags and <code>target:</code>/upstream context defaults from the Bake file; CI sets <code>LOCAL_IMAGE=""</code> so <code>docker/metadata-action</code> is the only tag source, and overrides each context to an already-pushed GHCR tag so groups can build in separate jobs. Locally, override tags with <code>--set &lt;target&gt;.tags=...</code>.</p>
+<p>Local builds get <code>LOCAL_IMAGE</code>-based tags — including the <code>&lt;target&gt;-&lt;arch&gt;-&lt;ros-distro&gt;</code> reference repository mode looks up — and <code>target:</code>/upstream context defaults from the Bake file. CI sets <code>LOCAL_IMAGE=""</code> so <code>docker/metadata-action</code> is the only tag source, and overrides each context to an already-pushed GHCR tag so groups can build in separate jobs. Locally, override tags with <code>--set &lt;target&gt;.tags=...</code>.</p>
 </div>
 <h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">#</a></h2>
 <p>CI builds every target through

@@ -24,7 +24,9 @@ overrides, and deployment-only services; it is the source of truth for the
 service set.
 
 Each curated deployment carries a `deployment.json` manifest and one complete
-`config.env` for Compose interpolation.
+`config.env` for Compose interpolation. Optional GPU mode also loads
+`config.gpu.env` so model flags can change without copying a shared service
+command.
 
 --8<-- "includes/cli-command-context.md"
 

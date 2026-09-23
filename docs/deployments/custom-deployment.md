@@ -32,6 +32,7 @@ The inventory entry makes the deployment available to the CLI.
 |------|----------------|
 | `docker-compose.yaml` | Select services with `include`, define `depends_on`, and add deployment-specific settings or services. |
 | `config.env` | Supply the parameters needed by the selected services, such as map paths and simulator settings. Use ignored `config.local.env` for personal overrides. |
+| `config.gpu.env` | Required when `deployment.json` lists `gpuFiles`. Loaded after `config.env` for `openadkit --gpu`; override interpolations here instead of restating a shared service command. |
 | `deployment.json` | Declare supported architectures, ROS distros, GPU requirements, downloads, and one-shot services to reset on each run. |
 
 Shared service definitions live in
@@ -74,5 +75,6 @@ together; use `config.local.env` to set `REMOTE_PASSWORD`.
 ```
 
 Validate each distro and GPU mode you declare. See
-[Logging Simulation](logging-simulation/index.md) for a GPU overlay and
+[Logging Simulation](logging-simulation/index.md) for a GPU overlay
+(`config.gpu.env` plus image/runtime overrides) and
 [CARLA Simulation](carla-simulation/index.md) for deployment-specific services.

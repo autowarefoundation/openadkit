@@ -36,7 +36,9 @@ For NVIDIA acceleration:
 openadkit run logging-simulation --gpu
 ```
 
-The CUDA image is amd64-only.
+The CUDA image is amd64-only. `--gpu` loads `config.gpu.env` to switch
+perception to CenterPoint; the Compose overlay only swaps the CUDA images and
+GPU reservations.
 --8<-- "includes/ros-distro.md"
 
 --8<-- "includes/visualizer-remote-access.md"

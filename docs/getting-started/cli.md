@@ -36,7 +36,9 @@ configuration.
 
 Use `deployments/<name>/config.local.env` for host-specific settings. Source
 checkouts also accept component image overrides there; release component refs
-stay pinned by the release context. The file is ignored by Git.
+stay pinned by the release context. The file is ignored by Git. Deployments
+with a GPU overlay load `config.gpu.env` after `config.env` when you pass
+`--gpu`; `config.local.env` still wins.
 
 ## Upgrading
 

@@ -47,6 +47,35 @@ def test_inventory_matches_bake_targets_and_metadata_stubs():
     assert metadata == inventory
 
 
+def test_kit_component_images_match_inventory_component_targets():
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    catalog = set(kit["componentImages"].values())
+    inventory = {
+        image["target"]
+        for image in INVENTORY["images"]
+        if image["stage"] == "component"
+    }
+    assert catalog == inventory
+
+
+def test_curated_compose_kit_image_envs_are_catalogued():
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    catalog_keys = set(kit["componentImages"])
+    third_party = {
+        "AUTOWARE_UNIVERSE_IMAGE",
+        "CARLA_CONTAINER_IMAGE",
+        "SCENARIO_SIMULATOR_IMAGE",
+    }
+    compose_keys: set[str] = set()
+    for path in (ROOT / "deployments").rglob("docker-compose*.yaml"):
+        if "zenoh-bridge" in path.parts:
+            continue
+        compose_keys.update(
+            re.findall(r"\$\{([A-Z][A-Z0-9_]*_IMAGE)", path.read_text())
+        )
+    assert compose_keys - third_party <= catalog_keys
+
+
 def test_matrix_preserves_platform_and_distro_constraints():
     index = manifest_index()
     assert index[("component", "planning-control", "humble")] == "amd64 arm64"

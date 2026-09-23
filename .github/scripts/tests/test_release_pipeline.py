@@ -929,9 +929,9 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert not (root / "openadkit.d").exists()
     bundled_context = json.loads((root / "openadkit.json").read_text())
     assert bundled_context["kind"] == "release"
-    assert bundled_context["componentImages"]["CARLA_INTERFACE_IMAGE"] == "carla-interface"
-    assert "carla-interface" in bundled_context["images"]["humble"]
     kit = json.loads((ROOT / "openadkit.json").read_text())
+    assert bundled_context["componentImages"] == kit["componentImages"]
+    assert "carla-interface" in bundled_context["images"]["humble"]
     expected_deployments = set(kit["deployments"])
     for name, reference in kit["deployments"].items():
         manifest = json.loads((ROOT / reference["path"] / "deployment.json").read_text())

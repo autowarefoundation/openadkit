@@ -85,23 +85,10 @@ touch autoware/src/middleware/external/.keep
 # 5. Build the universe-common base intermediate (~2 hours)
 docker buildx bake -f components/docker-bake.hcl universe-common
 
-# 6. Build and tag the planning-simulation images (~2 hours)
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64|amd64) ARCH=amd64 ;;
-  aarch64|arm64) ARCH=arm64 ;;
-esac
-docker buildx bake -f components/docker-bake.hcl \
-  --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping-${ARCH}-humble \
-  --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control-${ARCH}-humble \
-  --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system-${ARCH}-humble \
-  --set api.tags=ghcr.io/autowarefoundation/openadkit:api-${ARCH}-humble \
-  --set visualizer.tags=ghcr.io/autowarefoundation/openadkit:visualizer-${ARCH}-humble \
-  --set simulator.tags=ghcr.io/autowarefoundation/openadkit:simulator-${ARCH}-humble \
-  --load \
-  planning
+# 6. Build the planning-simulation images (~2 hours)
+docker buildx bake -f components/docker-bake.hcl --load planning
 
-# 7. Override image tags as needed, then start a deployment
+# 7. Start a deployment
 ./openadkit run planning-simulation
 ```
 
@@ -109,11 +96,14 @@ What the flags and tags mean:
 
 - `--load` puts the images in the local Docker store. Without it, Bake only
   fills the BuildKit cache.
-- Repository-mode `./openadkit` looks for
-  `<prefix>:<target>-<arch>-<ros-distro>` (for example
-  `planning-control-amd64-humble`). Local tags must match that name, or set the
-  `*_IMAGE` variables in `config.local.env`.
-- For Jazzy, build with `ROS_DISTRO=jazzy` and use `-jazzy` suffixes.
+- Local builds are tagged with the same
+  `<prefix>:<target>-<arch>-<ros-distro>` reference repository-mode
+  `./openadkit` looks up (for example `planning-control-amd64-humble`), so no
+  `--set` overrides are needed. The arch segment follows the build host; when
+  cross-building for another platform, set the tags with `--set`. To use
+  different tags, set the `*_IMAGE` variables in `config.local.env`.
+- For Jazzy, build with `ROS_DISTRO=jazzy docker buildx bake ...` and run with
+  `./openadkit run --ros-distro jazzy ...`; the tag suffix follows the build.
 - Group `planning` matches this walkthrough on amd64 and arm64. Group `component`
   also builds `carla-interface` and `sensing-perception-cuda`, which are
   amd64-only.
@@ -134,11 +124,10 @@ docker buildx bake -f components/docker-bake.hcl universe-common
 docker buildx bake -f components/docker-bake.hcl component
 
 # Build a single component
-docker buildx bake -f components/docker-bake.hcl \
-  --set sensing-perception.tags=openadkit:sensing-perception \
-  --load \
-  sensing-perception
+docker buildx bake -f components/docker-bake.hcl --load sensing-perception
 ```
+
+Override the tags of any target with `--set <target>.tags=...`.
 
 ### Build Variables
 
@@ -157,7 +146,7 @@ ROS_DISTRO=humble UPSTREAM_TAG="$AUTOWARE_REF" \
 ```
 
 !!! note "Tags and contexts"
-    Local builds get `LOCAL_IMAGE`-based tags and `target:`/upstream context defaults from the Bake file; CI sets `LOCAL_IMAGE=""` so `docker/metadata-action` is the only tag source, and overrides each context to an already-pushed GHCR tag so groups can build in separate jobs. Locally, override tags with `--set <target>.tags=...`.
+    Local builds get `LOCAL_IMAGE`-based tags — including the `<target>-<arch>-<ros-distro>` reference repository mode looks up — and `target:`/upstream context defaults from the Bake file. CI sets `LOCAL_IMAGE=""` so `docker/metadata-action` is the only tag source, and overrides each context to an already-pushed GHCR tag so groups can build in separate jobs. Locally, override tags with `--set <target>.tags=...`.
 
 ## Continuous Integration
 

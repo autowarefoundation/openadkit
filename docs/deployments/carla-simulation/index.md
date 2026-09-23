@@ -41,8 +41,8 @@ openadkit run carla-simulation --gpu
 and waits for Compose readiness. If startup fails after containers are created,
 use the stop command below to release their GPU and host resources.
 
-`sensor_mapping.yaml` enables LiDAR, IMU, and GNSS by default. Camera entries
-are available but commented out.
+`config/sensor_mapping.yaml` enables LiDAR, IMU, and GNSS by default. Camera
+entries are available but commented out.
 
 --8<-- "includes/visualizer-remote-access.md"
 

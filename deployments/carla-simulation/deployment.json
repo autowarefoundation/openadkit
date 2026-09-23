@@ -8,7 +8,19 @@
     "gpuFiles": [],
     "profiles": [],
     "resetServices": ["map-check", "carla-map-loader"],
-    "waitTimeout": 480
+    "waitTimeout": 480,
+    "roles": {
+      "autoware": {
+        "files": ["services.autoware.yaml"],
+        "resetServices": ["map-check"],
+        "requiredEnv": ["ZENOH_LISTEN"]
+      },
+      "carla": {
+        "files": ["services.carla.yaml"],
+        "resetServices": ["carla-map-loader"],
+        "requiredEnv": ["ZENOH_LISTEN", "ZENOH_PEER"]
+      }
+    }
   },
   "requirements": {
     "architectures": ["amd64"],
@@ -39,7 +51,8 @@
         "lanelet2_map.osm",
         "pointcloud_map.pcd",
         "map_projector_info.yaml"
-      ]
+      ],
+      "roles": ["autoware"]
     }
   ]
 }

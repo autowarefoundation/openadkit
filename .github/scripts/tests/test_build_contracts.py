@@ -1,7 +1,10 @@
 import io
 import json
+import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import sys
 
 import pytest
@@ -56,11 +59,10 @@ def test_curated_compose_kit_image_envs_are_catalogued():
         "AUTOWARE_UNIVERSE_IMAGE",
         "CARLA_CONTAINER_IMAGE",
         "SCENARIO_SIMULATOR_IMAGE",
+        "ZENOH_BRIDGE_IMAGE",
     }
     compose_keys: set[str] = set()
-    for path in (ROOT / "deployments").rglob("docker-compose*.yaml"):
-        if "zenoh-bridge" in path.parts:
-            continue
+    for path in (ROOT / "deployments").rglob("*.yaml"):
         compose_keys.update(
             re.findall(r"\$\{([A-Z][A-Z0-9_]*_IMAGE)", path.read_text())
         )
@@ -177,6 +179,114 @@ def test_unknown_component_input_fails_closed():
         matrices.build_single_image_plan(
             INVENTORY, ["components/new-component/Dockerfile"]
         )
+
+
+COMPOSE_AVAILABLE = shutil.which("docker") is not None
+
+
+def _compose_config(files, directory, extra_env=None):
+    env = dict(os.environ)
+    env.pop("COMPOSE_FILE", None)
+    env.update(extra_env or {})
+    command = ["docker", "compose", "--env-file", str(directory / "config.env")]
+    for path in files:
+        command.extend(("--file", str(path)))
+    command.extend(("config", "--format", "json"))
+    result = subprocess.run(
+        command,
+        cwd=directory,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def _role_compose_env(directory, role):
+    shared = ROOT / "deployments/shared"
+    return {
+        "ROS_DISTRO": "humble",
+        "OPENADKIT_ROLE": role,
+        "ZENOH_BASE_DIR": str(shared),
+        "ZENOH_CONFIG_PATH": str(directory / "config/zenoh.json5"),
+        "ZENOH_LISTEN": "tcp/127.0.0.1:7447",
+        "ZENOH_PEER": "tcp/127.0.0.1:7447",
+        "REMOTE_PASSWORD": "ci-validate",
+    }
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is required")
+def test_real_compose_views_keep_default_and_role_graphs_isolated():
+    scenario = ROOT / "deployments/scenario-simulation"
+    default = _compose_config([scenario / "docker-compose.yaml"], scenario)
+    assert "zenoh-bridge" not in default["services"]
+    assert "scenario_simulator" in default["services"]
+    assert "map" in default["services"]
+
+    autoware = _compose_config(
+        [
+            scenario / "services.autoware.yaml",
+            ROOT / "deployments/shared/compose.zenoh.yaml",
+        ],
+        scenario,
+        _role_compose_env(scenario, "autoware"),
+    )
+    assert "zenoh-bridge" in autoware["services"]
+    assert "scenario_simulator" not in autoware["services"]
+    assert "map" in autoware["services"]
+
+    scenario_role = _compose_config(
+        [
+            scenario / "services.scenario.yaml",
+            ROOT / "deployments/shared/compose.zenoh.yaml",
+        ],
+        scenario,
+        _role_compose_env(scenario, "scenario"),
+    )
+    assert set(scenario_role["services"]) == {"scenario_simulator", "zenoh-bridge"}
+    assert "pid" not in scenario_role["services"]["scenario_simulator"]
+
+    carla = ROOT / "deployments/carla-simulation"
+    carla_default = _compose_config(
+        [carla / "docker-compose.yaml"],
+        carla,
+        {"REMOTE_PASSWORD": "ci-validate"},
+    )
+    assert "zenoh-bridge" not in carla_default["services"]
+    assert "carla" in carla_default["services"]
+    assert "carla-interface" in carla_default["services"]
+    assert "map" in carla_default["services"]
+
+    carla_autoware = _compose_config(
+        [
+            carla / "services.autoware.yaml",
+            ROOT / "deployments/shared/compose.zenoh.yaml",
+        ],
+        carla,
+        _role_compose_env(carla, "autoware"),
+    )
+    assert "zenoh-bridge" in carla_autoware["services"]
+    assert "carla" not in carla_autoware["services"]
+    assert "carla-interface" not in carla_autoware["services"]
+    vehicle_deps = carla_autoware["services"]["vehicle"].get("depends_on") or {}
+    assert "carla-interface" not in vehicle_deps
+
+    carla_role = _compose_config(
+        [
+            carla / "services.carla.yaml",
+            ROOT / "deployments/shared/compose.zenoh.yaml",
+        ],
+        carla,
+        _role_compose_env(carla, "carla"),
+    )
+    assert set(carla_role["services"]) == {
+        "carla",
+        "carla-interface",
+        "carla-map-loader",
+        "zenoh-bridge",
+    }
 
 
 def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):

@@ -47,6 +47,12 @@ ALLOWED_COMPOSE_KEYS = {
     "profiles",
     "resetServices",
     "waitTimeout",
+    "roles",
+}
+ALLOWED_ROLE_KEYS = {
+    "files",
+    "resetServices",
+    "requiredEnv",
 }
 ALLOWED_REQUIREMENT_KEYS = {
     "architectures",
@@ -65,6 +71,7 @@ ALLOWED_DATA_KEYS = {
     "generatedFiles",
     "requiredFiles",
     "gpu",
+    "roles",
 }
 ALLOWED_DATA_FILE_KEYS = {"path", "url", "sha256"}
 
@@ -289,6 +296,7 @@ class RuntimeContext:
 class Selection:
     ros_distro: str
     gpu: bool
+    role: str | None
     injections: dict[str, str]
     environment: dict[str, str]
 
@@ -301,6 +309,7 @@ class Deployment:
         self.manifest = manifest
         self.name: str = manifest["name"]
         self.compose: dict[str, Any] = manifest["compose"]
+        self.roles: dict[str, dict[str, Any]] = self.compose["roles"]
         self.requirements: dict[str, Any] = manifest["requirements"]
         self.distro_environment: dict[str, dict[str, str]] = manifest["distroEnvironment"]
         self.data: list[dict[str, Any]] = manifest["data"]
@@ -343,13 +352,49 @@ class Deployment:
             values.update(parse_dotenv(path))
         return values
 
-    def compose_files(self, gpu: bool) -> list[Path]:
-        names = list(self.compose["files"])
+    def has_role(self, role: str) -> bool:
+        return role in self.roles
+
+    def compose_files(self, gpu: bool, role: str | None = None) -> list[Path]:
+        if role is None:
+            names = list(self.compose["files"])
+            if gpu:
+                names.extend(self.compose["gpuFiles"])
+            return [
+                ensure_safe_existing(self.directory, name, "Compose file")
+                for name in names
+            ]
+        names = list(self.roles[role]["files"])
         if gpu:
             names.extend(self.compose["gpuFiles"])
-        return [
+        files = [
             ensure_safe_existing(self.directory, name, "Compose file") for name in names
         ]
+        files.append(
+            ensure_safe_existing(
+                self.root / "deployments",
+                "shared/compose.zenoh.yaml",
+                "Compose file",
+            )
+        )
+        return files
+
+    def reset_services(self, role: str | None = None) -> list[str]:
+        if role is None:
+            return list(self.compose["resetServices"])
+        return list(self.roles[role]["resetServices"])
+
+    def _role_injections(self, role: str | None, injections: dict[str, str]) -> dict[str, str]:
+        if role is None:
+            return injections
+        injections["ZENOH_BASE_DIR"] = str(
+            (self.root / "deployments" / "shared").resolve()
+        )
+        injections["ZENOH_CONFIG_PATH"] = str(
+            (self.directory / "config" / "zenoh.json5").resolve()
+        )
+        injections["OPENADKIT_ROLE"] = role
+        return injections
 
     def select(
         self,
@@ -357,9 +402,15 @@ class Deployment:
         ros_distro: str | None,
         gpu: bool,
         *,
+        role: str | None = None,
         operational: bool = False,
         require_gpu: bool = True,
     ) -> Selection:
+        if role is not None and role not in self.roles:
+            valid = ", ".join(sorted(self.roles)) if self.roles else "none"
+            raise OpenADKitError(
+                f"{self.name} has no role {role}\navailable roles: {valid}"
+            )
         distro = ros_distro or current_context.default_ros_distro
 
         # Operational commands (status/logs/stop) do not select images or
@@ -369,11 +420,13 @@ class Deployment:
         if operational:
             injections = {"ROS_DISTRO": distro, **host_user_environment()}
             injections.update(self.distro_environment.get(distro, {}))
+            injections = self._role_injections(role, injections)
             environment = self.configuration_environment()
             environment.update(injections)
             return Selection(
                 ros_distro=distro,
                 gpu=False,
+                role=role,
                 injections=injections,
                 environment=environment,
             )
@@ -411,6 +464,8 @@ class Deployment:
                     f"{', '.join(gpu_architectures)}"
                 )
 
+        view = self.roles.get(role) if role is not None else None
+        required_environment = list(view["requiredEnv"]) if view else []
         environment = self.configuration_environment(gpu)
         injections: dict[str, str] = {"ROS_DISTRO": distro, **host_user_environment()}
         injections.update(self.distro_environment.get(distro, {}))
@@ -427,12 +482,27 @@ class Deployment:
         else:
             injections.update(component_environment)
         injections["ROS_DISTRO"] = distro
+        injections = self._role_injections(role, injections)
 
         environment.update(injections)
+        # Env files and injections stay authoritative for data paths and
+        # Compose interpolation. Shell values only fill requiredEnv gaps such
+        # as CI dummy ZENOH_LISTEN exports; they cannot hide MAP_PATH.
+        present = dict(os.environ)
+        present.update(environment)
+        missing_environment = [
+            name for name in required_environment if not present.get(name)
+        ]
+        if missing_environment:
+            raise OpenADKitError(
+                "required environment variable(s) are missing: "
+                + ", ".join(missing_environment)
+            )
 
         return Selection(
             ros_distro=distro,
             gpu=gpu,
+            role=role,
             injections=injections,
             environment=environment,
         )
@@ -529,12 +599,51 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     if not isinstance(wait_timeout, int) or isinstance(wait_timeout, bool) or wait_timeout <= 0:
         raise OpenADKitError("compose.waitTimeout must be a positive integer")
     compose["waitTimeout"] = wait_timeout
+
+    roles = compose.get("roles", {})
+    if not isinstance(roles, dict):
+        raise OpenADKitError("compose.roles must be an object")
+    for role_name, role_view in roles.items():
+        where = f"compose.roles.{role_name}"
+        if not isinstance(role_name, str) or not NAME_RE.fullmatch(role_name):
+            raise OpenADKitError(f"invalid role name: {role_name}")
+        if not isinstance(role_view, dict):
+            raise OpenADKitError(f"{where} must be an object")
+        reject_unknown(role_view, ALLOWED_ROLE_KEYS, where)
+        role_view["files"] = require_string_list(
+            role_view.get("files"), f"{where}.files", nonempty=True
+        )
+        role_view["resetServices"] = require_string_list(
+            role_view.get("resetServices", []), f"{where}.resetServices"
+        )
+        role_view["requiredEnv"] = require_string_list(
+            role_view.get("requiredEnv", []), f"{where}.requiredEnv"
+        )
+        invalid_role_env = [
+            item for item in role_view["requiredEnv"] if not ENV_NAME_RE.fullmatch(item)
+        ]
+        if invalid_role_env:
+            raise OpenADKitError(
+                f"{where}.requiredEnv contains invalid environment names: "
+                + ", ".join(invalid_role_env)
+            )
+        for file_name in role_view["files"]:
+            ensure_safe_existing(directory, file_name, "Compose file")
+    if roles:
+        if "shared" not in shared:
+            raise OpenADKitError("compose.roles requires the shared deployment assets")
+        ensure_safe_existing(
+            root / "deployments", "shared/compose.zenoh.yaml", "Zenoh Compose file"
+        )
+        ensure_safe_existing(directory, "config/zenoh.json5", "Zenoh configuration")
+    compose["roles"] = roles
     manifest["compose"] = compose
 
     data = manifest.get("data", [])
     if not isinstance(data, list):
         raise OpenADKitError("data must be an array")
     names: set[str] = set()
+    destinations: set[str] = set()
     for index, resource in enumerate(data):
         where = f"data[{index}]"
         if not isinstance(resource, dict):
@@ -549,8 +658,23 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
         if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
             raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
+        if resource["destinationEnv"] in destinations:
+            raise OpenADKitError(
+                f"duplicate data destination environment: {resource['destinationEnv']}"
+            )
+        destinations.add(resource["destinationEnv"])
         if "gpu" in resource and not isinstance(resource["gpu"], bool):
             raise OpenADKitError(f"{where}.gpu must be a boolean")
+        if "roles" in resource:
+            resource["roles"] = require_string_list(
+                resource["roles"], f"{where}.roles", nonempty=True
+            )
+            unknown_roles = sorted(set(resource["roles"]) - set(compose["roles"]))
+            if unknown_roles:
+                raise OpenADKitError(
+                    f"{where}.roles contains undeclared role(s): "
+                    + ", ".join(unknown_roles)
+                )
         resource["requiredFiles"] = require_string_list(
             resource.get("requiredFiles", []), f"{where}.requiredFiles"
         )
@@ -604,6 +728,10 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         ensure_safe_existing(
             directory, "config.gpu.env", "GPU environment file"
         )
+    for role_name in compose["roles"]:
+        deployment.compose_files(False, role_name)
+        if compose["gpuFiles"]:
+            deployment.compose_files(True, role_name)
     deployment.env_files()
     return deployment
 

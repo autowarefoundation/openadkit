@@ -16,6 +16,9 @@ openadkit run scenario-simulation
 openadkit logs scenario-simulation --follow
 ```
 
+Run Autoware on one host and the TIER IV runner on another with `--role`; see
+[Split-host simulation](../split-host.md).
+
 --8<-- "includes/ros-distro.md"
 
 `run` downloads the Kashiwanoha map. Autoware takes about 90 seconds to

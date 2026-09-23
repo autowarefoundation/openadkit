@@ -1,172 +1,33 @@
-# CARLA simulation — Autoware closed loop against CARLA 0.9.16 (Humble, amd64,
-# GPU required).
+# CARLA simulation — single-host graph.
 #
-# Service definitions live in ../shared/services/<service>.yaml (one file per service).
-# This file selects the stack, owns its topology (depends_on), moves
-# sensing/perception onto the CUDA images, and adds the CARLA-only services.
+# Assembles the shared Autoware and CARLA service files and restores the
+# single-host wiring: vehicle/sensing/visualizer wait on carla-interface. The
+# split views remove those edges: --role autoware / --role carla select one
+# service file plus the shared Zenoh fragment. This file never includes the
+# Zenoh bridge.
+#
+# Compose replaces depends_on on merge, so the default view restates the
+# Autoware edges plus the carla-interface edges.
 include:
-  - ../shared/services/map-check.yaml
-  - ../shared/services/map.yaml
-  - ../shared/services/system.yaml
-  - ../shared/services/sensing.yaml
-  - ../shared/services/perception.yaml
-  - ../shared/services/localization.yaml
-  - ../shared/services/planning.yaml
-  - ../shared/services/vehicle.yaml
-  - ../shared/services/control.yaml
-  - ../shared/services/api.yaml
-  - ../shared/services/visualizer.yaml
+  - services.autoware.yaml
+  - services.carla.yaml
 
 services:
-  map:
-    depends_on:
-      map-check:
-        condition: service_completed_successfully
-
-  # SYSTEM_DIAGNOSTICS_GRAPH=autoware-carla.yaml (config.env) selects the
-  # CARLA diagnostics graph; the shared system definition is unchanged.
-  system:
-    depends_on:
-      - map
-
-  sensing:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    depends_on:
-      - map
-      - carla-interface
-      - system
-
-  perception:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    depends_on:
-      - map
-      - sensing
-      - system
-
-  localization:
-    depends_on:
-      - map
-      - sensing
-      - perception
-      - system
-
-  planning:
-    depends_on:
-      - map
-      - localization
-      - perception
-      - system
-
   vehicle:
     depends_on:
       - map
       - carla-interface
 
-  control:
+  sensing:
     depends_on:
       - map
-      - planning
+      - carla-interface
       - system
 
-  api:
-    depends_on:
-      - map
-      - system
-
-  # The visualizer renders CARLA on the GPU, so it needs the graphics caps.
   visualizer:
-    container_name: autoware-e2e-visualizer
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
-      - RVIZ_GPU=auto
     depends_on:
       - map
       - api
       - planning
       - control
       - carla-interface
-
-  # CARLA-only services.
-  carla:
-    image: ${CARLA_CONTAINER_IMAGE:-carlasim/carla:0.9.16@sha256:aaf1df22702780ece072069e23d03c4879b002ae028c79744b09c4c7ddbae953}
-    container_name: ${CARLA_CONTAINER_NAME}
-    network_mode: host
-    init: true
-    ipc: host
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    command: >
-      /bin/bash ./CarlaUE4.sh
-      ${CARLA_RENDER_ARGS}
-      -nosound
-      -quality-level=${CARLA_QUALITY}
-      -carla-rpc-port=${CARLA_RPC_PORT}
-      -world-port=${CARLA_WORLD_PORT}
-      -stdout
-      -FullStdOutLogOutput
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/127.0.0.1/${CARLA_RPC_PORT}'"]
-      interval: 5s
-      timeout: 2s
-      retries: 60
-      start_period: 30s
-    restart: on-failure
-
-  carla-interface:
-    image: ${CARLA_INTERFACE_IMAGE:-ghcr.io/autowarefoundation/openadkit:carla-interface}
-    container_name: ${CARLA_INTERFACE_CONTAINER}
-    network_mode: host
-    init: true
-    ipc: host
-    env_file:
-      - ../shared/runtime.env
-    volumes:
-      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
-      - ./config/sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
-    depends_on:
-      carla:
-        condition: service_healthy
-        restart: true
-      carla-map-loader:
-        condition: service_completed_successfully
-        restart: true
-    command: >
-      ros2 launch autoware_carla_interface autoware_carla_interface.launch.xml
-      host:=${CARLA_RPC_HOST}
-      port:=${CARLA_RPC_PORT}
-      timeout:=${CARLA_LOAD_TIMEOUT}
-      carla_map:=${CARLA_WORLD}
-      sensor_kit_name:=carla_sensor_kit_description
-      sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
-    restart: on-failure
-
-  carla-map-loader:
-    image: ${CARLA_INTERFACE_IMAGE:-ghcr.io/autowarefoundation/openadkit:carla-interface}
-    container_name: ${CARLA_MAP_LOADER_CONTAINER}
-    network_mode: host
-    init: true
-    ipc: host
-    environment:
-      - CARLA_RPC_HOST=${CARLA_RPC_HOST}
-      - CARLA_RPC_PORT=${CARLA_RPC_PORT}
-      - CARLA_WORLD=${CARLA_WORLD}
-      - CARLA_LOAD_TIMEOUT=${CARLA_LOAD_TIMEOUT}
-    volumes:
-      - ./scripts/load-carla-map.py:/autoware_config/load-carla-map.py:ro
-    depends_on:
-      carla:
-        condition: service_healthy
-    command: python3 /autoware_config/load-carla-map.py
-    restart: "no"

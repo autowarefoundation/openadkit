@@ -15,18 +15,17 @@ CLI and release bundle:
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
 - [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation --gpu`)
 
-Standalone source-checkout helper:
-
-- [Zenoh Bridge](./zenoh-bridge) — Cloud-edge remote visualization with Zenoh ROS 2 bridging
+Split-host (`--role` over Zenoh) is documented but unreleased until the
+two-host runtime gates land. See the
+[split-host guide](https://autowarefoundation.github.io/openadkit/deployments/split-host/).
 
 ## Directory Layout
 
 ```text
 deployments/
-├── shared/                   # services/*.yaml + runtime.env and common config
+├── shared/                   # services/*.yaml + runtime.env + compose.zenoh.yaml
 ├── planning-simulation/      # complete deployment config.env
 ├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env
-├── carla-simulation/         # CLI deployment (Humble, amd64, GPU)
-└── zenoh-bridge/              # self-contained topology + config.env
+└── carla-simulation/         # CLI deployment (Humble, amd64, GPU)
 ```

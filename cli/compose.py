@@ -16,6 +16,7 @@ from manifest import Deployment, OpenADKitError, Selection, parse_dotenv
 
 PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
+ROLE_LABEL = "openadkit.role"
 # Launch failures show up within seconds; watch this long after `up`.
 SETTLE_SECONDS = 10
 
@@ -121,7 +122,7 @@ def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
     command = ["docker", "compose", "--project-name", deployment.project]
     for env_file in deployment.env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
-    for compose_file in deployment.compose_files(selection.gpu):
+    for compose_file in deployment.compose_files(selection.gpu, selection.role):
         command.extend(("--file", str(compose_file)))
     for profile in deployment.compose["profiles"]:
         command.extend(("--profile", profile))
@@ -203,6 +204,47 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
     return [name for name in wanted if name in found]
 
 
+def live_role(deployment: Deployment) -> str | None:
+    """Return the role recorded on a live project, or None for single-host."""
+    if deployment.name not in running_names([deployment.name]):
+        return None
+    result = capture_process(
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"label=com.docker.compose.project={deployment.project}",
+            "--filter",
+            f"label={ROLE_LABEL}",
+            "--format",
+            '{{.Label "openadkit.role"}}',
+        ],
+        check=False,
+        trace=False,
+    )
+    if result.returncode != 0:
+        return None
+    roles = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    if len(roles) != 1:
+        return None
+    return roles.pop()
+
+
+def live_state_conflict(deployment: Deployment, selection: Selection) -> str | None:
+    if not running_names([deployment.name]):
+        return None
+    current = live_role(deployment)
+    if current != selection.role:
+        saved_label = current or "single-host"
+        requested_label = selection.role or "single-host"
+        return (
+            f"{deployment.name} is already running as {saved_label}; "
+            f"stop it with openadkit stop {deployment.name} "
+            f"before starting {requested_label}"
+        )
+    return None
+
+
 def require_stopped(name: str) -> None:
     """Refuse destructive cleanup while this deployment's project is live."""
     if not shutil.which("docker"):
@@ -224,7 +266,7 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
     # The Compose project is the deployment: every configured service is meant
     # to run. Only the oneshot services are cross-checked, so a typo in a
     # resetServices entry still fails fast.
-    unknown = sorted(set(deployment.compose["resetServices"]) - configured)
+    unknown = sorted(set(deployment.reset_services(selection.role)) - configured)
     if unknown:
         raise OpenADKitError(
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
@@ -331,7 +373,7 @@ def start(deployment: Deployment, selection: Selection, pull_policy: str) -> Non
     if pull_policy != "never":
         compose_run(deployment, selection, ["pull", "--policy", pull_policy])
 
-    for service in deployment.compose["resetServices"]:
+    for service in deployment.reset_services(selection.role):
         compose_run(
             deployment,
             selection,

@@ -85,7 +85,7 @@ and is not passed on the command line.
 The same command surface is included in the release bundle. Use
 `deployments/<name>/config.local.env` for local overrides.
 
-For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/).
+For split-host (`--role`) topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployments/split-host/).
 
 ### Releasing
 

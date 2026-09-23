@@ -1,0 +1,119 @@
+// Zenoh bridge allowlist for split-host scenario-simulation.
+//
+// Applied by both role graphs (--role autoware and --role scenario): either
+// host can own an endpoint, so publishers/subscribers and service
+// servers/clients list the same routes. Entries are full-name regular
+// expressions, not globs. When `allow` is set, an omitted/empty type list
+// means none.
+//
+// Derived from the pinned Scenario Simulator V2 25.0.20 concealer interfaces
+// (AutowareUniverse, FieldOperatorApplication) plus the Autoware ADAPI
+// servers/clients. The simple sensor simulator's detection, obstacle
+// segmentation, occupancy grid, and IMU outputs are included because the
+// Autoware host consumes/visualizes them and the single-host graph kept them
+// local; autonomous emergency braking needs the IMU, and autonomous-mode
+// availability on the Autoware host depends on that control stack coming up.
+// Map blobs, camera images, and visualization/teleop interfaces are
+// intentionally excluded.
+{
+  plugins: {
+    ros2dds: {
+      allow: {
+        publishers: [
+          "/clock",
+          "/tf",
+          "/tf_static",
+          "/simulation/.*",
+          "/vehicle/status/.*",
+          "/control/command/.*",
+          "/perception/obstacle_segmentation/pointcloud",
+          "/perception/object_recognition/detection/objects",
+          "/perception/occupancy_grid_map/map",
+          "/sensing/imu/imu_data",
+          "/localization/acceleration",
+          "/localization/kinematic_state",
+          "/localization/pose_estimator/pose_with_covariance",
+          "/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id",
+          "/autoware/state",
+          "/api/localization/initialization_state",
+          "/api/routing/state",
+          "/api/operation_mode/state",
+          "/api/external/get/rtc_status",
+          "/api/external/get/emergency",
+          "/api/fail_safe/mrm_state",
+          "/api/autoware/get/engage",
+        ],
+        subscribers: [
+          "/clock",
+          "/tf",
+          "/tf_static",
+          "/simulation/.*",
+          "/vehicle/status/.*",
+          "/control/command/.*",
+          "/perception/obstacle_segmentation/pointcloud",
+          "/perception/object_recognition/detection/objects",
+          "/perception/occupancy_grid_map/map",
+          "/sensing/imu/imu_data",
+          "/localization/acceleration",
+          "/localization/kinematic_state",
+          "/localization/pose_estimator/pose_with_covariance",
+          "/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id",
+          "/autoware/state",
+          "/api/localization/initialization_state",
+          "/api/routing/state",
+          "/api/operation_mode/state",
+          "/api/external/get/rtc_status",
+          "/api/external/get/emergency",
+          "/api/fail_safe/mrm_state",
+          "/api/autoware/get/engage",
+        ],
+        service_servers: [
+          "/control/control_mode_request",
+          "/simulation/.*",
+          "/api/localization/initialize",
+          "/api/routing/set_route",
+          "/api/routing/set_route_points",
+          "/api/routing/clear_route",
+          "/api/operation_mode/change_to_stop",
+          "/api/operation_mode/enable_autoware_control",
+          "/api/operation_mode/change_to_autonomous",
+          "/api/external/set/engage",
+          "/api/autoware/set/engage",
+          "/api/external/set/rtc_commands",
+          "/api/external/set/rtc_auto_mode",
+          "/api/autoware/set/velocity_limit",
+        ],
+        service_clients: [
+          "/control/control_mode_request",
+          "/simulation/.*",
+          "/api/localization/initialize",
+          "/api/routing/set_route",
+          "/api/routing/set_route_points",
+          "/api/routing/clear_route",
+          "/api/operation_mode/change_to_stop",
+          "/api/operation_mode/enable_autoware_control",
+          "/api/operation_mode/change_to_autonomous",
+          "/api/external/set/engage",
+          "/api/autoware/set/engage",
+          "/api/external/set/rtc_commands",
+          "/api/external/set/rtc_auto_mode",
+          "/api/autoware/set/velocity_limit",
+        ],
+        action_servers: [],
+        action_clients: [],
+      },
+
+      // Callers allow 10 s for routing and a configurable (default 90 s)
+      // localization initialization; keep bridge-side query timeouts at or
+      // above those budgets.
+      queries_timeout: {
+        services: [
+          "/api/localization/initialize=120.0",
+          "/api/routing/set_route=30.0",
+          "/api/routing/set_route_points=30.0",
+          ".*=10.0",
+        ],
+      },
+    },
+  },
+}

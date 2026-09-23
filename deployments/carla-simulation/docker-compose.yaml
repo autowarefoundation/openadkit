@@ -134,7 +134,7 @@ services:
       - ../shared/runtime.env
     volumes:
       - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
-      - ./sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
+      - ./config/sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
     depends_on:
       carla:
         condition: service_healthy
@@ -164,7 +164,7 @@ services:
       - CARLA_WORLD=${CARLA_WORLD}
       - CARLA_LOAD_TIMEOUT=${CARLA_LOAD_TIMEOUT}
     volumes:
-      - ./load-carla-map.py:/autoware_config/load-carla-map.py:ro
+      - ./scripts/load-carla-map.py:/autoware_config/load-carla-map.py:ro
     depends_on:
       carla:
         condition: service_healthy

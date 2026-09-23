@@ -13,9 +13,13 @@ openadkit logs planning-simulation --follow
 openadkit stop planning-simulation
 ```
 
-Without a deployment name, `status`, `logs`, and `stop` list the running
-deployments. `openadkit run <deployment> --pull always` refreshes images before
-starting, and `openadkit --version` prints the CLI version.
+`status`, `logs`, and `stop` need a deployment name. Without one, they exit 2
+when any deployment is running: stderr says the name is required, and stdout
+lists the running names as a hint. They do not show status, stream logs, or
+stop anything. When nothing is running they print `no running deployments` and
+exit 0. `openadkit logs --follow` without a name is always a usage error.
+`openadkit run <deployment> --pull always` refreshes images before starting,
+and `openadkit --version` prints the CLI version.
 
 ## Validate Before Running
 
@@ -70,9 +74,12 @@ installed, omit `--force`. Source checkouts update with `git pull` or
 ## Uninstall and Cleanup
 
 Remove the installed release and its launcher (release installs only; remove a
-source checkout with Git):
+source checkout with Git). Stop every running deployment first. `uninstall`
+refuses while an `openadkit-*` Compose project is still running, because it
+removes the launcher `openadkit stop` needs:
 
 ```bash
+openadkit stop planning-simulation
 openadkit uninstall          # keep previously installed versions
 openadkit uninstall --all    # remove kept versions too
 ```
@@ -89,6 +96,7 @@ openadkit clean planning-simulation            # report only
 openadkit clean planning-simulation --data     # delete
 ```
 
-Stop the deployment first. The Kashiwanoha map used by Scenario Simulation is
+`clean --data` refuses if that deployment is still running; stop it first.
+The Kashiwanoha map used by Scenario Simulation is
 shared with the standalone Zenoh bridge; if it is removed, restore it with
 `openadkit fetch scenario-simulation --force`.

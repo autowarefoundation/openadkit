@@ -90,8 +90,8 @@ chmod +x auto-image-builder.sh
 sudo bash ./auto-image-builder.sh build-builder --distro autosd10-sig
 ```
 
-Now build the image (requires sudo/root). The container image is the first
-positional argument and the bootable disk image the second:
+Now build the image (requires sudo/root). The positionals are the manifest,
+the container image, and the optional bootable disk image:
 
 ```bash
 sudo bash ./auto-image-builder.sh build \

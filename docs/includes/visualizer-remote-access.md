@@ -19,7 +19,7 @@ Use the default password **`openadkit`**. The connection uses a self-signed cert
     or put a TLS-terminating reverse proxy in front of `127.0.0.1:6080` and set a
     strong `REMOTE_PASSWORD`. For manifest-driven deployments, put it in
     ignored `config.local.env`; standalone deployments document their own
-    environment handling. `base/runtime.env` is reserved for container ROS/DDS
+    environment handling. `shared/runtime.env` is reserved for container ROS/DDS
     variables.
     Editing `docker-compose.yaml` to add a `ports:` mapping has no effect under
     host networking.

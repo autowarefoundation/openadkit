@@ -1,106 +1,78 @@
 # Custom Deployment
 
-Use the published component images to compose a deployment for your own task.
-Start from the [Planning Simulation Compose file](https://github.com/autowarefoundation/openadkit/blob/main/deployments/planning-simulation/docker-compose.yaml)
-and the shared [deployment base](https://github.com/autowarefoundation/openadkit/blob/main/deployments/base/docker-compose.yaml)
-rather than assembling a complete stack from scratch. The
-[component catalog](../components/index.md#image-reference) lists image targets
-and supported platforms.
+Start from an existing deployment in a source checkout and adapt it to your task.
+Each deployment selects shared services using native Docker Compose `include`;
+its Compose file defines the dependencies and deployment-specific overrides.
 
-## Base + Overlay Pattern
+## Start from Planning Simulation
 
-Create `deployments/<your-deployment>/` with a Compose file, complete
-`config.env`, and a `deployment.json` manifest. Then add it to the root
-`openadkit.json` inventory. Base-backed deployments `include`
-`deployments/base/docker-compose.yaml` and declare the shared assets:
+From the repository root:
+
+```bash
+cp -r deployments/planning-simulation deployments/my-simulation
+```
+
+In the copied `deployment.json`, set `name` to `my-simulation` and update
+`description`. Keep the other settings for this planning-based example, including
+`"shared": ["shared"]`, the map download, and `resetServices`.
+
+Add this entry to the `deployments` object in the root `openadkit.json`:
 
 ```json
-{
-  "schemaVersion": 1,
-  "name": "your-deployment",
-  "description": "Describe the deployment",
-  "shared": ["base"],
-  "compose": {
-    "files": ["docker-compose.yaml"],
-    "gpuFiles": [],
-    "profiles": [],
-    "services": ["map", "planning", "visualizer"],
-    "resetServices": [],
-    "waitTimeout": 300
-  },
-  "requirements": {
-    "architectures": ["amd64", "arm64"],
-    "rosDistros": ["humble", "jazzy"],
-    "gpu": "none"
-  },
-  "data": []
+"my-simulation": {
+  "path": "deployments/my-simulation"
 }
 ```
 
-Without an inventory entry, `openadkit run your-deployment` fails with
-`unknown deployment`; direct Compose still works. The base's `runtime.env` is
-loaded inside containers and should hold only ROS/DDS runtime values. See
-[Deployments](index.md) for the operator model.
+The inventory entry makes the deployment available to the CLI.
 
-## Core Patterns
+## Customize the Stack
+
+| File | What to change |
+|------|----------------|
+| `docker-compose.yaml` | Select services with `include`, define `depends_on`, and add deployment-specific settings or services. |
+| `config.env` | Supply the parameters needed by the selected services, such as map paths and simulator settings. Use ignored `config.local.env` for personal overrides. |
+| `deployment.json` | Declare supported architectures, ROS distros, GPU requirements, downloads, and one-shot services to reset on each run. |
+
+Shared service definitions live in
+[`deployments/shared/services/`](https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services).
+For example, these excerpts from the copied Compose file select the visualizer
+and define its dependency:
 
 ```yaml
-services:
-  planning:
-    image: {{ registry }}:planning-control
-    network_mode: host
-    ipc: host
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=1
-    command: >
-      ros2 launch autoware_launch tier4_planning_component.launch.xml
-      component_wise_launch:=true
-      use_sim_time:=true
-      vehicle_model:=sample_vehicle
+include:
+  # Other selected services...
+  - ../shared/services/visualizer.yaml
 
+services:
   visualizer:
-    image: {{ registry }}:visualizer
-    network_mode: host
-    ipc: host
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=1
-      - REMOTE_PASSWORD=openadkit
-      - USE_SIM_TIME=true
+    depends_on:
+      - map
 ```
 
-Keep these invariants:
+The `visualizer` block customizes the included service; it does not create a
+second container. Add only the settings that differ. Deployment-only services
+can be defined directly in the same file.
 
-- All services use the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID`.
-- Launch files are not always `tier4_<component>_component.launch.xml`. Match the
-  command used in the base or deployment compose:
-  - map / planning / system / control / simulator: `tier4_*_component.launch.xml` under `autoware_launch`
-  - vehicle: `tier4_vehicle_launch vehicle.launch.xml`
-  - API: `tier4_autoware_api_component.launch.xml`
-  - CARLA bridge: `autoware_carla_interface.launch.xml`
-- Do not override the visualizer command; its entrypoint starts noVNC and RViz2.
-- Add map, vehicle, system, simulator, and API services as required by the task.
-- Use `sensing-perception-cuda` only on amd64 hosts with the NVIDIA Container
-  Toolkit (Logging Simulation GPU overlay and CARLA default).
-- Keep noVNC loopback-bound and set a strong `REMOTE_PASSWORD` from
-  `config.local.env`. Do not expose the visualizer on untrusted networks without
-  TLS and a non-default password.
+Compose is the source of truth for the service set; there is no service list in
+`deployment.json`. When removing a service, check references from `depends_on`,
+`pid`, and `resetServices`. Most shared services use `pid: service:map` and need
+the `map` service in the project.
 
-With host networking, open the visualizer at
-`https://localhost:6080/vnc.html` and accept the self-signed certificate.
+Shared ROS/DDS settings live in `shared/runtime.env`, loaded inside containers
+via `env_file`. Keep communicating services on the same ROS domain and middleware.
+Keep the visualizer's entrypoint and command intact so noVNC and RViz start
+together; use `config.local.env` to set `REMOTE_PASSWORD`.
 
-## Operate
-
---8<-- "includes/cli-command-context.md"
+## Validate and Run
 
 ```bash
-openadkit validate your-deployment
-openadkit run your-deployment
-openadkit status your-deployment
-openadkit logs your-deployment --follow
-openadkit stop your-deployment
+./openadkit validate my-simulation
+./openadkit run my-simulation
+./openadkit logs my-simulation --follow
+./openadkit stop my-simulation
 ```
 
-See [Logging Simulation](logging-simulation/index.md) for a GPU overlay and
-[Zenoh Bridge](zenoh-bridge/index.md) for distributed ROS 2 domains.
+Validate each distro and GPU mode you declare. See
+[Logging Simulation](logging-simulation/index.md) for a GPU overlay and
+[CARLA Simulation](carla-simulation/index.md) for deployment-specific services.

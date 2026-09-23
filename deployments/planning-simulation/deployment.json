@@ -2,12 +2,11 @@
   "schemaVersion": 1,
   "name": "planning-simulation",
   "description": "Run Autoware planning and control against the built-in simulator",
-  "shared": ["base"],
+  "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],
     "gpuFiles": [],
     "profiles": [],
-    "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer"],
     "resetServices": ["map-check"],
     "waitTimeout": 300
   },

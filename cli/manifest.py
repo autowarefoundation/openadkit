@@ -45,7 +45,6 @@ ALLOWED_COMPOSE_KEYS = {
     "files",
     "gpuFiles",
     "profiles",
-    "services",
     "resetServices",
     "waitTimeout",
 }
@@ -264,7 +263,6 @@ class RuntimeContext:
 class Selection:
     ros_distro: str
     gpu: bool
-    services: tuple[str, ...]
     injections: dict[str, str]
     environment: dict[str, str]
 
@@ -335,7 +333,6 @@ class Deployment:
             return Selection(
                 ros_distro=distro,
                 gpu=False,
-                services=tuple(self.compose["services"]),
                 injections=injections,
                 environment=environment,
             )
@@ -373,7 +370,6 @@ class Deployment:
                     f"{', '.join(gpu_architectures)}"
                 )
 
-        services = list(self.compose["services"])
         required_environment = list(self.requirements["requiredEnv"])
         environment = self.configuration_environment
         injections: dict[str, str] = {"ROS_DISTRO": distro}
@@ -405,7 +401,6 @@ class Deployment:
         return Selection(
             ros_distro=distro,
             gpu=gpu,
-            services=tuple(services),
             injections=injections,
             environment=environment,
         )
@@ -505,12 +500,10 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     if not isinstance(compose, dict):
         raise OpenADKitError("compose must be an object")
     reject_unknown(compose, ALLOWED_COMPOSE_KEYS, "compose")
-    for field in ("files", "gpuFiles", "profiles", "services", "resetServices"):
+    for field in ("files", "gpuFiles", "profiles", "resetServices"):
         compose[field] = require_string_list(compose.get(field, []), f"compose.{field}")
     if not compose["files"]:
         raise OpenADKitError("compose.files must not be empty")
-    if not compose["services"]:
-        raise OpenADKitError("compose.services must not be empty")
     wait_timeout = compose.get("waitTimeout", 300)
     if not isinstance(wait_timeout, int) or isinstance(wait_timeout, bool) or wait_timeout <= 0:
         raise OpenADKitError("compose.waitTimeout must be a positive integer")

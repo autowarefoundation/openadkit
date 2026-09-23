@@ -1,0 +1,32 @@
+# Map data gate — fails fast when MAP_PATH is empty or missing required files.
+# A oneshot (restart: "no"): deployments list it in deployment.json resetServices.
+services:
+  map-check:
+    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
+    container_name: autoware-map-check
+    network_mode: host
+    init: true
+    volumes:
+      - type: bind
+        source: ${MAP_PATH}
+        target: /autoware_map
+        read_only: true
+        bind:
+          create_host_path: false
+    entrypoint: ["bash", "-lc"]
+    command:
+      - |
+        set -euo pipefail
+        missing=0
+        for f in "${LANELET2_MAP_FILE}" "${POINTCLOUD_MAP_FILE}"; do
+          if [[ ! -s "/autoware_map/$${f}" ]]; then
+            echo "map-check: missing or empty /autoware_map/$${f} (MAP_PATH on host)" >&2
+            missing=1
+          fi
+        done
+        if [[ "$${missing}" -ne 0 ]]; then
+          echo "map-check: fetch sample data with ./openadkit fetch <deployment>" >&2
+          exit 1
+        fi
+        echo "map-check: ok (${LANELET2_MAP_FILE}, ${POINTCLOUD_MAP_FILE})"
+    restart: "no"

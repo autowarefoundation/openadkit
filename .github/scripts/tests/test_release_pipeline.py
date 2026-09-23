@@ -815,7 +815,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert plan["bundle"]["root"] == f"openadkit-{VERSION}"
     assert plan["bundle"]["runtime"] == ["openadkit", "openadkit.json", "cli"]
     assert {asset["name"] for asset in plan["githubAssets"]} >= {"openadkit", plan["bundle"]["asset"]}
-    assert plan["bundle"]["shared"] == ["base"]
+    assert plan["bundle"]["shared"] == ["shared"]
     assert plan["bundle"]["deployments"] == sorted(
         json.loads((ROOT / "openadkit.json").read_text())["deployments"]
     )
@@ -824,7 +824,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert context["defaultRosDistro"] == "humble"
     assert context["componentImages"]["CARLA_INTERFACE_IMAGE"] == "carla-interface"
     assert set(context["deployments"]) == set(plan["bundle"]["deployments"])
-    assert set(context["shared"]) == {"base"}
+    assert set(context["shared"]) == {"shared"}
     for distro in ("humble", "jazzy"):
         assert set(context["images"][distro]) == RUNTIME_TARGETS
         assert all(

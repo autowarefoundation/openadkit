@@ -1,3 +1,6 @@
+# GPU overlay for logging simulation — swap sensing/perception onto the CUDA
+# images and reserve the GPU. Model flags differ from the CPU stack, so
+# perception's command is restated here.
 services:
   sensing:
     image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}

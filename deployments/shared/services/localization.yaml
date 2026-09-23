@@ -1,0 +1,19 @@
+# Localization — determines the vehicle's position on the map.
+services:
+  localization:
+    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
+    container_name: autoware-localization
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    command: >
+      ros2 launch autoware_launch tier4_localization_component.launch.xml
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

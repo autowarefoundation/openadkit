@@ -104,7 +104,6 @@ def minimal_manifest(name="example", *, data=None):
             "files": ["docker-compose.yaml"],
             "gpuFiles": [],
             "profiles": [],
-            "services": ["app"],
             "resetServices": [],
             "waitTimeout": 30,
         },
@@ -907,9 +906,9 @@ def test_release_deployment_change_is_marked_modified(tmp_path):
 
 def test_release_shared_asset_change_is_marked_modified(tmp_path):
     manifest = minimal_manifest()
-    manifest["shared"] = ["base"]
+    manifest["shared"] = ["shared"]
     root, _ = runtime_tree(tmp_path, release=True, manifest=manifest)
-    (root / "deployments/base/runtime.env").write_text("ROS_DOMAIN_ID=2\n")
+    (root / "deployments/shared/runtime.env").write_text("ROS_DOMAIN_ID=2\n")
     result = run_cli(root, ["list"])
     assert result.returncode == 0, result.stderr
     assert re.search(r"example\s+modified", result.stdout)
@@ -994,9 +993,10 @@ def test_run_pull_policy_is_explicit_for_up(tmp_path, policy, expects_pull):
     text = calls.read_text()
     assert ("pull --policy" in text) is expects_pull
     assert (
-        "up --detach --wait --wait-timeout 30 --pull never --remove-orphans app"
-        in text
+        "up --detach --wait --wait-timeout 30 --pull never --remove-orphans" in text
     )
+    # The Compose project is the deployment, so `up` takes no service allowlist.
+    assert "--remove-orphans app" not in text
 
 
 def test_run_resets_declared_one_shot_services(tmp_path):
@@ -1676,7 +1676,7 @@ def test_validate_rejects_active_relative_data_destination_before_compose(tmp_pa
     assert not calls.exists()
 
 
-def test_unknown_manifest_service_fails_before_data_pull_or_up(tmp_path):
+def test_unknown_reset_service_fails_before_data_pull_or_up(tmp_path):
     resources = [
         {
             "name": "dataset",
@@ -1693,7 +1693,7 @@ def test_unknown_manifest_service_fails_before_data_pull_or_up(tmp_path):
         }
     ]
     manifest = minimal_manifest(data=resources)
-    manifest["compose"]["services"] = ["typo"]
+    manifest["compose"]["resetServices"] = ["typo"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path, configured="app\n")
     result = run_cli(
@@ -1769,13 +1769,15 @@ def test_gpu_architecture_constraint_fails_before_compose(tmp_path):
     assert not calls.exists()
 
 
-def test_empty_services_are_rejected(tmp_path):
+def test_removed_compose_services_field_is_rejected(tmp_path):
+    # The Compose project owns the service set; a second manifest list is not
+    # accepted.
     manifest = minimal_manifest()
-    manifest["compose"]["services"] = []
+    manifest["compose"]["services"] = ["app"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     result = run_cli(root, ["list"])
     assert result.returncode == 0
-    assert "compose.services must not be empty" in result.stdout
+    assert "unknown compose field(s): services" in result.stdout
 
 
 def test_operational_commands_ignore_previous_gpu_selection(tmp_path):

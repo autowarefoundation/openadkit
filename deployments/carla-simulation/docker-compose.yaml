@@ -1,21 +1,87 @@
-# CARLA simulation — extends the deployment base with CARLA-specific services
-# and overrides:
-#   docker compose --env-file config.env up -d
+# CARLA simulation — Autoware closed loop against CARLA 0.9.16 (Humble, amd64,
+# GPU required).
+#
+# Service definitions live in ../shared/services/<service>.yaml (one file per service).
+# This file selects the stack, owns its topology (depends_on), moves
+# sensing/perception onto the CUDA images, and adds the CARLA-only services.
 include:
-  - ../base/docker-compose.yaml
+  - ../shared/services/map-check.yaml
+  - ../shared/services/map.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/sensing.yaml
+  - ../shared/services/localization.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
 
 services:
-  # Override base services with CARLA-specific changes.
+  map:
+    depends_on:
+      map-check:
+        condition: service_completed_successfully
+
+  # SYSTEM_DIAGNOSTICS_GRAPH=autoware-carla.yaml (config.env) selects the
+  # CARLA diagnostics graph; the shared system definition is unchanged.
   system:
+    depends_on:
+      - map
+
+  sensing:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    depends_on:
+      - map
+      - carla-interface
+      - system
+
+  # CARLA's perception takes a different set of launch arguments (it adds
+  # use_empty_dynamic_object_publisher), so it is defined here rather than
+  # included from ../shared/services/perception.yaml.
+  perception:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    container_name: autoware-perception
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    runtime: nvidia
+    env_file:
+      - ../shared/runtime.env
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ${DATA_PATH}:/autoware_data:rw
+      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    depends_on:
+      - map
+      - sensing
+      - system
     command: >
-      ros2 launch autoware_launch tier4_system_component.launch.xml
-      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/autoware-carla.yaml
-      launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
-      launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
-      sensor_model:=${SENSOR_MODEL}
-      system_run_mode:=${SYSTEM_RUN_MODE}
+      ros2 launch autoware_launch tier4_perception_component.launch.xml
+      data_path:=/autoware_data
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
+      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
+      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
+      perception_mode:=${PERCEPTION_MODE}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_empty_dynamic_object_publisher:=${AUTOWARE_E2E_EMPTY_OBJECTS}
       use_sim_time:=${USE_SIM_TIME}
+      use_traffic_light_recognition:=${AUTOWARE_E2E_USE_TRAFFIC_LIGHT_RECOGNITION}
       vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure
+
+  localization:
+    depends_on:
+      - map
+      - sensing
+      - perception
+      - system
 
   planning:
     depends_on:
@@ -29,26 +95,25 @@ services:
       - map
       - carla-interface
 
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
   api:
     depends_on:
       - map
       - system
 
+  # The visualizer renders CARLA on the GPU, so it needs the graphics caps.
   visualizer:
     container_name: autoware-e2e-visualizer
     runtime: nvidia
-    env_file:
-      - ../base/runtime.env
     environment:
-      - RVIZ_CONFIG=${RVIZ_CONFIG}
-      - USE_SIM_TIME=${USE_SIM_TIME}
-      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
-      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
       - RVIZ_GPU=auto
-    volumes:
-      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - api
@@ -56,7 +121,7 @@ services:
       - control
       - carla-interface
 
-  # CARLA-specific services.
+  # CARLA-only services.
   carla:
     image: ${CARLA_CONTAINER_IMAGE:-carlasim/carla:0.9.16@sha256:aaf1df22702780ece072069e23d03c4879b002ae028c79744b09c4c7ddbae953}
     container_name: ${CARLA_CONTAINER_NAME}
@@ -91,9 +156,9 @@ services:
     init: true
     ipc: host
     env_file:
-      - ../base/runtime.env
+      - ../shared/runtime.env
     volumes:
-      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ./sensor_mapping.yaml:/autoware_config/sensor_mapping.yaml:ro
     depends_on:
       carla:
@@ -130,89 +195,3 @@ services:
         condition: service_healthy
     command: python3 /autoware_config/load-carla-map.py
     restart: "no"
-
-  sensing:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
-    container_name: autoware-sensing
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    runtime: nvidia
-    env_file:
-      - ../base/runtime.env
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    volumes:
-      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
-    depends_on:
-      - map
-      - carla-interface
-      - system
-    command: >
-      ros2 launch autoware_launch tier4_sensing_component.launch.xml
-      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_SENSING}
-      launch_sensing_driver:=${LAUNCH_SENSING_DRIVER}
-      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
-      sensor_model:=${SENSOR_MODEL}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  perception:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
-    container_name: autoware-perception
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    runtime: nvidia
-    env_file:
-      - ../base/runtime.env
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    volumes:
-      - ${DATA_PATH}:/autoware_data:rw
-      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
-    depends_on:
-      - map
-      - sensing
-      - system
-    command: >
-      ros2 launch autoware_launch tier4_perception_component.launch.xml
-      data_path:=/autoware_data
-      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
-      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
-      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
-      perception_mode:=${PERCEPTION_MODE}
-      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
-      use_empty_dynamic_object_publisher:=${AUTOWARE_E2E_EMPTY_OBJECTS}
-      use_sim_time:=${USE_SIM_TIME}
-      use_traffic_light_recognition:=${AUTOWARE_E2E_USE_TRAFFIC_LIGHT_RECOGNITION}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
-
-  localization:
-    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
-    container_name: autoware-localization
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
-    env_file:
-      - ../base/runtime.env
-    volumes:
-      - ../base/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
-    depends_on:
-      - map
-      - sensing
-      - perception
-      - system
-    command: >
-      ros2 launch autoware_launch tier4_localization_component.launch.xml
-      system_run_mode:=${SYSTEM_RUN_MODE}
-      use_sim_time:=${USE_SIM_TIME}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure

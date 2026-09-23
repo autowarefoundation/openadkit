@@ -186,9 +186,10 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
         compose_capture(deployment, selection, ["config", "--services"])
         .stdout.splitlines()
     )
-    declared = set(selection.services)
-    declared.update(deployment.compose["resetServices"])
-    unknown = sorted(declared - configured)
+    # The Compose project is the deployment: every configured service is meant
+    # to run. Only the oneshot services are cross-checked, so a typo in a
+    # resetServices entry still fails fast.
+    unknown = sorted(set(deployment.compose["resetServices"]) - configured)
     if unknown:
         raise OpenADKitError(
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
@@ -221,24 +222,9 @@ def check_daemon(selection: Selection) -> None:
         )
 
 
-def start(
-    deployment: Deployment,
-    selection: Selection,
-    pull_policy: str,
-    configured_services: set[str],
-) -> None:
-    services = list(selection.services)
+def start(deployment: Deployment, selection: Selection, pull_policy: str) -> None:
     if pull_policy != "never":
-        compose_run(
-            deployment,
-            selection,
-            ["pull", "--policy", pull_policy, *services],
-        )
-
-    excluded = sorted(configured_services - set(services))
-    if excluded:
-        compose_run(deployment, selection, ["stop", *excluded])
-        compose_run(deployment, selection, ["rm", "--force", *excluded])
+        compose_run(deployment, selection, ["pull", "--policy", pull_policy])
 
     for service in deployment.compose["resetServices"]:
         compose_run(
@@ -259,7 +245,6 @@ def start(
             "--pull",
             "never",
             "--remove-orphans",
-            *services,
         ],
     )
 

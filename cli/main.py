@@ -339,9 +339,9 @@ def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> 
         )
 
 
-def print_run_next_steps(deployment, selection) -> None:
+def print_run_next_steps(deployment, services: set[str]) -> None:
     print(f"running: {deployment.name}")
-    if "visualizer" in selection.services:
+    if "visualizer" in services:
         print("visualizer: https://localhost:6080/vnc.html")
         print("password: REMOTE_PASSWORD (default openadkit; override in config.local.env)")
     print(f"stop with: openadkit stop {deployment.name}")
@@ -463,8 +463,8 @@ def main() -> int:
 
         compose.check_daemon(selection)
         data.install_data(deployment, selection, args.force)
-        compose.start(deployment, selection, args.pull, configured_services)
-        print_run_next_steps(deployment, selection)
+        compose.start(deployment, selection, args.pull)
+        print_run_next_steps(deployment, configured_services)
         return 0
 
     compose.ensure_runtime_user()

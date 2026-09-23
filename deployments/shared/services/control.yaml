@@ -1,0 +1,26 @@
+# Control — turns a trajectory into throttle, brake, and steering commands.
+services:
+  control:
+    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
+    container_name: autoware-control
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ../config/vehicle_cmd_gate.param.yaml:/opt/autoware/autoware_vehicle_cmd_gate/share/autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml:ro
+      - ../config/vehicle_cmd_gate.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml:ro
+    command: >
+      ros2 launch autoware_launch tier4_control_component.launch.xml
+      check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT}
+      component_wise_launch:=true
+      lateral_controller_mode:=${LATERAL_CONTROLLER_MODE}
+      longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE}
+      module_preset:=${CONTROL_MODULE_PRESET}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_id:=${VEHICLE_ID}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

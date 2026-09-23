@@ -1242,10 +1242,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#base-overlay-pattern" class="md-nav__link">
+  <a href="#start-from-planning-simulation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Base + Overlay Pattern
+        Start from Planning Simulation
       
     </span>
   </a>
@@ -1253,10 +1253,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#core-patterns" class="md-nav__link">
+  <a href="#customize-the-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Core Patterns
+        Customize the Stack
       
     </span>
   </a>
@@ -1264,10 +1264,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#operate" class="md-nav__link">
+  <a href="#validate-and-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Operate
+        Validate and Run
       
     </span>
   </a>
@@ -1974,10 +1974,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#base-overlay-pattern" class="md-nav__link">
+  <a href="#start-from-planning-simulation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Base + Overlay Pattern
+        Start from Planning Simulation
       
     </span>
   </a>
@@ -1985,10 +1985,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#core-patterns" class="md-nav__link">
+  <a href="#customize-the-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Core Patterns
+        Customize the Stack
       
     </span>
   </a>
@@ -1996,10 +1996,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#operate" class="md-nav__link">
+  <a href="#validate-and-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Operate
+        Validate and Run
       
     </span>
   </a>
@@ -2032,99 +2032,78 @@
 
 
 <h1 id="custom-deployment">Custom Deployment<a class="headerlink" href="#custom-deployment" title="Permanent link">#</a></h1>
-<p>Use the published component images to compose a deployment for your own task.
-Start from the <a href="https://github.com/autowarefoundation/openadkit/blob/main/deployments/planning-simulation/docker-compose.yaml">Planning Simulation Compose file</a>
-and the shared <a href="https://github.com/autowarefoundation/openadkit/blob/main/deployments/base/docker-compose.yaml">deployment base</a>
-rather than assembling a complete stack from scratch. The
-<a href="../../components/#image-reference">component catalog</a> lists image targets
-and supported platforms.</p>
-<h2 id="base-overlay-pattern">Base + Overlay Pattern<a class="headerlink" href="#base-overlay-pattern" title="Permanent link">#</a></h2>
-<p>Create <code>deployments/&lt;your-deployment&gt;/</code> with a Compose file, complete
-<code>config.env</code>, and a <code>deployment.json</code> manifest. Then add it to the root
-<code>openadkit.json</code> inventory. Base-backed deployments <code>include</code>
-<code>deployments/base/docker-compose.yaml</code> and declare the shared assets:</p>
-<div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">"schemaVersion"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"your-deployment"</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Describe the deployment"</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"shared"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"base"</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">"compose"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">"files"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"docker-compose.yaml"</span><span class="p">],</span>
-<span class="w">    </span><span class="nt">"gpuFiles"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">"profiles"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">"services"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"map"</span><span class="p">,</span><span class="w"> </span><span class="s2">"planning"</span><span class="p">,</span><span class="w"> </span><span class="s2">"visualizer"</span><span class="p">],</span>
-<span class="w">    </span><span class="nt">"resetServices"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">"waitTimeout"</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">"requirements"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">"architectures"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"amd64"</span><span class="p">,</span><span class="w"> </span><span class="s2">"arm64"</span><span class="p">],</span>
-<span class="w">    </span><span class="nt">"rosDistros"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"humble"</span><span class="p">,</span><span class="w"> </span><span class="s2">"jazzy"</span><span class="p">],</span>
-<span class="w">    </span><span class="nt">"gpu"</span><span class="p">:</span><span class="w"> </span><span class="s2">"none"</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<p>Start from an existing deployment in a source checkout and adapt it to your task.
+Each deployment selects shared services using native Docker Compose <code>include</code>;
+its Compose file defines the dependencies and deployment-specific overrides.</p>
+<h2 id="start-from-planning-simulation">Start from Planning Simulation<a class="headerlink" href="#start-from-planning-simulation" title="Permanent link">#</a></h2>
+<p>From the repository root:</p>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>-r<span class="w"> </span>deployments/planning-simulation<span class="w"> </span>deployments/my-simulation
+</code></pre></div>
+<p>In the copied <code>deployment.json</code>, set <code>name</code> to <code>my-simulation</code> and update
+<code>description</code>. Keep the other settings for this planning-based example, including
+<code>"shared": ["shared"]</code>, the map download, and <code>resetServices</code>.</p>
+<p>Add this entry to the <code>deployments</code> object in the root <code>openadkit.json</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">"my-simulation"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"deployments/my-simulation"</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>Without an inventory entry, <code>openadkit run your-deployment</code> fails with
-<code>unknown deployment</code>; direct Compose still works. The base's <code>runtime.env</code> is
-loaded inside containers and should hold only ROS/DDS runtime values. See
-<a href="../">Deployments</a> for the operator model.</p>
-<h2 id="core-patterns">Core Patterns<a class="headerlink" href="#core-patterns" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">planning</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit:planning-control</span>
-<span class="w">    </span><span class="nt">network_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
-<span class="w">    </span><span class="nt">ipc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
-<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RMW_IMPLEMENTATION=rmw_cyclonedds_cpp</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROS_DOMAIN_ID=1</span>
-<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
-<span class="w">      </span><span class="no">ros2 launch autoware_launch tier4_planning_component.launch.xml</span>
-<span class="w">      </span><span class="no">component_wise_launch:=true</span>
-<span class="w">      </span><span class="no">use_sim_time:=true</span>
-<span class="w">      </span><span class="no">vehicle_model:=sample_vehicle</span>
+<p>The inventory entry makes the deployment available to the CLI.</p>
+<h2 id="customize-the-stack">Customize the Stack<a class="headerlink" href="#customize-the-stack" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What to change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker-compose.yaml</code></td>
+<td>Select services with <code>include</code>, define <code>depends_on</code>, and add deployment-specific settings or services.</td>
+</tr>
+<tr>
+<td><code>config.env</code></td>
+<td>Supply the parameters needed by the selected services, such as map paths and simulator settings. Use ignored <code>config.local.env</code> for personal overrides.</td>
+</tr>
+<tr>
+<td><code>deployment.json</code></td>
+<td>Declare supported architectures, ROS distros, GPU requirements, downloads, and one-shot services to reset on each run.</td>
+</tr>
+</tbody>
+</table>
+<p>Shared service definitions live in
+<a href="https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services"><code>deployments/shared/services/</code></a>.
+For example, these excerpts from the copied Compose file select the visualizer
+and define its dependency:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">include</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Other selected services...</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">../shared/services/visualizer.yaml</span>
 
+<span class="nt">services</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">visualizer</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/autowarefoundation/openadkit:visualizer</span>
-<span class="w">    </span><span class="nt">network_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
-<span class="w">    </span><span class="nt">ipc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">host</span>
-<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RMW_IMPLEMENTATION=rmw_cyclonedds_cpp</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROS_DOMAIN_ID=1</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">REMOTE_PASSWORD=openadkit</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">USE_SIM_TIME=true</span>
+<span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span>
 </code></pre></div>
-<p>Keep these invariants:</p>
-<ul>
-<li>All services use the same <code>RMW_IMPLEMENTATION</code> and <code>ROS_DOMAIN_ID</code>.</li>
-<li>Launch files are not always <code>tier4_&lt;component&gt;_component.launch.xml</code>. Match the
-  command used in the base or deployment compose:<ul>
-<li>map / planning / system / control / simulator: <code>tier4_*_component.launch.xml</code> under <code>autoware_launch</code></li>
-<li>vehicle: <code>tier4_vehicle_launch vehicle.launch.xml</code></li>
-<li>API: <code>tier4_autoware_api_component.launch.xml</code></li>
-<li>CARLA bridge: <code>autoware_carla_interface.launch.xml</code></li>
-</ul>
-</li>
-<li>Do not override the visualizer command; its entrypoint starts noVNC and RViz2.</li>
-<li>Add map, vehicle, system, simulator, and API services as required by the task.</li>
-<li>Use <code>sensing-perception-cuda</code> only on amd64 hosts with the NVIDIA Container
-  Toolkit (Logging Simulation GPU overlay and CARLA default).</li>
-<li>Keep noVNC loopback-bound and set a strong <code>REMOTE_PASSWORD</code> from
-  <code>config.local.env</code>. Do not expose the visualizer on untrusted networks without
-  TLS and a non-default password.</li>
-</ul>
-<p>With host networking, open the visualizer at
-<code>https://localhost:6080/vnc.html</code> and accept the self-signed certificate.</p>
-<h2 id="operate">Operate<a class="headerlink" href="#operate" title="Permanent link">#</a></h2>
-<p>Commands on this page are shown as installed by the release installer. From a
-source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>validate<span class="w"> </span>your-deployment
-openadkit<span class="w"> </span>run<span class="w"> </span>your-deployment
-openadkit<span class="w"> </span>status<span class="w"> </span>your-deployment
-openadkit<span class="w"> </span>logs<span class="w"> </span>your-deployment<span class="w"> </span>--follow
-openadkit<span class="w"> </span>stop<span class="w"> </span>your-deployment
+<p>The <code>visualizer</code> block customizes the included service; it does not create a
+second container. Add only the settings that differ. Deployment-only services
+can be defined directly in the same file.</p>
+<p>Compose is the source of truth for the service set; there is no service list in
+<code>deployment.json</code>. When removing a service, check references from <code>depends_on</code>,
+<code>pid</code>, and <code>resetServices</code>. Most shared services use <code>pid: service:map</code> and need
+the <code>map</code> service in the project.</p>
+<p>Shared ROS/DDS settings live in <code>shared/runtime.env</code>, loaded inside containers
+via <code>env_file</code>. Keep communicating services on the same ROS domain and middleware.
+Keep the visualizer's entrypoint and command intact so noVNC and RViz start
+together; use <code>config.local.env</code> to set <code>REMOTE_PASSWORD</code>.</p>
+<h2 id="validate-and-run">Validate and Run<a class="headerlink" href="#validate-and-run" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code>./openadkit<span class="w"> </span>validate<span class="w"> </span>my-simulation
+./openadkit<span class="w"> </span>run<span class="w"> </span>my-simulation
+./openadkit<span class="w"> </span>logs<span class="w"> </span>my-simulation<span class="w"> </span>--follow
+./openadkit<span class="w"> </span>stop<span class="w"> </span>my-simulation
 </code></pre></div>
-<p>See <a href="../logging-simulation/">Logging Simulation</a> for a GPU overlay and
-<a href="../zenoh-bridge/">Zenoh Bridge</a> for distributed ROS 2 domains.</p>
+<p>Validate each distro and GPU mode you declare. See
+<a href="../logging-simulation/">Logging Simulation</a> for a GPU overlay and
+<a href="../carla-simulation/">CARLA Simulation</a> for deployment-specific services.</p>
 
 
 

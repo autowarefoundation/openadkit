@@ -2082,7 +2082,7 @@
 <li><a href="../components/#planning-control"><strong>Control</strong></a> converts that trajectory into throttle, brake, and steering commands.</li>
 <li><a href="../components/#vehicle-and-system"><strong>Vehicle System</strong></a> bridges those commands to the actual vehicle or simulator.</li>
 </ol>
-<p>A <strong>deployment</strong> combines the shared base services with task-specific overlays. Planning and Scenario Simulation add a dummy simulator on top of the base; Logging Simulation adds sensing, perception, and localization for recorded sensor data. Autoware Safety Island integrates with the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services. See <a href="../components/">Components</a> and <a href="../deployments/">Deployments</a>.</p>
+<p>A <strong>deployment</strong> selects shared Compose services and defines their dependencies and task-specific settings. Planning and Scenario Simulation use the dummy simulator; Logging Simulation uses sensing, perception, and localization for recorded sensor data. Autoware Safety Island integrates with the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services. See <a href="../components/">Components</a> and <a href="../deployments/">Deployments</a>.</p>
 <h2 id="key-terms">Key Terms<a class="headerlink" href="#key-terms" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -2106,7 +2106,7 @@
 </tr>
 <tr>
 <td><strong>Overlay</strong></td>
-<td>A deployment-specific Compose file layered on the shared <code>deployments/base/docker-compose.yaml</code>.</td>
+<td>An additional Compose file that changes selected service settings, such as Logging Simulation's GPU configuration.</td>
 </tr>
 <tr>
 <td><strong>Tag alias</strong></td>

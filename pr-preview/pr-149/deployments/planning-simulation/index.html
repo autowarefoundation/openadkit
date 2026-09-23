@@ -1979,7 +1979,7 @@ only.</p>
 <p>or put a TLS-terminating reverse proxy in front of <code>127.0.0.1:6080</code> and set a
 strong <code>REMOTE_PASSWORD</code>. For manifest-driven deployments, put it in
 ignored <code>config.local.env</code>; standalone deployments document their own
-environment handling. <code>base/runtime.env</code> is reserved for container ROS/DDS
+environment handling. <code>shared/runtime.env</code> is reserved for container ROS/DDS
 variables.
 Editing <code>docker-compose.yaml</code> to add a <code>ports:</code> mapping has no effect under
 host networking.</p>

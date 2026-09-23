@@ -1892,10 +1892,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#base-and-overlay-model" class="md-nav__link">
+  <a href="#shared-services" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Base and Overlay Model
+        Shared Services
       
     </span>
   </a>
@@ -1975,12 +1975,12 @@ configuration for a specific task.</p>
 <p>New users should start with Planning Simulation. The CLI and release bundle
 support Planning, Scenario, Logging, and CARLA Simulation. Zenoh remains a
 standalone source-checkout deployment.</p>
-<h2 id="base-and-overlay-model">Base and Overlay Model<a class="headerlink" href="#base-and-overlay-model" title="Permanent link">#</a></h2>
-<p>Planning, Scenario, Logging, and CARLA Simulation all include the shared
-<code>deployments/base/docker-compose.yaml</code>. The base defines the map-check, map,
-planning, vehicle, system, control, API, and visualizer services; each deployment
-overlay adds only its delta. Planning and Scenario Simulation add the dummy
-simulator.</p>
+<h2 id="shared-services">Shared Services<a class="headerlink" href="#shared-services" title="Permanent link">#</a></h2>
+<p>Planning, Scenario, Logging, and CARLA Simulation select the services they need
+from <code>deployments/shared/services/</code> using Docker Compose <code>include</code>. Each shared
+file defines one service. The deployment's Compose file defines dependencies,
+overrides, and deployment-only services; it is the source of truth for the
+service set.</p>
 <p>Each curated deployment carries a <code>deployment.json</code> manifest and one complete
 <code>config.env</code> for Compose interpolation.</p>
 <p>Commands on this page are shown as installed by the release installer. From a
@@ -1995,9 +1995,9 @@ openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 <p>Add <code>--ros-distro jazzy</code> to <code>validate</code>, <code>fetch</code>, or <code>run</code> to select Jazzy;
 Humble is the default. CARLA is Humble-only and requires <code>--gpu</code>. <code>status</code>,
 <code>logs</code>, and <code>stop</code> take neither flag — they read the running deployment.</p>
-<p>The release bundle vendors the curated deployments and shared base. Local
+<p>The release bundle vendors the curated deployments and shared assets. Local
 settings belong in ignored <code>config.local.env</code>; release component images remain
-pinned. The base's <code>runtime.env</code> is loaded inside containers via <code>env_file:</code>.</p>
+pinned. <code>shared/runtime.env</code> is loaded inside containers via <code>env_file:</code>.</p>
 <p>Zenoh does not have a runtime manifest. Use its source-checkout launcher
 scripts documented on its deployment page.</p>
 <p>See <a href="custom-deployment/">Custom Deployment</a> to compose a different stack and

@@ -18,12 +18,10 @@ After preparing `autoware/src` as described in the build-from-source guide, run
 the following from the repository root:
 
 ```bash
-docker buildx bake -f components/docker-bake.hcl \
-  --set carla-interface.tags=ghcr.io/autowarefoundation/openadkit:carla-interface-amd64-humble \
-  --load \
-  carla-interface
+docker buildx bake -f components/docker-bake.hcl --load carla-interface
 ```
 
-`./openadkit run carla-simulation --gpu` uses that reference from
-`deployments/carla-simulation/config.env`. Override it in
-`config.local.env` if you tag the image differently.
+The build is tagged with the `<target>-<arch>-<ros-distro>` reference
+repository-mode `./openadkit` injects, so `./openadkit run carla-simulation
+--gpu` picks it up. Override the `*_IMAGE` variables in `config.local.env` if
+you tag the image differently.

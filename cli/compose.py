@@ -95,7 +95,7 @@ def process_environment(selection: Selection) -> dict[str, str]:
 
 def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
     command = ["docker", "compose", "--project-name", deployment.project]
-    for env_file in deployment.env_files:
+    for env_file in deployment.env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
     for compose_file in deployment.compose_files(selection.gpu):
         command.extend(("--file", str(compose_file)))

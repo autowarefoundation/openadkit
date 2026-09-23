@@ -170,6 +170,8 @@ def runtime_tree(tmp_path, *, release=False, manifest=None):
         (deployment / gpu_file).write_text(
             "services:\n  app:\n    environment:\n      GPU: 'true'\n"
         )
+    if manifest["compose"].get("gpuFiles"):
+        (deployment / "config.gpu.env").write_text("GPU_MODE=true\n")
     for shared_name in manifest.get("shared", []):
         shared = root / "deployments" / shared_name
         shared.mkdir()
@@ -960,6 +962,38 @@ def test_config_local_env_is_applied_last(tmp_path):
     assert result.returncode == 0, result.stderr
     call = calls.read_text()
     assert call.index("config.env") < call.index("config.local.env")
+
+
+def test_gpu_env_is_loaded_only_with_gpu_and_before_local(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
+    (deployment / "config.local.env").write_text("REMOTE_PASSWORD=local\n")
+    bin_dir, calls = fake_docker(tmp_path)
+    path_env = {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+
+    result = run_cli(root, ["validate", "example"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    assert "config.gpu.env" not in calls.read_text()
+
+    calls.write_text("")
+    result = run_cli(root, ["validate", "example", "--gpu"], env=path_env)
+    assert result.returncode == 0, result.stderr
+    call = calls.read_text()
+    assert call.index("config.env") < call.index("config.gpu.env")
+    assert call.index("config.gpu.env") < call.index("config.local.env")
+
+
+def test_gpu_overlay_requires_gpu_env(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
+    (deployment / "config.gpu.env").unlink()
+    result = run_cli(root, ["validate", "example"])
+    assert result.returncode == 1
+    assert "GPU environment file" in result.stderr
 
 
 def test_run_orders_render_daemon_pull_and_up(tmp_path):

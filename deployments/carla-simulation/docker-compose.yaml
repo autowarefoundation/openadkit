@@ -9,6 +9,7 @@ include:
   - ../shared/services/map.yaml
   - ../shared/services/system.yaml
   - ../shared/services/sensing.yaml
+  - ../shared/services/perception.yaml
   - ../shared/services/localization.yaml
   - ../shared/services/planning.yaml
   - ../shared/services/vehicle.yaml
@@ -39,42 +40,16 @@ services:
       - carla-interface
       - system
 
-  # CARLA's perception takes a different set of launch arguments (it adds
-  # use_empty_dynamic_object_publisher), so it is defined here rather than
-  # included from ../shared/services/perception.yaml.
   perception:
     image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
-    container_name: autoware-perception
-    network_mode: host
-    init: true
-    ipc: host
-    pid: service:map
     runtime: nvidia
-    env_file:
-      - ../shared/runtime.env
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    volumes:
-      - ${DATA_PATH}:/autoware_data:rw
-      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
     depends_on:
       - map
       - sensing
       - system
-    command: >
-      ros2 launch autoware_launch tier4_perception_component.launch.xml
-      data_path:=/autoware_data
-      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_PERCEPTION}
-      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
-      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
-      perception_mode:=${PERCEPTION_MODE}
-      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
-      use_empty_dynamic_object_publisher:=${AUTOWARE_E2E_EMPTY_OBJECTS}
-      use_sim_time:=${USE_SIM_TIME}
-      use_traffic_light_recognition:=${AUTOWARE_E2E_USE_TRAFFIC_LIGHT_RECOGNITION}
-      vehicle_model:=${VEHICLE_MODEL}
-    restart: on-failure
 
   localization:
     depends_on:

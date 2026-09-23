@@ -434,6 +434,21 @@ def test_carla_compose_uses_gpu_sensing_image():
     assert "image: ${SENSING_PERCEPTION_IMAGE" not in carla
 
 
+def test_perception_command_lives_only_in_the_shared_service():
+    shared = (ROOT / "deployments/shared/services/perception.yaml").read_text()
+    logging_gpu = (
+        ROOT / "deployments/logging-simulation/docker-compose.gpu.yaml"
+    ).read_text()
+    carla = (ROOT / "deployments/carla-simulation/docker-compose.yaml").read_text()
+    gpu_env = (ROOT / "deployments/logging-simulation/config.gpu.env").read_text()
+    assert "use_empty_dynamic_object_publisher:=${USE_EMPTY_DYNAMIC_OBJECT_PUBLISHER}" in shared
+    assert "command:" not in logging_gpu
+    assert "../shared/services/perception.yaml" in carla
+    assert "tier4_perception_component.launch.xml" not in carla
+    assert "LIDAR_DETECTION_MODEL=centerpoint" in gpu_env
+    assert "OCCUPANCY_GRID_MAP_METHOD=pointcloud_based" in gpu_env
+
+
 def test_lint_validates_standalone_zenoh_compose():
     assert "cd deployments/zenoh-bridge && docker compose --env-file config.env config -q" in (
         LINT_WORKFLOW

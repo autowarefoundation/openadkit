@@ -281,23 +281,34 @@ class Deployment:
         self.shared: list[str] = manifest["shared"]
         self.project = f"openadkit-{self.name}"
 
-    @property
-    def env_files(self) -> list[Path]:
+    def env_files(self, gpu: bool = False) -> list[Path]:
         result = [
             ensure_safe_existing(self.directory, "config.env", "environment file")
         ]
-        for name in ("config.release.env", "config.local.env"):
+
+        def add_optional(name: str) -> None:
             candidate = self.directory / name
             if candidate.exists() or candidate.is_symlink():
                 result.append(
                     ensure_safe_existing(self.directory, name, "environment file")
                 )
+
+        add_optional("config.release.env")
+        if gpu:
+            if self.compose["gpuFiles"]:
+                result.append(
+                    ensure_safe_existing(
+                        self.directory, "config.gpu.env", "environment file"
+                    )
+                )
+            else:
+                add_optional("config.gpu.env")
+        add_optional("config.local.env")
         return result
 
-    @property
-    def configuration_environment(self) -> dict[str, str]:
+    def configuration_environment(self, gpu: bool = False) -> dict[str, str]:
         values: dict[str, str] = {}
-        for path in self.env_files:
+        for path in self.env_files(gpu):
             values.update(parse_dotenv(path))
         values.update(os.environ)
         return values
@@ -328,7 +339,7 @@ class Deployment:
         if operational:
             injections = {"ROS_DISTRO": distro}
             injections.update(self.distro_environment.get(distro, {}))
-            environment = self.configuration_environment
+            environment = self.configuration_environment()
             environment.update(injections)
             return Selection(
                 ros_distro=distro,
@@ -371,7 +382,7 @@ class Deployment:
                 )
 
         required_environment = list(self.requirements["requiredEnv"])
-        environment = self.configuration_environment
+        environment = self.configuration_environment(gpu)
         injections: dict[str, str] = {"ROS_DISTRO": distro}
         injections.update(self.distro_environment.get(distro, {}))
         component_environment = current_context.component_environment(
@@ -580,7 +591,10 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     deployment.compose_files(False)
     if compose["gpuFiles"]:
         deployment.compose_files(True)
-    deployment.env_files
+        ensure_safe_existing(
+            directory, "config.gpu.env", "GPU environment file"
+        )
+    deployment.env_files()
     return deployment
 
 

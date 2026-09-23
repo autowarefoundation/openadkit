@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -11,7 +12,7 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 
-from manifest import Deployment, OpenADKitError, Selection
+from manifest import Deployment, OpenADKitError, Selection, parse_dotenv
 
 PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
@@ -85,11 +86,55 @@ def capture_process(
         ) from error
 
 
+# Compose env-file substitution: $VAR, ${VAR}, ${VAR:-default}, ${VAR-default}, $$.
+_ENV_REF = re.compile(
+    r"\$\$"
+    r"|\$\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)(?:(?P<op>:-|-)(?P<default>[^}]*))?\}"
+    r"|\$(?P<bare>[A-Za-z_][A-Za-z0-9_]*)"
+)
+
+
+def _expand_env_value(value: str, environment: dict[str, str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        if match.group(0) == "$$":
+            return "$"
+        name = match.group("braced") or match.group("bare")
+        current = environment.get(name)
+        if match.group("op") == ":-":
+            return current if current else (match.group("default") or "")
+        if match.group("op") == "-":
+            return current if current is not None else (match.group("default") or "")
+        return "" if current is None else current
+
+    return _ENV_REF.sub(replace, value)
+
+
 def process_environment(selection: Selection) -> dict[str, str]:
     environment = dict(os.environ)
     for name in COMPOSE_CONTROL_ENV:
         environment.pop(name, None)
     environment.update(selection.injections)
+    return environment
+
+
+def compose_process_environment(
+    deployment: Deployment, selection: Selection
+) -> dict[str, str]:
+    """Environment Compose uses to interpolate the deployment.
+
+    Compose prefers the process environment over ``--env-file``, so a shell
+    export would otherwise hide ``config.gpu.env`` and ``config.local.env``.
+    Apply those files on top of the shell, later files winning, and expand
+    ``$VAR`` while loading so values such as ``$HOME/...`` stay paths.
+    CLI injections (distro and component images) still win.
+    """
+    environment = dict(os.environ)
+    for path in deployment.env_files(selection.gpu):
+        for name, value in parse_dotenv(path).items():
+            environment[name] = _expand_env_value(value, environment)
+    environment.update(selection.injections)
+    for name in COMPOSE_CONTROL_ENV:
+        environment.pop(name, None)
     return environment
 
 
@@ -112,7 +157,7 @@ def compose_run(
     run_process(
         compose_command(deployment, selection) + arguments,
         cwd=deployment.directory,
-        env=process_environment(selection),
+        env=compose_process_environment(deployment, selection),
     )
 
 
@@ -126,7 +171,7 @@ def compose_capture(
     return capture_process(
         compose_command(deployment, selection) + arguments,
         cwd=deployment.directory,
-        env=process_environment(selection),
+        env=compose_process_environment(deployment, selection),
         check=check,
     )
 
@@ -177,6 +222,17 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
         if key in wanted and state in LIVE_PROJECT_STATES:
             found.add(key)
     return [name for name in wanted if name in found]
+
+
+def require_stopped(name: str) -> None:
+    """Refuse destructive cleanup while this deployment's project is live."""
+    if not shutil.which("docker"):
+        return
+    if name in running_names([name]):
+        raise OpenADKitError(
+            f"{name} is running; stop it before deleting data: "
+            f"openadkit stop {name}"
+        )
 
 
 def render(deployment: Deployment, selection: Selection) -> set[str]:

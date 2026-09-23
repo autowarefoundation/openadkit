@@ -985,6 +985,56 @@ def test_gpu_env_is_loaded_only_with_gpu_and_before_local(tmp_path):
     assert call.index("config.gpu.env") < call.index("config.local.env")
 
 
+def test_shell_map_path_does_not_redirect_data(tmp_path):
+    root, deployment = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (deployment / "config.env").write_text(
+        "MAP_PATH=$HOME/data/from-file\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    result = run_cli(
+        root,
+        ["clean", "example"],
+        env={"MAP_PATH": "/tmp/from-shell"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert str(root.parent / "home" / "data/from-file") in result.stdout
+    assert "/tmp/from-shell" not in result.stdout
+
+
+def test_compose_env_files_override_shell(tmp_path):
+    manifest = minimal_manifest()
+    manifest["requirements"]["gpu"] = "optional"
+    manifest["compose"]["gpuFiles"] = ["docker-compose.gpu.yaml"]
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
+    (deployment / "config.env").write_text(
+        "MAP_PATH=$HOME/autoware_map/sample\nLIDAR_DETECTION_MODEL=clustering\n"
+    )
+    (deployment / "config.gpu.env").write_text("LIDAR_DETECTION_MODEL=centerpoint\n")
+    (deployment / "config.local.env").write_text("LIDAR_DETECTION_MODEL=from-local\n")
+    bin_dir = tmp_path / "env-docker"
+    bin_dir.mkdir()
+    seen = tmp_path / "seen-env"
+    executable(
+        bin_dir / "docker",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f'printf "%s\\n" "${{MAP_PATH:-}}" "${{LIDAR_DETECTION_MODEL:-}}" '
+        f"> {json.dumps(str(seen))}\n"
+        "exit 0\n",
+    )
+    result = run_cli(
+        root,
+        ["validate", "example", "--gpu"],
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "LIDAR_DETECTION_MODEL": "clustering",
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    recorded = seen.read_text().splitlines()
+    assert recorded[0] == str(root.parent / "home" / "autoware_map/sample")
+    assert recorded[1] == "from-local"
+
+
 def test_gpu_overlay_requires_gpu_env(tmp_path):
     manifest = minimal_manifest()
     manifest["requirements"]["gpu"] = "optional"
@@ -2186,6 +2236,22 @@ def test_catalog_json_stays_parseable_without_deployment(tmp_path):
     assert "deployment name required" in result.stderr
 
 
+def idle_docker(tmp_path, *, projects="[]"):
+    bin_dir = tmp_path / "idle-docker"
+    bin_dir.mkdir()
+    listed = tmp_path / "idle-compose-ls.json"
+    listed.write_text(projects if projects.endswith("\n") else projects + "\n")
+    executable(
+        bin_dir / "docker",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'if [[ "$*" == "compose ls --format json" ]]; then '
+        f"cat {json.dumps(str(listed))}; exit 0; fi\n"
+        "exit 0\n",
+    )
+    return bin_dir
+
+
 def run_installed_command(home, destination, version, bin_dir, *args):
     env = os.environ | {"HOME": str(home)}
     if bin_dir is not None:
@@ -2225,7 +2291,9 @@ def test_upgrade_check_reports_up_to_date(tmp_path):
 def test_uninstall_removes_active_release_and_launcher(tmp_path):
     home, destination, _ = install_standalone(tmp_path, "v1.2.3")
     launcher = home / ".local/bin/openadkit"
-    result = run_installed_command(home, destination, "v1.2.3", None, "uninstall")
+    result = run_installed_command(
+        home, destination, "v1.2.3", idle_docker(tmp_path), "uninstall"
+    )
     assert result.returncode == 0, result.stderr
     assert not (destination / "openadkit-v1.2.3").exists()
     assert not launcher.exists()
@@ -2240,11 +2308,30 @@ def test_uninstall_all_removes_kept_releases(tmp_path):
     assert upgrade.returncode == 0, upgrade.stderr
     assert (destination / "openadkit-v1.2.3").is_dir()
 
-    result = run_installed_command(home, destination, "v1.3.0", None, "uninstall", "--all")
+    result = run_installed_command(
+        home, destination, "v1.3.0", idle_docker(tmp_path), "uninstall", "--all"
+    )
     assert result.returncode == 0, result.stderr
     assert not (destination / "openadkit-v1.3.0").exists()
     assert not (destination / "openadkit-v1.2.3").exists()
     assert not (home / ".local/bin/openadkit").exists()
+
+
+def test_uninstall_refuses_while_a_deployment_is_running(tmp_path):
+    home, destination, _ = install_standalone(tmp_path, "v1.2.3")
+    launcher = home / ".local/bin/openadkit"
+    docker = idle_docker(
+        tmp_path,
+        projects='[{"Name":"openadkit-planning-simulation","Status":"running(1)"}]',
+    )
+    result = run_installed_command(
+        home, destination, "v1.2.3", docker, "uninstall"
+    )
+    assert result.returncode != 0
+    assert "stop running deployments before uninstall" in result.stderr
+    assert "planning-simulation" in result.stderr
+    assert (destination / "openadkit-v1.2.3").is_dir()
+    assert launcher.is_symlink()
 
 
 def test_uninstall_rejects_non_symlink_launcher(tmp_path):
@@ -2299,6 +2386,11 @@ def test_uninstall_requires_an_install():
     )
     assert result.returncode != 0
     assert "Open AD Kit is not installed" in result.stderr
+
+
+def _stopped_env(tmp_path, compose_ls="[]"):
+    bin_dir, _ = fake_docker(tmp_path, compose_ls=compose_ls)
+    return {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
 
 
 def _clean_manifest():
@@ -2356,7 +2448,11 @@ def test_clean_lists_and_removes_all_declared_data(tmp_path):
     assert "gpu-model: ok" in result.stdout
     assert map_dir.is_dir() and gpu_dir.is_dir()
 
-    result = run_cli(root, ["clean", "example", "--data"])
+    result = run_cli(
+        root,
+        ["clean", "example", "--data"],
+        env=_stopped_env(tmp_path),
+    )
     assert result.returncode == 0, result.stderr
     assert f"removed data: {map_dir}" in result.stdout
     assert f"removed data: {gpu_dir}" in result.stdout
@@ -2377,7 +2473,11 @@ def test_clean_refuses_symlinked_data_target(tmp_path):
     link = home / "data/example"
     link.symlink_to(outside)
 
-    result = run_cli(root, ["clean", "example", "--data"])
+    result = run_cli(
+        root,
+        ["clean", "example", "--data"],
+        env=_stopped_env(tmp_path),
+    )
     assert result.returncode != 0
     assert "refusing to remove symlinked data" in result.stderr
     assert link.is_symlink()
@@ -2394,10 +2494,68 @@ def test_clean_removes_file_target(tmp_path):
     target = home / "data/example"
     target.write_text("corrupted\n")
 
-    result = run_cli(root, ["clean", "example", "--data"])
+    result = run_cli(
+        root,
+        ["clean", "example", "--data"],
+        env=_stopped_env(tmp_path),
+    )
     assert result.returncode == 0, result.stderr
     assert f"removed data: {target}" in result.stdout
     assert not target.exists()
+
+
+def test_clean_refuses_later_symlink_before_deleting_earlier_data(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    map_dir = home / "data/example"
+    map_dir.mkdir(parents=True)
+    (map_dir / "lanelet2_map.osm").write_text("map\n")
+    outside = home / "real-model"
+    outside.mkdir()
+    (outside / "model.onnx").write_text("model\n")
+    link = home / "data/gpu-model"
+    link.symlink_to(outside)
+
+    result = run_cli(
+        root,
+        ["clean", "example", "--data"],
+        env=_stopped_env(tmp_path),
+    )
+    assert result.returncode != 0
+    assert "refusing to remove symlinked data" in result.stderr
+    assert (map_dir / "lanelet2_map.osm").is_file()
+    assert link.is_symlink()
+    assert (outside / "model.onnx").is_file()
+
+
+def test_clean_refuses_running_deployment_before_deleting(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (root / "deployments/example/config.env").write_text(
+        "MAP_PATH=$HOME/data/example\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    home = root.parent / "home"
+    map_dir = home / "data/example"
+    map_dir.mkdir(parents=True)
+    (map_dir / "lanelet2_map.osm").write_text("map\n")
+    gpu_dir = home / "data/gpu-model"
+    gpu_dir.mkdir()
+    (gpu_dir / "model.onnx").write_text("model\n")
+
+    result = run_cli(
+        root,
+        ["clean", "example", "--data"],
+        env=_stopped_env(
+            tmp_path,
+            '[{"Name":"openadkit-example","Status":"running(1)"}]',
+        ),
+    )
+    assert result.returncode != 0
+    assert "example is running" in result.stderr
+    assert (map_dir / "lanelet2_map.osm").is_file()
+    assert (gpu_dir / "model.onnx").is_file()
 
 
 def test_clean_without_deployment_prints_catalog(tmp_path):

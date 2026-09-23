@@ -169,20 +169,20 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name from list; omit to list running",
+        help="curated deployment name; required when one is running",
     )
     logs = subparsers.add_parser("logs", help="show deployment logs")
     logs.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name from list; omit to list running",
+        help="curated deployment name; required when one is running",
     )
     logs.add_argument("--follow", action="store_true", help="stream logs")
     stop = subparsers.add_parser("stop", help="stop and remove a deployment")
     stop.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name from list; omit to list running",
+        help="curated deployment name; required when one is running",
     )
     return parser
 
@@ -394,6 +394,7 @@ def main() -> int:
                     f"{item['name']}: {item['status']} ({item['destination']})"
                 )
             return 0
+        compose.require_stopped(deployment.name)
         data.remove_installed_data(deployment, selection, include_gpu=True)
         return 0
 

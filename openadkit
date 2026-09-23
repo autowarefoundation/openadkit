@@ -405,13 +405,78 @@ uninstall_usage() {
 Usage: openadkit uninstall [--all]
 
 Removes the active Open AD Kit release installation and its launcher.
-Downloaded data is not touched.
+Downloaded data is not touched. Refuses while an openadkit-* Compose project
+is still running, because uninstall removes the launcher `openadkit stop` needs.
 
   --all  also remove previously kept releases in the install destination
 
-Run `openadkit clean <deployment> --data` before uninstalling if you also
-want to delete downloaded data such as maps and perception models.
+Stop running deployments first (`openadkit stop <deployment>`). Run
+`openadkit clean <deployment> --data` before uninstalling if you also want to
+delete downloaded data such as maps and perception models.
 EOF
+}
+
+require_no_running_deployments() {
+  local running
+  command -v docker >/dev/null 2>&1 || return 0
+  require_command python3
+  # Same live states as cli/compose.py. Fail closed if the list cannot be read:
+  # uninstall removes the only launcher that can stop these projects.
+  running=$(
+    python3 - <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+env = os.environ.copy()
+for name in (
+    "COMPOSE_ENV_FILES",
+    "COMPOSE_FILE",
+    "COMPOSE_PROFILES",
+    "COMPOSE_PROJECT_NAME",
+):
+    env.pop(name, None)
+result = subprocess.run(
+    ["docker", "compose", "ls", "--format", "json"],
+    capture_output=True,
+    text=True,
+    check=False,
+    env=env,
+)
+if result.returncode != 0:
+    detail = result.stderr.strip()
+    suffix = f": {detail}" if detail else ""
+    print(f"could not list Compose projects{suffix}", file=sys.stderr)
+    raise SystemExit(1)
+try:
+    projects = json.loads(result.stdout) if result.stdout.strip() else []
+except json.JSONDecodeError:
+    print("could not parse Compose project list", file=sys.stderr)
+    raise SystemExit(1)
+if not isinstance(projects, list):
+    print("could not parse Compose project list", file=sys.stderr)
+    raise SystemExit(1)
+live = {"running", "restarting", "paused", "removing"}
+found = []
+for project in projects:
+    if not isinstance(project, dict):
+        continue
+    name = project.get("Name")
+    status = project.get("Status") or ""
+    if not isinstance(name, str) or not isinstance(status, str):
+        continue
+    if not name.startswith("openadkit-"):
+        continue
+    state = status.lower().split("(", 1)[0].strip()
+    if state in live:
+        found.append(name[len("openadkit-") :])
+print("\n".join(found))
+PY
+  ) || fail 'could not confirm deployments are stopped; stop them before uninstall'
+  if [[ -n $running ]]; then
+    fail "stop running deployments before uninstall: ${running//$'\n'/, }. Run: openadkit stop <deployment>"
+  fi
 }
 
 uninstall_openadkit() {
@@ -469,6 +534,8 @@ PY
     || fail "the active installation is not ${active_root}; run openadkit uninstall through the installed launcher"
 
   destination=$(dirname -- "$active_root")
+
+  require_no_running_deployments
 
   log "removing ${active_root}"
   rm -rf -- "$active_root"

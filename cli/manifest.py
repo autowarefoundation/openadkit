@@ -307,10 +307,15 @@ class Deployment:
         return result
 
     def configuration_environment(self, gpu: bool = False) -> dict[str, str]:
+        """Deployment env files only. The shell must not override these.
+
+        Compose interpolation uses the same file order. A shell export of
+        MAP_PATH would otherwise install data somewhere other than the mount.
+        Host overrides belong in config.local.env, which is loaded last.
+        """
         values: dict[str, str] = {}
         for path in self.env_files(gpu):
             values.update(parse_dotenv(path))
-        values.update(os.environ)
         return values
 
     def compose_files(self, gpu: bool) -> list[Path]:

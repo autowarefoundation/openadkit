@@ -7,10 +7,8 @@ usage() {
   cat <<'EOF'
 Usage: ./start.sh [options]
 
-Starts CARLA + sensors-only carla-interface via the Open AD Kit CLI.
-
-Requires SAFETY_ISLAND_REPO (absolute path to autoware-safety-island).
-Does not start the Safety Island binary, vcan, domain-bridge, or
+Starts CARLA, sensors-only carla-interface and the domain-bridge via the
+Open AD Kit CLI. Does not start the Safety Island binary, vcan, or
 CAN-CARLA bridge.
 
 Options:
@@ -31,17 +29,6 @@ for arg in "$@"; do
       ;;
   esac
 done
-
-: "${SAFETY_ISLAND_REPO:?Set SAFETY_ISLAND_REPO to the autoware-safety-island checkout}"
-if [[ ! "$SAFETY_ISLAND_REPO" = /* ]]; then
-  printf 'SAFETY_ISLAND_REPO must be an absolute path (got %s)\n' "$SAFETY_ISLAND_REPO" >&2
-  exit 1
-fi
-if [[ ! -f "$SAFETY_ISLAND_REPO/demo/carla-closed-loop/overlay/carla_autoware.py" ]]; then
-  printf 'SAFETY_ISLAND_REPO=%s is missing the sensors-only overlay\n' "$SAFETY_ISLAND_REPO" >&2
-  exit 1
-fi
-export SAFETY_ISLAND_REPO
 
 if [[ " $* " == *" --down "* ]]; then
   exec "$ROOT/openadkit" stop safety-island-carla-simulation

@@ -29,6 +29,7 @@ on:
       - '**/*.env'
       - 'deployments/**/*.yaml'
       - 'deployments/**/*.yml'
+      - 'deployments/safety-island-carla-simulation/**'
       - 'platforms/**/*.yaml'
       - 'platforms/**/*.yml'
       - 'components/**/*.hcl'
@@ -121,6 +122,7 @@ jobs:
               --ros-distro "${ros_distro}" --gpu
           done
           ./openadkit validate carla-simulation --gpu --ros-distro humble
+          ./openadkit validate safety-island-carla-simulation --gpu --ros-distro humble
           export REMOTE_PASSWORD="${REMOTE_PASSWORD:-ci-validate}"
           ( cd deployments/zenoh-bridge && docker compose --env-file config.env config -q )
 
@@ -165,7 +167,9 @@ jobs:
           test -f site/index.html
 
       - name: Run Python tests
-        run: pytest .github/scripts/
+        run: |
+          pytest .github/scripts/
+          python3 deployments/safety-island-carla-simulation/test_contract.py
 
       - name: Run shell tests
         run: |

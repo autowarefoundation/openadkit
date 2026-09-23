@@ -1,0 +1,28 @@
+name: safety_island_bridge
+topics:
+  vehicle/status/steering_status:
+    type: autoware_vehicle_msgs/msg/SteeringReport
+    from_domain: 1
+    to_domain: 2
+  planning/trajectory:
+    type: autoware_planning_msgs/msg/Trajectory
+    from_domain: 1
+    to_domain: 2
+    remap: planning/scenario_planning/trajectory
+  system/operation_mode/state:
+    type: autoware_adapi_v1_msgs/msg/OperationModeState
+    from_domain: 1
+    to_domain: 2
+    qos:
+      reliability: reliable
+      durability: transient_local
+      history: keep_last
+      depth: 1
+  localization/kinematic_state:
+    type: nav_msgs/msg/Odometry
+    from_domain: 1
+    to_domain: 2
+  localization/acceleration:
+    type: geometry_msgs/msg/AccelWithCovarianceStamped
+    from_domain: 1
+    to_domain: 2

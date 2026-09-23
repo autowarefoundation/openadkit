@@ -1,0 +1,18 @@
+inputs:
+  - topic: /vehicle/status/steering_status
+    type: autoware_vehicle_msgs/msg/SteeringReport
+    direction: 1_to_2
+  - topic: /planning/trajectory
+    remap: /planning/scenario_planning/trajectory
+    type: autoware_planning_msgs/msg/Trajectory
+    direction: 1_to_2
+  - topic: /localization/kinematic_state
+    type: nav_msgs/msg/Odometry
+    direction: 1_to_2
+  - topic: /localization/acceleration
+    type: geometry_msgs/msg/AccelWithCovarianceStamped
+    direction: 1_to_2
+  - topic: /system/operation_mode/state
+    type: autoware_adapi_v1_msgs/msg/OperationModeState
+    direction: 1_to_2
+outputs: []

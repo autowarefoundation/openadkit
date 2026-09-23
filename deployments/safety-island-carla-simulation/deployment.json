@@ -18,6 +18,7 @@
       "planning",
       "vehicle",
       "control",
+      "safety-island-bridge",
       "api",
       "visualizer"
     ],
@@ -28,7 +29,7 @@
     "architectures": ["amd64"],
     "rosDistros": ["humble"],
     "gpu": "required",
-    "requiredEnv": ["SAFETY_ISLAND_REPO"]
+    "requiredEnv": []
   },
   "data": [
     {

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+
+  <Domain id="1">
+    <General>
+      <AllowMulticast>spdp</AllowMulticast>
+      <MaxMessageSize>1400B</MaxMessageSize>
+        <Interfaces>
+            <NetworkInterface autodetermine="false" priority="default" multicast="default" name="lo"/>
+        </Interfaces>
+    </General>
+
+    <Sizing>
+      <ReceiveBufferSize>2097152B</ReceiveBufferSize>
+      <ReceiveBufferChunkSize>131072B</ReceiveBufferChunkSize>
+    </Sizing>
+
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+
+  <Domain id="2">
+    <General>
+      <AllowMulticast>spdp</AllowMulticast>
+      <MaxMessageSize>1400B</MaxMessageSize>
+        <Interfaces>
+            <NetworkInterface autodetermine="false" priority="default" multicast="default" name="lo"/>
+        </Interfaces>
+    </General>
+
+    <Sizing>
+      <ReceiveBufferSize>2097152B</ReceiveBufferSize>
+      <ReceiveBufferChunkSize>131072B</ReceiveBufferChunkSize>
+    </Sizing>
+
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

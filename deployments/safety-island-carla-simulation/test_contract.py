@@ -135,6 +135,13 @@ def test_deployment_files_exist() -> None:
     assert "./control.launch.xml:" in compose
     assert "./overlay/patch_sensors_only.py:" in compose
     assert "carla_autoware.py:" not in compose
+    fvp = (ROOT / "docker-compose.fvp.yaml").read_text()
+    assert "cyclonedds.fvp-tap.xml" in fvp
+    tap = (ROOT / "cyclonedds.fvp-tap.xml").read_text()
+    assert 'name="tap0"' in tap
+    lo = (ROOT / "cyclonedds.xml").read_text()
+    assert 'name="lo"' in lo
+    assert 'name="tap0"' not in lo
 
 
 def main() -> int:

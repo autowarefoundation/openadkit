@@ -28,6 +28,17 @@ Then from the Safety Island repository: `vcan0`,
 `freertos-posix --control-output CAN_ONLY --dds-interface lo`, and
 `demo/can_carla_bridge/bridge.py --ego-role ego_vehicle`.
 
+For Zephyr FVP TAP (`zephyr-fvp --network tap`), recreate the domain-bridge
+so domain 2 is on `tap0`:
+
+```bash
+docker compose --project-name openadkit-safety-island-carla-simulation \
+  --env-file deployments/safety-island-carla-simulation/config.env \
+  -f deployments/safety-island-carla-simulation/docker-compose.yaml \
+  -f deployments/safety-island-carla-simulation/docker-compose.fvp.yaml \
+  up -d --no-deps safety-island-bridge
+```
+
 The domain-bridge and sensors-only overlay are part of this deployment.
 The image references in `config.env` are digest-pinned; record the Open AD Kit
 commit (`git rev-parse HEAD`) alongside the Safety Island commit for a

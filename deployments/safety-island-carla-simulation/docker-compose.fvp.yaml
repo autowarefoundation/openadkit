@@ -1,0 +1,6 @@
+# Optional overlay for zephyr-fvp --network tap.
+# Domain 1 stays on loopback; domain 2 is pinned to tap0 so FVP can join.
+services:
+  safety-island-bridge:
+    volumes:
+      - ./cyclonedds.fvp-tap.xml:/autoware/cyclonedds.xml:ro

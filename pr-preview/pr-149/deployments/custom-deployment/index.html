@@ -2066,6 +2066,10 @@ its Compose file defines the dependencies and deployment-specific overrides.</p>
 <td>Supply the parameters needed by the selected services, such as map paths and simulator settings. Use ignored <code>config.local.env</code> for personal overrides.</td>
 </tr>
 <tr>
+<td><code>config.gpu.env</code></td>
+<td>Required when <code>deployment.json</code> lists <code>gpuFiles</code>. Loaded after <code>config.env</code> for <code>openadkit --gpu</code>; override interpolations here instead of restating a shared service command.</td>
+</tr>
+<tr>
 <td><code>deployment.json</code></td>
 <td>Declare supported architectures, ROS distros, GPU requirements, downloads, and one-shot services to reset on each run.</td>
 </tr>
@@ -2102,7 +2106,8 @@ together; use <code>config.local.env</code> to set <code>REMOTE_PASSWORD</code>.
 ./openadkit<span class="w"> </span>stop<span class="w"> </span>my-simulation
 </code></pre></div>
 <p>Validate each distro and GPU mode you declare. See
-<a href="../logging-simulation/">Logging Simulation</a> for a GPU overlay and
+<a href="../logging-simulation/">Logging Simulation</a> for a GPU overlay
+(<code>config.gpu.env</code> plus image/runtime overrides) and
 <a href="../carla-simulation/">CARLA Simulation</a> for deployment-specific services.</p>
 
 

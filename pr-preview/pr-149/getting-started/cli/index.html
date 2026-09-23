@@ -2087,7 +2087,9 @@ configuration.
 <h2 id="local-overrides">Local Overrides<a class="headerlink" href="#local-overrides" title="Permanent link">#</a></h2>
 <p>Use <code>deployments/&lt;name&gt;/config.local.env</code> for host-specific settings. Source
 checkouts also accept component image overrides there; release component refs
-stay pinned by the release context. The file is ignored by Git.</p>
+stay pinned by the release context. The file is ignored by Git. Deployments
+with a GPU overlay load <code>config.gpu.env</code> after <code>config.env</code> when you pass
+<code>--gpu</code>; <code>config.local.env</code> still wins.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">#</a></h2>
 <p>Check whether a newer stable version exists:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade<span class="w"> </span>--check

@@ -1982,7 +1982,9 @@ file defines one service. The deployment's Compose file defines dependencies,
 overrides, and deployment-only services; it is the source of truth for the
 service set.</p>
 <p>Each curated deployment carries a <code>deployment.json</code> manifest and one complete
-<code>config.env</code> for Compose interpolation.</p>
+<code>config.env</code> for Compose interpolation. Optional GPU mode also loads
+<code>config.gpu.env</code> so model flags can change without copying a shared service
+command.</p>
 <p>Commands on this page are shown as installed by the release installer. From a
 source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>list

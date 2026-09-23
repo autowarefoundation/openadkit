@@ -1998,7 +1998,9 @@ complete than with a full recording.</p>
 <p>For NVIDIA acceleration:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation<span class="w"> </span>--gpu
 </code></pre></div>
-<p>The CUDA image is amd64-only.
+<p>The CUDA image is amd64-only. <code>--gpu</code> loads <code>config.gpu.env</code> to switch
+perception to CenterPoint; the Compose overlay only swaps the CUDA images and
+GPU reservations.
 Add <code>--ros-distro jazzy</code> to select Jazzy; Humble is the default.</p>
 <h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
 <p>Open your browser and navigate to:</p>

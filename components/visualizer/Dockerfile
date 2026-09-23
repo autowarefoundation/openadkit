@@ -74,14 +74,13 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --skip-keys "${internal_packages}" && \
     bash /tmp/runtime-cleanup.sh
 
-# Install VNC / NoVNC / Openbox stack and simulation tooling.
+# Install the VNC / noVNC / Openbox stack.
 USER root
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
-      unzip \
       openssl \
       openbox \
       tigervnc-standalone-server \
@@ -89,11 +88,7 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       tigervnc-tools \
       novnc \
       websockify \
-      python3-numpy \
-      python3-xdg \
-      pipx && \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install yamale && \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema && \
+      python3-numpy && \
     VIRTUALGL_VERSION=3.1.2 && \
     arch="$(dpkg --print-architecture)" && \
     case "${arch}" in \

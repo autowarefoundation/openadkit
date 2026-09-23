@@ -173,7 +173,6 @@ set -u
 
 MODE="${1:-stack}"
 ENVF=/etc/containers/systemd/awf-oak-x5h.env
-DDS_URI=file:///autoware/cyclonedds.xml
 # Frozen link constants, hoisted here rather than inlined at their point of
 # use, matching rpmsg-eth-smoke.sh. Do not retune: MTU 462 is sized to the
 # CR52's RPMsg payload budget (see scripts/rpmsg-eth-ifup.sh) and PEER is
@@ -234,11 +233,6 @@ fail() { echo "X5H_${2}_FAIL reason=$1"; exit 1; }
 
 ros1() { # run a ros2 command on domain 1 inside the Autoware container
     podman exec awf-oak-autoware bash -lc \
-      "source /opt/ros/\$ROS_DISTRO/setup.bash && source /opt/autoware/setup.bash && $1" 2>/dev/null
-}
-ros2dom() { # run a ros2 command on domain 2, from inside the bridge
-            # container (podman exec uses the container's mounts)
-    podman exec -e ROS_DOMAIN_ID=2 -e CYCLONEDDS_URI="$DDS_URI" awf-oak-bridge bash -lc \
       "source /opt/ros/\$ROS_DISTRO/setup.bash && source /opt/autoware/setup.bash && $1" 2>/dev/null
 }
 

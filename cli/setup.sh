@@ -50,7 +50,7 @@ case "$(uname -m)" in
   *) fail "unsupported architecture: $(uname -m)" ;;
 esac
 
-RUNTIME_PACKAGES=(ca-certificates curl git gzip python3 python3-venv tar unzip)
+RUNTIME_PACKAGES=(ca-certificates curl git gzip python3 tar)
 MISSING_PACKAGES=()
 
 compose_capable() {

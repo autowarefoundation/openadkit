@@ -9,18 +9,20 @@ configuration for a specific task.
 | [Scenario Simulation](scenario-simulation/index.md) | Execute predefined traffic scenarios | Single host | No |
 | [Logging Simulation](logging-simulation/index.md) | Replay sensor data through sensing, perception, and localization | Single host | Recommended |
 | [CARLA Simulation](carla-simulation/index.md) | Drive a CARLA ego vehicle in closed loop | Single host | Required |
+| [Safety Island CARLA Simulation](safety-island-carla-simulation/index.md) | CARLA with the Safety Island as the controller over CAN | Single host | Required |
 | [Zenoh Bridge](zenoh-bridge/index.md) | Separate edge compute from visualization and control | Single Compose project | Varies |
 
 New users should start with Planning Simulation. The CLI and release bundle
-support Planning, Scenario, Logging, and CARLA Simulation. Zenoh remains a
-standalone source-checkout deployment.
+support Planning, Scenario, Logging, CARLA, and Safety Island CARLA
+Simulation. Zenoh remains a standalone source-checkout deployment.
 
 ## Base and Overlay Model
 
-Planning, Scenario, Logging, and CARLA Simulation include the shared
-`deployments/base/docker-compose.yaml`. The base defines map-check, map,
-planning, vehicle, system, control, API, and visualizer services. Planning and
-scenario overlays add the dummy simulator; each deployment adds only its delta.
+Planning, Scenario, Logging, CARLA, and Safety Island CARLA Simulation include
+the shared `deployments/base/docker-compose.yaml`. The base defines map-check,
+map, planning, vehicle, system, control, API, and visualizer services. Planning
+and scenario overlays add the dummy simulator; each deployment adds only its
+delta.
 
 Each curated deployment carries a `deployment.json` manifest and one complete
 `config.env` for Compose interpolation.

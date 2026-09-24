@@ -4,5 +4,6 @@ nav:
   - Scenario Simulation: scenario-simulation
   - Logging Simulation: logging-simulation
   - CARLA Simulation: carla-simulation
+  - Safety Island CARLA Simulation: safety-island-carla-simulation
   - Zenoh Bridge: zenoh-bridge
   - Custom Deployment: custom-deployment.md

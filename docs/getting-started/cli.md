@@ -1,7 +1,7 @@
 # CLI & Maintenance
 
-Commands you need after the first run: runtime controls, validation, upgrades,
-and cleanup.
+Commands you need after the first run: runtime controls, validation,
+configuration, upgrades, and cleanup.
 
 --8<-- "includes/cli-command-context.md"
 
@@ -13,13 +13,9 @@ openadkit logs planning-simulation --follow
 openadkit stop planning-simulation
 ```
 
-`status`, `logs`, and `stop` need a deployment name. Without one, they exit 2
-when any deployment is running: stderr says the name is required, and stdout
-lists the running names as a hint. They do not show status, stream logs, or
-stop anything. When nothing is running they print `no running deployments` and
-exit 0. `openadkit logs --follow` without a name is always a usage error.
+Pass the deployment name. Without it, these commands only list what is running.
 `openadkit run <deployment> --pull always` refreshes images before starting,
-and `openadkit --version` prints the CLI version.
+and `openadkit --version` prints the installed version.
 
 ## Validate Before Running
 
@@ -27,56 +23,49 @@ and `openadkit --version` prints the CLI version.
 openadkit validate planning-simulation --data
 ```
 
-`--data` reports each selected data resource as `ok`, `missing`, or `incomplete`,
-and fails when any reported resource is missing or incomplete. It uses the same
-GPU selection as `run`, so GPU-only resources are included only with `--gpu`.
-Logging Simulation's CenterPoint models are checked with
-`openadkit validate logging-simulation --gpu --data`. Without `--data`,
-`validate` checks the manifest, the declared data destinations, and the Compose
-configuration.
-`list`, `version`, and `validate` also accept `--json` for scripting.
+`validate` checks the manifest and the Compose configuration without starting
+anything. `--data` also reports each data resource as `ok`, `missing`, or
+`incomplete` and fails on any gap. It follows the same GPU selection as `run`:
+use `openadkit validate logging-simulation --gpu --data` to include the
+CenterPoint models.
 
-## Local Overrides
+`list`, `version`, and `validate` accept `--json` for scripting.
 
-Use `deployments/<name>/config.local.env` for host-specific settings. Source
-checkouts also accept component image overrides there; release component refs
-stay pinned by the release context. The file is ignored by Git. Deployments
-with a GPU overlay load `config.gpu.env` after `config.env` when you pass
-`--gpu`; `config.local.env` still wins.
+## Configuration
+
+Each deployment reads its settings from environment files in
+`deployments/<name>/`, in this order (later files win):
+
+1. `config.env`: the deployment defaults
+2. `config.gpu.env`: GPU settings, loaded only with `--gpu`
+3. `config.local.env`: your local overrides, ignored by Git
+
+Shell exports do not override variables defined in these files. Put host
+settings such as `MAP_PATH` or `REMOTE_PASSWORD` in `config.local.env`. Source
+checkouts can also override component images there; release images stay pinned.
 
 ## Upgrading
 
-Check whether a newer stable version exists:
-
 ```bash
-openadkit upgrade --check
+openadkit upgrade --check   # report whether a newer stable version exists
+openadkit upgrade           # install it
 ```
 
-Then upgrade to the latest stable version:
-
-```bash
-openadkit upgrade
-```
-
-The new release is verified, installed alongside the old one, and the `openadkit`
-launcher is repointed. The previous version is kept in the install destination
-(by default `~/.local/share/openadkit/`; change it with
-`openadkit install --destination DIRECTORY`), so you can roll back:
+The new release is verified and installed next to the old one, and the
+`openadkit` launcher is repointed. The previous version stays in the install
+destination (default `~/.local/share/openadkit/`), so you can roll back:
 
 ```bash
 openadkit install --version vOLD --force
 ```
 
-`--force` replaces the kept version directory. To switch to a version that is not
-installed, omit `--force`. Source checkouts update with `git pull` or
-`git checkout` instead.
+`--force` replaces the kept version directory; omit it to install a version
+that is not kept. Source checkouts update with `git pull` instead.
 
 ## Uninstall and Cleanup
 
-Remove the installed release and its launcher (release installs only; remove a
-source checkout with Git). Stop every running deployment first. `uninstall`
-refuses while an `openadkit-*` Compose project is still running, because it
-removes the launcher `openadkit stop` needs:
+Stop running deployments first; `uninstall` refuses while any is running,
+because it removes the launcher that `openadkit stop` needs.
 
 ```bash
 openadkit stop planning-simulation
@@ -84,19 +73,37 @@ openadkit uninstall          # keep previously installed versions
 openadkit uninstall --all    # remove kept versions too
 ```
 
-Any `config.local.env` overrides inside the version directory are removed with
-it; downloaded data is kept.
+`uninstall` is for release installs; remove a source checkout with Git. It also
+removes any `config.local.env` inside the version directory.
 
-Downloaded data (maps, rosbag samples, and perception models) lives under
-`~/autoware_map` and `~/autoware_data` and is not removed by `uninstall`. Inspect
-what a deployment has installed and delete it with:
+Downloaded data (maps, rosbags, and perception models) lives under
+`~/autoware_map` and `~/autoware_data` and is kept by `uninstall`. Inspect and
+delete a deployment's data with:
 
 ```bash
 openadkit clean planning-simulation            # report only
 openadkit clean planning-simulation --data     # delete
 ```
 
-`clean --data` refuses if that deployment is still running; stop it first.
-The Kashiwanoha map used by Scenario Simulation is
-shared with the standalone Zenoh bridge; if it is removed, restore it with
+`clean --data` refuses while that deployment is running. Scenario Simulation's
+Kashiwanoha map is shared with the Zenoh bridge; restore it with
 `openadkit fetch scenario-simulation --force`.
+
+## Verify a Release Bundle Manually
+
+To inspect a release before running anything, download the bundle and check it
+against the release metadata:
+
+```bash
+VERSION=$(curl -fsSL \
+  https://api.github.com/repos/autowarefoundation/openadkit/releases/latest \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')
+curl -fLO "https://github.com/autowarefoundation/openadkit/releases/download/${VERSION}/openadkit-${VERSION}.tar.gz"
+curl -fLO "https://github.com/autowarefoundation/openadkit/releases/download/${VERSION}/release-metadata.json"
+EXPECTED=$(python3 -c 'import json; print(json.load(open("release-metadata.json"))["bundles"][0]["sha256"])')
+printf '%s  %s\n' "$EXPECTED" "openadkit-${VERSION}.tar.gz" | sha256sum --check -
+tar -xzf "openadkit-${VERSION}.tar.gz"
+cd "openadkit-${VERSION}"
+```
+
+The extracted directory is a complete runtime; run it with `./openadkit`.

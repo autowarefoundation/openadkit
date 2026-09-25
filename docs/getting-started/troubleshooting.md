@@ -1,72 +1,71 @@
 # Troubleshooting
 
-This page covers common issues and solutions when working with Open AD Kit.
-
 --8<-- "includes/cli-command-context.md"
 
-## Docker Issues
-
-### Container fails to start
-
-- Verify Docker Engine is running: `docker info`
-- Check that required ports are not already in use
-- Ensure the deployment has its `config.env` and `deployment.json` (the bundle
-  root has `openadkit.json`). Put local overrides in `config.local.env`, then run
-  `openadkit validate <deployment>`.
+## Docker
 
 ### Permission denied
 
-- Make sure your user is in the `docker` group; do not run runtime commands with
-  `sudo`
-- Check file permissions on mounted volumes
+Your user must be in the `docker` group. Log out and back in after
+`openadkit setup`, or run `newgrp docker`. Do not run `openadkit` with `sudo`.
 
-## GPU Issues
+### A deployment fails to start
+
+1. Check that Docker is running: `docker info`.
+2. Check the configuration: `openadkit validate <deployment> --data`.
+3. Read the logs: `openadkit logs <deployment> --follow`.
+
+If `run` fails after the containers are created, they keep running so you can
+read their logs. Stop them with `openadkit stop <deployment>`.
+
+## Data
+
+### Missing or incomplete maps, rosbags, or models
+
+```bash
+openadkit validate <deployment> --data
+openadkit fetch <deployment> --force
+```
+
+`validate --data` reports each resource as `ok`, `missing`, or `incomplete`;
+add `--gpu` to it for CARLA and for Logging Simulation's CenterPoint models.
+`fetch` always includes GPU data. The Zenoh bridge uses Scenario Simulation's
+map; refresh it with
+`./openadkit fetch scenario-simulation --force` from the repository root.
+
+## GPU
 
 ### NVIDIA Container Toolkit not detected
 
-- Verify installation: `nvidia-ctk --version`
-- Restart Docker: `sudo systemctl restart docker`
-- Check GPU availability: `nvidia-smi`
+- Install it with `openadkit setup --gpu --verify`.
+- Check the GPU: `nvidia-smi` and `nvidia-ctk --version`.
+- Restart Docker: `sudo systemctl restart docker`.
 
-### Perception is very slow or the GPU overlay does not start
+### Perception is slow
 
-- The default sensing and perception image runs on CPU.
-- A deployment selects `sensing-perception-cuda` instead: Logging Simulation
-  through its GPU overlay, CARLA Simulation by default.
-- The CUDA image needs a working NVIDIA runtime and does not fall back to CPU.
-  Install the NVIDIA Container Toolkit with `openadkit setup --gpu`.
+The default perception image runs on CPU. For CUDA perception, run Logging
+Simulation with `--gpu` on an amd64 host with an NVIDIA GPU. The CUDA image does
+not fall back to CPU.
 
-## Deployment Issues
+## Visualizer and Network
 
-### Visualizer shows blank screen
+### Blank visualizer
 
-- Wait 10–30 seconds for containers to fully initialize
-- Check container logs with `openadkit logs <deployment> --follow`.
-- Verify all required map files are present
+Wait 10 to 30 seconds after `run`, then reload the page. If it stays blank,
+check `openadkit logs <deployment> --follow`.
 
 ### Port 6080 or 6081 already in use
 
-- Stop the conflicting service. Most deployments run the visualizer under
-  `network_mode: host`, which binds the port directly; `ports:` mappings in
-  `docker-compose.yaml` are ignored in that mode.
+Port 6080 serves the visualizer of the CLI deployments and 6081 the Zenoh
+bridge. Stop the service that holds the port. The CLI deployments use host
+networking, so adding a `ports:` mapping to `docker-compose.yaml` has no effect.
 
-### Sample data or artifacts `file not found`
+### ROS 2 nodes on another machine cannot see the stack
 
-Recovery depends on the deployment:
-
-| Deployment | Recover |
-|------------|---------|
-| `planning-simulation`, `scenario-simulation` | Run `openadkit fetch <deployment> --force`. Maps land under `~/autoware_map`. |
-| `logging-simulation` | Run `openadkit fetch logging-simulation --force` for the map and rosbag; the fetch also refreshes the CenterPoint models under `~/autoware_data/lidar_centerpoint`. |
-| `zenoh-bridge` | From the source root, run `./openadkit fetch scenario-simulation --force` to refresh its Kashiwanoha map. |
-| `carla-simulation` | Run `openadkit fetch carla-simulation --force` for the Town01 map. |
-
-To see what is missing before downloading anything, run
-`openadkit validate <deployment> --data`. It reports each selected data resource
-as `ok`, `missing`, or `incomplete`, using the same GPU selection as `run`.
-Add `--gpu` for CARLA and for Logging Simulation CenterPoint:
-`openadkit validate carla-simulation --gpu --data` and
-`openadkit validate logging-simulation --gpu --data`.
+DDS stays on loopback by default. To reach other hosts, set
+`CYCLONEDDS_NETWORK_INTERFACE` in `deployments/shared/runtime.env` to the exact
+LAN or VPN interface name. `ROS_DOMAIN_ID` separates traffic but provides no
+authentication or encryption.
 
 ## Getting Help
 

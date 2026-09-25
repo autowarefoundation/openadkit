@@ -54,8 +54,6 @@ It also integrates [Autoware Safety Island](https://autowarefoundation.github.io
 
 Open AD Kit runs Autoware as a pipeline of containerized components. Each container handles one stage of autonomous driving, and the stages communicate over ROS 2 DDS on the host network.
 
-Single-host deployments bind CycloneDDS to loopback by default. Set `CYCLONEDDS_NETWORK_INTERFACE` to an exact LAN or VPN interface name only when cross-host DDS is required. `ROS_DOMAIN_ID` separates domains but does not provide authentication or encryption.
-
 1. [**Sensing**](components/index.md#sensing-perception) captures and preprocesses raw sensor data (LiDAR, camera, IMU).
 2. [**Perception**](components/index.md#sensing-perception) detects and tracks objects, traffic lights, and drivable space.
 3. [**Mapping**](components/index.md#localization-mapping) serves high-definition map data that the rest of the stack consumes.
@@ -64,7 +62,7 @@ Single-host deployments bind CycloneDDS to loopback by default. Set `CYCLONEDDS_
 6. [**Control**](components/index.md#planning-control) converts that trajectory into throttle, brake, and steering commands.
 7. [**Vehicle System**](components/index.md#vehicle-and-system) bridges those commands to the actual vehicle or simulator.
 
-A **deployment** selects shared Compose services and defines their dependencies and task-specific settings. Planning and Scenario Simulation use the dummy simulator; Logging Simulation uses sensing, perception, and localization for recorded sensor data. Autoware Safety Island integrates with the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services. See [Components](components/index.md) and [Deployments](deployments/index.md).
+A [deployment](deployments/index.md) runs the subset of these stages a task needs. Autoware Safety Island joins the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services.
 
 ## Key Terms
 
@@ -72,8 +70,8 @@ A **deployment** selects shared Compose services and defines their dependencies 
 |------|---------|
 | **Component image** | A published container image holding one or more Autoware functions, for example `planning-control`. |
 | **Deployment** | A named, ready-to-run stack: a manifest, environment files, and Compose configuration for a task such as planning simulation. |
-| **Manifest** | The `deployment.json` file that tells the CLI how to run a deployment: services, requirements, and data. |
-| **Overlay** | An additional Compose file that changes selected service settings, such as Logging Simulation's GPU configuration. |
+| **Manifest** | The `deployment.json` file that tells the CLI how to run a deployment: requirements, data downloads, and one-shot services. |
+| **Overlay** | The GPU Compose file and `config.gpu.env` that `--gpu` adds on top of a deployment, such as Logging Simulation's CUDA perception. |
 | **Tag alias** | A moving image tag such as `planning-control-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |
 | **Digest pin** | An image reference by content hash (`@sha256:…`) instead of a tag, so the same image bits are always used. |
 | **Mixed criticality** | Running safety-critical and non-critical workloads in separate containers or partitions on the same hardware. |

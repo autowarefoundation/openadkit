@@ -74,26 +74,11 @@ From zero to a running Autoware planning simulation in about 10 minutes. No GPU 
       | bash -s -- install --version vX.Y.Z
     ```
 
-    To inspect the bundle before running anything, download and verify it
-    manually against the release metadata:
+    To verify the bundle yourself before running it, see
+    [Verify a Release Bundle Manually](cli.md#verify-a-release-bundle-manually).
 
-    ```bash
-    VERSION=$(curl -fsSL \
-      https://api.github.com/repos/autowarefoundation/openadkit/releases/latest \
-      | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')
-    curl -fLO "https://github.com/autowarefoundation/openadkit/releases/download/${VERSION}/openadkit-${VERSION}.tar.gz"
-    curl -fLO "https://github.com/autowarefoundation/openadkit/releases/download/${VERSION}/release-metadata.json"
-    EXPECTED=$(python3 -c 'import json; print(json.load(open("release-metadata.json"))["bundles"][0]["sha256"])')
-    printf '%s  %s\n' "$EXPECTED" "openadkit-${VERSION}.tar.gz" | sha256sum --check -
-    tar -xzf "openadkit-${VERSION}.tar.gz"
-    cd "openadkit-${VERSION}"
-    ```
-
-    The extracted bundle is the same runtime; run it with `./openadkit` from the
-    extracted directory.
-
-The release bundle contains only the runtime entry point and deployment assets.
-A source checkout also contains `components/`, CI, tests, and development tools.
+The release bundle contains only the runtime and deployment assets. A source
+checkout also contains the image sources, CI, and development tools.
 
 ## 2. Set Up the Host {: #set-up-the-host }
 
@@ -120,9 +105,8 @@ openadkit run planning-simulation
 Add `--ros-distro jazzy` to select Jazzy. Humble is the default in both source
 checkouts and release bundles.
 
-`run` downloads and verifies the sample map, pulls missing images, waits for
-Compose readiness, and verifies the running deployment. A verification failure
-leaves the containers running so their logs remain available.
+`run` downloads and verifies the sample map, pulls missing images, starts the
+services, and waits until they are ready.
 
 ## 4. Open the Visualizer {: #open-the-visualizer }
 

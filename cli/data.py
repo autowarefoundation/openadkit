@@ -191,6 +191,75 @@ def validate_destinations(
         resolve_destination(resource, selection)
 
 
+def check_installed_data(
+    deployment: Deployment,
+    selection: Selection,
+    *,
+    include_gpu: bool | None = None,
+) -> list[dict[str, Any]]:
+    """Report presence and completeness for each selected data resource."""
+    results: list[dict[str, Any]] = []
+    for resource in selected_resources(
+        deployment, selection, include_gpu=include_gpu
+    ):
+        target = resolve_destination(resource, selection)
+        if validate_dataset(target, resource["requiredFiles"]):
+            status = "ok"
+            recovery = None
+        elif target.is_symlink() or (target.exists() and not target.is_dir()):
+            # fetch --force refuses these; the operator has to remove them first.
+            status = "incomplete"
+            recovery = "remove"
+        elif target.is_dir():
+            status = "incomplete"
+            recovery = "fetch-force"
+        else:
+            status = "missing"
+            recovery = "fetch"
+        results.append(
+            {
+                "name": resource["name"],
+                "destination": target,
+                "status": status,
+                "recovery": recovery,
+            }
+        )
+    return results
+
+
+def remove_installed_data(
+    deployment: Deployment,
+    selection: Selection,
+    *,
+    include_gpu: bool | None = None,
+) -> list[dict[str, Any]]:
+    """Delete installed data targets and report what was removed."""
+    targets: list[tuple[str, Path]] = []
+    seen: set[Path] = set()
+    for resource in selected_resources(
+        deployment, selection, include_gpu=include_gpu
+    ):
+        target = resolve_destination(resource, selection)
+        if target in seen:
+            continue
+        seen.add(target)
+        if target.is_symlink():
+            raise OpenADKitError(f"refusing to remove symlinked data: {target}")
+        targets.append((resource["name"], target))
+
+    removed: list[dict[str, Any]] = []
+    for name, target in targets:
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.is_file():
+            target.unlink()
+        else:
+            continue
+        print(f"removed data: {target}")
+        removed.append({"name": name, "destination": target})
+    return removed
+
+
 def validate_install_targets(
     deployment: Deployment,
     selection: Selection,

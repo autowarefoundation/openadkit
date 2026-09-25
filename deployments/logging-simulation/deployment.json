@@ -2,12 +2,11 @@
   "schemaVersion": 1,
   "name": "logging-simulation",
   "description": "Replay recorded sensor data through sensing and perception",
-  "shared": ["base"],
+  "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],
     "gpuFiles": ["docker-compose.gpu.yaml"],
     "profiles": ["rosbag"],
-    "services": ["map", "system", "sensing", "perception", "localization", "rosbag", "visualizer"],
     "resetServices": ["map-check", "rosbag"],
     "waitTimeout": 300
   },

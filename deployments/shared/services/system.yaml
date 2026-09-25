@@ -1,0 +1,25 @@
+# System — diagnostics, MRM handling, and system monitoring.
+# SYSTEM_DIAGNOSTICS_GRAPH selects the diagnostics graph definition
+# (autoware-main.yaml by default, autoware-carla.yaml for carla-simulation).
+services:
+  system:
+    image: ${VEHICLE_SYSTEM_IMAGE:-ghcr.io/autowarefoundation/openadkit:vehicle-system}
+    container_name: autoware-system
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    command: >
+      ros2 launch autoware_launch tier4_system_component.launch.xml
+      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/${SYSTEM_DIAGNOSTICS_GRAPH:-autoware-main.yaml}
+      launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
+      launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
+      sensor_model:=${SENSOR_MODEL}
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

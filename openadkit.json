@@ -11,7 +11,8 @@
     "VISUALIZER_IMAGE": "visualizer",
     "SIMULATOR_IMAGE": "simulator",
     "SENSING_PERCEPTION_IMAGE": "sensing-perception",
-    "SENSING_PERCEPTION_GPU_IMAGE": "sensing-perception-cuda"
+    "SENSING_PERCEPTION_GPU_IMAGE": "sensing-perception-cuda",
+    "CARLA_INTERFACE_IMAGE": "carla-interface"
   },
   "deployments": {
     "planning-simulation": {

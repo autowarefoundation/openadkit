@@ -45,7 +45,6 @@ ALLOWED_COMPOSE_KEYS = {
     "files",
     "gpuFiles",
     "profiles",
-    "services",
     "resetServices",
     "waitTimeout",
 }
@@ -54,7 +53,6 @@ ALLOWED_REQUIREMENT_KEYS = {
     "rosDistros",
     "gpu",
     "gpuArchitectures",
-    "requiredEnv",
 }
 ALLOWED_DATA_KEYS = {
     "name",
@@ -163,6 +161,24 @@ def ensure_safe_existing(
     return current
 
 
+def _dotenv_value(raw: str, where: str) -> str:
+    """Read a value the way Compose does: quotes group, ` #` starts a comment."""
+    value = raw.strip()
+    quote = value[:1]
+    if quote in ("'", '"'):
+        end = value.find(quote, 1)
+        while end != -1 and value[end - 1] == "\\":
+            end = value.find(quote, end + 1)
+        if end == -1:
+            raise OpenADKitError(f"unterminated quoted value at {where}")
+        rest = value[end + 1 :].strip()
+        if rest and not rest.startswith("#"):
+            raise OpenADKitError(f"unexpected text after quoted value at {where}")
+        return value[1:end].replace("\\" + quote, quote)
+    comment = value.find(" #")
+    return (value if comment == -1 else value[:comment]).strip()
+
+
 def parse_dotenv(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     try:
@@ -177,12 +193,12 @@ def parse_dotenv(path: Path) -> dict[str, str]:
             raise OpenADKitError(f"invalid dotenv assignment at {path}:{number}")
         name, value = line.split("=", 1)
         name = name.strip()
-        value = value.strip()
+        words = name.split(None, 1)
+        if len(words) == 2 and words[0] == "export":
+            name = words[1]
         if not ENV_NAME_RE.fullmatch(name):
             raise OpenADKitError(f"invalid environment name at {path}:{number}: {name}")
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[name] = value
+        values[name] = _dotenv_value(value, f"{path}:{number}")
     return values
 
 
@@ -197,6 +213,15 @@ def expand_home(value: str) -> str:
     if value.startswith("${HOME}/"):
         return str(Path(home) / value[8:])
     return value
+
+
+def host_user_environment() -> dict[str, str]:
+    """Host user ids, so files written to host mounts belong to the user.
+
+    ``shared/runtime.env`` passes them to the Open AD Kit images as
+    ``HOST_UID``/``HOST_GID``; the upstream scenario runner uses them as ``user:``.
+    """
+    return {"OPENADKIT_UID": str(os.getuid()), "OPENADKIT_GID": str(os.getgid())}
 
 
 def host_architecture() -> str:
@@ -264,7 +289,6 @@ class RuntimeContext:
 class Selection:
     ros_distro: str
     gpu: bool
-    services: tuple[str, ...]
     injections: dict[str, str]
     environment: dict[str, str]
 
@@ -283,25 +307,40 @@ class Deployment:
         self.shared: list[str] = manifest["shared"]
         self.project = f"openadkit-{self.name}"
 
-    @property
-    def env_files(self) -> list[Path]:
+    def env_files(self, gpu: bool = False) -> list[Path]:
         result = [
             ensure_safe_existing(self.directory, "config.env", "environment file")
         ]
-        for name in ("config.release.env", "config.local.env"):
+
+        def add_optional(name: str) -> None:
             candidate = self.directory / name
             if candidate.exists() or candidate.is_symlink():
                 result.append(
                     ensure_safe_existing(self.directory, name, "environment file")
                 )
+
+        if gpu:
+            if self.compose["gpuFiles"]:
+                result.append(
+                    ensure_safe_existing(
+                        self.directory, "config.gpu.env", "environment file"
+                    )
+                )
+            else:
+                add_optional("config.gpu.env")
+        add_optional("config.local.env")
         return result
 
-    @property
-    def configuration_environment(self) -> dict[str, str]:
+    def configuration_environment(self, gpu: bool = False) -> dict[str, str]:
+        """Deployment env files only. The shell must not override these.
+
+        Compose interpolation uses the same file order. A shell export of
+        MAP_PATH would otherwise install data somewhere other than the mount.
+        Host overrides belong in config.local.env, which is loaded last.
+        """
         values: dict[str, str] = {}
-        for path in self.env_files:
+        for path in self.env_files(gpu):
             values.update(parse_dotenv(path))
-        values.update(os.environ)
         return values
 
     def compose_files(self, gpu: bool) -> list[Path]:
@@ -322,6 +361,23 @@ class Deployment:
         require_gpu: bool = True,
     ) -> Selection:
         distro = ros_distro or current_context.default_ros_distro
+
+        # Operational commands (status/logs/stop) do not select images or
+        # profiles; they only need the deployment's Compose and env files.
+        # Skip requirement validation and component image injection so a
+        # missing default-distro image map can never block a stop.
+        if operational:
+            injections = {"ROS_DISTRO": distro, **host_user_environment()}
+            injections.update(self.distro_environment.get(distro, {}))
+            environment = self.configuration_environment()
+            environment.update(injections)
+            return Selection(
+                ros_distro=distro,
+                gpu=False,
+                injections=injections,
+                environment=environment,
+            )
+
         architecture = host_architecture()
         if architecture not in self.requirements["architectures"]:
             raise OpenADKitError(
@@ -335,7 +391,7 @@ class Deployment:
             )
 
         gpu_requirement = self.requirements["gpu"]
-        if not operational and require_gpu:
+        if require_gpu:
             if gpu_requirement == "required" and not gpu:
                 raise OpenADKitError(f"{self.name} requires --gpu")
             if gpu_requirement == "none" and gpu:
@@ -355,10 +411,8 @@ class Deployment:
                     f"{', '.join(gpu_architectures)}"
                 )
 
-        services = list(self.compose["services"])
-        required_environment = list(self.requirements["requiredEnv"])
-        environment = self.configuration_environment
-        injections: dict[str, str] = {"ROS_DISTRO": distro}
+        environment = self.configuration_environment(gpu)
+        injections: dict[str, str] = {"ROS_DISTRO": distro, **host_user_environment()}
         injections.update(self.distro_environment.get(distro, {}))
         component_environment = current_context.component_environment(
             distro, architecture, gpu
@@ -375,19 +429,10 @@ class Deployment:
         injections["ROS_DISTRO"] = distro
 
         environment.update(injections)
-        missing_environment = [
-            name for name in required_environment if not environment.get(name)
-        ]
-        if missing_environment:
-            raise OpenADKitError(
-                "required environment variable(s) are missing: "
-                + ", ".join(missing_environment)
-            )
 
         return Selection(
             ros_distro=distro,
             gpu=gpu,
-            services=tuple(services),
             injections=injections,
             environment=environment,
         )
@@ -453,17 +498,6 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
                 "requirements.gpuArchitectures contains undeclared architectures: "
                 + ", ".join(unknown)
             )
-    requirements["requiredEnv"] = require_string_list(
-        requirements.get("requiredEnv", []), "requirements.requiredEnv"
-    )
-    invalid = [
-        item for item in requirements["requiredEnv"] if not ENV_NAME_RE.fullmatch(item)
-    ]
-    if invalid:
-        raise OpenADKitError(
-            "requirements.requiredEnv contains invalid environment names: "
-            + ", ".join(invalid)
-        )
     manifest["requirements"] = requirements
 
     distro_environment = manifest.get("distroEnvironment", {})
@@ -487,12 +521,10 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     if not isinstance(compose, dict):
         raise OpenADKitError("compose must be an object")
     reject_unknown(compose, ALLOWED_COMPOSE_KEYS, "compose")
-    for field in ("files", "gpuFiles", "profiles", "services", "resetServices"):
+    for field in ("files", "gpuFiles", "profiles", "resetServices"):
         compose[field] = require_string_list(compose.get(field, []), f"compose.{field}")
     if not compose["files"]:
         raise OpenADKitError("compose.files must not be empty")
-    if not compose["services"]:
-        raise OpenADKitError("compose.services must not be empty")
     wait_timeout = compose.get("waitTimeout", 300)
     if not isinstance(wait_timeout, int) or isinstance(wait_timeout, bool) or wait_timeout <= 0:
         raise OpenADKitError("compose.waitTimeout must be a positive integer")
@@ -569,7 +601,10 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     deployment.compose_files(False)
     if compose["gpuFiles"]:
         deployment.compose_files(True)
-    deployment.env_files
+        ensure_safe_existing(
+            directory, "config.gpu.env", "GPU environment file"
+        )
+    deployment.env_files()
     return deployment
 
 

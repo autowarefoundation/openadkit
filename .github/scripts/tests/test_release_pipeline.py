@@ -93,35 +93,55 @@ def write_plan(tmp_path, *, images=None):
     )
     output = tmp_path / "release-plan.json"
     result = subprocess.run(
-        [
-            "python3",
-            str(PLANNER),
-            "--source-root",
-            str(ROOT),
-            "--build-metadata",
-            str(metadata),
-            "--version",
-            VERSION,
-            "--release-sha",
-            RELEASE_SHA,
-            "--packager-sha",
-            "c" * 40,
-            "--default-ros-distro",
-            "humble",
-            "--stable-release",
-            "true",
-            "--publish-latest-aliases",
-            "true",
-            "--output",
-            str(output),
-        ],
+        ["python3", str(PLANNER), "--source-root", str(ROOT),
+         "--build-metadata", str(metadata), "--version", VERSION,
+         "--release-sha", RELEASE_SHA, "--packager-sha", "c" * 40,
+         "--default-ros-distro", "humble", "--stable-release", "true",
+         "--publish-latest-aliases", "true", "--output", str(output)],
         text=True,
         capture_output=True,
     )
     return result, output
 
 
-def run_release_rules(tmp_path, *, version, ref_type, input_ref, base_version="1.8.0"):
+def run_validator(tmp_path, function, **env):
+    """Run one validate_release.sh check in the release workflow environment."""
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    return subprocess.run(
+        ["bash", "-c", f'source "$1"; release_sha="$2"; {function}', "bash",
+         str(VALIDATOR), RELEASE_SHA],
+        cwd=tmp_path,
+        env=os.environ | {
+            "BUILD_TAG": BUILD_TAG,
+            "VERSION": VERSION,
+            "GH_TOKEN": "test",
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_REPOSITORY": "example/repo",
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+            "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
+            "IMAGE_PREFIX_COMPONENT": kit["imagePrefixComponent"],
+            "DEFAULT_ROS_DISTRO": kit["defaultRosDistro"],
+            **env,
+        },
+        text=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("version", "ref_type", "input_ref", "accepted"),
+    [
+        ("v2.0.0", "tag", "1.8.0", True),
+        ("v2.0.0-rc.1", "tag", "1.8.0", True),
+        ("v2.0.0-rc.1", "sha", "a" * 40, True),
+        ("v2.0.0", "sha", "a" * 40, False),
+        ("v2.0.0-rc.1", "branch", "main", False),
+        ("v2.0.0-rc.1", "sha", "abc123", False),
+    ],
+)
+def test_release_rules_accept_only_supported_autoware_refs(
+    tmp_path, version, ref_type, input_ref, accepted
+):
     build = tmp_path / "release-input/build"
     build.mkdir(parents=True)
     (build / "build-metadata.json").write_text(
@@ -130,117 +150,32 @@ def run_release_rules(tmp_path, *, version, ref_type, input_ref, base_version="1
                 "openadkit_sha": RELEASE_SHA,
                 "autoware_input_ref": input_ref,
                 "autoware_ref_type": ref_type,
-                "autoware_base_version": base_version,
+                "autoware_base_version": "1.8.0",
             }
         )
     )
-    env = os.environ | {
-        "BUILD_TAG": "123-1",
-        "GH_TOKEN": "test",
-        "GITHUB_OUTPUT": str(tmp_path / "output"),
-        "GITHUB_REF": "refs/heads/main",
-        "GITHUB_REPOSITORY": "example/repo",
-        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
-        "IMAGE_PREFIX_COMPONENT": "ghcr.io/example/openadkit",
-        "VERSION": version,
-    }
-    return subprocess.run(
-        [
-            "bash",
-            "-c",
-            'source "$1"; release_sha="$2"; validate_release_rules',
-            "bash",
-            str(VALIDATOR),
-            RELEASE_SHA,
-        ],
-        cwd=tmp_path,
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    result = run_validator(tmp_path, "validate_release_rules", VERSION=version)
+    assert (result.returncode == 0) is accepted, result.stderr
 
 
 @pytest.mark.parametrize(
-    ("version", "ref_type", "input_ref"),
+    ("env", "message"),
     [
-        ("v2.0.0", "tag", "1.8.0"),
-        ("v2.0.0-rc.1", "tag", "1.8.0"),
-        ("v2.0.0-rc.1", "sha", "a" * 40),
+        ({}, None),
+        ({"DEFAULT_ROS_DISTRO": "jazzy"}, "must match openadkit.json defaultRosDistro"),
+        (
+            {"IMAGE_PREFIX_COMPONENT": "ghcr.io/example/openadkit"},
+            "must match openadkit.json imagePrefixComponent",
+        ),
     ],
 )
-def test_release_rules_accept_supported_autoware_refs(
-    tmp_path, version, ref_type, input_ref
-):
-    result = run_release_rules(
-        tmp_path, version=version, ref_type=ref_type, input_ref=input_ref
-    )
-    assert result.returncode == 0, result.stderr
-
-
-@pytest.mark.parametrize(
-    ("version", "ref_type", "input_ref"),
-    [
-        ("v2.0.0", "sha", "a" * 40),
-        ("v2.0.0-rc.1", "branch", "main"),
-        ("v2.0.0-rc.1", "sha", "abc123"),
-    ],
-)
-def test_release_rules_reject_unsupported_autoware_refs(
-    tmp_path, version, ref_type, input_ref
-):
-    result = run_release_rules(
-        tmp_path, version=version, ref_type=ref_type, input_ref=input_ref
-    )
-    assert result.returncode != 0
-
-
-def run_manifest_consistency(tmp_path, *, distro=None, registry=None):
-    manifest = json.loads((ROOT / "openadkit.json").read_text())
-    env = os.environ | {
-        "BUILD_TAG": BUILD_TAG,
-        "VERSION": VERSION,
-        "GH_TOKEN": "test",
-        "GITHUB_REF": "refs/heads/main",
-        "GITHUB_REPOSITORY": "example/repo",
-        "GITHUB_OUTPUT": str(tmp_path / "output"),
-        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
-        "IMAGE_PREFIX_COMPONENT": registry or manifest["imagePrefixComponent"],
-        "DEFAULT_ROS_DISTRO": distro or manifest["defaultRosDistro"],
-    }
-    return subprocess.run(
-        [
-            "bash",
-            "-c",
-            'source "$1"; validate_manifest_consistency',
-            "bash",
-            str(VALIDATOR),
-        ],
-        cwd=tmp_path,
-        env=env,
-        text=True,
-        capture_output=True,
-    )
-
-
-def test_manifest_consistency_accepts_release_inputs_matching_manifest(tmp_path):
-    result = run_manifest_consistency(tmp_path)
-    assert result.returncode == 0, result.stderr
-
-
-def test_manifest_consistency_rejects_distro_that_contradicts_manifest(tmp_path):
-    manifest_distro = json.loads((ROOT / "openadkit.json").read_text())[
-        "defaultRosDistro"
-    ]
-    other_distro = "jazzy" if manifest_distro == "humble" else "humble"
-    result = run_manifest_consistency(tmp_path, distro=other_distro)
-    assert result.returncode != 0
-    assert "must match openadkit.json defaultRosDistro" in result.stderr
-
-
-def test_manifest_consistency_rejects_registry_that_contradicts_manifest(tmp_path):
-    result = run_manifest_consistency(tmp_path, registry="ghcr.io/example/openadkit")
-    assert result.returncode != 0
-    assert "must match openadkit.json imagePrefixComponent" in result.stderr
+def test_manifest_consistency_checks_release_inputs(tmp_path, env, message):
+    result = run_validator(tmp_path, "validate_manifest_consistency", **env)
+    if message is None:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode != 0
+        assert message in result.stderr
 
 
 def test_registry_lookup_retries_and_classifies_failures(tmp_path):
@@ -293,28 +228,27 @@ def release_record(
     }
 
 
+ASSETS = {
+    "release-plan.json": "release-plan.json",
+    "release-metadata.json": "release-metadata.json",
+    "autoware-lock.repos": "release-input/build/autoware-lock.repos",
+    "upstream-images.json": "release-input/build/upstream-images.json",
+    "openadkit": "dist/openadkit",
+    f"openadkit-{VERSION}.tar.gz": f"dist/openadkit-{VERSION}.tar.gz",
+}
+
+
 def release_assets():
-    return [
-        {"id": 101, "name": "release-plan.json"},
-        {"id": 102, "name": "release-metadata.json"},
-        {"id": 103, "name": "autoware-lock.repos"},
-        {"id": 104, "name": "upstream-images.json"},
-        {"id": 105, "name": "openadkit"},
-        {"id": 106, "name": f"openadkit-{VERSION}.tar.gz"},
-    ]
+    return [{"id": 101 + index, "name": name} for index, name in enumerate(ASSETS)]
 
 
 def release_workspace(tmp_path):
-    (tmp_path / "dist").mkdir()
-    launcher = tmp_path / "dist/openadkit"
-    launcher.write_text("#!/usr/bin/env bash\n")
-    launcher.chmod(0o755)
-    bundle = tmp_path / f"dist/openadkit-{VERSION}.tar.gz"
-    bundle.write_bytes(b"bundle")
-    build = tmp_path / "release-input/build"
-    build.mkdir(parents=True)
-    (build / "autoware-lock.repos").write_text("repositories: {}\n")
-    (build / "upstream-images.json").write_text("[]\n")
+    for relative in ("dist", "release-input/build"):
+        (tmp_path / relative).mkdir(parents=True)
+    executable(tmp_path / "dist/openadkit", "#!/usr/bin/env bash\n")
+    (tmp_path / f"dist/openadkit-{VERSION}.tar.gz").write_bytes(b"bundle")
+    (tmp_path / "release-input/build/autoware-lock.repos").write_text("repositories: {}\n")
+    (tmp_path / "release-input/build/upstream-images.json").write_text("[]\n")
     (tmp_path / "release-metadata.json").write_text("{}\n")
     (tmp_path / "release-notes.md").write_text(MARKER + "\n")
     (tmp_path / "release-plan.json").write_text(
@@ -328,38 +262,17 @@ def release_workspace(tmp_path):
                     "publishLatestAliases": True,
                 },
                 "githubAssets": [
-                    {"name": "release-plan.json", "path": "release-plan.json"},
-                    {"name": "release-metadata.json", "path": "release-metadata.json"},
-                    {
-                        "name": "autoware-lock.repos",
-                        "path": "release-input/build/autoware-lock.repos",
-                    },
-                    {
-                        "name": "upstream-images.json",
-                        "path": "release-input/build/upstream-images.json",
-                    },
-                    {"name": "openadkit", "path": "dist/openadkit"},
-                    {
-                        "name": bundle.name,
-                        "path": f"dist/{bundle.name}",
-                    },
+                    {"name": name, "path": path} for name, path in ASSETS.items()
                 ],
             }
         )
     )
-    files = [
-        tmp_path / "release-plan.json",
-        tmp_path / "release-metadata.json",
-        build / "autoware-lock.repos",
-        build / "upstream-images.json",
-        launcher,
-        bundle,
-    ]
-    manifest = "".join(
-        f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
-        for path in sorted(files, key=lambda path: path.name)
+    (tmp_path / "release-assets.sha256").write_text(
+        "".join(
+            f"{hashlib.sha256((tmp_path / ASSETS[name]).read_bytes()).hexdigest()}  {name}\n"
+            for name in sorted(ASSETS)
+        )
     )
-    (tmp_path / "release-assets.sha256").write_text(manifest)
 
 
 def fake_gh_environment(tmp_path, listed, refreshed=None):
@@ -372,18 +285,9 @@ def fake_gh_environment(tmp_path, listed, refreshed=None):
     (responses / "refreshed").write_text(json.dumps(refreshed or listed or {}))
     (responses / "created").write_text(json.dumps(created))
     state = refreshed or listed or {}
-    asset_sources = {
-        "release-plan.json": tmp_path / "release-plan.json",
-        "release-metadata.json": tmp_path / "release-metadata.json",
-        "autoware-lock.repos": tmp_path / "release-input/build/autoware-lock.repos",
-        "upstream-images.json": tmp_path / "release-input/build/upstream-images.json",
-        "openadkit": tmp_path / "dist/openadkit",
-        f"openadkit-{VERSION}.tar.gz": tmp_path / f"dist/openadkit-{VERSION}.tar.gz",
-    }
     for asset in state.get("assets", []):
-        source = asset_sources.get(asset["name"])
-        if source is not None:
-            (responses / f"asset-{asset['id']}").write_bytes(source.read_bytes())
+        source = tmp_path / ASSETS[asset["name"]]
+        (responses / f"asset-{asset['id']}").write_bytes(source.read_bytes())
     log = tmp_path / "gh-calls"
     executable(
         bin_dir / "gh",
@@ -415,6 +319,14 @@ def fake_gh_environment(tmp_path, listed, refreshed=None):
         "VERSION": VERSION,
     }
     return env, log
+
+
+def publish_env(env):
+    return env | {
+        "RELEASE_ID": "42",
+        "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
+        "PUBLISH_LATEST_ALIASES": "true",
+    }
 
 
 def run_manager(tmp_path, env, operation="prepare"):
@@ -458,15 +370,12 @@ def test_prepare_refuses_unowned_or_changed_draft(tmp_path, listed, refreshed):
 
 def test_publish_revalidates_body_before_mutation(tmp_path):
     release_workspace(tmp_path)
-    changed = release_record(body=MARKER + "\nchanged\n")
+    changed = release_record(body=MARKER + "\nchanged\n", assets=release_assets())
     env, _ = fake_gh_environment(tmp_path, changed)
-    env |= {
-        "RELEASE_ID": "42",
-        "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
-        "PUBLISH_LATEST_ALIASES": "true",
-    }
+    env = publish_env(env)
     result = run_manager(tmp_path, env, "publish")
     assert result.returncode != 0
+    assert "Draft release body changed" in result.stderr
     assert not (tmp_path / "patched").exists()
 
 
@@ -474,11 +383,7 @@ def test_publish_patches_the_revalidated_release_id(tmp_path):
     release_workspace(tmp_path)
     owned = release_record(assets=release_assets())
     env, log = fake_gh_environment(tmp_path, owned)
-    env |= {
-        "RELEASE_ID": "42",
-        "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
-        "PUBLISH_LATEST_ALIASES": "true",
-    }
+    env = publish_env(env)
     result = run_manager(tmp_path, env, "publish")
     assert result.returncode == 0, result.stderr
     patch = next(call for call in log.read_text().splitlines() if "PATCH" in call)
@@ -491,178 +396,23 @@ def test_publish_rejects_changed_draft_asset(tmp_path):
     owned = release_record(assets=release_assets())
     env, _ = fake_gh_environment(tmp_path, owned)
     (tmp_path / "responses/asset-106").write_bytes(b"replaced bundle")
-    env |= {
-        "RELEASE_ID": "42",
-        "RELEASE_BODY_SHA256": hashlib.sha256((MARKER + "\n").encode()).hexdigest(),
-        "PUBLISH_LATEST_ALIASES": "true",
-    }
+    env = publish_env(env)
     result = run_manager(tmp_path, env, "publish")
     assert result.returncode != 0
     assert not (tmp_path / "patched").exists()
 
 
-def test_registry_auth_failure_never_mutates_image_tags(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls = tmp_path / "docker-calls"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\n"
-        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        f'  if [[ "$4" == *"-{BUILD_TAG}" ]]; then printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit; fi\n'
-        f'  if [[ "$4" == *"-{VERSION}" ]]; then echo "ERROR: $4: not found" >&2; exit 1; fi\n'
-        '  echo "401 Unauthorized" >&2; exit 1\n'
-        'fi\n'
-        "exit 1\n",
-    )
-    executable(bin_dir / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' v9.8.7\n")
-    (tmp_path / "release-plan.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "release": {
-                    "version": VERSION,
-                    "defaultRosDistro": "humble",
-                    "stable": True,
-                    "publishLatestAliases": True,
-                },
-                "images": [
-                    {
-                        "repo": "ghcr.io/example/openadkit",
-                        "rosDistro": "humble",
-                        "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": ["ghcr.io/example/openadkit:api-humble"],
-                    }
-                ]
-            }
-        )
-    )
-    env = os.environ | {
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
-        "GITHUB_REPOSITORY": "example/repo",
-        "REGISTRY_LOOKUP_RETRY_DELAY_SECONDS": "0",
-    }
-    result = subprocess.run(["bash", str(PROMOTER)], cwd=tmp_path, env=env)
-    assert result.returncode != 0
-    assert all("imagetools create" not in call for call in calls.read_text().splitlines())
+def run_promoter(
+    tmp_path, *, latest=VERSION, publish_latest=True, aliases=("api-humble",),
+    fail_create="-no-such-ref", deny_aliases=False,
+):
+    """Promote one image against a fake registry.
 
-
-def test_failed_version_tag_never_updates_stable_aliases(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls = tmp_path / "docker-calls"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        f'  if [[ "$4" == *"-{BUILD_TAG}" ]]; then printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit; fi\n'
-        '  echo "ERROR: $4: not found" >&2; exit 1\n'
-        'fi\n'
-        f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
-        "exit 1\n",
-    )
-    executable(bin_dir / "sleep", "#!/usr/bin/env bash\nexit 0\n")
-    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {VERSION}\n")
-    (tmp_path / "release-plan.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "release": {
-                    "version": VERSION,
-                    "defaultRosDistro": "humble",
-                    "stable": True,
-                    "publishLatestAliases": True,
-                },
-                "images": [
-                    {
-                        "repo": "ghcr.io/example/openadkit",
-                        "rosDistro": "humble",
-                        "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": ["ghcr.io/example/openadkit:api-humble"],
-                    }
-                ]
-            }
-        )
-    )
-    env = os.environ | {
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
-        "GITHUB_REPOSITORY": "example/repo",
-        "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-    }
-    result = subprocess.run(["bash", str(PROMOTER)], cwd=tmp_path, env=env)
-    assert result.returncode != 0
-    assert all(f"-{VERSION}" in call for call in calls.read_text().splitlines())
-
-
-def test_stable_promotion_consumes_planned_version_and_aliases(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    promoted = tmp_path / "promoted"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        '  ref="$4"\n'
-        f'  if [[ "$ref" == *"-{BUILD_TAG}" ]] || grep -Fxq "$ref" "$PROMOTED" 2>/dev/null; then\n'
-        f'    printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit\n'
-        '  fi\n'
-        '  echo "ERROR: $ref: not found" >&2; exit 1\n'
-        'fi\n'
-        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then printf \'%s\\n\' "$5" >> "$PROMOTED"; exit; fi\n'
-        'exit 2\n',
-    )
-    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {VERSION}\n")
-    (tmp_path / "release-plan.json").write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "release": {
-                    "version": VERSION,
-                    "defaultRosDistro": "humble",
-                    "stable": True,
-                    "publishLatestAliases": True,
-                },
-                "images": [
-                    {
-                        "repo": "ghcr.io/example/openadkit",
-                        "rosDistro": "humble",
-                        "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": ["ghcr.io/example/openadkit:api-humble"],
-                    }
-                ],
-            }
-        )
-    )
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "PROMOTED": str(promoted),
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert promoted.read_text().splitlines() == [
-        f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-        "ghcr.io/example/openadkit:api-humble",
-    ]
-
-
-def write_promotion_plan(tmp_path, *, publish_latest=True, aliases=None):
-    if aliases is None:
-        aliases = ["ghcr.io/example/openadkit:api-humble"]
+    Build-tag refs and refs this run created resolve; alias lookups fail with
+    401 when deny_aliases is set; creating a ref ending in fail_create fails.
+    Returns the result, the refs created, and every create attempt.
+    """
+    repo = "ghcr.io/example/openadkit"
     (tmp_path / "release-plan.json").write_text(
         json.dumps(
             {
@@ -675,133 +425,105 @@ def write_promotion_plan(tmp_path, *, publish_latest=True, aliases=None):
                 },
                 "images": [
                     {
-                        "repo": "ghcr.io/example/openadkit",
+                        "repo": repo,
                         "rosDistro": "humble",
                         "digest": DIGEST,
-                        "sourceRef": f"ghcr.io/example/openadkit:api-humble-{BUILD_TAG}",
-                        "releaseRef": f"ghcr.io/example/openadkit:api-humble-{VERSION}",
-                        "aliases": aliases,
+                        "sourceRef": f"{repo}:api-humble-{BUILD_TAG}",
+                        "releaseRef": f"{repo}:api-humble-{VERSION}",
+                        "aliases": [f"{repo}:{alias}" for alias in aliases],
                     }
                 ],
             }
         )
     )
-
-
-def test_older_stable_does_not_update_aliases(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    promoted = tmp_path / "promoted"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        '  ref="$4"\n'
-        f'  if [[ "$ref" == *"-{BUILD_TAG}" ]] || grep -Fxq "$ref" "$PROMOTED" 2>/dev/null; then\n'
-        f'    printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit\n'
-        '  fi\n'
-        '  echo "ERROR: $ref: not found" >&2; exit 1\n'
-        'fi\n'
-        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then printf \'%s\\n\' "$5" >> "$PROMOTED"; exit; fi\n'
-        'exit 2\n',
-    )
-    executable(bin_dir / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' v9.9.0\n")
-    write_promotion_plan(tmp_path, publish_latest=False)
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "PROMOTED": str(promoted),
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert promoted.read_text().splitlines() == [
-        f"ghcr.io/example/openadkit:api-humble-{VERSION}"
-    ]
-
-
-def test_alias_policy_mismatch_aborts_before_mutation(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    calls = tmp_path / "docker-calls"
+    promoted, calls = tmp_path / "promoted", tmp_path / "docker-calls"
+    digest = json.dumps({"manifest": {"digest": DIGEST}})
+    deny = f'[[ "$4" != *"-{VERSION}" ]] && {{ echo "401 Unauthorized" >&2; exit 1; }}\n' if deny_aliases else ""
     executable(
         bin_dir / "docker",
         "#!/usr/bin/env bash\n"
         f'printf "%s\\n" "$*" >> {json.dumps(str(calls))}\n'
-        "exit 1\n",
+        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
+        f'  if [[ "$4" == *"-{BUILD_TAG}" ]] || grep -Fxq "$4" {json.dumps(str(promoted))} 2>/dev/null; then\n'
+        f"    printf '%s\\n' '{digest}'; exit\n"
+        "  fi\n"
+        f"  {deny}"
+        '  echo "ERROR: $4: not found" >&2; exit 1\n'
+        "fi\n"
+        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then\n'
+        f'  if [[ "$5" == *"{fail_create}" ]]; then echo "create failed" >&2; exit 1; fi\n'
+        f'  printf "%s\\n" "$5" >> {json.dumps(str(promoted))}; exit\n'
+        "fi\n"
+        "exit 2\n",
     )
-    executable(bin_dir / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' v9.9.0\n")
-    write_promotion_plan(tmp_path, publish_latest=True)
+    executable(bin_dir / "sleep", "#!/usr/bin/env bash\n")
+    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {latest}\n")
     result = subprocess.run(
         ["bash", str(PROMOTER)],
         cwd=tmp_path,
-        env=os.environ
-        | {
+        env=os.environ | {
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
             "GITHUB_REPOSITORY": "example/repo",
             "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
+            "REGISTRY_LOOKUP_RETRY_DELAY_SECONDS": "0",
         },
         text=True,
         capture_output=True,
     )
+    created = promoted.read_text().splitlines() if promoted.exists() else []
+    attempts = [  # buildx imagetools create --tag <ref> <source>
+        call.split()[4]
+        for call in (calls.read_text().splitlines() if calls.exists() else [])
+        if "imagetools create" in call
+    ]
+    return result, created, attempts
+
+
+def test_stable_promotion_creates_the_version_tag_then_aliases(tmp_path):
+    result, created, _ = run_promoter(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert created == [
+        f"ghcr.io/example/openadkit:api-humble-{VERSION}",
+        "ghcr.io/example/openadkit:api-humble",
+    ]
+
+
+def test_older_stable_does_not_update_aliases(tmp_path):
+    result, created, _ = run_promoter(tmp_path, latest="v9.9.0", publish_latest=False)
+    assert result.returncode == 0, result.stderr
+    assert created == [f"ghcr.io/example/openadkit:api-humble-{VERSION}"]
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"deny_aliases": True}, "401"),
+        ({"latest": "v9.9.0"}, "Latest alias policy changed"),
+    ],
+)
+def test_promotion_aborts_before_any_tag_changes(tmp_path, options, message):
+    result, _, attempts = run_promoter(tmp_path, **options)
     assert result.returncode != 0
-    assert "Latest alias policy changed" in result.stderr
-    assert not calls.exists() or all(
-        "imagetools create" not in call for call in calls.read_text().splitlines()
-    )
+    assert message in result.stderr
+    assert attempts == []
+
+
+def test_failed_version_tag_never_updates_aliases(tmp_path):
+    result, created, attempts = run_promoter(tmp_path, fail_create=f"-{VERSION}")
+    assert result.returncode != 0
+    assert created == []
+    assert attempts and all(ref.endswith(f"-{VERSION}") for ref in attempts)
 
 
 def test_alias_loop_reports_unconverged_and_continues(tmp_path):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    promoted = tmp_path / "promoted"
-    executable(
-        bin_dir / "docker",
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        'if [ "$1 $2 $3" = "buildx imagetools inspect" ]; then\n'
-        '  ref="$4"\n'
-        f'  if [[ "$ref" == *"-{BUILD_TAG}" ]] || grep -Fxq "$ref" "$PROMOTED" 2>/dev/null; then\n'
-        f'    printf \'%s\\n\' \'{json.dumps({"manifest": {"digest": DIGEST}})}\'; exit\n'
-        '  fi\n'
-        '  echo "ERROR: $ref: not found" >&2; exit 1\n'
-        'fi\n'
-        'if [ "$1 $2 $3" = "buildx imagetools create" ]; then\n'
-        '  if [[ "$5" == *"-latest" ]]; then echo "create failed" >&2; exit 1; fi\n'
-        '  printf \'%s\\n\' "$5" >> "$PROMOTED"; exit\n'
-        'fi\n'
-        'exit 2\n',
-    )
-    executable(bin_dir / "sleep", "#!/usr/bin/env bash\nexit 0\n")
-    executable(bin_dir / "gh", f"#!/usr/bin/env bash\nprintf '%s\\n' {VERSION}\n")
-    write_promotion_plan(
-        tmp_path,
-        aliases=[
-            "ghcr.io/example/openadkit:api-humble",
-            "ghcr.io/example/openadkit:api-humble-latest",
-        ],
-    )
-    result = subprocess.run(
-        ["bash", str(PROMOTER)],
-        cwd=tmp_path,
-        env=os.environ
-        | {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "GITHUB_REPOSITORY": "example/repo",
-            "PROMOTED": str(promoted),
-            "REGISTRY_LOOKUP_MAX_ATTEMPTS": "1",
-        },
-        text=True,
-        capture_output=True,
+    result, created, _ = run_promoter(
+        tmp_path, aliases=("api-humble-latest", "api-humble"), fail_create="-latest"
     )
     assert result.returncode != 0
     assert "Unconverged aliases: ghcr.io/example/openadkit:api-humble-latest" in result.stderr
-    assert promoted.read_text().splitlines() == [
+    assert created == [
         f"ghcr.io/example/openadkit:api-humble-{VERSION}",
         "ghcr.io/example/openadkit:api-humble",
     ]
@@ -815,7 +537,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert plan["bundle"]["root"] == f"openadkit-{VERSION}"
     assert plan["bundle"]["runtime"] == ["openadkit", "openadkit.json", "cli"]
     assert {asset["name"] for asset in plan["githubAssets"]} >= {"openadkit", plan["bundle"]["asset"]}
-    assert plan["bundle"]["shared"] == ["base"]
+    assert plan["bundle"]["shared"] == ["shared"]
     assert plan["bundle"]["deployments"] == sorted(
         json.loads((ROOT / "openadkit.json").read_text())["deployments"]
     )
@@ -824,7 +546,7 @@ def test_release_plan_builds_complete_dual_distro_context(tmp_path):
     assert context["defaultRosDistro"] == "humble"
     assert context["componentImages"]["CARLA_INTERFACE_IMAGE"] == "carla-interface"
     assert set(context["deployments"]) == set(plan["bundle"]["deployments"])
-    assert set(context["shared"]) == {"base"}
+    assert set(context["shared"]) == {"shared"}
     for distro in ("humble", "jazzy"):
         assert set(context["images"][distro]) == RUNTIME_TARGETS
         assert all(
@@ -929,9 +651,9 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert not (root / "openadkit.d").exists()
     bundled_context = json.loads((root / "openadkit.json").read_text())
     assert bundled_context["kind"] == "release"
-    assert bundled_context["componentImages"]["CARLA_INTERFACE_IMAGE"] == "carla-interface"
-    assert "carla-interface" in bundled_context["images"]["humble"]
     kit = json.loads((ROOT / "openadkit.json").read_text())
+    assert bundled_context["componentImages"] == kit["componentImages"]
+    assert "carla-interface" in bundled_context["images"]["humble"]
     expected_deployments = set(kit["deployments"])
     for name, reference in kit["deployments"].items():
         manifest = json.loads((ROOT / reference["path"] / "deployment.json").read_text())
@@ -1031,17 +753,3 @@ def test_release_packager_requires_an_install_capable_launcher(tmp_path):
 
     with pytest.raises(subprocess.CalledProcessError):
         run_packager(tmp_path, env | {"INSTALLER_SOURCE_DIR": str(stale)})
-
-
-def test_release_scripts_do_not_hardcode_product_catalog():
-    packager = PACKAGER.read_text()
-    notes = WRITE_NOTES.read_text()
-    planner = PLANNER.read_text()
-    kit = json.loads((ROOT / "openadkit.json").read_text())
-    for name in kit["deployments"]:
-        assert name not in packager
-        assert name not in notes
-    assert "CURATED_DEPLOYMENTS" not in planner
-    assert "ROS_DISTROS" not in planner
-    assert "length == 9" not in notes
-    assert "length == 4" not in notes

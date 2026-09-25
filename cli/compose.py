@@ -8,13 +8,16 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
-from manifest import Deployment, OpenADKitError, Selection
+from manifest import Deployment, OpenADKitError, Selection, parse_dotenv
 
 PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
+# Launch failures show up within seconds; watch this long after `up`.
+SETTLE_SECONDS = 10
 
 
 COMPOSE_CONTROL_ENV = {
@@ -77,8 +80,11 @@ def capture_process(
             f"required command is not installed: {command[0]}"
         ) from error
     except subprocess.CalledProcessError as error:
+        detail = " ".join((error.stderr or "").split())
+        suffix = f": {detail}" if detail else ""
         raise OpenADKitError(
-            f"command failed with exit code {error.returncode}: {command[0]}"
+            f"command failed with exit code {error.returncode}: "
+            f"{command[0]}{suffix}"
         ) from error
 
 
@@ -90,9 +96,30 @@ def process_environment(selection: Selection) -> dict[str, str]:
     return environment
 
 
+def compose_process_environment(
+    deployment: Deployment, selection: Selection
+) -> dict[str, str]:
+    """Environment Compose uses to interpolate the deployment.
+
+    Compose prefers the process environment over ``--env-file``, so a shell
+    export would otherwise hide ``config.gpu.env`` and ``config.local.env``.
+    Drop shell values for names the env files define and let Compose read
+    the files itself, so quoting and ``$VAR`` expansion follow Compose rules.
+    CLI injections (distro and component images) still win.
+    """
+    environment = dict(os.environ)
+    for path in deployment.env_files(selection.gpu):
+        for name in parse_dotenv(path):
+            environment.pop(name, None)
+    environment.update(selection.injections)
+    for name in COMPOSE_CONTROL_ENV:
+        environment.pop(name, None)
+    return environment
+
+
 def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
     command = ["docker", "compose", "--project-name", deployment.project]
-    for env_file in deployment.env_files:
+    for env_file in deployment.env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
     for compose_file in deployment.compose_files(selection.gpu):
         command.extend(("--file", str(compose_file)))
@@ -109,7 +136,7 @@ def compose_run(
     run_process(
         compose_command(deployment, selection) + arguments,
         cwd=deployment.directory,
-        env=process_environment(selection),
+        env=compose_process_environment(deployment, selection),
     )
 
 
@@ -123,14 +150,14 @@ def compose_capture(
     return capture_process(
         compose_command(deployment, selection) + arguments,
         cwd=deployment.directory,
-        env=process_environment(selection),
+        env=compose_process_environment(deployment, selection),
         check=check,
     )
 
 
 def require_docker() -> None:
     if not shutil.which("docker"):
-        raise OpenADKitError("Docker is unavailable. Run: ./openadkit setup")
+        raise OpenADKitError("Docker is unavailable. Run: openadkit setup")
 
 
 def _compose_ls_environment() -> dict[str, str]:
@@ -176,46 +203,15 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
     return [name for name in wanted if name in found]
 
 
-def _runtime_state_path(deployment: Deployment) -> Path:
-    return deployment.directory / ".cache" / "runtime.json"
-
-
-def save_runtime(deployment: Deployment, selection: Selection) -> None:
-    cache = deployment.directory / ".cache"
-    if cache.is_symlink() or (cache.exists() and not cache.is_dir()):
-        raise OpenADKitError(f"unsafe runtime cache path: {cache}")
-    cache.mkdir(exist_ok=True)
-    path = _runtime_state_path(deployment)
-    if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise OpenADKitError(f"unsafe runtime state path: {path}")
-    path.write_text(
-        json.dumps(
-            {
-                "schemaVersion": 1,
-                "rosDistro": selection.ros_distro,
-                "gpu": selection.gpu,
-            }
+def require_stopped(name: str) -> None:
+    """Refuse destructive cleanup while this deployment's project is live."""
+    if not shutil.which("docker"):
+        return
+    if name in running_names([name]):
+        raise OpenADKitError(
+            f"{name} is running; stop it before deleting data: "
+            f"openadkit stop {name}"
         )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
-def load_runtime(deployment: Deployment) -> tuple[str, bool] | None:
-    path = _runtime_state_path(deployment)
-    if path.is_symlink() or not path.is_file():
-        return None
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(value, dict) or value.get("schemaVersion") != 1:
-        return None
-    ros_distro = value.get("rosDistro")
-    gpu = value.get("gpu")
-    if not isinstance(ros_distro, str) or not ros_distro or not isinstance(gpu, bool):
-        return None
-    return ros_distro, gpu
 
 
 def render(deployment: Deployment, selection: Selection) -> set[str]:
@@ -225,14 +221,35 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
         compose_capture(deployment, selection, ["config", "--services"])
         .stdout.splitlines()
     )
-    declared = set(selection.services)
-    declared.update(deployment.compose["resetServices"])
-    unknown = sorted(declared - configured)
+    # The Compose project is the deployment: every configured service is meant
+    # to run. Only the oneshot services are cross-checked, so a typo in a
+    # resetServices entry still fails fast.
+    unknown = sorted(set(deployment.compose["resetServices"]) - configured)
     if unknown:
         raise OpenADKitError(
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
         )
     return configured
+
+
+def create_writable_mounts(deployment: Deployment, selection: Selection) -> None:
+    """Create missing writable bind sources as the user.
+
+    Docker creates a missing bind source as root, which the services, running
+    as the user, then cannot write to (for example ~/autoware_data).
+    """
+    result = compose_capture(deployment, selection, ["config", "--format", "json"])
+    try:
+        services = json.loads(result.stdout).get("services") or {}
+    except (json.JSONDecodeError, AttributeError) as error:
+        raise OpenADKitError("could not parse the Compose configuration") from error
+    for service in services.values():
+        for volume in service.get("volumes") or []:
+            if volume.get("type") != "bind" or volume.get("read_only"):
+                continue
+            source = Path(volume["source"])
+            if not source.exists():
+                source.mkdir(parents=True)
 
 
 def check_daemon(selection: Selection) -> None:
@@ -260,24 +277,59 @@ def check_daemon(selection: Selection) -> None:
         )
 
 
-def start(
-    deployment: Deployment,
-    selection: Selection,
-    pull_policy: str,
-    configured_services: set[str],
-) -> None:
-    services = list(selection.services)
-    if pull_policy != "never":
-        compose_run(
-            deployment,
-            selection,
-            ["pull", "--policy", pull_policy, *services],
-        )
+def failed_services(
+    deployment: Deployment, selection: Selection, ids: list[str]
+) -> list[str]:
+    """Long-running services that restarted or exited with an error."""
+    result = capture_process(
+        [
+            "docker",
+            "inspect",
+            "--format",
+            '{{index .Config.Labels "com.docker.compose.service"}} '
+            "{{.RestartCount}} {{.State.Status}} {{.State.ExitCode}}",
+            *ids,
+        ],
+        env=process_environment(selection),
+        trace=False,
+    )
+    failed = set()
+    for line in result.stdout.splitlines():
+        service, restarts, state, exit_code = line.split()
+        if service in deployment.compose["resetServices"]:
+            continue
+        if restarts != "0" or state == "restarting" or exit_code != "0":
+            failed.add(service)
+    return sorted(failed)
 
-    excluded = sorted(configured_services - set(services))
-    if excluded:
-        compose_run(deployment, selection, ["stop", *excluded])
-        compose_run(deployment, selection, ["rm", "--force", *excluded])
+
+def check_services_stay_up(deployment: Deployment, selection: Selection) -> None:
+    """Fail when a service crashes shortly after `up`.
+
+    Without healthchecks `up --wait` only waits for the containers to start, so
+    a service that fails during launch and restarts would still look running.
+    """
+    ids = compose_capture(deployment, selection, ["ps", "--all", "--quiet"]).stdout.split()
+    if not ids:
+        return
+    print(
+        f"checking that services stay up for {SETTLE_SECONDS}s...",
+        file=sys.stderr,
+        flush=True,
+    )
+    for _ in range(SETTLE_SECONDS):
+        failed = failed_services(deployment, selection, ids)
+        if failed:
+            raise OpenADKitError(
+                f"{', '.join(failed)} failed after start; "
+                f"see: openadkit logs {deployment.name}"
+            )
+        time.sleep(1)
+
+
+def start(deployment: Deployment, selection: Selection, pull_policy: str) -> None:
+    if pull_policy != "never":
+        compose_run(deployment, selection, ["pull", "--policy", pull_policy])
 
     for service in deployment.compose["resetServices"]:
         compose_run(
@@ -298,9 +350,9 @@ def start(
             "--pull",
             "never",
             "--remove-orphans",
-            *services,
         ],
     )
+    check_services_stay_up(deployment, selection)
 
 
 def status(deployment: Deployment, selection: Selection) -> None:

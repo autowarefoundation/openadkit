@@ -23,7 +23,7 @@ Standalone source-checkout helper:
 
 ```text
 deployments/
-├── base/                     # shared Compose + container runtime.env
+├── shared/                   # services/*.yaml + runtime.env and common config
 ├── planning-simulation/      # complete deployment config.env
 ├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env

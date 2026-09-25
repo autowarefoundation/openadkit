@@ -8,6 +8,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from manifest import Deployment, OpenADKitError, Selection, parse_dotenv
 
 PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
+# Launch failures show up within seconds; watch this long after `up`.
+SETTLE_SECONDS = 10
 
 
 COMPOSE_CONTROL_ENV = {
@@ -274,6 +277,56 @@ def check_daemon(selection: Selection) -> None:
         )
 
 
+def failed_services(
+    deployment: Deployment, selection: Selection, ids: list[str]
+) -> list[str]:
+    """Long-running services that restarted or exited with an error."""
+    result = capture_process(
+        [
+            "docker",
+            "inspect",
+            "--format",
+            '{{index .Config.Labels "com.docker.compose.service"}} '
+            "{{.RestartCount}} {{.State.Status}} {{.State.ExitCode}}",
+            *ids,
+        ],
+        env=process_environment(selection),
+        trace=False,
+    )
+    failed = set()
+    for line in result.stdout.splitlines():
+        service, restarts, state, exit_code = line.split()
+        if service in deployment.compose["resetServices"]:
+            continue
+        if restarts != "0" or state == "restarting" or exit_code != "0":
+            failed.add(service)
+    return sorted(failed)
+
+
+def check_services_stay_up(deployment: Deployment, selection: Selection) -> None:
+    """Fail when a service crashes shortly after `up`.
+
+    Without healthchecks `up --wait` only waits for the containers to start, so
+    a service that fails during launch and restarts would still look running.
+    """
+    ids = compose_capture(deployment, selection, ["ps", "--all", "--quiet"]).stdout.split()
+    if not ids:
+        return
+    print(
+        f"checking that services stay up for {SETTLE_SECONDS}s...",
+        file=sys.stderr,
+        flush=True,
+    )
+    for _ in range(SETTLE_SECONDS):
+        failed = failed_services(deployment, selection, ids)
+        if failed:
+            raise OpenADKitError(
+                f"{', '.join(failed)} failed after start; "
+                f"see: openadkit logs {deployment.name}"
+            )
+        time.sleep(1)
+
+
 def start(deployment: Deployment, selection: Selection, pull_policy: str) -> None:
     if pull_policy != "never":
         compose_run(deployment, selection, ["pull", "--policy", pull_policy])
@@ -299,6 +352,7 @@ def start(deployment: Deployment, selection: Selection, pull_policy: str) -> Non
             "--remove-orphans",
         ],
     )
+    check_services_stay_up(deployment, selection)
 
 
 def status(deployment: Deployment, selection: Selection) -> None:

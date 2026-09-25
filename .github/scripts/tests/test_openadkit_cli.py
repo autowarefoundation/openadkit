@@ -219,6 +219,8 @@ def fake_docker(
     runtimes='{"nvidia": {}}',
     compose_ls="[]",
     config_json='{"services": {}}',
+    container_ids="",
+    inspect="",
 ):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -250,6 +252,10 @@ def fake_docker(
         f"printf '%b' {json.dumps(configured)}; fi\n"
         'if [[ "$*" == *"config --quiet"* ]]; then '
         f"exit {config_returncode}; fi\n"
+        'if [[ "$*" == *"ps --all --quiet"* ]]; then '
+        f"printf '%b' {json.dumps(container_ids)}; fi\n"
+        'if [[ "$1" == inspect ]]; then '
+        f"printf '%b' {json.dumps(inspect)}; fi\n"
         "exit 0\n",
     )
     return bin_dir, calls
@@ -1116,6 +1122,26 @@ def test_run_resets_declared_one_shot_services(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert "rm --stop --force map-check" in calls.read_text()
+
+
+def test_run_fails_when_a_service_crashes_after_start(tmp_path):
+    manifest = minimal_manifest()
+    manifest["compose"]["resetServices"] = ["map-check"]
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    bin_dir, _ = fake_docker(
+        tmp_path,
+        configured="app\nmap-check\n",
+        container_ids="c1\nc2\n",
+        # A one-shot that exited with an error is left to `up --wait`.
+        inspect="app 2 running 0\nmap-check 0 exited 1\n",
+    )
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 1
+    assert "error: app failed after start; see: openadkit logs example" in result.stderr
 
 
 def test_stop_removes_project_but_not_volumes(tmp_path):

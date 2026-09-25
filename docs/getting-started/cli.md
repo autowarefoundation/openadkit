@@ -14,6 +14,7 @@ openadkit stop planning-simulation
 ```
 
 Pass the deployment name. Without it, these commands only list what is running.
+One deployment runs at a time; `run` asks you to stop the current one first.
 `openadkit run <deployment> --pull always` refreshes images before starting,
 and `openadkit --version` prints the installed version.
 

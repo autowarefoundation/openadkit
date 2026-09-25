@@ -1,5 +1,5 @@
 # Simulation default: disable emergency-handling gate so dummy/system diagnostics
-# do not force MRM. Mounted over the package configs by base/docker-compose.yaml.
+# do not force MRM. Mounted over the package configs by shared/services/control.yaml.
 #
 # Full fork of autoware_vehicle_cmd_gate/config/vehicle_cmd_gate.param.yaml with
 # only use_emergency_handling flipped to false. Re-sync when upstream renames or

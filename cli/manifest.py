@@ -216,10 +216,10 @@ def expand_home(value: str) -> str:
 
 
 def host_user_environment() -> dict[str, str]:
-    """Host user ids for services that write to host directories.
+    """Host user ids, so files written to host mounts belong to the user.
 
-    Compose runs those services as ``${OPENADKIT_UID}:${OPENADKIT_GID}`` so the
-    files they create stay owned by the user instead of root.
+    ``shared/runtime.env`` passes them to the Open AD Kit images as
+    ``HOST_UID``/``HOST_GID``; the upstream scenario runner uses them as ``user:``.
     """
     return {"OPENADKIT_UID": str(os.getuid()), "OPENADKIT_GID": str(os.getgid())}
 

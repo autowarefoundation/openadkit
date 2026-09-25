@@ -5,6 +5,10 @@ repo_url: https://github.com/autowarefoundation/openadkit
 edit_uri: edit/main/docs/
 docs_dir: docs
 strict: true
+# With strict mode, a link to a missing #anchor fails the build.
+validation:
+  links:
+    anchors: warn
 copyright: Copyright &copy; 2026 The Autoware Foundation
 
 theme:

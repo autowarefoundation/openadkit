@@ -734,17 +734,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cuda-images" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CUDA Images
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#choosing-a-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -753,23 +742,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Choosing a Tag">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#decision-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decision Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -777,17 +749,6 @@
     <span class="md-ellipsis">
       
         Versioning
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#relationship-to-autoware" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Relationship to Autoware
       
     </span>
   </a>
@@ -810,17 +771,6 @@
     <span class="md-ellipsis">
       
         What "Supported" Means
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-releases-are-tagged" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Releases Are Tagged
       
     </span>
   </a>
@@ -2042,17 +1992,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cuda-images" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CUDA Images
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#choosing-a-tag" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2061,23 +2000,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Choosing a Tag">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#decision-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decision Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -2085,17 +2007,6 @@
     <span class="md-ellipsis">
       
         Versioning
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#relationship-to-autoware" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Relationship to Autoware
       
     </span>
   </a>
@@ -2118,17 +2029,6 @@
     <span class="md-ellipsis">
       
         What "Supported" Means
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-releases-are-tagged" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Releases Are Tagged
       
     </span>
   </a>
@@ -2161,130 +2061,98 @@
 
 
 <h1 id="container-images-versioning">Container Images &amp; Versioning<a class="headerlink" href="#container-images-versioning" title="Permanent link">#</a></h1>
-<p>Open AD Kit publishes images to the GitHub Container Registry (<code>ghcr.io/autowarefoundation/openadkit</code>). This page is the canonical reference for the tag schema, the version scheme, and what "supported" means.</p>
+<p>Open AD Kit publishes images to the GitHub Container Registry (<code>ghcr.io/autowarefoundation/openadkit</code>).
+This page is the reference for image tags, versions, and what "supported" means.</p>
 <h2 id="tag-reference">Tag Reference<a class="headerlink" href="#tag-reference" title="Permanent link">#</a></h2>
+<p>Releases are promoted from existing CI builds rather than rebuilt, so the images
+tested in CI are the images that ship. Every tag below points at a promoted
+image digest.</p>
 <table>
 <thead>
 <tr>
-<th>Tag Pattern</th>
+<th>Tag</th>
 <th>Example</th>
-<th>Description</th>
+<th>Created</th>
+<th>Moves?</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Stable release</strong></td>
+<td><strong>Release</strong></td>
 <td><code>planning-control-humble-v2.0.0</code></td>
-<td>Immutable release tag. Use this when you need a fully reproducible deployment.</td>
+<td>Every release</td>
+<td>No</td>
 </tr>
 <tr>
-<td><strong>Latest stable alias</strong></td>
+<td><strong>Latest per distro</strong></td>
 <td><code>planning-control-humble</code></td>
-<td>Always resolves to the latest stable release for the specified ROS distro.</td>
+<td>Stable releases</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td><strong>Latest stable + suffix</strong></td>
-<td><code>planning-control-humble-latest</code></td>
-<td>Same as above, explicit.</td>
-</tr>
-<tr>
-<td><strong>Default ROS distro alias</strong></td>
+<td><strong>Default distro</strong></td>
 <td><code>planning-control</code></td>
-<td>Convenience alias that resolves to the current default ROS distro (Humble).</td>
-</tr>
-<tr>
-<td><strong>Default + latest suffix</strong></td>
-<td><code>planning-control-latest</code></td>
-<td>Explicit default-distro latest alias.</td>
-</tr>
-<tr>
-<td><strong>Immutable build tag</strong></td>
-<td><code>planning-control-humble-123456789-1</code></td>
-<td>Pin to a specific CI build. Format: <code>&lt;target&gt;-&lt;ros_distro&gt;-&lt;run_id&gt;-&lt;run_attempt&gt;</code>. Per-platform variants include the platform label (e.g. <code>planning-control-amd64-humble-123456789-1</code>), but prefer the multi-arch tag for portability.</td>
-</tr>
-<tr>
-<td><strong>CI development alias</strong></td>
-<td><code>planning-control-amd64-humble</code></td>
-<td>Per-platform mutable tag used during CI. <strong>Do not use for pinned deployments.</strong></td>
+<td>Stable releases, default distro only</td>
+<td>Yes</td>
 </tr>
 <tr>
 <td><strong>Pre-release</strong></td>
 <td><code>planning-control-humble-v2.0.0-rc.1</code></td>
-<td>Pre-release tag for testing. Pre-releases do not update latest stable aliases.</td>
+<td>Pre-releases</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>CI build</strong></td>
+<td><code>planning-control-humble-123456789-1</code></td>
+<td>Every CI build (<code>&lt;run_id&gt;-&lt;run_attempt&gt;</code>)</td>
+<td>No</td>
 </tr>
 </tbody>
 </table>
-<div class="admonition note">
-<p class="admonition-title">ROS 2 distributions</p>
-<p>Examples use <strong>Humble</strong> (the current default). <strong>Jazzy</strong> images are published in parallel for most components — substitute <code>-jazzy</code> for <code>-humble</code> in tags (e.g. <code>planning-control-jazzy</code>, <code>planning-control-jazzy-v2.0.0</code>). <code>carla-interface</code> is amd64-only for Humble and Jazzy; the CARLA <em>deployment</em> is Humble-only.</p>
-</div>
-<h2 id="cuda-images">CUDA Images<a class="headerlink" href="#cuda-images" title="Permanent link">#</a></h2>
-<p>CUDA-enabled variants follow the same patterns but are <strong>amd64-only</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>Tag Pattern</th>
-<th>Example</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Stable release</td>
-<td><code>sensing-perception-cuda-humble-v2.0.0</code></td>
-</tr>
-<tr>
-<td>Latest alias</td>
-<td><code>sensing-perception-cuda-humble</code></td>
-</tr>
-</tbody>
-</table>
+<p>The moving aliases also exist with a <code>-latest</code> suffix
+(<code>planning-control-humble-latest</code>, <code>planning-control-latest</code>). Pre-releases
+never update them.</p>
+<p>Examples use <strong>Humble</strong>, the default distro. Jazzy images use
+the same patterns with <code>-jazzy</code> (for example <code>planning-control-jazzy</code>).
+<code>sensing-perception-cuda</code> and <code>carla-interface</code> are amd64-only.</p>
 <h2 id="choosing-a-tag">Choosing a Tag<a class="headerlink" href="#choosing-a-tag" title="Permanent link">#</a></h2>
-<div class="oak-callout">
-<p><strong>Production / reproducible deployments</strong> — Use a stable release tag (<code>vX.Y.Z</code>).</p>
-<p><strong>Development / latest features</strong> — Use a latest stable alias (<code>&lt;target&gt;-&lt;ros_distro&gt;</code>).</p>
-<p><strong>Quick start / deployments</strong> — Use a default ROS distro alias (<code>&lt;target&gt;</code>).</p>
-<p><strong>Never pin to CI development aliases</strong> (<code>*-amd64-*</code>) — Do not use mutable per-platform tags in committed deployment files.</p>
-</div>
-<h3 id="decision-flow">Decision Flow<a class="headerlink" href="#decision-flow" title="Permanent link">#</a></h3>
-<pre class="mermaid"><code>flowchart TD
-    A{Need fully reproducible&lt;br/&gt;deployment?} --&gt;|Yes| B[Use stable release tag&lt;br/&gt;vX.Y.Z]
-    A --&gt;|No| C{Need specific&lt;br/&gt;ROS distro?}
-    C --&gt;|Yes| D[Use latest stable alias&lt;br/&gt;&amp;lt;target&amp;gt;-&amp;lt;ros_distro&amp;gt;]
-    C --&gt;|No| E[Use default alias&lt;br/&gt;&amp;lt;target&amp;gt;]</code></pre>
+<ul>
+<li><strong>Reproducible deployments</strong>: use a release tag (<code>vX.Y.Z</code>) or a digest.</li>
+<li><strong>Latest stable for a distro</strong>: use <code>&lt;target&gt;-&lt;ros_distro&gt;</code>.</li>
+<li><strong>Quick experiments</strong>: use the default alias <code>&lt;target&gt;</code>.</li>
+<li><strong>Never</strong> pin per-platform CI tags such as <code>planning-control-amd64-humble</code>;
+  they move with every build.</li>
+</ul>
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">#</a></h2>
-<p>Open AD Kit releases use <a href="https://semver.org/">Semantic Versioning</a>: <code>vMAJOR.MINOR.PATCH</code> (for example, <code>v2.0.0</code>).</p>
+<p>Open AD Kit uses <a href="https://semver.org/">Semantic Versioning</a>
+(<code>vMAJOR.MINOR.PATCH</code>):</p>
 <table>
 <thead>
 <tr>
-<th>Component</th>
+<th>Part</th>
 <th>Increments when</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><strong>MAJOR</strong></td>
-<td>A backward-incompatible change to the public deployment surface — image taxonomy, documented compose/deployment layout, or removal of a supported platform/variant.</td>
+<td>A backward-incompatible change to the image set, the documented deployment layout, or a supported platform is removed.</td>
 </tr>
 <tr>
 <td><strong>MINOR</strong></td>
-<td>New backward-compatible capability — additional components, platforms, deployments, or CI/release machinery.</td>
+<td>New backward-compatible capability: components, platforms, deployments, or tooling.</td>
 </tr>
 <tr>
 <td><strong>PATCH</strong></td>
-<td>Backward-compatible fixes — bug fixes, security/CVE remediation, image refreshes, and documentation corrections within the same release surface.</td>
+<td>Backward-compatible fixes: bugs, CVE remediation, image refreshes, and documentation.</td>
 </tr>
 </tbody>
 </table>
-<p>The Open AD Kit version is <strong>independent of the Autoware version</strong> it packages: a single Open AD Kit release pins a specific upstream Autoware release (see below), and a new Autoware release does not automatically change the Open AD Kit version.</p>
-<h2 id="relationship-to-autoware">Relationship to Autoware<a class="headerlink" href="#relationship-to-autoware" title="Permanent link">#</a></h2>
-<p>Each Open AD Kit release pins a specific upstream <strong>Autoware semver meta-release</strong>
-(an <code>X.Y.Z</code> tag) and records it in the release notes.</p>
-<p>A release pins, at minimum: the Open AD Kit version, the Autoware meta-release,
-the ROS 2 distro(s), and the published image tags and digests. Published releases
-are listed on
-<a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Releases</a>; tag
-structure is described in the <a href="#tag-reference">Tag Reference</a> above. See
-<a href="../../releases/">Releases &amp; Roadmap</a> for current status.</p>
+<p>The Open AD Kit version is <strong>independent of the Autoware version</strong>. Each release
+pins one upstream Autoware release, the ROS 2 distros, and every image digest,
+and lists them in its
+<a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>
+notes.</p>
 <h2 id="ros-2-distro-support">ROS 2 Distro Support<a class="headerlink" href="#ros-2-distro-support" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -2296,77 +2164,26 @@ structure is described in the <a href="#tag-reference">Tag Reference</a> above. 
 <tbody>
 <tr>
 <td><strong>Humble</strong></td>
-<td>Default, documented path.</td>
+<td>Default</td>
 </tr>
 <tr>
 <td><strong>Jazzy</strong></td>
-<td>Built and published <strong>in parallel</strong> wherever the <code>amd64</code>+<code>arm64</code> matrix is green.</td>
+<td>Published in parallel where the amd64 and arm64 builds pass</td>
 </tr>
 </tbody>
 </table>
-<p>The release bundle carries digest-pinned Humble and Jazzy component maps and
-selects one at runtime with <code>--ros-distro</code>. Humble remains the default. Distro
-support tracks the upstream ROS 2 lifecycle; a distro is supported by Open AD
-Kit only while it is supported upstream.</p>
+<p>A release bundle carries pinned images for both distros; choose one with
+<code>--ros-distro</code>. A distro is supported only while it is supported upstream.</p>
 <h2 id="what-supported-means">What "Supported" Means<a class="headerlink" href="#what-supported-means" title="Permanent link">#</a></h2>
 <ul>
-<li><strong>Releases</strong> — The latest stable release is supported. Fixes (including
-  security/CVE remediation) land in a new patch or minor release; older tags are
-  not backported. Stable release tags are immutable — see
-  <a href="#choosing-a-tag">Choosing a Tag</a> for pinning guidance.</li>
-<li><strong>Platforms</strong> — Support is tiered: committed, experimental, best-effort, or
-  unsupported. A variant that fails its build or validation gate is dropped from
-  the matrix instead of being shipped as if it worked. See
-  <a href="../../platforms/">Supported Platforms</a>.</li>
-<li><strong>No certification claims</strong> — "Supported" means build, deployment, and
-  validation in a non-certified environment. Open AD Kit makes no
-  safety-certification, functional-safety, or production-readiness claims.</li>
+<li><strong>Releases</strong>: the latest stable release is supported. Fixes, including CVE
+  remediation, ship in a new release; older releases are not patched.</li>
+<li><strong>Platforms</strong>: support is tiered (committed, experimental, best-effort,
+  unsupported). See <a href="../../platforms/">Supported Platforms</a>.</li>
+<li><strong>No certification claims</strong>: Open AD Kit makes no safety-certification,
+  functional-safety, or production-readiness claims.</li>
 </ul>
-<h2 id="how-releases-are-tagged">How Releases Are Tagged<a class="headerlink" href="#how-releases-are-tagged" title="Permanent link">#</a></h2>
-<p>Releases are promoted from existing CI builds rather than rebuilt, so the images
-validated in CI are the images that ship. Each tag alias is created independently
-from the promoted image digest:</p>
-<table>
-<thead>
-<tr>
-<th>Alias</th>
-<th>Example</th>
-<th>Condition</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Stable release</td>
-<td><code>planning-control-humble-v2.0.0</code></td>
-<td>Always created</td>
-</tr>
-<tr>
-<td>Latest per-distro</td>
-<td><code>planning-control-humble</code></td>
-<td>Stable releases only</td>
-</tr>
-<tr>
-<td>Latest per-distro + suffix</td>
-<td><code>planning-control-humble-latest</code></td>
-<td>Stable releases only</td>
-</tr>
-<tr>
-<td>Default distro alias</td>
-<td><code>planning-control</code></td>
-<td>Stable releases, only for the default ROS distro</td>
-</tr>
-<tr>
-<td>Default distro + suffix</td>
-<td><code>planning-control-latest</code></td>
-<td>Stable releases, only for the default ROS distro</td>
-</tr>
-</tbody>
-</table>
-<div class="admonition info">
-<p class="admonition-title">Pre-Releases</p>
-<p>Pre-release tags (e.g., <code>-rc.1</code>) are published but <strong>do not update</strong> latest stable aliases. This prevents prerelease images from being pulled by default aliases.</p>
-</div>
-<p>Maintainer workflow steps are documented in the <a href="../../development/build-from-source/#release-process">Release Process</a>.</p>
+<p>Maintainers: see the <a href="../../development/build-from-source/#release-process">Release Process</a>.</p>
 
 
 

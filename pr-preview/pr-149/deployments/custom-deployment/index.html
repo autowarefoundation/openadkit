@@ -1242,6 +1242,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-deployments-are-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Deployments Are Built
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#start-from-planning-simulation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1974,6 +1985,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-deployments-are-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Deployments Are Built
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#start-from-planning-simulation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2032,53 +2054,53 @@
 
 
 <h1 id="custom-deployment">Custom Deployment<a class="headerlink" href="#custom-deployment" title="Permanent link">#</a></h1>
-<p>Start from an existing deployment in a source checkout and adapt it to your task.
-Each deployment selects shared services using native Docker Compose <code>include</code>;
-its Compose file defines the dependencies and deployment-specific overrides.</p>
-<h2 id="start-from-planning-simulation">Start from Planning Simulation<a class="headerlink" href="#start-from-planning-simulation" title="Permanent link">#</a></h2>
-<p>From the repository root:</p>
-<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>-r<span class="w"> </span>deployments/planning-simulation<span class="w"> </span>deployments/my-simulation
-</code></pre></div>
-<p>In the copied <code>deployment.json</code>, set <code>name</code> to <code>my-simulation</code> and update
-<code>description</code>. Keep the other settings for this planning-based example, including
-<code>"shared": ["shared"]</code>, the map download, and <code>resetServices</code>.</p>
-<p>Add this entry to the <code>deployments</code> object in the root <code>openadkit.json</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">"my-simulation"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"deployments/my-simulation"</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>The inventory entry makes the deployment available to the CLI.</p>
-<h2 id="customize-the-stack">Customize the Stack<a class="headerlink" href="#customize-the-stack" title="Permanent link">#</a></h2>
+<p>Build your own stack by copying an existing deployment in a source checkout.</p>
+<h2 id="how-deployments-are-built">How Deployments Are Built<a class="headerlink" href="#how-deployments-are-built" title="Permanent link">#</a></h2>
+<p>Each service is defined once in
+<a href="https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services"><code>deployments/shared/services/</code></a>,
+one file per service. A deployment directory contains:</p>
 <table>
 <thead>
 <tr>
 <th>File</th>
-<th>What to change</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>docker-compose.yaml</code></td>
-<td>Select services with <code>include</code>, define <code>depends_on</code>, and add deployment-specific settings or services.</td>
+<td>Selects services with <code>include</code>, sets <code>depends_on</code>, and adds deployment-specific settings or services. It is the source of truth for the service set.</td>
 </tr>
 <tr>
 <td><code>config.env</code></td>
-<td>Supply the parameters needed by the selected services, such as map paths and simulator settings. Use ignored <code>config.local.env</code> for personal overrides.</td>
+<td>Values the selected services need, such as map paths and simulator settings.</td>
 </tr>
 <tr>
 <td><code>config.gpu.env</code></td>
-<td>Required when <code>deployment.json</code> lists <code>gpuFiles</code>. Loaded after <code>config.env</code> for <code>openadkit validate &lt;deployment&gt; --gpu</code> and <code>openadkit run &lt;deployment&gt; --gpu</code>; override interpolations here instead of restating a shared service command.</td>
+<td>GPU settings loaded with <code>--gpu</code>. Required when <code>deployment.json</code> lists <code>gpuFiles</code>.</td>
 </tr>
 <tr>
 <td><code>deployment.json</code></td>
-<td>Declare supported architectures, ROS distros, GPU requirements, downloads, and one-shot services to reset on each run.</td>
+<td>Supported architectures, ROS distros, GPU requirement, data downloads, and one-shot services to reset on each run.</td>
 </tr>
 </tbody>
 </table>
-<p>Shared service definitions live in
-<a href="https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services"><code>deployments/shared/services/</code></a>.
-For example, these excerpts from the copied Compose file select the visualizer
-and define its dependency:</p>
+<p>Container ROS and DDS settings shared by all deployments live in
+<code>deployments/shared/runtime.env</code>.</p>
+<h2 id="start-from-planning-simulation">Start from Planning Simulation<a class="headerlink" href="#start-from-planning-simulation" title="Permanent link">#</a></h2>
+<p>From the repository root:</p>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>-r<span class="w"> </span>deployments/planning-simulation<span class="w"> </span>deployments/my-simulation
+</code></pre></div>
+<p>In the copied <code>deployment.json</code>, set <code>name</code> to <code>my-simulation</code> and update
+<code>description</code>. Then register it in the <code>deployments</code> object of the root
+<code>openadkit.json</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">"my-simulation"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"deployments/my-simulation"</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2 id="customize-the-stack">Customize the Stack<a class="headerlink" href="#customize-the-stack" title="Permanent link">#</a></h2>
+<p>Add or remove services in <code>docker-compose.yaml</code>. A block under <code>services:</code>
+customizes an included service; it does not create a second container:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">include</span><span class="p">:</span>
 <span class="w">  </span><span class="c1"># Other selected services...</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">../shared/services/visualizer.yaml</span>
@@ -2088,27 +2110,20 @@ and define its dependency:</p>
 <span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span>
 </code></pre></div>
-<p>The <code>visualizer</code> block customizes the included service; it does not create a
-second container. Add only the settings that differ. Deployment-only services
-can be defined directly in the same file.</p>
-<p>Compose is the source of truth for the service set; there is no service list in
-<code>deployment.json</code>. When removing a service, check references from <code>depends_on</code>,
-<code>pid</code>, and <code>resetServices</code>. Most shared services use <code>pid: service:map</code> and need
-the <code>map</code> service in the project.</p>
-<p>Shared ROS/DDS settings live in <code>shared/runtime.env</code>, loaded inside containers
-via <code>env_file</code>. Keep communicating services on the same ROS domain and middleware.
-Keep the visualizer's entrypoint and command intact so noVNC and RViz start
-together; use <code>config.local.env</code> to set <code>REMOTE_PASSWORD</code>.</p>
+<p>Add only the settings that differ. Deployment-only services can be defined
+directly in the same file. When removing a service, also check <code>depends_on</code>,
+<code>pid</code>, and <code>resetServices</code>: most shared services use <code>pid: service:map</code> and need
+the <code>map</code> service.</p>
+<p>Keep communicating services on the same ROS domain and middleware. For the
+order in which env files are loaded, see
+<a href="../../getting-started/cli/#configuration">Configuration</a>.</p>
 <h2 id="validate-and-run">Validate and Run<a class="headerlink" href="#validate-and-run" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>./openadkit<span class="w"> </span>validate<span class="w"> </span>my-simulation
 ./openadkit<span class="w"> </span>run<span class="w"> </span>my-simulation
-./openadkit<span class="w"> </span>logs<span class="w"> </span>my-simulation<span class="w"> </span>--follow
 ./openadkit<span class="w"> </span>stop<span class="w"> </span>my-simulation
 </code></pre></div>
-<p>Validate each distro and GPU mode you declare. See
-<a href="../logging-simulation/">Logging Simulation</a> for a GPU overlay
-(<code>config.gpu.env</code> plus image/runtime overrides) and
-<a href="../carla-simulation/">CARLA Simulation</a> for deployment-specific services.</p>
+<p>Validate every distro and GPU mode you declare. Logging Simulation is an example
+of a GPU overlay; CARLA Simulation is an example of deployment-only services.</p>
 
 
 

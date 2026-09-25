@@ -1877,39 +1877,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#architecture-overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architecture Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#build-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Pipeline
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interface-layers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interface Layers
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#component-images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2051,62 +2018,15 @@
 
 
 <h1 id="components">Components<a class="headerlink" href="#components" title="Permanent link">#</a></h1>
-<p>Open AD Kit packages the Autoware stack as containerized services. Each
-<strong>Autoware function</strong> stays independently deployable, and the published images
-group closely related functions to keep the runtime layout simple.</p>
-<h2 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">#</a></h2>
-<p>Autoware separates <strong>Core</strong> from <strong>Universe</strong>:</p>
-<ul>
-<li><strong>Core</strong> — rigorously reviewed base functionality required for safe autonomous driving.</li>
-<li><strong>Universe</strong> — community extensions and research features built on Core.</li>
-</ul>
-<p>Open AD Kit packages Universe components into focused container images that
-compose into complete AD systems.</p>
-<h2 id="build-pipeline">Build Pipeline<a class="headerlink" href="#build-pipeline" title="Permanent link">#</a></h2>
-<pre class="mermaid"><code>flowchart TB
-    CORE["autoware:core-devel (build)&lt;br/&gt;autoware:base (runtime)"] --&gt; UC["universe-common"]
-    CUDA["autoware:base-cuda-{devel,runtime}"] --&gt; SPC["sensing-perception-cuda"]
-
-    UC --&gt; SP["sensing-perception"]
-    UC --&gt; LM["localization-mapping"]
-    UC --&gt; PC["planning-control"]
-    UC --&gt; VS["vehicle-system"]
-    UC --&gt; API["api"]
-    UC --&gt; VIZ["visualizer"]
-    UC --&gt; SIM["simulator"]
-    UC -.-&gt; SPC
-    SIM --&gt; CARLA["carla-interface"]</code></pre>
-<p><code>universe-common</code> is an Open AD Kit-owned thin intermediate built on the upstream
-<code>autoware:core-devel</code>/<code>base</code> images. The bake groups and build commands are in
-<a href="../development/build-from-source/">Build from Source</a>.</p>
-<h2 id="interface-layers">Interface Layers<a class="headerlink" href="#interface-layers" title="Permanent link">#</a></h2>
-<p>Autoware defines three interface categories that govern how components
-communicate:</p>
-<div class="oak-component-grid oak-component-grid--three">
-
-<div class="oak-component-item">
-<strong>AD API</strong>
-<span>External interface for fleet management and HMI, exposed as ROS 2 services and topics. HTTP/MQTT gateways can be layered on top.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>Component Interface</strong>
-<span>Internal inter-module communication over ROS 2 topics and services, with standardized message types.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>Local Interface</strong>
-<span>Intra-component communication inside one image. Implementation details that do not cross component boundaries.</span>
-</div>
-
-</div>
-
-<p>The AD API is the outer boundary, the component interface connects images to each
-other, and the local interface stays inside one image.</p>
+<p>Open AD Kit packages Autoware Universe into focused container images. Each image
+groups closely related Autoware functions, and deployments run them as separate
+containers that talk over ROS 2. External clients use the
+<a href="https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/">Autoware AD API</a>;
+the images use Autoware's component interfaces between them.</p>
+<p>All images build on a shared <code>universe-common</code> layer; see
+<a href="../development/build-from-source/#build-system">Build from Source</a> for the
+build graph. The <a href="#image-reference">image reference</a> lists tags and platforms.</p>
 <h2 id="component-images">Component Images<a class="headerlink" href="#component-images" title="Permanent link">#</a></h2>
-<p>Each section below covers one published image: what it contains, its launch
-file, and where it is used. The <a href="#image-reference">image reference</a> lists the
-tags and platforms.</p>
 <h3 id="sensing-perception">Sensing &amp; Perception<a class="headerlink" href="#sensing-perception" title="Permanent link">#</a></h3>
 <p>Sensor preprocessing and environment understanding in one image.</p>
 <ul>
@@ -2159,32 +2079,6 @@ image.</p>
   aggregation; Minimum Risk Maneuver handling; CPU, memory, and process
   monitoring. Launch: <code>tier4_system_component.launch.xml</code></li>
 </ul>
-<table>
-<thead>
-<tr>
-<th>Aspect</th>
-<th>Vehicle</th>
-<th>System</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Purpose</td>
-<td>Communicates with real or simulated vehicle hardware</td>
-<td>Monitors the Autoware stack</td>
-</tr>
-<tr>
-<td>Outputs</td>
-<td>Actuation commands and vehicle state</td>
-<td>Diagnostics, health, and emergency state</td>
-</tr>
-<tr>
-<td>Typical configuration</td>
-<td>Vehicle model and interface</td>
-<td>Monitor enablement and run mode</td>
-</tr>
-</tbody>
-</table>
 <h3 id="api">API<a class="headerlink" href="#api" title="Permanent link">#</a></h3>
 <p>Packages the <a href="https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/">Autoware AD API</a>
 used by fleet managers, HMIs, and scenario runners. It provides ROS 2 services
@@ -2263,9 +2157,8 @@ and each container creates its own self-signed certificate at startup.</p>
 </tr>
 </tbody>
 </table>
-<p>Under host networking, open <code>https://localhost:6080/vnc.html</code>. For remote access,
-use SSH forwarding or an authenticated reverse proxy rather than exposing noVNC
-directly.</p>
+<p>For access and remote use, see the
+<a href="../getting-started/#open-the-visualizer">Quickstart</a>.</p>
 <h3 id="carla-interface">CARLA Interface<a class="headerlink" href="#carla-interface" title="Permanent link">#</a></h3>
 <p>Packages <code>autoware_carla_interface</code>, translating Autoware control commands to
 CARLA and CARLA sensor data to ROS 2 messages:</p>
@@ -2276,21 +2169,13 @@ CARLA and CARLA sensor data to ROS 2 messages:</p>
 <li>vehicle command calibration and traffic light state publication</li>
 <li>lightweight sensor mappings for constrained hosts</li>
 </ul>
-<p>Launch: <code>autoware_carla_interface.launch.xml</code>.</p>
-<div class="admonition note">
-<p class="admonition-title">Platform support</p>
-<p>The image is published for amd64 on Humble and Jazzy. The CARLA
-<em>deployment</em> is Humble-only. The bridge itself does not require a GPU, but
-the complete deployment needs an NVIDIA GPU for the CARLA server and
-defaults to the amd64 <code>sensing-perception-cuda</code> image for perception.</p>
-</div>
-<p>See <a href="../deployments/carla-simulation/">CARLA Simulation</a> for
-<code>openadkit run carla-simulation --gpu</code>.</p>
+<p>Launch: <code>autoware_carla_interface.launch.xml</code>. The image is amd64-only (Humble
+and Jazzy); the <a href="../deployments/carla-simulation/">CARLA Simulation</a>
+deployment is Humble-only and needs an NVIDIA GPU.</p>
 <h2 id="image-reference">Image Reference<a class="headerlink" href="#image-reference" title="Permanent link">#</a></h2>
-<p>The published images and their platforms. This table is generated from the
-image catalog (<code>.github/image-inventory.json</code>), so it always matches what CI
-builds. See <a href="../getting-started/container-images/">Container Images &amp; Versioning</a>
-for the tag naming scheme.</p>
+<p>Generated from the image catalog (<code>.github/image-inventory.json</code>), so it always
+matches what CI builds. Tag names are explained in
+<a href="../getting-started/container-images/">Container Images &amp; Versioning</a>.</p>
 <table>
 <thead>
 <tr>

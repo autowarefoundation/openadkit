@@ -1802,58 +1802,19 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Build System">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Groups
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
-  <a href="#building" class="md-nav__link">
+  <a href="#build-and-run-locally" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Building
+        Build and Run Locally
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Building">
+    <nav class="md-nav" aria-label="Build and Run Locally">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#end-to-end-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        End-to-End Workflow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-targets-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Targets (Reference)
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#build-variables" class="md-nav__link">
@@ -1906,21 +1867,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#workflow-steps" class="md-nav__link">
+  <a href="#workflow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Workflow Steps
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#source-of-truth" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Source of Truth
+        Workflow
       
     </span>
   </a>
@@ -2095,58 +2045,19 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Build System">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Groups
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
-  <a href="#building" class="md-nav__link">
+  <a href="#build-and-run-locally" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Building
+        Build and Run Locally
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Building">
+    <nav class="md-nav" aria-label="Build and Run Locally">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#end-to-end-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        End-to-End Workflow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-targets-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Targets (Reference)
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#build-variables" class="md-nav__link">
@@ -2199,21 +2110,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#workflow-steps" class="md-nav__link">
+  <a href="#workflow" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Workflow Steps
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#source-of-truth" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Source of Truth
+        Workflow
       
     </span>
   </a>
@@ -2251,33 +2151,22 @@
 
 
 <h1 id="build-from-source">Build from Source<a class="headerlink" href="#build-from-source" title="Permanent link">#</a></h1>
-<p>How to build Open AD Kit container images locally from the repository source.</p>
-<div class="admonition note">
-<p class="admonition-title">Who needs this</p>
-<p>Building from source is for <strong>maintainers and contributors</strong>. Typical users
-should pull the pre-built images from GHCR — see
-<a href="../../getting-started/container-images/">Container Images &amp; Versioning</a>.</p>
-</div>
+<p>How to build the Open AD Kit images locally, how CI builds them, and how
+releases are cut. Most users do not need this; pull the published images
+instead (see <a href="../../getting-started/container-images/">Container Images &amp; Versioning</a>).</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">#</a></h2>
 <ul>
-<li>Ubuntu 22.04 or 24.04. <code>openadkit setup</code> supports Ubuntu only; on other
-  distributions provide Docker/Buildx, Compose, Docker group membership, and
-  <code>pipx</code>/<code>vcs2l</code> yourself.</li>
-<li>Docker Engine with <a href="https://docs.docker.com/build/architecture/#buildx">Buildx</a>
-  (bundled with current Docker Engine).</li>
-<li>Git, plus <code>pipx</code> and <code>vcs2l</code> to import the Autoware source tree used by the
-  component Dockerfiles.</li>
-<li>Disk space: the full build set is several multi-gigabyte images.</li>
+<li>Ubuntu 22.04 or 24.04 (<code>openadkit setup</code> supports Ubuntu only; elsewhere,
+  install Docker with Buildx and Compose yourself)</li>
+<li>Git, <code>pipx</code>, and <code>vcs2l</code> to import the Autoware sources</li>
+<li>Disk space for several multi-gigabyte images</li>
 </ul>
-<p>The build uses upstream Autoware base images from GHCR, but the component
-Dockerfiles still bind-mount a local <code>autoware/src</code> tree to compile their scoped
-package sets. Prepare that tree before running Bake (step 4 below).</p>
+<p>The component Dockerfiles build on upstream Autoware images from GHCR and
+compile their package sets from a local <code>autoware/src</code> tree (step 4 below).</p>
 <h2 id="build-system">Build System<a class="headerlink" href="#build-system" title="Permanent link">#</a></h2>
 <p>Images are built with <a href="https://docs.docker.com/build/bake/">Docker Bake</a> from
 <a href="https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl"><code>components/docker-bake.hcl</code></a>,
-the same file CI uses (<code>build-all-images.yaml</code>).</p>
-<p>The build is staged: the <code>universe-common</code> intermediate builds on the upstream
-Autoware images, and every component image builds <em>from</em> <code>universe-common</code>.</p>
+the same file CI uses.</p>
 <pre class="mermaid"><code>flowchart TB
     CORE["autoware:core-devel (build)&lt;br/&gt;autoware:base (runtime)"] --&gt; UC["universe-common"]
     CUDA["autoware:base-cuda-{devel,runtime}"] --&gt; SPC["sensing-perception-cuda"]
@@ -2291,19 +2180,17 @@ Autoware images, and every component image builds <em>from</em> <code>universe-c
     UC --&gt; SIM["simulator"]
     UC -.-&gt; SPC
     SIM --&gt; CARLA["carla-interface"]</code></pre>
-<p><code>universe-common</code> compiles only the universe-common slice of Autoware on
-upstream <code>core-devel</code>. Its runtime stage uses the lean upstream <code>base</code> image and
-copies in the compiled install tree, so development files never reach published
-runtime layers. <code>sensing-perception-cuda</code> is a parallel CUDA branch: it inherits
-from the upstream <code>base-cuda-{devel,runtime}</code> images and grafts in the
+<p><code>universe-common</code> compiles the shared part of Autoware Universe on the upstream
+<code>core-devel</code> image and copies the result onto the lean upstream <code>base</code> image, so
+build tools never reach the runtime layers. Every component builds from it.
+<code>sensing-perception-cuda</code> builds on the upstream CUDA images and adds the
 <code>universe-common</code> install tree.</p>
-<h3 id="build-groups">Build Groups<a class="headerlink" href="#build-groups" title="Permanent link">#</a></h3>
 <table>
 <thead>
 <tr>
 <th>Group</th>
 <th>Targets</th>
-<th>Published To</th>
+<th>Published to</th>
 </tr>
 </thead>
 <tbody>
@@ -2314,21 +2201,22 @@ from the upstream <code>base-cuda-{devel,runtime}</code> images and grafts in th
 </tr>
 <tr>
 <td><code>component</code></td>
-<td><code>sensing-perception</code>, <code>localization-mapping</code>, <code>planning-control</code>, <code>vehicle-system</code>, <code>api</code>, <code>visualizer</code>, <code>simulator</code>, <code>sensing-perception-cuda</code>, <code>carla-interface</code></td>
+<td>all component images, including the amd64-only <code>sensing-perception-cuda</code> and <code>carla-interface</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit</code></td>
 </tr>
 <tr>
+<td><code>planning</code></td>
+<td><code>universe-common</code> plus the images Planning Simulation needs</td>
+<td>— (local builds)</td>
+</tr>
+<tr>
 <td><code>default</code></td>
-<td>everything: <code>universe-common</code> + <code>component</code></td>
+<td><code>universe-common</code> + <code>component</code></td>
 <td>—</td>
 </tr>
 </tbody>
 </table>
-<p><code>carla-interface</code> is an <strong>amd64-only</strong> member of the <code>component</code> group, built on
-top of the <code>simulator</code> image.</p>
-<h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">#</a></h2>
-<h3 id="end-to-end-workflow">End-to-End Workflow<a class="headerlink" href="#end-to-end-workflow" title="Permanent link">#</a></h3>
-<p>From a fresh clone to a running deployment using locally built images:</p>
+<h2 id="build-and-run-locally">Build and Run Locally<a class="headerlink" href="#build-and-run-locally" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><span class="c1"># 1. Clone the repository</span>
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/autowarefoundation/openadkit.git
 <span class="nb">cd</span><span class="w"> </span>openadkit
@@ -2343,7 +2231,7 @@ Docker without <code>sudo</code>. Either log out and back in, or run:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># 3. Make the pipx-installed vcs command available in this shell</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.local/bin:</span><span class="nv">$PATH</span><span class="s2">"</span>
 
-<span class="c1"># 4. Import Autoware sources at the release used by upstream base images</span>
+<span class="c1"># 4. Import Autoware sources at the release used by the upstream base images</span>
 <span class="nv">AUTOWARE_REF</span><span class="o">=</span><span class="m">1</span>.8.0
 <span class="nb">export</span><span class="w"> </span><span class="nv">UPSTREAM_TAG</span><span class="o">=</span><span class="s2">"</span><span class="nv">$AUTOWARE_REF</span><span class="s2">"</span>
 git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span><span class="s2">"</span><span class="nv">$AUTOWARE_REF</span><span class="s2">"</span><span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
@@ -2353,49 +2241,31 @@ vcs<span class="w"> </span>import<span class="w"> </span>--shallow<span class="w
 mkdir<span class="w"> </span>-p<span class="w"> </span>autoware/src/middleware/external
 touch<span class="w"> </span>autoware/src/middleware/external/.keep
 
-<span class="c1"># 5. Build the universe-common base intermediate (~2 hours)</span>
+<span class="c1"># 5. Build the shared universe-common layer (~2 hours)</span>
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>universe-common
 
-<span class="c1"># 6. Build the planning-simulation images (~2 hours)</span>
+<span class="c1"># 6. Build the Planning Simulation images (~2 hours)</span>
 docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>--load<span class="w"> </span>planning
 
-<span class="c1"># 7. Start a deployment</span>
+<span class="c1"># 7. Run with the local images</span>
 ./openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation
 </code></pre></div>
-<p>What the flags and tags mean:</p>
 <ul>
-<li><code>--load</code> puts the images in the local Docker store. Without it, Bake only
-  fills the BuildKit cache.</li>
-<li>Local builds are tagged with the same
-  <code>&lt;prefix&gt;:&lt;target&gt;-&lt;arch&gt;-&lt;ros-distro&gt;</code> reference repository-mode
-  <code>./openadkit</code> looks up (for example <code>planning-control-amd64-humble</code>), so no
-  <code>--set</code> overrides are needed. The arch segment follows the build host; when
-  cross-building for another platform, set the tags with <code>--set</code>. To use
-  different tags, set the <code>*_IMAGE</code> variables in <code>config.local.env</code>.</li>
-<li>For Jazzy, build with <code>ROS_DISTRO=jazzy docker buildx bake ...</code> and run with
-  <code>./openadkit run --ros-distro jazzy ...</code>; the tag suffix follows the build.</li>
-<li>Group <code>planning</code> matches this walkthrough on amd64 and arm64. Group <code>component</code>
-  also builds <code>carla-interface</code> and <code>sensing-perception-cuda</code>, which are
-  amd64-only.</li>
+<li><code>--load</code> puts the images in the local Docker store; without it, Bake only
+  fills the build cache.</li>
+<li>Local builds are tagged <code>&lt;target&gt;-&lt;arch&gt;-&lt;ros-distro&gt;</code> (for example
+  <code>planning-control-amd64-humble</code>), which is the tag <code>./openadkit</code> looks up in a
+  source checkout. The arch follows the build host; when cross-building, set tags
+  with <code>--set &lt;target&gt;.tags=...</code>. To use other images, set the <code>*_IMAGE</code>
+  variables in <code>config.local.env</code>.</li>
+<li>For Jazzy, build with <code>ROS_DISTRO=jazzy</code> and run with <code>--ros-distro jazzy</code>.</li>
 </ul>
-<h3 id="build-targets-reference">Build Targets (Reference)<a class="headerlink" href="#build-targets-reference" title="Permanent link">#</a></h3>
-<p>Pass a group or target name to build only that part of the graph. Local builds
-resolve cross-stage references within a single Bake graph.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Build everything (universe-common + all components)</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl
-
-<span class="c1"># Build only the universe-common intermediate</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>universe-common
-
-<span class="c1"># Build the component group</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component
-
-<span class="c1"># Build a single component</span>
-docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>--load<span class="w"> </span>sensing-perception
+<p>Other useful targets:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w">                                </span><span class="c1"># everything</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component<span class="w">                      </span><span class="c1"># all components</span>
+docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>--load<span class="w"> </span>sensing-perception<span class="w">      </span><span class="c1"># one image</span>
 </code></pre></div>
-<p>Override the tags of any target with <code>--set &lt;target&gt;.tags=...</code>.</p>
 <h3 id="build-variables">Build Variables<a class="headerlink" href="#build-variables" title="Permanent link">#</a></h3>
-<p>The Bake file exposes a few variables, overridable via environment variables:</p>
 <table>
 <thead>
 <tr>
@@ -2412,7 +2282,7 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 </tr>
 <tr>
 <td><code>UPSTREAM_TAG</code></td>
-<td>Pins the upstream Autoware release (e.g. <code>1.8.0</code>). Empty pulls the plain <code>&lt;name&gt;-&lt;distro&gt;</code> multi-arch tag — handy for local experiments, not for reproducible builds.</td>
+<td>Upstream Autoware release to build on (e.g. <code>1.8.0</code>). Empty uses the moving <code>&lt;name&gt;-&lt;distro&gt;</code> tag, which is not reproducible.</td>
 <td><code>""</code></td>
 </tr>
 <tr>
@@ -2422,190 +2292,56 @@ docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w">
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><span class="c1"># Reuse the ref selected for the Autoware checkout above</span>
-<span class="nv">ROS_DISTRO</span><span class="o">=</span>humble<span class="w"> </span><span class="nv">UPSTREAM_TAG</span><span class="o">=</span><span class="s2">"</span><span class="nv">$AUTOWARE_REF</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>docker<span class="w"> </span>buildx<span class="w"> </span>bake<span class="w"> </span>-f<span class="w"> </span>components/docker-bake.hcl<span class="w"> </span>component
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Tags and contexts</p>
-<p>Local builds get <code>LOCAL_IMAGE</code>-based tags — including the <code>&lt;target&gt;-&lt;arch&gt;-&lt;ros-distro&gt;</code> reference repository mode looks up — and <code>target:</code>/upstream context defaults from the Bake file. CI sets <code>LOCAL_IMAGE=""</code> so <code>docker/metadata-action</code> is the only tag source, and overrides each context to an already-pushed GHCR tag so groups can build in separate jobs. Locally, override tags with <code>--set &lt;target&gt;.tags=...</code>.</p>
-</div>
 <h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">#</a></h2>
-<p>CI builds every target through
-<a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml"><code>.github/workflows/build-all-images.yaml</code></a>,
-which runs the same Bake file across a build matrix. The matrix (targets,
-platforms, ROS distros) comes from
+<p><a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml"><code>build-all-images.yaml</code></a>
+builds every target with the same Bake file. The build matrix comes from
 <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json"><code>.github/image-inventory.json</code></a>,
-the source of truth for what gets built and on which architectures.</p>
-<p>Jobs run in stages — <code>prepare</code>, then <code>build-common</code> and <code>build-components</code>, then
-<code>build-carla-interface</code> (which needs <code>simulator</code>) — so each layer is pushed
-before the layer that depends on it. Most targets build for
-<code>{humble, jazzy} × {amd64, arm64}</code>; <code>sensing-perception-cuda</code> and
-<code>carla-interface</code> are amd64-only. A final <code>create-manifests</code> job stitches the
-per-arch tags into multi-arch manifests.</p>
-<p>If a <strong>scheduled</strong> build fails, a <code>notify-failure</code> job opens a GitHub issue with
-the run URL. Push and manual runs do not create failure issues.</p>
+the source of truth for which images are built and for which architectures.</p>
+<p>Jobs run in dependency order: <code>prepare</code>, then <code>build-common</code>, then
+<code>build-components</code>, then <code>build-carla-interface</code>. Most images build for Humble and
+Jazzy on amd64 and arm64. <code>create-manifests</code> then combines the per-arch images
+into multi-arch tags. CI disables the local tags (<code>LOCAL_IMAGE=""</code>) and tags
+images through <code>docker/metadata-action</code>. A failed scheduled build opens a GitHub
+issue.</p>
 <h2 id="release-process">Release Process<a class="headerlink" href="#release-process" title="Permanent link">#</a></h2>
-<p>Releases are promoted from existing CI builds instead of being rebuilt, so the
-images validated in CI are the images that ship.</p>
+<p>Releases promote an existing CI build; nothing is rebuilt.</p>
 <h3 id="before-you-release">Before You Release<a class="headerlink" href="#before-you-release" title="Permanent link">#</a></h3>
-<p>Before running the release pipeline, verify:</p>
 <ul>
-<li><strong><code>vars.UPSTREAM_TAG</code></strong> is set in the repository or organization Variables on
-  GitHub. It selects the default Autoware source release (e.g. <code>1.8.0</code>). A manual
-  <code>autoware_ref</code> input overrides it; the workflow then derives and pins the
-  matching base-image release.</li>
-<li><strong>GHCR packages</strong> accept pushes from CI:
-  <code>ghcr.io/autowarefoundation/openadkit</code>,
-  <code>ghcr.io/autowarefoundation/openadkit-common</code>, and the build cache repo
-  <code>ghcr.io/autowarefoundation/openadkit-buildcache</code>.</li>
-<li><strong><code>secrets.RELEASE_TOKEN</code></strong> is set when promoting a build commit older than
-  later workflow changes. It needs repository Contents and Workflows write
-  access; otherwise the workflow uses <code>GITHUB_TOKEN</code>.</li>
-<li><strong>A successful build</strong> exists: <code>build-all-images</code> completed on <code>main</code> from an
-  exact Autoware release tag or full SHA. Stable releases require a tag; SHA
-  builds can only be promoted to pre-releases, and branch builds cannot be
-  promoted at all. The build summary shows the resulting <code>build_tag</code>.</li>
-<li><strong>A successful scan</strong> exists: <code>scan-images</code> completed and <strong>passed</strong> for that
-  <code>build_tag</code>.</li>
+<li><strong><code>vars.UPSTREAM_TAG</code></strong> is set in the repository or organization variables. It
+  selects the Autoware release to build; the workflow's <code>autoware_ref</code> input
+  overrides it.</li>
+<li><strong>GHCR packages</strong> accept pushes from CI: <code>openadkit</code>, <code>openadkit-common</code>, and
+  <code>openadkit-buildcache</code> under <code>ghcr.io/autowarefoundation/</code>.</li>
+<li><strong><code>secrets.RELEASE_TOKEN</code></strong> (Contents and Workflows write) is set when promoting
+  a build commit older than later workflow changes; otherwise <code>GITHUB_TOKEN</code> is
+  used.</li>
+<li><strong>A successful build</strong> of <code>build-all-images</code> exists on <code>main</code> from an exact
+  Autoware release tag. Builds from a full SHA can only become pre-releases. The
+  build summary shows its <code>build_tag</code>.</li>
+<li><strong>A passing scan</strong> of <code>scan-images</code> exists for that <code>build_tag</code>.</li>
 </ul>
-<h3 id="workflow-steps">Workflow Steps<a class="headerlink" href="#workflow-steps" title="Permanent link">#</a></h3>
-<p>The release workflow (<code>.github/workflows/release.yaml</code>) runs seven jobs in
-sequence:</p>
-<ol>
-<li><strong>validate</strong> — Downloads build metadata and scan results, then runs 16 validation gates before any images are tagged.</li>
-<li><strong>package-bundles</strong> — Generates the immutable release plan and packages the unified Humble/Jazzy runtime bundle.</li>
-<li><strong>release-tag</strong> — Creates or verifies the Git tag, failing closed on API errors or a conflicting commit.</li>
-<li><strong>prepare-github-release</strong> — Creates a workflow-owned draft, or verifies an existing published release against the metadata, notes, target SHA, and assets.</li>
-<li><strong>release-images</strong> — Promotes immutable image tags, rechecks the latest-stable policy, then updates mutable aliases only if the policy is unchanged.</li>
-<li><strong>release-github</strong> — Revalidates the exact draft release ID and publishes it after image promotion succeeds.</li>
-<li><strong>deploy-docs</strong> — Publishes the current <code>main</code> tip when the release updates stable aliases.</li>
-</ol>
+<h3 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">#</a></h3>
+<p>Run <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a>
+with the version and <code>build_tag</code>. Its jobs run in order:</p>
 <pre class="mermaid"><code>flowchart LR
-    A[Build All Images] --&gt; S[Scan Images]
-    S --&gt; V[validate]
-    V --&gt; P[package-bundles]
-    P --&gt; T[release-tag]
-    T --&gt; D[prepare-github-release]
-    D --&gt; I[release-images]
-    I --&gt; G[release-github]
-    G --&gt; W[deploy-docs]</code></pre>
-<h4 id="validation-gates">Validation Gates<a class="headerlink" href="#validation-gates" title="Permanent link">#</a></h4>
-<p>Before any image is tagged, the <code>validate</code> job (<code>.github/scripts/validate_release.sh</code>) checks:</p>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Gate</th>
-<th>What it verifies</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td><strong>Version format</strong></td>
-<td><code>vX.Y.Z</code> for stable, <code>vX.Y.Z-prerelease</code> for pre-release</td>
-</tr>
-<tr>
-<td>2</td>
-<td><strong>Build tag format</strong></td>
-<td>Must match <code>RUN_ID-RUN_ATTEMPT</code></td>
-</tr>
-<tr>
-<td>3</td>
-<td><strong>Source branch</strong></td>
-<td>Release must run from <code>main</code></td>
-</tr>
-<tr>
-<td>4</td>
-<td><strong>Manifest consistency</strong></td>
-<td><code>default_ros_distro</code> and the component image prefix must match <code>openadkit.json</code></td>
-</tr>
-<tr>
-<td>5</td>
-<td><strong>Alias policy</strong></td>
-<td>If a newer stable release already exists, latest aliases won't be updated</td>
-</tr>
-<tr>
-<td>6</td>
-<td><strong>Build provenance</strong></td>
-<td>The build tag must reference a completed, successful <code>build-all-images</code> run on <code>main</code></td>
-</tr>
-<tr>
-<td>7</td>
-<td><strong>Build age</strong></td>
-<td>Build must be no more than 90 days old</td>
-</tr>
-<tr>
-<td>8</td>
-<td><strong>Scan results</strong></td>
-<td>A passing <code>scan-images</code> run must exist for the build; scan metadata is validated against the build metadata</td>
-</tr>
-<tr>
-<td>9</td>
-<td><strong>Metadata schema</strong></td>
-<td>15+ fields in <code>build-metadata.json</code> are validated (types, formats, SHA256 lengths)</td>
-</tr>
-<tr>
-<td>10</td>
-<td><strong>File integrity</strong></td>
-<td>SHA256 of <code>autoware-lock.repos</code>, <code>image-inventory.json</code>, and <code>upstream-images.json</code> must match the metadata</td>
-</tr>
-<tr>
-<td>11</td>
-<td><strong>Autoware revision</strong></td>
-<td>Stable releases require an exact Autoware release tag matching the base version; pre-releases also accept a full SHA</td>
-</tr>
-<tr>
-<td>12</td>
-<td><strong>Inventory coverage</strong></td>
-<td>Every image in <code>image-inventory.json</code> must be present in the build; no missing or extra images</td>
-</tr>
-<tr>
-<td>13</td>
-<td><strong>Upstream coverage</strong></td>
-<td>Every required Autoware base is recorded and consumed as an immutable manifest digest</td>
-</tr>
-<tr>
-<td>14</td>
-<td><strong>Scan coverage</strong></td>
-<td>Every image digest and platform must have a scan result</td>
-</tr>
-<tr>
-<td>15</td>
-<td><strong>Registry integrity</strong></td>
-<td>Build images must still exist in GHCR with matching digests; confirmed missing tags are distinguished from retried transient and fail-closed registry errors</td>
-</tr>
-<tr>
-<td>16</td>
-<td><strong>Git tag</strong></td>
-<td>The release tag must not already exist at a different commit</td>
-</tr>
-</tbody>
-</table>
-<p>If all 16 gates pass, the workflow proceeds to tag promotion.</p>
-<h4 id="tag-promotion">Tag Promotion<a class="headerlink" href="#tag-promotion" title="Permanent link">#</a></h4>
-<p>The <code>release-images</code> job creates every tag alias directly from the promoted
-digest — there is no sequential retagging. Alias names and their conditions are
-documented in
-<a href="../../getting-started/container-images/#how-releases-are-tagged">How Releases Are Tagged</a>.</p>
-<h4 id="github-release">GitHub Release<a class="headerlink" href="#github-release" title="Permanent link">#</a></h4>
-<ul>
-<li><strong><code>prepare-github-release</code></strong> creates a workflow-owned draft (or verifies an
-  existing published release) with notes, provenance, the immutable release
-  plan, and one unified dual-distro runtime bundle.</li>
-<li><strong><code>release-github</code></strong> revalidates that draft and publishes it only after
-  <code>release-images</code> succeeds.</li>
-</ul>
-<h3 id="source-of-truth">Source of Truth<a class="headerlink" href="#source-of-truth" title="Permanent link">#</a></h3>
-<p>These artifacts are the canonical reference for release validation:</p>
-<ul>
-<li><strong>Build metadata</strong> — CI run logs and artifact manifests</li>
-<li><strong><code>upstream-images.json</code></strong> — Exact Autoware base manifests consumed by the build</li>
-<li><strong>Scan metadata</strong> — CVE scan results</li>
-<li><strong><code>.github/image-inventory.json</code></strong> — Canonical inventory of all published images and their tags</li>
-<li><strong><code>release-plan.json</code></strong> — Immutable release refs, aliases, asset inventory, deployment checksums, and dual-distro runtime context</li>
-</ul>
+    V[validate] --&gt; P[package-bundles] --&gt; T[release-tag] --&gt; D[prepare-github-release] --&gt; I[release-images] --&gt; G[release-github] --&gt; W[deploy-docs]</code></pre>
+<ol>
+<li><strong>validate</strong>: runs the release gates in
+   <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/scripts/validate_release.sh"><code>validate_release.sh</code></a>
+   (version format, build provenance and age, scan results, metadata and file
+   integrity, image coverage, registry digests, Git tag). Nothing is tagged if a
+   gate fails.</li>
+<li><strong>package-bundles</strong>: writes the immutable release plan and the runtime bundle
+   for both distros.</li>
+<li><strong>release-tag</strong>: creates or verifies the Git tag.</li>
+<li><strong>prepare-github-release</strong>: creates a draft release with notes and assets.</li>
+<li><strong>release-images</strong>: creates the release tags and, for stable releases, the
+   moving aliases (see <a href="../../getting-started/container-images/#tag-reference">Tag Reference</a>).</li>
+<li><strong>release-github</strong>: publishes the draft.</li>
+<li><strong>deploy-docs</strong>: republishes the docs when the stable aliases moved.</li>
+</ol>
+<p>The release plan (<code>release-plan.json</code>) attached to each GitHub Release records
+the exact image digests, aliases, assets, and checksums of that release.</p>
 
 
 

@@ -1892,10 +1892,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#shared-services" class="md-nav__link">
+  <a href="#running-a-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared Services
+        Running a Deployment
       
     </span>
   </a>
@@ -1928,14 +1928,13 @@
 
 
 <h1 id="deployments">Deployments<a class="headerlink" href="#deployments" title="Permanent link">#</a></h1>
-<p>A deployment combines Open AD Kit images, environment files, and Docker Compose
-configuration for a specific task.</p>
+<p>A deployment is a ready-to-run Autoware stack for one task. New users should
+start with Planning Simulation.</p>
 <table>
 <thead>
 <tr>
 <th>Deployment</th>
 <th>Purpose</th>
-<th>Topology</th>
 <th>GPU</th>
 </tr>
 </thead>
@@ -1943,68 +1942,50 @@ configuration for a specific task.</p>
 <tr>
 <td><a href="planning-simulation/">Planning Simulation</a></td>
 <td>Plan and follow a route on a demo map</td>
-<td>Single host</td>
 <td>No</td>
 </tr>
 <tr>
 <td><a href="scenario-simulation/">Scenario Simulation</a></td>
-<td>Execute predefined traffic scenarios</td>
-<td>Single host</td>
+<td>Run predefined traffic scenarios</td>
 <td>No</td>
 </tr>
 <tr>
 <td><a href="logging-simulation/">Logging Simulation</a></td>
-<td>Replay sensor data through sensing, perception, and localization</td>
-<td>Single host</td>
+<td>Replay recorded sensor data through sensing, perception, and localization</td>
 <td>Recommended</td>
 </tr>
 <tr>
 <td><a href="carla-simulation/">CARLA Simulation</a></td>
-<td>Drive a CARLA ego vehicle in closed loop</td>
-<td>Single host</td>
+<td>Drive a CARLA vehicle in closed loop</td>
 <td>Required</td>
 </tr>
 <tr>
 <td><a href="zenoh-bridge/">Zenoh Bridge</a></td>
-<td>Separate edge compute from visualization and control</td>
-<td>Single Compose project</td>
-<td>Varies</td>
+<td>Split Autoware and visualization into separate ROS domains</td>
+<td>No</td>
 </tr>
 </tbody>
 </table>
-<p>New users should start with Planning Simulation. The CLI and release bundle
-support Planning, Scenario, Logging, and CARLA Simulation. Zenoh remains a
-standalone source-checkout deployment.</p>
-<h2 id="shared-services">Shared Services<a class="headerlink" href="#shared-services" title="Permanent link">#</a></h2>
-<p>Planning, Scenario, Logging, and CARLA Simulation select the services they need
-from <code>deployments/shared/services/</code> using Docker Compose <code>include</code>. Each shared
-file defines one service. The deployment's Compose file defines dependencies,
-overrides, and deployment-only services; it is the source of truth for the
-service set.</p>
-<p>Each curated deployment carries a <code>deployment.json</code> manifest and one complete
-<code>config.env</code> for Compose interpolation. Optional GPU mode also loads
-<code>config.gpu.env</code> so model flags can change without copying a shared service
-command.</p>
+<h2 id="running-a-deployment">Running a Deployment<a class="headerlink" href="#running-a-deployment" title="Permanent link">#</a></h2>
+<p>Complete the <a href="../getting-started/">Quickstart</a> setup first.</p>
 <p>Commands on this page are shown as installed by the release installer. From a
 source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>list
-openadkit<span class="w"> </span>validate<span class="w"> </span>planning-simulation
 openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation
 openadkit<span class="w"> </span>status<span class="w"> </span>planning-simulation
 openadkit<span class="w"> </span>logs<span class="w"> </span>planning-simulation<span class="w"> </span>--follow
 openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 </code></pre></div>
-<p>Add <code>--ros-distro jazzy</code> to <code>validate</code>, <code>fetch</code>, or <code>run</code> to select Jazzy;
-Humble is the default. CARLA is Humble-only and requires <code>--gpu</code>. <code>status</code>,
-<code>logs</code>, and <code>stop</code> take neither flag — they read the running deployment.</p>
-<p>The release bundle vendors the curated deployments and shared assets. Local
-settings belong in ignored <code>config.local.env</code>; release component images remain
-pinned. <code>shared/runtime.env</code> is loaded inside containers via <code>env_file:</code>.</p>
-<p>Zenoh does not have a runtime manifest. Use its source-checkout launcher
-scripts documented on its deployment page.</p>
-<p>See <a href="custom-deployment/">Custom Deployment</a> to compose a different stack and
-<a href="../getting-started/container-images/">Container Images &amp; Versioning</a> for tag
-selection.</p>
+<ul>
+<li>Add <code>--ros-distro jazzy</code> to <code>validate</code>, <code>fetch</code>, or <code>run</code> to select Jazzy;
+  Humble is the default.</li>
+<li>Add <code>--gpu</code> for GPU mode. CARLA requires it and is Humble-only.</li>
+<li>Put local settings in <code>config.local.env</code>; see
+  <a href="../getting-started/cli/#configuration">Configuration</a>.</li>
+</ul>
+<p>The Zenoh bridge is not managed by the CLI. It runs from a source checkout with
+its own scripts; see its page.</p>
+<p>To build your own stack, see <a href="custom-deployment/">Custom Deployment</a>.</p>
 
 
 

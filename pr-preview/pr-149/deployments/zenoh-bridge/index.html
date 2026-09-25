@@ -1892,17 +1892,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architecture
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1921,34 +1910,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Run">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#full-project" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Full Project
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#selected-groups" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selected Groups
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2000,11 +1961,9 @@
 
 
 <h1 id="zenoh-bridge">Zenoh Bridge<a class="headerlink" href="#zenoh-bridge" title="Permanent link">#</a></h1>
-<p>Bridge an edge Autoware domain to a separate visualization and control domain
-inside one Compose project. The edge runs Autoware and simulation; the cloud
-side runs browser-based RViz2. Zenoh carries selected ROS 2 topics between the
-isolated domains without publishing its transport port to the host.</p>
-<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">#</a></h2>
+<p>Split Autoware and its visualization into separate ROS 2 domains and connect
+them with Zenoh. The edge side runs Autoware and the simulator; the cloud side
+runs browser-based RViz2. Both run on one host in one Compose project.</p>
 <pre class="mermaid"><code>flowchart LR
     subgraph Edge[Edge ROS_DOMAIN_ID 0]
         A[Autoware] --&gt; EB[Zenoh Client]
@@ -2014,20 +1973,15 @@ isolated domains without publishing its transport port to the host.</p>
         CB[Zenoh Router] --&gt; V[RViz2 / noVNC]
     end
     EB --&gt;|Internal TCP 7448| CB</code></pre>
-<p>The separate ROS domain IDs prevent native DDS cross-traffic. Configure topic
-filters and namespaces in <code>config/zenoh-bridge-ros2dds.json5</code>.</p>
+<p>This deployment needs a source checkout. It is not part of the release bundle
+and is not managed by <code>openadkit run</code>.</p>
 <h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>./openadkit<span class="w"> </span>setup<span class="w"> </span>--verify
-./openadkit<span class="w"> </span>fetch<span class="w"> </span>scenario-simulation
+<p>From the repository root, after the <a href="../../getting-started/">Quickstart</a>
+setup:</p>
+<div class="highlight"><pre><span></span><code>./openadkit<span class="w"> </span>fetch<span class="w"> </span>scenario-simulation<span class="w">   </span><span class="c1"># the Kashiwanoha map</span>
 <span class="nb">cd</span><span class="w"> </span>deployments/zenoh-bridge
 </code></pre></div>
-<p>Activate the Docker group membership added by <code>openadkit setup</code> before running
-Docker without <code>sudo</code>. Either log out and back in, or run:</p>
-<div class="highlight"><pre><span></span><code>newgrp<span class="w"> </span>docker
-</code></pre></div>
-<p>This standalone deployment requires a source checkout and is not included in
-the unified release bundle or manifest-driven CLI. Override these in the
-environment or <code>config.env</code> before invoking the helpers:</p>
+<p>Set these in the shell or in <code>config.env</code>:</p>
 <table>
 <thead>
 <tr>
@@ -2044,36 +1998,27 @@ environment or <code>config.env</code> before invoking the helpers:</p>
 </tr>
 <tr>
 <td><code>REMOTE_PASSWORD</code></td>
-<td>Required noVNC password</td>
+<td>noVNC password</td>
 <td><code>openadkit</code></td>
 </tr>
 </tbody>
 </table>
-<p>The deployment uses wall time and does not bridge <code>/clock</code>.</p>
-<div class="admonition note">
-<p class="admonition-title">Internal Zenoh transport</p>
-<p>TCP 7448 has no authentication or encryption, so it remains inside the
-dedicated Compose network and is not published to the host.</p>
-</div>
+<p>Topic filters and namespaces are in <code>config/zenoh-bridge-ros2dds.json5</code>.</p>
 <h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h2>
-<h3 id="full-project">Full Project<a class="headerlink" href="#full-project" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>up<span class="w"> </span>-d
-./edge.sh<span class="w"> </span>up<span class="w"> </span>-d
+./edge.sh<span class="w"> </span>up<span class="w"> </span>-d<span class="w">            </span><span class="c1"># add --no-sim to skip the scenario simulator</span>
 </code></pre></div>
-<h3 id="selected-groups">Selected Groups<a class="headerlink" href="#selected-groups" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>up<span class="w"> </span>-d
-./edge.sh<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--no-sim
-</code></pre></div>
-<p>The edge helper starts Autoware, the edge bridge, and Scenario Simulator unless
-<code>--no-sim</code> is selected. The cloud helper starts the cloud bridge and visualizer.</p>
-<p>Open the visualizer at <code>https://localhost:6081/vnc.html</code> and use
+<p>Open the visualizer at <code>https://localhost:6081/vnc.html</code> and sign in with
 <code>REMOTE_PASSWORD</code>.</p>
+<p>The Zenoh link (TCP 7448) has no authentication or encryption, so it stays
+inside the Compose network and is not published to the host. The bridge does not
+forward <code>/clock</code>; both sides use wall time.</p>
 <h2 id="teleoperation">Teleoperation<a class="headerlink" href="#teleoperation" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--with-teleop
 ./edge.sh<span class="w"> </span>up<span class="w"> </span>-d
 ./run_teleop.sh
 </code></pre></div>
-<p>Use <code>./edge.sh up -d --no-sim</code> to run Autoware without the scenario simulator.</p>
+<p>Start the edge with <code>--no-sim</code> to drive Autoware without the scenario simulator.</p>
 <table>
 <thead>
 <tr>
@@ -2092,7 +2037,7 @@ dedicated Compose network and is not published to the host.</p>
 </tr>
 <tr>
 <td><code>Z</code></td>
-<td>Toggle the operation mode between <code>STOP</code> and the configured <code>operator_mode</code> (<code>REMOTE</code> by default)</td>
+<td>Toggle between <code>STOP</code> and the configured <code>operator_mode</code> (<code>REMOTE</code> by default)</td>
 </tr>
 <tr>
 <td><code>X</code> / <code>C</code> / <code>V</code></td>
@@ -2104,7 +2049,7 @@ dedicated Compose network and is not published to the host.</p>
 </tr>
 <tr>
 <td><code>R</code></td>
-<td>Cycle the configured initial-pose presets and seed the pose</td>
+<td>Cycle the initial-pose presets and set the pose</td>
 </tr>
 <tr>
 <td><code>Space</code></td>
@@ -2116,23 +2061,16 @@ dedicated Compose network and is not published to the host.</p>
 </tr>
 </tbody>
 </table>
-<p>For a fresh <code>--no-sim</code> session, press <code>R</code> to cycle the initial-pose presets,
-<code>Z</code> to leave <code>STOP</code>, choose a gear with <code>X</code> or <code>C</code>, select the drive mode with
-<code>M</code>, then use the movement keys.</p>
+<p>In a <code>--no-sim</code> session: press <code>R</code> to set a pose, <code>Z</code> to leave <code>STOP</code>, choose a gear
+with <code>X</code> or <code>C</code>, select a drive mode with <code>M</code>, then steer and accelerate.</p>
 <h2 id="stop-and-troubleshoot">Stop and Troubleshoot<a class="headerlink" href="#stop-and-troubleshoot" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>./cloud.sh<span class="w"> </span>ps
-./edge.sh<span class="w"> </span>ps
+<div class="highlight"><pre><span></span><code>./edge.sh<span class="w"> </span>logs
 ./cloud.sh<span class="w"> </span>logs
-./edge.sh<span class="w"> </span>logs
 ./edge.sh<span class="w"> </span>down
 ./cloud.sh<span class="w"> </span>down
 </code></pre></div>
-<p>If a bridge is not ready, inspect the helper logs. Host port <strong>6081</strong> must be
-free; Zenoh ports <strong>7447</strong> and <strong>7448</strong> stay inside the Compose networks.
-Re-fetch the map from the repository root with
-<code>./openadkit fetch scenario-simulation --force</code>.</p>
-<p>The <code>autoware</code> service uses the digest-pinned upstream image declared directly
-in <code>docker-compose.yaml</code>.</p>
+<p>Host port 6081 must be free. If the map is missing, run
+<code>./openadkit fetch scenario-simulation --force</code> from the repository root.</p>
 
 
 

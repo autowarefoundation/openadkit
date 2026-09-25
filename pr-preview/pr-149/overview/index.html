@@ -2072,7 +2072,6 @@
 </div>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h2>
 <p>Open AD Kit runs Autoware as a pipeline of containerized components. Each container handles one stage of autonomous driving, and the stages communicate over ROS 2 DDS on the host network.</p>
-<p>Single-host deployments bind CycloneDDS to loopback by default. Set <code>CYCLONEDDS_NETWORK_INTERFACE</code> to an exact LAN or VPN interface name only when cross-host DDS is required. <code>ROS_DOMAIN_ID</code> separates domains but does not provide authentication or encryption.</p>
 <ol>
 <li><a href="../components/#sensing-perception"><strong>Sensing</strong></a> captures and preprocesses raw sensor data (LiDAR, camera, IMU).</li>
 <li><a href="../components/#sensing-perception"><strong>Perception</strong></a> detects and tracks objects, traffic lights, and drivable space.</li>
@@ -2082,7 +2081,7 @@
 <li><a href="../components/#planning-control"><strong>Control</strong></a> converts that trajectory into throttle, brake, and steering commands.</li>
 <li><a href="../components/#vehicle-and-system"><strong>Vehicle System</strong></a> bridges those commands to the actual vehicle or simulator.</li>
 </ol>
-<p>A <strong>deployment</strong> selects shared Compose services and defines their dependencies and task-specific settings. Planning and Scenario Simulation use the dummy simulator; Logging Simulation uses sensing, perception, and localization for recorded sensor data. Autoware Safety Island integrates with the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services. See <a href="../components/">Components</a> and <a href="../deployments/">Deployments</a>.</p>
+<p>A <a href="../deployments/">deployment</a> runs the subset of these stages a task needs. Autoware Safety Island joins the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services.</p>
 <h2 id="key-terms">Key Terms<a class="headerlink" href="#key-terms" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -2102,11 +2101,11 @@
 </tr>
 <tr>
 <td><strong>Manifest</strong></td>
-<td>The <code>deployment.json</code> file that tells the CLI how to run a deployment: services, requirements, and data.</td>
+<td>The <code>deployment.json</code> file that tells the CLI how to run a deployment: requirements, data downloads, and one-shot services.</td>
 </tr>
 <tr>
 <td><strong>Overlay</strong></td>
-<td>An additional Compose file that changes selected service settings, such as Logging Simulation's GPU configuration.</td>
+<td>The GPU Compose file and <code>config.gpu.env</code> that <code>--gpu</code> adds on top of a deployment, such as Logging Simulation's CUDA perception.</td>
 </tr>
 <tr>
 <td><strong>Tag alias</strong></td>

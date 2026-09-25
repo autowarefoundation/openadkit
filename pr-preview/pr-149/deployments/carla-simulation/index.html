@@ -1903,17 +1903,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Setup
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1925,10 +1914,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#access-the-visualizer" class="md-nav__link">
+  <a href="#open-the-visualizer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Access the Visualizer
+        Open the Visualizer
       
     </span>
   </a>
@@ -1936,10 +1925,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#stop" class="md-nav__link">
+  <a href="#stop-and-recover" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stop
+        Stop and Recover
       
     </span>
   </a>
@@ -1974,63 +1963,39 @@
 <h1 id="carla-simulation">CARLA Simulation<a class="headerlink" href="#carla-simulation" title="Permanent link">#</a></h1>
 <p>Run the full modular Autoware stack against CARLA 0.9.16 in closed loop.</p>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
-<p>Host (no ROS install required):</p>
 <ul>
-<li>amd64 and Ubuntu 22.04</li>
-<li>Docker with NVIDIA Container Toolkit</li>
-<li>NVIDIA GPU and Vulkan ICD at <code>/usr/share/vulkan/icd.d/nvidia_icd.json</code></li>
-<li>Host X access only for optional windowed rendering; offscreen mode is default</li>
+<li>amd64 host with Ubuntu 22.04 (CARLA 0.9.16 is not validated on 24.04)</li>
+<li>NVIDIA GPU with the Vulkan ICD at <code>/usr/share/vulkan/icd.d/nvidia_icd.json</code></li>
+<li>ROS 2 Humble images; this deployment does not support Jazzy</li>
 </ul>
-<p>Container images use ROS 2 Humble (including the default
-<code>sensing-perception-cuda</code> Autoware image). CARLA 0.9.16 uses Unreal Engine 4.26
-and is not validated on Ubuntu 24.04.</p>
-<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
-<p>Commands on this page are shown as installed by the release installer. From a
-source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
-<p>Install Docker and the NVIDIA toolkit once:</p>
+<p>Install Docker and the NVIDIA toolkit once, as described in the
+<a href="../../getting-started/">Quickstart</a>, with GPU support:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>setup<span class="w"> </span>--gpu<span class="w"> </span>--verify
 </code></pre></div>
-<p>Activate the Docker group membership added by <code>openadkit setup</code> before running
-Docker without <code>sudo</code>. Either log out and back in, or run:</p>
-<div class="highlight"><pre><span></span><code>newgrp<span class="w"> </span>docker
-</code></pre></div>
-<p>CARLA is a curated CLI deployment in both installed and source-checkout
-runtimes. It is Humble-only and requires <code>--gpu</code>. Setup configures NVIDIA and
-the DDS UDP buffers; <code>run</code> downloads the Town01 map.</p>
 <h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h2>
+<p>Commands on this page are shown as installed by the release installer. From a
+source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>carla-simulation<span class="w"> </span>--gpu
 </code></pre></div>
-<p><code>run</code> checksum-validates the Town01 assets, starts CARLA and the modular stack,
-and waits for Compose readiness. If startup fails after containers are created,
-use the stop command below to release their GPU and host resources.</p>
-<p><code>config/sensor_mapping.yaml</code> enables LiDAR, IMU, and GNSS by default. Camera
-entries are available but commented out.</p>
-<h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
-<p>Open your browser and navigate to:</p>
-<div class="highlight"><pre><span></span><code>https://localhost:6080/vnc.html
-</code></pre></div>
-<p>Use the default password <strong><code>openadkit</code></strong>. The connection uses a self-signed certificate; dismiss the browser privacy warning to continue.</p>
-<div class="admonition tip">
-<p class="admonition-title">Remote Access</p>
-<p>The visualizer runs under <code>network_mode: host</code>, so <code>ports:</code> is ignored and the loopback bind (<code>127.0.0.1:6080</code>) lives in the visualizer entrypoint. To reach noVNC from another machine, either forward the port over SSH:</p>
+<p><code>run</code> downloads and verifies the Town01 map, then starts CARLA and the Autoware
+stack. CARLA renders offscreen by default.</p>
+<p><code>config/sensor_mapping.yaml</code> enables LiDAR, IMU, and GNSS. Camera entries are
+available but commented out.</p>
+<h2 id="open-the-visualizer">Open the Visualizer<a class="headerlink" href="#open-the-visualizer" title="Permanent link">#</a></h2>
+<p>Open <code>https://localhost:6080/vnc.html</code>, accept the self-signed certificate, and
+sign in with the default password <strong><code>openadkit</code></strong>. Set your own
+<code>REMOTE_PASSWORD</code> in <code>config.local.env</code>.</p>
+<p>For a remote host, forward the port over SSH and open
+<code>https://localhost:8080/vnc.html</code> locally:</p>
 <div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">8080</span>:localhost:6080<span class="w"> </span>&lt;user&gt;@&lt;host&gt;
-<span class="c1"># then open https://localhost:8080/vnc.html</span>
 </code></pre></div>
-<p>or put a TLS-terminating reverse proxy in front of <code>127.0.0.1:6080</code> and set a
-strong <code>REMOTE_PASSWORD</code>. For manifest-driven deployments, put it in
-ignored <code>config.local.env</code>; standalone deployments document their own
-environment handling. <code>shared/runtime.env</code> is reserved for container ROS/DDS
-variables.
-Editing <code>docker-compose.yaml</code> to add a <code>ports:</code> mapping has no effect under
-host networking.</p>
-</div>
-<p>Set a goal with <strong>2D Goal Pose</strong> and select <strong>Auto</strong> in RViz2.</p>
-<h2 id="stop">Stop<a class="headerlink" href="#stop" title="Permanent link">#</a></h2>
+<p>In RViz2, set a goal with <strong>2D Goal Pose</strong> and select <strong>Auto</strong>.</p>
+<h2 id="stop-and-recover">Stop and Recover<a class="headerlink" href="#stop-and-recover" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>stop<span class="w"> </span>carla-simulation
 </code></pre></div>
-<p>If autonomous mode is unavailable, inspect <code>/system/command_mode/availability</code>
-and <code>/diagnostics_graph/status</code> rather than overriding availability. For common
-Docker, GPU, and visualizer issues, see
+<p>Run <code>stop</code> also after a failed start, to release the GPU. If autonomous mode is
+unavailable, inspect <code>/system/command_mode/availability</code> and
+<code>/diagnostics_graph/status</code>. For other issues, see
 <a href="../../getting-started/troubleshooting/">Troubleshooting</a>.</p>
 
 

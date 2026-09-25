@@ -1879,47 +1879,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-ewaol" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is EWAOL?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1944,25 +1903,19 @@
 
 
 <h1 id="ewaol">EWAOL<a class="headerlink" href="#ewaol" title="Permanent link">#</a></h1>
-<div class="admonition abstract">
-<p>EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It was the original SOAFEE reference implementation, extending cloud-native methods to automotive with an emphasis on real-time execution and deterministic behavior.</p>
-</div>
-<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">#</a></h2>
-<p><span class="oak-badge oak-badge--neutral">Upstream reference</span></p>
 <div class="admonition note">
-<p class="admonition-title">Not a committed Open AD Kit target</p>
-<p>EWAOL is retained as upstream SOAFEE background. Open AD Kit may explore
-related Arm Automotive Solutions / RD-1 AE FVP paths later, but there is no
-committed target or validated deployment today, and no EWAOL deployment
-assets in this repository — this page points to the upstream project only.</p>
+<p class="admonition-title">Not an Open AD Kit target</p>
+<p>This page is background only. There are no EWAOL assets in this repository
+and no validated EWAOL deployment.</p>
 </div>
-<h2 id="what-is-ewaol">What is EWAOL?<a class="headerlink" href="#what-is-ewaol" title="Permanent link">#</a></h2>
-<p>EWAOL is delivered via the <code>meta-ewaol</code> Yocto layer and provides a container-native edge runtime (Docker and K3s, with optional Xen virtualization for mixed-criticality separation). It offers runtime parity between edge hardware (ADLINK AVA with Arm Neoverse N1) and cloud instances (AWS Graviton), making it suited to hybrid development and deployment workflows.</p>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h2>
-<p>For installation and runtime instructions, see the upstream project:</p>
+<p>EWAOL (Edge Workload Abstraction and Orchestration Layer) is Arm's
+container-centric Yocto framework and the original SOAFEE reference
+implementation. It is delivered as the <code>meta-ewaol</code> layer and provides Docker and
+K3s, with optional Xen virtualization, on edge hardware and cloud instances.</p>
 <ul>
-<li><a href="https://gitlab.com/soafee/ewaol/meta-ewaol">meta-ewaol source (GitLab, archived — read-only)</a></li>
-<li><a href="https://ewaol.docs.arm.com/en/latest/">EWAOL documentation</a> — development is now hosted by the SOAFEE SIG</li>
+<li><a href="https://gitlab.com/soafee/ewaol/meta-ewaol">meta-ewaol source (GitLab, archived)</a></li>
+<li><a href="https://ewaol.docs.arm.com/en/latest/">EWAOL documentation</a>: development is now
+  hosted by the SOAFEE SIG</li>
 </ul>
 
 
@@ -2001,7 +1954,7 @@ assets in this repository — this page points to the upstream project only.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../autosd/planning-simulator/" class="md-footer__link md-footer__link--prev" aria-label="Previous: AutoSD + Planning + Simulator">
+          <a href="../autosd/planning-simulator/" class="md-footer__link md-footer__link--prev" aria-label="Previous: AutoSD Planning Simulator">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2011,7 +1964,7 @@ assets in this repository — this page points to the upstream project only.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                AutoSD + Planning + Simulator
+                AutoSD Planning Simulator
               </div>
             </div>
           </a>

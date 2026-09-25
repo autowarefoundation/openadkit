@@ -229,6 +229,26 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
     return configured
 
 
+def create_writable_mounts(deployment: Deployment, selection: Selection) -> None:
+    """Create missing writable bind sources as the user.
+
+    Docker creates a missing bind source as root, which the services, running
+    as the user, then cannot write to (for example ~/autoware_data).
+    """
+    result = compose_capture(deployment, selection, ["config", "--format", "json"])
+    try:
+        services = json.loads(result.stdout).get("services") or {}
+    except (json.JSONDecodeError, AttributeError) as error:
+        raise OpenADKitError("could not parse the Compose configuration") from error
+    for service in services.values():
+        for volume in service.get("volumes") or []:
+            if volume.get("type") != "bind" or volume.get("read_only"):
+                continue
+            source = Path(volume["source"])
+            if not source.exists():
+                source.mkdir(parents=True)
+
+
 def check_daemon(selection: Selection) -> None:
     result = capture_process(
         ["docker", "info"], env=process_environment(selection), check=False

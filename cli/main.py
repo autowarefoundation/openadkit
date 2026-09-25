@@ -463,7 +463,20 @@ def main() -> int:
             return 0
 
         compose.check_daemon(selection)
+        # Shared services use fixed container names, so only one deployment
+        # can run at a time. Rerunning the same deployment updates it in place.
+        others = [
+            name
+            for name in compose.running_names(kit.deployments)
+            if name != deployment.name
+        ]
+        if others:
+            raise OpenADKitError(
+                f"{', '.join(others)} is already running; stop it first: "
+                f"openadkit stop {others[0]}"
+            )
         data.install_data(deployment, selection, args.force)
+        compose.create_writable_mounts(deployment, selection)
         compose.start(deployment, selection, args.pull)
         print_run_next_steps(deployment, configured_services)
         return 0
@@ -494,5 +507,16 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except OpenADKitError as error:
+        print(f"error: {error}", file=sys.stderr)
+        raise SystemExit(1) from None
+    except KeyboardInterrupt:
+        # Ctrl+C (for example during `logs --follow`) is a normal way to stop.
+        print(file=sys.stderr)
+        raise SystemExit(130) from None
+    except PermissionError as error:
+        print(f"error: permission denied: {error.filename or error}", file=sys.stderr)
+        print("hint: check that your user owns this path", file=sys.stderr)
+        raise SystemExit(1) from None
+    except OSError as error:
         print(f"error: {error}", file=sys.stderr)
         raise SystemExit(1) from None

@@ -162,6 +162,24 @@ def ensure_safe_existing(
     return current
 
 
+def _dotenv_value(raw: str, where: str) -> str:
+    """Read a value the way Compose does: quotes group, ` #` starts a comment."""
+    value = raw.strip()
+    quote = value[:1]
+    if quote in ("'", '"'):
+        end = value.find(quote, 1)
+        while end != -1 and value[end - 1] == "\\":
+            end = value.find(quote, end + 1)
+        if end == -1:
+            raise OpenADKitError(f"unterminated quoted value at {where}")
+        rest = value[end + 1 :].strip()
+        if rest and not rest.startswith("#"):
+            raise OpenADKitError(f"unexpected text after quoted value at {where}")
+        return value[1:end].replace("\\" + quote, quote)
+    comment = value.find(" #")
+    return (value if comment == -1 else value[:comment]).strip()
+
+
 def parse_dotenv(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     try:
@@ -176,12 +194,12 @@ def parse_dotenv(path: Path) -> dict[str, str]:
             raise OpenADKitError(f"invalid dotenv assignment at {path}:{number}")
         name, value = line.split("=", 1)
         name = name.strip()
-        value = value.strip()
+        words = name.split(None, 1)
+        if len(words) == 2 and words[0] == "export":
+            name = words[1]
         if not ENV_NAME_RE.fullmatch(name):
             raise OpenADKitError(f"invalid environment name at {path}:{number}: {name}")
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[name] = value
+        values[name] = _dotenv_value(value, f"{path}:{number}")
     return values
 
 
@@ -196,6 +214,15 @@ def expand_home(value: str) -> str:
     if value.startswith("${HOME}/"):
         return str(Path(home) / value[8:])
     return value
+
+
+def host_user_environment() -> dict[str, str]:
+    """Host user ids for services that write to host directories.
+
+    Compose runs those services as ``${OPENADKIT_UID}:${OPENADKIT_GID}`` so the
+    files they create stay owned by the user instead of root.
+    """
+    return {"OPENADKIT_UID": str(os.getuid()), "OPENADKIT_GID": str(os.getgid())}
 
 
 def host_architecture() -> str:
@@ -342,7 +369,7 @@ class Deployment:
         # Skip requirement validation and component image injection so a
         # missing default-distro image map can never block a stop.
         if operational:
-            injections = {"ROS_DISTRO": distro}
+            injections = {"ROS_DISTRO": distro, **host_user_environment()}
             injections.update(self.distro_environment.get(distro, {}))
             environment = self.configuration_environment()
             environment.update(injections)
@@ -388,7 +415,7 @@ class Deployment:
 
         required_environment = list(self.requirements["requiredEnv"])
         environment = self.configuration_environment(gpu)
-        injections: dict[str, str] = {"ROS_DISTRO": distro}
+        injections: dict[str, str] = {"ROS_DISTRO": distro, **host_user_environment()}
         injections.update(self.distro_environment.get(distro, {}))
         component_environment = current_context.component_environment(
             distro, architecture, gpu

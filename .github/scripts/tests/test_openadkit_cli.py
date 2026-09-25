@@ -6,10 +6,12 @@ import platform
 import re
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
 import threading
+import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import zipfile
 
@@ -216,12 +218,16 @@ def fake_docker(
     config_returncode=0,
     runtimes='{"nvidia": {}}',
     compose_ls="[]",
+    config_json='{"services": {}}',
 ):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     calls = tmp_path / "docker-calls"
+    ids = tmp_path / "docker-ids"
     ls_path = tmp_path / "compose-ls.json"
     ls_path.write_text(compose_ls if compose_ls.endswith("\n") else compose_ls + "\n")
+    config_path = tmp_path / "compose-config.json"
+    config_path.write_text(config_json + "\n")
     executable(
         bin_dir / "docker",
         "#!/usr/bin/env bash\n"
@@ -230,6 +236,10 @@ def fake_docker(
         '"${ROS_DISTRO:-}" "${DISTRO_VALUE:-}" "${API_IMAGE:-}" '
         '"${LOCALIZATION_MAPPING_IMAGE:-}" "${SENSING_PERCEPTION_GPU_IMAGE:-}" '
         f'"$*" >> {json.dumps(str(calls))}\n'
+        'printf "%s:%s\\n" "${OPENADKIT_UID:-}" "${OPENADKIT_GID:-}" '
+        f">> {json.dumps(str(ids))}\n"
+        'if [[ "$*" == *"config --format json"* ]]; then '
+        f"cat {json.dumps(str(config_path))}; exit 0; fi\n"
         'if [[ "$*" == "info" ]]; then '
         f"exit {daemon_returncode}; fi\n"
         'if [[ "$*" == "info --format {{json .Runtimes}}" ]]; then '
@@ -1119,6 +1129,175 @@ def test_stop_removes_project_but_not_volumes(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "down --remove-orphans" in calls.read_text()
     assert "--volumes" not in calls.read_text()
+
+
+def test_run_refuses_while_another_deployment_runs(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    kit = json.loads((root / "openadkit.json").read_text())
+    kit["deployments"]["other"] = {"path": "deployments/other"}
+    (root / "openadkit.json").write_text(json.dumps(kit))
+    bin_dir, calls = fake_docker(
+        tmp_path,
+        compose_ls='[{"Name":"openadkit-other","Status":"running(3)"}]',
+    )
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 1
+    assert "other is already running; stop it first: openadkit stop other" in (
+        result.stderr
+    )
+    assert "up --detach" not in calls.read_text()
+
+
+def test_run_updates_the_same_running_deployment(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir, calls = fake_docker(
+        tmp_path,
+        compose_ls='[{"Name":"openadkit-example","Status":"running(3)"}]',
+    )
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "up --detach" in calls.read_text()
+
+
+def _mount_config(source, *, read_only=False):
+    return json.dumps(
+        {
+            "services": {
+                "writer": {
+                    "volumes": [
+                        {
+                            "type": "bind",
+                            "source": str(source),
+                            "target": "/data",
+                            "read_only": read_only,
+                        }
+                    ],
+                }
+            }
+        }
+    )
+
+
+def test_run_creates_missing_writable_mounts_as_user(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    source = tmp_path / "home/autoware_data"
+    bin_dir, _ = fake_docker(tmp_path, config_json=_mount_config(source))
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    # Created by the CLI as the user, so Docker never creates it as root.
+    assert source.is_dir()
+    assert source.stat().st_uid == os.getuid()
+    assert f"{os.getuid()}:{os.getgid()}" in (tmp_path / "docker-ids").read_text()
+
+
+def test_run_leaves_read_only_mounts_to_compose(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    source = tmp_path / "home/not-created"
+    bin_dir, _ = fake_docker(
+        tmp_path, config_json=_mount_config(source, read_only=True)
+    )
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert not source.exists()
+
+
+def test_run_accepts_existing_file_mounts(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    source = tmp_path / "home/docker.sock"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("")
+    bin_dir, _ = fake_docker(tmp_path, config_json=_mount_config(source))
+    result = run_cli(
+        root,
+        ["run", "example", "--pull", "never"],
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert source.is_file()
+
+
+def test_ctrl_c_exits_quietly(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    bin_dir = tmp_path / "bin"
+    started = tmp_path / "docker-started"
+    executable(
+        bin_dir / "docker",
+        f"#!/usr/bin/env bash\ntouch {json.dumps(str(started))}\nexec sleep 30\n",
+    )
+    (tmp_path / "home").mkdir(exist_ok=True)
+    process = subprocess.Popen(
+        [str(root / "openadkit"), "logs", "example", "--follow"],
+        cwd=root,
+        env=os.environ
+        | {"HOME": str(tmp_path / "home"), "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    # Wait until Python has started docker, then interrupt it like Ctrl+C.
+    for _ in range(200):
+        if started.exists() or process.poll() is not None:
+            break
+        time.sleep(0.05)
+    process.send_signal(signal.SIGINT)
+    _, stderr = process.communicate(timeout=10)
+    assert process.returncode == 130
+    assert "Traceback" not in stderr
+
+
+def test_permission_errors_are_reported_without_traceback(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip("root can remove any file")
+    root, deployment = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (deployment / "config.env").write_text(
+        "MAP_PATH=$HOME/data/map\nGPU_MODEL_PATH=$HOME/data/gpu-model\n"
+    )
+    locked = tmp_path / "home/data/map/locked"
+    locked.mkdir(parents=True)
+    (locked / "file").write_text("x")
+    locked.chmod(0o555)
+    bin_dir, _ = fake_docker(tmp_path)
+    try:
+        result = run_cli(
+            root,
+            ["clean", "example", "--data"],
+            env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        )
+    finally:
+        locked.chmod(0o755)
+    assert result.returncode == 1
+    assert "error: permission denied:" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_dotenv_follows_compose_comment_and_export_rules(tmp_path):
+    root, deployment = runtime_tree(tmp_path, manifest=_clean_manifest())
+    (deployment / "config.env").write_text(
+        "export MAP_PATH=$HOME/data/map # sample map\n"
+        'GPU_MODEL_PATH="$HOME/data/gpu # model" # quoted keeps the hash\n'
+        'export\tREMOTE_PASSWORD="pa\\"ss"\n'
+    )
+    result = run_cli(root, ["clean", "example"])
+    assert result.returncode == 0, result.stderr
+    home = root.parent / "home"
+    assert f"({home}/data/map)" in result.stdout
+    assert f"({home}/data/gpu # model)" in result.stdout
 
 
 def test_setup_rejects_unknown_development_option(tmp_path):

@@ -68,9 +68,13 @@ services:
     init: true
     ipc: host
     pid: service:map
+    # Writes results to ${OUTPUT_HOST_PATH}; run as the host user so they are
+    # not root-owned. The CLI injects the ids; HOME must be writable for ROS logs.
+    user: ${OPENADKIT_UID:-1000}:${OPENADKIT_GID:-1000}
     env_file:
       - ../shared/runtime.env
     environment:
+      - HOME=/tmp
       # Passed as runtime environment data (not interpolated into the command
       # program) so shell metacharacters in a value cannot alter the script.
       - ROS_DISTRO=${ROS_DISTRO:-humble}

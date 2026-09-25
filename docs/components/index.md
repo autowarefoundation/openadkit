@@ -1,59 +1,16 @@
 # Components
 
-Open AD Kit packages the Autoware stack as containerized services. Each
-**Autoware function** stays independently deployable, and the published images
-group closely related functions to keep the runtime layout simple.
+Open AD Kit packages Autoware Universe into focused container images. Each image
+groups closely related Autoware functions, and deployments run them as separate
+containers that talk over ROS 2. External clients use the
+[Autoware AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/);
+the images use Autoware's component interfaces between them.
 
-## Architecture Overview
-
-Autoware separates **Core** from **Universe**:
-
-- **Core** — rigorously reviewed base functionality required for safe autonomous driving.
-- **Universe** — community extensions and research features built on Core.
-
-Open AD Kit packages Universe components into focused container images that
-compose into complete AD systems.
-
-## Build Pipeline
-
---8<-- "includes/build-pipeline.md"
-
-`universe-common` is an Open AD Kit-owned thin intermediate built on the upstream
-`autoware:core-devel`/`base` images. The bake groups and build commands are in
-[Build from Source](../development/build-from-source.md).
-
-## Interface Layers
-
-Autoware defines three interface categories that govern how components
-communicate:
-
-<div class="oak-component-grid oak-component-grid--three">
-
-<div class="oak-component-item">
-<strong>AD API</strong>
-<span>External interface for fleet management and HMI, exposed as ROS 2 services and topics. HTTP/MQTT gateways can be layered on top.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>Component Interface</strong>
-<span>Internal inter-module communication over ROS 2 topics and services, with standardized message types.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>Local Interface</strong>
-<span>Intra-component communication inside one image. Implementation details that do not cross component boundaries.</span>
-</div>
-
-</div>
-
-The AD API is the outer boundary, the component interface connects images to each
-other, and the local interface stays inside one image.
+All images build on a shared `universe-common` layer; see
+[Build from Source](../development/build-from-source.md#build-system) for the
+build graph. The [image reference](#image-reference) lists tags and platforms.
 
 ## Component Images
-
-Each section below covers one published image: what it contains, its launch
-file, and where it is used. The [image reference](#image-reference) lists the
-tags and platforms.
 
 ### Sensing & Perception {: #sensing-perception }
 
@@ -112,12 +69,6 @@ image.
   aggregation; Minimum Risk Maneuver handling; CPU, memory, and process
   monitoring. Launch: `tier4_system_component.launch.xml`
 
-| Aspect | Vehicle | System |
-|---|---|---|
-| Purpose | Communicates with real or simulated vehicle hardware | Monitors the Autoware stack |
-| Outputs | Actuation commands and vehicle state | Diagnostics, health, and emergency state |
-| Typical configuration | Vehicle model and interface | Monitor enablement and run mode |
-
 ### API {: #api }
 
 Packages the [Autoware AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/)
@@ -163,9 +114,8 @@ and each container creates its own self-signed certificate at startup.
 | `USE_SIM_TIME` | `false` | `true`, `false` | Use the ROS simulation clock |
 | `RVIZ_GPU` | `auto` | `auto`, `on`, `off` | Automatic, forced, or disabled VirtualGL acceleration |
 
-Under host networking, open `https://localhost:6080/vnc.html`. For remote access,
-use SSH forwarding or an authenticated reverse proxy rather than exposing noVNC
-directly.
+For access and remote use, see the
+[Quickstart](../getting-started/index.md#open-the-visualizer).
 
 ### CARLA Interface {: #carla-interface }
 
@@ -178,22 +128,14 @@ CARLA and CARLA sensor data to ROS 2 messages:
 - vehicle command calibration and traffic light state publication
 - lightweight sensor mappings for constrained hosts
 
-Launch: `autoware_carla_interface.launch.xml`.
-
-!!! note "Platform support"
-    The image is published for amd64 on Humble and Jazzy. The CARLA
-    *deployment* is Humble-only. The bridge itself does not require a GPU, but
-    the complete deployment needs an NVIDIA GPU for the CARLA server and
-    defaults to the amd64 `sensing-perception-cuda` image for perception.
-
-See [CARLA Simulation](../deployments/carla-simulation/index.md) for
-`openadkit run carla-simulation --gpu`.
+Launch: `autoware_carla_interface.launch.xml`. The image is amd64-only (Humble
+and Jazzy); the [CARLA Simulation](../deployments/carla-simulation/index.md)
+deployment is Humble-only and needs an NVIDIA GPU.
 
 ## Image Reference
 
-The published images and their platforms. This table is generated from the
-image catalog (`.github/image-inventory.json`), so it always matches what CI
-builds. See [Container Images & Versioning](../getting-started/container-images.md)
-for the tag naming scheme.
+Generated from the image catalog (`.github/image-inventory.json`), so it always
+matches what CI builds. Tag names are explained in
+[Container Images & Versioning](../getting-started/container-images.md).
 
 {{ component_table() }}

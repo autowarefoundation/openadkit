@@ -1,25 +1,14 @@
 # EWAOL
 
-!!! abstract ""
-    EWAOL is a standards-based, container-centric framework for deploying and orchestrating edge workloads. It was the original SOAFEE reference implementation, extending cloud-native methods to automotive with an emphasis on real-time execution and deterministic behavior.
+!!! note "Not an Open AD Kit target"
+    This page is background only. There are no EWAOL assets in this repository
+    and no validated EWAOL deployment.
 
-## Status
+EWAOL (Edge Workload Abstraction and Orchestration Layer) is Arm's
+container-centric Yocto framework and the original SOAFEE reference
+implementation. It is delivered as the `meta-ewaol` layer and provides Docker and
+K3s, with optional Xen virtualization, on edge hardware and cloud instances.
 
-<span class="oak-badge oak-badge--neutral">Upstream reference</span>
-
-!!! note "Not a committed Open AD Kit target"
-    EWAOL is retained as upstream SOAFEE background. Open AD Kit may explore
-    related Arm Automotive Solutions / RD-1 AE FVP paths later, but there is no
-    committed target or validated deployment today, and no EWAOL deployment
-    assets in this repository — this page points to the upstream project only.
-
-## What is EWAOL?
-
-EWAOL is delivered via the `meta-ewaol` Yocto layer and provides a container-native edge runtime (Docker and K3s, with optional Xen virtualization for mixed-criticality separation). It offers runtime parity between edge hardware (ADLINK AVA with Arm Neoverse N1) and cloud instances (AWS Graviton), making it suited to hybrid development and deployment workflows.
-
-## Documentation
-
-For installation and runtime instructions, see the upstream project:
-
-- [meta-ewaol source (GitLab, archived — read-only)](https://gitlab.com/soafee/ewaol/meta-ewaol)
-- [EWAOL documentation](https://ewaol.docs.arm.com/en/latest/) — development is now hosted by the SOAFEE SIG
+- [meta-ewaol source (GitLab, archived)](https://gitlab.com/soafee/ewaol/meta-ewaol)
+- [EWAOL documentation](https://ewaol.docs.arm.com/en/latest/): development is now
+  hosted by the SOAFEE SIG

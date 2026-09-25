@@ -1,87 +1,39 @@
-# AutoSD + Open AD Kit
+# AutoSD
 
-!!! abstract ""
-    AutoSD is the upstream binary distribution serving as the public, in-development preview of the **Red Hat In-Vehicle Operating System (RHIVOS)**. It brings cloud-native, container-first principles to automotive edge computing with an emphasis on safety, security, and deterministic behavior.
+AutoSD (Automotive Stream Distribution) is the public, in-development preview of
+**Red Hat In-Vehicle OS**. It is built on CentOS Stream with an automotive
+kernel and provides:
 
-## What is AutoSD?
+- **Mixed criticality**: safety-critical containers in the root partition,
+  non-critical ones in an isolated QM partition
+- **Atomic updates**: immutable OSTree images with A/B updates and rollback
+- **Real-time kernel** for deterministic scheduling
+- **Container-native runtime**: Podman, Quadlet (systemd container units), and
+  BlueChi orchestration, with no Docker daemon
 
-AutoSD is built on **CentOS Stream** with an automotive-specific kernel
-(`kernel-automotive`). It is the upstream, in-development preview of Red Hat's
-commercial **In-Vehicle OS (RHIVOS)**, which Red Hat positions for
-functional-safety use. In this repository, it is the platform-specific deployment
-path for Open AD Kit.
+## In This Repository
 
-## Key Features for Autonomous Driving
+AutoSD assets live under
+[`platforms/autosd/`](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd).
+Each use case contains Quadlet files for its services and Automotive Image
+Builder files for its OS image.
 
-<div class="oak-card-grid" markdown="1">
+- [Planning Simulator](planning-simulator/index.md): Autoware planning and
+  Scenario Simulator under Podman and Quadlet
+- [R-Car X5H](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/x5h):
+  AutoSD 10 image for the R-Car X5H board, tested in QEMU before board bring-up
 
-<div class="oak-card" markdown="1">
+!!! note "Current scope"
+    These are platform demos. They run upstream Autoware images, not the modular
+    Open AD Kit component images. Mapping the components onto AutoSD's
+    root and QM partitions is on the [roadmap](../../releases/index.md).
 
-:material-shield-check:{ .oak-card-icon }
+## Build an Image {: #building-an-autosd-image }
 
-<p class="oak-card-title" role="heading" aria-level="3">Mixed Criticality</p>
-<p>Separates safety-critical containers in the root partition from non-critical workloads in the QM partition using systemd, Eclipse BlueChi, and QM.</p>
-</div>
-
-<div class="oak-card" markdown="1">
-
-:material-refresh-auto:{ .oak-card-icon }
-
-<p class="oak-card-title" role="heading" aria-level="3">Atomic Updates</p>
-<p>Immutable system images with OSTree and composefs enable A/B updates, rollback, and tamper-proofing. Bootc brings container-native OS lifecycle management.</p>
-</div>
-
-<div class="oak-card" markdown="1">
-
-:material-clock-fast:{ .oak-card-icon }
-
-<p class="oak-card-title" role="heading" aria-level="3">Real-Time Kernel</p>
-<p>RT-optimized automotive kernel with deterministic scheduling for time-critical autonomous driving functions.</p>
-</div>
-
-<div class="oak-card" markdown="1">
-
-:material-docker:{ .oak-card-icon }
-
-<p class="oak-card-title" role="heading" aria-level="3">Container-Native</p>
-<p>Built around Podman, Quadlet (systemd container units), and BlueChi orchestration. No Docker daemon required.</p>
-</div>
-
-</div>
-
-## Repository layout
-
-Runnable AutoSD assets live under
-[`platforms/autosd/`](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd)
-in the Open AD Kit repository. Each use-case directory contains at least:
-
-- **Quadlet files** to define containerized services managed by Podman and systemd
-- **Automotive Image Builder files** to build an AutoSD image
-
-Build and run commands on this page assume you are inside a use-case directory
+You need Docker or Podman and QEMU. Run these commands from a use-case directory
 such as `platforms/autosd/planning-simulator/`.
 
-- [Planning Simulator](planning-simulator/index.md): Platform demo that runs
-  Autoware planning and TIER IV Scenario Simulator under Podman/Quadlet
-- [R-Car X5H](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/x5h):
-  AutoSD 10 rootfs for the R-Car X5H board, netbooted under the BSP or a rebuilt
-  AutoSD-aligned kernel and QEMU-gated before board bring-up
-
-## Requirements
-
-| Path | Needs |
-|------|-------|
-| Container script (recommended) | Docker or Podman, QEMU |
-| Automotive Image Builder on the host | RPM-based Linux (Fedora, CentOS, or RHEL), Automotive Image Builder, OSBuild, QEMU |
-
-## Building an AutoSD Image
-
-This section guides you through running `automotive-image-builder` from a
-container. From a clone of this repository, `cd` into a use-case directory
-(for example `platforms/autosd/planning-simulator/`) before running the
-commands below.
-
-First, download the runner script and build the builder container:
+Download the Automotive Image Builder runner and build its container:
 
 ```bash
 curl -fL -o auto-image-builder.sh \
@@ -90,8 +42,8 @@ chmod +x auto-image-builder.sh
 sudo bash ./auto-image-builder.sh build-builder --distro autosd10-sig
 ```
 
-Now build the image (requires sudo/root). The positionals are the manifest,
-the container image, and the optional bootable disk image:
+Build the image. The arguments are the manifest, the container image name, and
+the disk image to write:
 
 ```bash
 sudo bash ./auto-image-builder.sh build \
@@ -101,25 +53,21 @@ sudo bash ./auto-image-builder.sh build \
   aib/image.aib.yml \
   localhost/awf-oak:latest \
   disk.qcow2
+sudo chown "$(logname)" disk.qcow2
 ```
 
-You may want to change the owner of `disk.qcow2`:
+To run Automotive Image Builder directly instead, use an RPM-based host (Fedora,
+CentOS, or RHEL) with Automotive Image Builder, OSBuild, and QEMU installed.
 
-```bash
-sudo chown $(logname) disk.qcow2
-```
+## Run the Image
 
-You can now use QEMU to run the image from a mounted QEMU disk.
-
-## Running the Image
-
-If you have `air` available:
+With `air` installed:
 
 ```bash
 air disk.qcow2
 ```
 
-Otherwise, use the following example QEMU command:
+Or with QEMU directly:
 
 ```bash
 /usr/bin/qemu-system-x86_64 \
@@ -128,7 +76,7 @@ Otherwise, use the following example QEMU command:
   -smp 20 \
   -nographic \
   -enable-kvm \
-  -m 2G \
+  -m 16384 \
   -machine q35 \
   -cpu host \
   -device virtio-net-pci,netdev=n0,mac=FE:00:e2:0d:ba:4d \
@@ -136,76 +84,5 @@ Otherwise, use the following example QEMU command:
   -drive file=disk.qcow2,index=0,media=disk,format=qcow2,if=virtio,id=rootdisk,snapshot=off
 ```
 
-!!! note "Memory sizing"
-    `-m 2G` only boots and explores the AutoSD image. The full Open AD Kit stack
-    needs much more — see the [hardware requirements](../hardware/index.md)
-    (16 GB minimum, 32 GB recommended) — so raise `-m` accordingly: start at
-    `-m 16384`, or `-m 32768` for heavier workloads.
-
-## Current demo vs target architecture
-
-!!! note "Platform demo, not modular Open AD Kit images"
-    The in-repo [Planning Simulator](planning-simulator/index.md) path is a
-    **platform demo**. It does **not** run the modular
-    `ghcr.io/autowarefoundation/openadkit:*` component images used by Docker
-    Compose deployments. Automotive Image Builder pins two upstream images:
-
-    - `ghcr.io/autowarefoundation/autoware:universe-0.45.1-amd64` → `localhost/autoware:latest`
-    - `ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime` → `localhost/scenario_simulator_v2:runtime`
-
-    After boot, systemd runs two containers in one pod (`awf-oak-planning` and
-    `awf-oak-simulator`) plus a map extraction oneshot. That is not the full
-    map/planning/control/vehicle/api/visualizer split, and not BlueChi
-    multi-host orchestration.
-
-AutoSD's mixed-criticality features remain a natural **target** home for Open AD
-Kit's component model on production profiles (see
-[Releases & Roadmap](../../releases/index.md)):
-
-<div class="oak-component-grid oak-component-grid--four">
-
-<div class="oak-component-item">
-<strong>Root Partition</strong>
-<span>Higher-criticality workloads (planning, control, vehicle interface) can map to the privileged root partition with RT scheduling.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>QM Partition</strong>
-<span>Non-critical workloads (visualizer, simulator, development tools) can be isolated in the QM partition for safety containment.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>OSTree / Bootc</strong>
-<span>Atomic, rollback-capable updates. The entire OS is versioned and updated as a unit, matching Open AD Kit's container-native philosophy.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>BlueChi + Quadlet</strong>
-<span>Container orchestration via systemd units. Production profiles may map each Open AD Kit component to a Quadlet service; BlueChi is available for multi-host orchestration.</span>
-</div>
-
-</div>
-
-```mermaid
-flowchart LR
-    subgraph Today["Current demo (in repo)"]
-        direction TB
-        M[awf-oak-map oneshot] --> P[awf-oak-planning<br/>autoware:universe]
-        P --- S[awf-oak-simulator<br/>scenario_simulator_v2]
-    end
-
-    subgraph Target["Target mixed-criticality mapping"]
-        direction TB
-        subgraph Root["Root partition"]
-            R1[Planning]
-            R2[Control]
-            R3[Vehicle System]
-        end
-        subgraph QM["QM partition"]
-            Q1[Visualizer]
-            Q2[Simulator]
-        end
-    end
-
-    Today -.-> Target
-```
+`-m 16384` (16 GB) is the minimum for the Autoware stack; use `-m 32768` for
+heavier workloads. `-m 2G` is enough only to boot and explore the OS.

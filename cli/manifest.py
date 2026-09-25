@@ -53,7 +53,6 @@ ALLOWED_REQUIREMENT_KEYS = {
     "rosDistros",
     "gpu",
     "gpuArchitectures",
-    "requiredEnv",
 }
 ALLOWED_DATA_KEYS = {
     "name",
@@ -320,7 +319,6 @@ class Deployment:
                     ensure_safe_existing(self.directory, name, "environment file")
                 )
 
-        add_optional("config.release.env")
         if gpu:
             if self.compose["gpuFiles"]:
                 result.append(
@@ -413,7 +411,6 @@ class Deployment:
                     f"{', '.join(gpu_architectures)}"
                 )
 
-        required_environment = list(self.requirements["requiredEnv"])
         environment = self.configuration_environment(gpu)
         injections: dict[str, str] = {"ROS_DISTRO": distro, **host_user_environment()}
         injections.update(self.distro_environment.get(distro, {}))
@@ -432,14 +429,6 @@ class Deployment:
         injections["ROS_DISTRO"] = distro
 
         environment.update(injections)
-        missing_environment = [
-            name for name in required_environment if not environment.get(name)
-        ]
-        if missing_environment:
-            raise OpenADKitError(
-                "required environment variable(s) are missing: "
-                + ", ".join(missing_environment)
-            )
 
         return Selection(
             ros_distro=distro,
@@ -509,17 +498,6 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
                 "requirements.gpuArchitectures contains undeclared architectures: "
                 + ", ".join(unknown)
             )
-    requirements["requiredEnv"] = require_string_list(
-        requirements.get("requiredEnv", []), "requirements.requiredEnv"
-    )
-    invalid = [
-        item for item in requirements["requiredEnv"] if not ENV_NAME_RE.fullmatch(item)
-    ]
-    if invalid:
-        raise OpenADKitError(
-            "requirements.requiredEnv contains invalid environment names: "
-            + ", ".join(invalid)
-        )
     manifest["requirements"] = requirements
 
     distro_environment = manifest.get("distroEnvironment", {})

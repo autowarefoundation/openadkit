@@ -1537,7 +1537,6 @@ def test_operational_commands_do_not_take_selection_flags(command):
 
 def test_repository_default_distro_uses_development_image_alias(tmp_path):
     manifest = minimal_manifest()
-    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
     result = run_cli(
@@ -1558,7 +1557,6 @@ def test_repository_default_distro_uses_development_image_alias(tmp_path):
 
 def test_repository_injects_selected_distro_and_component_environment(tmp_path):
     manifest = minimal_manifest()
-    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     manifest["distroEnvironment"] = {"jazzy": {"DISTRO_VALUE": "jazzy-value"}}
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     bin_dir, calls = fake_docker(tmp_path)
@@ -1595,7 +1593,6 @@ def test_kit_default_ros_distro_is_used(tmp_path):
 
 def test_release_injects_exact_component_references(tmp_path):
     manifest = minimal_manifest()
-    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     root, _ = runtime_tree(tmp_path, release=True, manifest=manifest)
     kit_path = root / "openadkit.json"
     current = json.loads(kit_path.read_text())
@@ -1644,7 +1641,6 @@ def test_missing_required_release_target_fails_before_compose(tmp_path):
 
 def test_repository_component_image_override_is_preserved(tmp_path):
     manifest = minimal_manifest()
-    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     root, deployment = runtime_tree(tmp_path, manifest=manifest)
     exact = f"registry.example/custom-api@sha256:{'b' * 64}"
     (deployment / "config.local.env").write_text(f"API_IMAGE={exact}\n")
@@ -1660,7 +1656,6 @@ def test_repository_component_image_override_is_preserved(tmp_path):
 
 def test_release_ignores_env_file_component_images(tmp_path):
     manifest = minimal_manifest()
-    manifest["requirements"]["requiredEnv"] = ["API_IMAGE"]
     root, deployment = runtime_tree(tmp_path, release=True, manifest=manifest)
     kit_path = root / "openadkit.json"
     current = json.loads(kit_path.read_text())
@@ -1995,21 +1990,6 @@ def test_ros_distro_constraints_fail_before_compose(tmp_path):
     )
     assert result.returncode != 0
     assert "does not support ROS distro jazzy" in result.stderr
-    assert not calls.exists()
-
-
-def test_required_environment_fails_before_compose(tmp_path):
-    manifest = minimal_manifest()
-    manifest["requirements"]["requiredEnv"] = ["DEPLOYMENT_TOKEN"]
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
-    bin_dir, calls = fake_docker(tmp_path)
-    result = run_cli(
-        root,
-        ["validate", "example"],
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}"},
-    )
-    assert result.returncode != 0
-    assert "required environment variable(s) are missing: DEPLOYMENT_TOKEN" in result.stderr
     assert not calls.exists()
 
 

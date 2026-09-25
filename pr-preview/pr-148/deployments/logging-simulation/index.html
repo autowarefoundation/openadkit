@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/autoware-foundation.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1845,10 +1845,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
+  <a href="#run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Setup
+        Run
       
     </span>
   </a>
@@ -1856,32 +1856,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#start-the-stack" class="md-nav__link">
+  <a href="#open-the-visualizer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start the Stack
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#access-the-visualizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Access the Visualizer
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#play-the-rosbag" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Play the Rosbag
+        Open the Visualizer
       
     </span>
   </a>
@@ -1925,68 +1903,36 @@
 
 
 <h1 id="logging-simulation">Logging Simulation<a class="headerlink" href="#logging-simulation" title="Permanent link">#</a></h1>
-<p>Replay a demo rosbag through sensing, perception, and localization while map,
-system, and visualization services provide the supporting runtime. An NVIDIA
-GPU with at least 4 GB VRAM is strongly recommended; CPU operation is supported
-but substantially slower.</p>
-<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
+<p>Replay a demo rosbag through sensing, perception, and localization. An NVIDIA
+GPU with at least 4 GB VRAM is recommended; CPU mode works but is much slower.</p>
+<p>Complete the <a href="../../getting-started/">Quickstart</a> setup first. For GPU
+mode, run <code>openadkit setup --gpu --verify</code>.</p>
+<h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h2>
 <p>Commands on this page are shown as installed by the release installer. From a
 source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>setup<span class="w"> </span>--verify
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation<span class="w">         </span><span class="c1"># CPU: clustering-based detection</span>
+openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation<span class="w"> </span>--gpu<span class="w">   </span><span class="c1"># GPU: CenterPoint on CUDA (amd64 only)</span>
 </code></pre></div>
-<p>Use <code>openadkit setup --gpu --verify</code> to install and verify the NVIDIA
-Container Toolkit. GPU mode downloads the pinned CenterPoint models into
-<code>~/autoware_data/lidar_centerpoint</code>; CPU mode uses clustering and does not
-select those models.</p>
-<p>Activate the Docker group membership added by <code>openadkit setup</code> before running
-Docker without <code>sudo</code>. Either log out and back in, or run:</p>
-<div class="highlight"><pre><span></span><code>newgrp<span class="w"> </span>docker
-</code></pre></div>
-<p>The demo rosbag is Copyright 2020 TIER IV, Inc. It contains no camera images,
-so traffic-light recognition is unavailable and object detection is less
-complete than with a full recording.</p>
-<h2 id="start-the-stack">Start the Stack<a class="headerlink" href="#start-the-stack" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation
-</code></pre></div>
-<p>For NVIDIA acceleration:</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation<span class="w"> </span>--gpu
-</code></pre></div>
-<p>The CUDA image is amd64-only. <code>--gpu</code> loads <code>config.gpu.env</code> to switch
-perception to CenterPoint; the Compose overlay only swaps the CUDA images and
-GPU reservations.
-Add <code>--ros-distro jazzy</code> to select Jazzy; Humble is the default.</p>
-<h2 id="access-the-visualizer">Access the Visualizer<a class="headerlink" href="#access-the-visualizer" title="Permanent link">#</a></h2>
-<p>Open your browser and navigate to:</p>
-<div class="highlight"><pre><span></span><code>https://localhost:6080/vnc.html
-</code></pre></div>
-<p>Use the default password <strong><code>openadkit</code></strong>. The connection uses a self-signed certificate; dismiss the browser privacy warning to continue.</p>
-<div class="admonition tip">
-<p class="admonition-title">Remote Access</p>
-<p>The visualizer runs under <code>network_mode: host</code>, so <code>ports:</code> is ignored and the loopback bind (<code>127.0.0.1:6080</code>) lives in the visualizer entrypoint. To reach noVNC from another machine, either forward the port over SSH:</p>
+<p>Add <code>--ros-distro jazzy</code> to select Jazzy; Humble is the default.</p>
+<p><code>run</code> downloads the sample map and rosbag, and with <code>--gpu</code> also the CenterPoint
+models (to <code>~/autoware_data/lidar_centerpoint</code>). The rosbag starts playing once
+Autoware is ready.</p>
+<p>The demo rosbag is Copyright 2020 TIER IV, Inc. It has no camera images, so
+traffic-light recognition is unavailable and detection is less complete than
+with a full recording.</p>
+<h2 id="open-the-visualizer">Open the Visualizer<a class="headerlink" href="#open-the-visualizer" title="Permanent link">#</a></h2>
+<p>Open <code>https://localhost:6080/vnc.html</code>, accept the self-signed certificate, and
+sign in with the default password <strong><code>openadkit</code></strong>. Set your own
+<code>REMOTE_PASSWORD</code> in <code>config.local.env</code>.</p>
+<p>For a remote host, forward the port over SSH and open
+<code>https://localhost:8080/vnc.html</code> locally:</p>
 <div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">8080</span>:localhost:6080<span class="w"> </span>&lt;user&gt;@&lt;host&gt;
-<span class="c1"># then open https://localhost:8080/vnc.html</span>
 </code></pre></div>
-<p>or put a TLS-terminating reverse proxy in front of <code>127.0.0.1:6080</code> and set a
-strong <code>REMOTE_PASSWORD</code>. For manifest-driven deployments, put it in
-ignored <code>config.local.env</code>; standalone deployments document their own
-environment handling. <code>shared/runtime.env</code> is reserved for container ROS/DDS
-variables.
-Editing <code>docker-compose.yaml</code> to add a <code>ports:</code> mapping has no effect under
-host networking.</p>
-</div>
-<h2 id="play-the-rosbag">Play the Rosbag<a class="headerlink" href="#play-the-rosbag" title="Permanent link">#</a></h2>
-<p>The rosbag profile starts automatically with the deployment.</p>
-<p>Playback waits for <code>ROSBAG_READY_TOPIC</code> for up to <code>ROSBAG_READY_TIMEOUT</code> seconds
-before starting.</p>
 <h2 id="stop-and-recover">Stop and Recover<a class="headerlink" href="#stop-and-recover" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>status<span class="w"> </span>logging-simulation
-openadkit<span class="w"> </span>logs<span class="w"> </span>logging-simulation<span class="w"> </span>--follow
-openadkit<span class="w"> </span>stop<span class="w"> </span>logging-simulation
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>stop<span class="w"> </span>logging-simulation
 </code></pre></div>
-<p>The rosbag service uses a digest-pinned upstream <code>autoware:universe</code> image in a
-release. Put local overrides in
-<code>deployments/logging-simulation/config.local.env</code>. To replace missing sample
-data, run <code>openadkit fetch logging-simulation --force</code>. For common issues, see
+<p>To replace missing sample data, run <code>openadkit fetch logging-simulation --force</code>;
+it also refreshes the CenterPoint models. For other issues, see
 <a href="../../getting-started/troubleshooting/">Troubleshooting</a>.</p>
 
 
@@ -2092,7 +2038,7 @@ data, run <code>openadkit fetch logging-simulation --force</code>. For common is
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

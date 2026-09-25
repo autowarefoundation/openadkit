@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/autoware-foundation.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -717,10 +717,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#local-overrides" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Local Overrides
+        Configuration
       
     </span>
   </a>
@@ -754,6 +754,17 @@
     <span class="md-ellipsis">
       
         Split-host roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify-a-release-bundle-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify a Release Bundle Manually
       
     </span>
   </a>
@@ -1970,10 +1981,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#local-overrides" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Local Overrides
+        Configuration
       
     </span>
   </a>
@@ -2013,6 +2024,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#verify-a-release-bundle-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify a Release Bundle Manually
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2039,8 +2061,8 @@
 
 
 <h1 id="cli-maintenance">CLI &amp; Maintenance<a class="headerlink" href="#cli-maintenance" title="Permanent link">#</a></h1>
-<p>Commands you need after the first run: runtime controls, validation, upgrades,
-and cleanup.</p>
+<p>Commands you need after the first run: runtime controls, validation,
+configuration, upgrades, and cleanup.</p>
 <p>Commands on this page are shown as installed by the release installer. From a
 source checkout, prefix them with <code>./</code> and run them from the repository root.</p>
 <h2 id="runtime-controls">Runtime Controls<a class="headerlink" href="#runtime-controls" title="Permanent link">#</a></h2>
@@ -2048,70 +2070,79 @@ source checkout, prefix them with <code>./</code> and run them from the reposito
 openadkit<span class="w"> </span>logs<span class="w"> </span>planning-simulation<span class="w"> </span>--follow
 openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 </code></pre></div>
-<p><code>status</code>, <code>logs</code>, and <code>stop</code> need a deployment name. Without one, they exit 2
-when any deployment is running: stderr says the name is required, and stdout
-lists the running names as a hint. They do not show status, stream logs, or
-stop anything. When nothing is running they print <code>no running deployments</code> and
-exit 0. <code>openadkit logs --follow</code> without a name is always a usage error.
+<p>Pass the deployment name. Without it, these commands only list what is running.
+One deployment runs at a time; <code>run</code> asks you to stop the current one first.
+After starting, <code>run</code> watches the services for 10 seconds and fails if one
+crashes.
 <code>openadkit run &lt;deployment&gt; --pull always</code> refreshes images before starting,
-and <code>openadkit --version</code> prints the CLI version.</p>
+and <code>openadkit --version</code> prints the installed version.</p>
 <h2 id="validate-before-running">Validate Before Running<a class="headerlink" href="#validate-before-running" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>validate<span class="w"> </span>planning-simulation<span class="w"> </span>--data
 </code></pre></div>
-<p><code>--data</code> reports each selected data resource as <code>ok</code>, <code>missing</code>, or <code>incomplete</code>,
-and fails when any reported resource is missing or incomplete. It uses the same
-GPU selection as <code>run</code>, so GPU-only resources are included only with <code>--gpu</code>.
-Logging Simulation's CenterPoint models are checked with
-<code>openadkit validate logging-simulation --gpu --data</code>. Without <code>--data</code>,
-<code>validate</code> checks the manifest, the declared data destinations, and the Compose
-configuration.
-<code>list</code>, <code>version</code>, and <code>validate</code> also accept <code>--json</code> for scripting.</p>
-<h2 id="local-overrides">Local Overrides<a class="headerlink" href="#local-overrides" title="Permanent link">#</a></h2>
-<p>Use <code>deployments/&lt;name&gt;/config.local.env</code> for host-specific settings. Source
-checkouts also accept component image overrides there; release component refs
-stay pinned by the release context. The file is ignored by Git. Deployments
-with a GPU overlay load <code>config.gpu.env</code> after <code>config.env</code> when you pass
-<code>--gpu</code>; <code>config.local.env</code> still wins.</p>
+<p><code>validate</code> checks the manifest and the Compose configuration without starting
+anything. <code>--data</code> also reports each data resource as <code>ok</code>, <code>missing</code>, or
+<code>incomplete</code> and fails on any gap. It follows the same GPU selection as <code>run</code>:
+use <code>openadkit validate logging-simulation --gpu --data</code> to include the
+CenterPoint models.</p>
+<p><code>list</code>, <code>version</code>, and <code>validate</code> accept <code>--json</code> for scripting.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
+<p>Each deployment reads its settings from environment files in
+<code>deployments/&lt;name&gt;/</code>, in this order (later files win):</p>
+<ol>
+<li><code>config.env</code>: the deployment defaults</li>
+<li><code>config.gpu.env</code>: GPU settings, loaded only with <code>--gpu</code></li>
+<li><code>config.local.env</code>: your local overrides, ignored by Git</li>
+</ol>
+<p>Shell exports do not override variables defined in these files. Put host
+settings such as <code>MAP_PATH</code> or <code>REMOTE_PASSWORD</code> in <code>config.local.env</code>. Source
+checkouts can also override component images there; release images stay pinned.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">#</a></h2>
-<p>Check whether a newer stable version exists:</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade<span class="w"> </span>--check
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade<span class="w"> </span>--check<span class="w">   </span><span class="c1"># report whether a newer stable version exists</span>
+openadkit<span class="w"> </span>upgrade<span class="w">           </span><span class="c1"># install it</span>
 </code></pre></div>
-<p>Then upgrade to the latest stable version:</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade
-</code></pre></div>
-<p>The new release is verified, installed alongside the old one, and the <code>openadkit</code>
-launcher is repointed. The previous version is kept in the install destination
-(by default <code>~/.local/share/openadkit/</code>; change it with
-<code>openadkit install --destination DIRECTORY</code>), so you can roll back:</p>
+<p>The new release is verified and installed next to the old one, and the
+<code>openadkit</code> launcher is repointed. The previous version stays in the install
+destination (default <code>~/.local/share/openadkit/</code>), so you can roll back:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>install<span class="w"> </span>--version<span class="w"> </span>vOLD<span class="w"> </span>--force
 </code></pre></div>
-<p><code>--force</code> replaces the kept version directory. To switch to a version that is not
-installed, omit <code>--force</code>. Source checkouts update with <code>git pull</code> or
-<code>git checkout</code> instead.</p>
+<p><code>--force</code> replaces the kept version directory; omit it to install a version
+that is not kept. Source checkouts update with <code>git pull</code> instead.</p>
 <h2 id="uninstall-and-cleanup">Uninstall and Cleanup<a class="headerlink" href="#uninstall-and-cleanup" title="Permanent link">#</a></h2>
-<p>Remove the installed release and its launcher (release installs only; remove a
-source checkout with Git). Stop every running deployment first. <code>uninstall</code>
-refuses while an <code>openadkit-*</code> Compose project is still running, because it
-removes the launcher <code>openadkit stop</code> needs:</p>
+<p>Stop running deployments first; <code>uninstall</code> refuses while any is running,
+because it removes the launcher that <code>openadkit stop</code> needs.</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 openadkit<span class="w"> </span>uninstall<span class="w">          </span><span class="c1"># keep previously installed versions</span>
 openadkit<span class="w"> </span>uninstall<span class="w"> </span>--all<span class="w">    </span><span class="c1"># remove kept versions too</span>
 </code></pre></div>
-<p>Any <code>config.local.env</code> overrides inside the version directory are removed with
-it; downloaded data is kept.</p>
-<p>Downloaded data (maps, rosbag samples, and perception models) lives under
-<code>~/autoware_map</code> and <code>~/autoware_data</code> and is not removed by <code>uninstall</code>. Inspect
-what a deployment has installed and delete it with:</p>
+<p><code>uninstall</code> is for release installs; remove a source checkout with Git. It also
+removes any <code>config.local.env</code> inside the version directory.</p>
+<p>Downloaded data (maps, rosbags, and perception models) lives under
+<code>~/autoware_map</code> and <code>~/autoware_data</code> and is kept by <code>uninstall</code>. Inspect and
+delete a deployment's data with:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulation<span class="w">            </span><span class="c1"># report only</span>
 openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulation<span class="w"> </span>--data<span class="w">     </span><span class="c1"># delete</span>
 </code></pre></div>
-<p><code>clean --data</code> refuses if that deployment is still running; stop it first.
-If Scenario Simulation's Kashiwanoha map is removed, restore it with
+<p><code>clean --data</code> refuses while that deployment is running. If Scenario
+Simulation's Kashiwanoha map is removed, restore it with
 <code>openadkit fetch scenario-simulation --force</code>.</p>
 <h2 id="split-host-roles">Split-host roles<a class="headerlink" href="#split-host-roles" title="Permanent link">#</a></h2>
 <p><code>validate</code> and <code>run</code> accept <code>--role</code> for
 <a href="../../deployments/split-host/">split-host simulation</a>. <code>status</code>, <code>logs</code>, and
 <code>stop</code> restore the live role from the Compose project and do not take <code>--role</code>.</p>
+<h2 id="verify-a-release-bundle-manually">Verify a Release Bundle Manually<a class="headerlink" href="#verify-a-release-bundle-manually" title="Permanent link">#</a></h2>
+<p>To inspect a release before running anything, download the bundle and check it
+against the release metadata:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">VERSION</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>https://api.github.com/repos/autowarefoundation/openadkit/releases/latest<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["tag_name"])'</span><span class="k">)</span>
+curl<span class="w"> </span>-fLO<span class="w"> </span><span class="s2">"https://github.com/autowarefoundation/openadkit/releases/download/</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/openadkit-</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">.tar.gz"</span>
+curl<span class="w"> </span>-fLO<span class="w"> </span><span class="s2">"https://github.com/autowarefoundation/openadkit/releases/download/</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/release-metadata.json"</span>
+<span class="nv">EXPECTED</span><span class="o">=</span><span class="k">$(</span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json; print(json.load(open("release-metadata.json"))["bundles"][0]["sha256"])'</span><span class="k">)</span>
+<span class="nb">printf</span><span class="w"> </span><span class="s1">'%s  %s\n'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$EXPECTED</span><span class="s2">"</span><span class="w"> </span><span class="s2">"openadkit-</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sha256sum<span class="w"> </span>--check<span class="w"> </span>-
+tar<span class="w"> </span>-xzf<span class="w"> </span><span class="s2">"openadkit-</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">.tar.gz"</span>
+<span class="nb">cd</span><span class="w"> </span><span class="s2">"openadkit-</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">"</span>
+</code></pre></div>
+<p>The extracted directory is a complete runtime; run it with <code>./openadkit</code>.</p>
 
 
 
@@ -2216,7 +2247,7 @@ If Scenario Simulation's Kashiwanoha map is removed, restore it with
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/autoware-foundation.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1842,41 +1842,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#workstation-or-cloud-instance" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#local-development-simulation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Local Development &amp; Simulation
+        Workstation or Cloud Instance
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#verified-edge-deployment" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#edge-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verified Edge Deployment
+        Edge Deployment
       
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1885,17 +1868,6 @@
     <span class="md-ellipsis">
       
         Tested Hardware
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tests-ongoing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tests Ongoing
       
     </span>
   </a>
@@ -1928,13 +1900,10 @@
 
 
 <h1 id="hardware">Hardware<a class="headerlink" href="#hardware" title="Permanent link">#</a></h1>
-<p>Requirements and tested platforms for Open AD Kit deployments.</p>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
-<p>Open AD Kit supports <strong>amd64</strong> and <strong>arm64</strong>. Requirements differ between local
-development and a verified edge deployment.</p>
-<h3 id="local-development-simulation">Local Development &amp; Simulation<a class="headerlink" href="#local-development-simulation" title="Permanent link">#</a></h3>
-<p>For deployments, simulations, and development workloads on a workstation or
-cloud instance:</p>
+<p>Requirements and tested hardware for Open AD Kit. Both <strong>amd64</strong> and <strong>arm64</strong>
+are supported.</p>
+<h2 id="workstation-or-cloud-instance">Workstation or Cloud Instance<a class="headerlink" href="#workstation-or-cloud-instance" title="Permanent link">#</a></h2>
+<p>For deployments, simulation, and development:</p>
 <table>
 <thead>
 <tr>
@@ -1956,8 +1925,8 @@ cloud instance:</p>
 </tr>
 <tr>
 <td>GPU</td>
-<td>—</td>
-<td>NVIDIA with 4 GB+ VRAM (for sensing/perception)</td>
+<td>None</td>
+<td>NVIDIA with 4 GB+ VRAM (for perception)</td>
 </tr>
 <tr>
 <td>Storage</td>
@@ -1966,14 +1935,11 @@ cloud instance:</p>
 </tr>
 </tbody>
 </table>
-<div class="admonition tip">
-<p class="admonition-title">GPU Recommendation</p>
-<p>An NVIDIA GPU is strongly recommended for sensing and perception. CUDA images
-need a working NVIDIA runtime and do not fall back to CPU; on hosts without a
-GPU, use the standard CPU image or deployment configuration.</p>
-</div>
-<h3 id="verified-edge-deployment">Verified Edge Deployment<a class="headerlink" href="#verified-edge-deployment" title="Permanent link">#</a></h3>
-<p>For running a full Autoware stack on a verified edge platform, the requirements are higher:</p>
+<p>The CUDA perception image is amd64-only and does not fall back to CPU. Hosts
+without an NVIDIA GPU, and all arm64 hosts, use the CPU perception image.</p>
+<h2 id="edge-deployment">Edge Deployment<a class="headerlink" href="#edge-deployment" title="Permanent link">#</a></h2>
+<p>Running the full Autoware stack in real time on a vehicle computer needs more.
+These figures come from the verified ADLINK AADP-AVA platform:</p>
 <table>
 <thead>
 <tr>
@@ -1984,15 +1950,11 @@ GPU, use the standard CPU image or deployment configuration.</p>
 <tbody>
 <tr>
 <td>CPU</td>
-<td>40-core Arm Neoverse N1 equivalent (or better)</td>
+<td>40-core Arm Neoverse N1 or equivalent</td>
 </tr>
 <tr>
 <td>RAM</td>
 <td>32 GB</td>
-</tr>
-<tr>
-<td>GPU</td>
-<td>NVIDIA with CUDA support (hardware capability; see the ARM64 image note below)</td>
 </tr>
 <tr>
 <td>Architecture</td>
@@ -2000,19 +1962,6 @@ GPU, use the standard CPU image or deployment configuration.</p>
 </tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">ARM64 sensing and perception</p>
-<p>ARM64 edge hardware may include a CUDA-capable NVIDIA GPU, but the published
-<code>sensing-perception-cuda</code> image currently supports <code>linux/amd64</code> only. On
-ARM64, use the standard <code>sensing-perception</code> image; sensing and perception
-run on CPU and do not use the available GPU.</p>
-</div>
-<div class="admonition info">
-<p class="admonition-title">Why the difference?</p>
-<p>The 40-core Neoverse N1 requirement comes from the verified ADLINK AADP-AVA
-platform, which runs the full Autoware stack under real-time constraints.
-Demo simulations on a workstation need far less.</p>
-</div>
 <h2 id="tested-hardware">Tested Hardware<a class="headerlink" href="#tested-hardware" title="Permanent link">#</a></h2>
 <table>
 <thead>
@@ -2026,46 +1975,33 @@ Demo simulations on a workstation need far less.</p>
 <tbody>
 <tr>
 <td>ADLINK AADP-AVA</td>
-<td>arm64 (Ampere Altra, Neoverse N1)</td>
+<td>arm64 (Ampere Altra)</td>
 <td><span class="oak-badge oak-badge--verified">Verified</span></td>
-<td>Primary verified platform for edge deployment</td>
+<td>Primary edge platform</td>
 </tr>
 <tr>
 <td>AWS EC2 G5.4XLarge</td>
 <td>amd64</td>
 <td><span class="oak-badge oak-badge--verified">Verified</span></td>
-<td>GPU-enabled cloud instance for simulation workloads</td>
+<td>GPU cloud instance for simulation</td>
 </tr>
-</tbody>
-</table>
-<h2 id="tests-ongoing">Tests Ongoing<a class="headerlink" href="#tests-ongoing" title="Permanent link">#</a></h2>
-<table>
-<thead>
-<tr>
-<th>Platform</th>
-<th>Architecture</th>
-<th>Status</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
 <tr>
 <td>NVIDIA Jetson Orin</td>
 <td>arm64</td>
 <td><span class="oak-badge oak-badge--testing">Tests Ongoing</span></td>
-<td>JetPack 6 validation in progress. Not yet fully verified for production use.</td>
+<td>JetPack 6 validation in progress</td>
 </tr>
 <tr>
-<td>R-Car X5H (r8a78000 / ironhide)</td>
+<td>R-Car X5H</td>
 <td>arm64</td>
 <td><span class="oak-badge oak-badge--testing">Tests Ongoing</span></td>
-<td>AutoSD 10 board bring-up; QEMU-gated off-board, board smoke remains manual</td>
+<td>AutoSD 10 bring-up; QEMU-tested, board tests manual</td>
 </tr>
 <tr>
 <td>ADLINK ADM-AL30</td>
 <td>arm64</td>
 <td><span class="oak-badge oak-badge--testing">Tests Ongoing</span></td>
-<td>Arm64 edge platform; no validation evidence recorded in this repository</td>
+<td>No validation results recorded yet</td>
 </tr>
 </tbody>
 </table>
@@ -2173,7 +2109,7 @@ Demo simulations on a workstation need far less.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

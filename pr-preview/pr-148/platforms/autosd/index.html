@@ -23,15 +23,15 @@
       
       
       <link rel="icon" href="../../assets/images/autoware-foundation.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>AutoSD + Open AD Kit - Open AD Kit</title>
+        <title>AutoSD - Open AD Kit</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#autosd-open-ad-kit" class="md-skip">
+        <a href="#autosd" class="md-skip">
           Skip to content
         </a>
       
@@ -135,7 +135,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              AutoSD + Open AD Kit
+              AutoSD
             
           </span>
         </div>
@@ -1842,43 +1842,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-is-autosd" class="md-nav__link">
+  <a href="#in-this-repository" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is AutoSD?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-features-for-autonomous-driving" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features for Autonomous Driving
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#repository-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repository layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
+        In This Repository
       
     </span>
   </a>
@@ -1889,7 +1856,7 @@
   <a href="#building-an-autosd-image" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Building an AutoSD Image
+        Build an Image
       
     </span>
   </a>
@@ -1897,21 +1864,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#running-the-image" class="md-nav__link">
+  <a href="#run-the-image" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Running the Image
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#current-demo-vs-target-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current demo vs target architecture
+        Run the Image
       
     </span>
   </a>
@@ -1943,88 +1899,46 @@
   
 
 
-<h1 id="autosd-open-ad-kit">AutoSD + Open AD Kit<a class="headerlink" href="#autosd-open-ad-kit" title="Permanent link">#</a></h1>
-<div class="admonition abstract">
-<p>AutoSD is the upstream binary distribution serving as the public, in-development preview of the <strong>Red Hat In-Vehicle Operating System (RHIVOS)</strong>. It brings cloud-native, container-first principles to automotive edge computing with an emphasis on safety, security, and deterministic behavior.</p>
-</div>
-<h2 id="what-is-autosd">What is AutoSD?<a class="headerlink" href="#what-is-autosd" title="Permanent link">#</a></h2>
-<p>AutoSD is built on <strong>CentOS Stream</strong> with an automotive-specific kernel
-(<code>kernel-automotive</code>). It is the upstream, in-development preview of Red Hat's
-commercial <strong>In-Vehicle OS (RHIVOS)</strong>, which Red Hat positions for
-functional-safety use. In this repository, it is the platform-specific deployment
-path for Open AD Kit.</p>
-<h2 id="key-features-for-autonomous-driving">Key Features for Autonomous Driving<a class="headerlink" href="#key-features-for-autonomous-driving" title="Permanent link">#</a></h2>
-<div class="oak-card-grid">
-<div class="oak-card">
-<p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m10 17-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9m-6-8L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5z"/></svg></span></p>
-<p aria-level="3" class="oak-card-title" role="heading">Mixed Criticality</p>
-<p>Separates safety-critical containers in the root partition from non-critical workloads in the QM partition using systemd, Eclipse BlueChi, and QM.</p>
-</div>
-<div class="oak-card">
-<p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.68 6h-1.36L7 16h2l.73-2h4.54l.73 2h2zm-2.38 6.5L12 8l1.7 4.5zm7.1 7.9L19 22h-5v-5l2 2c2.39-1.39 4-4.05 4-7 0-4.41-3.59-8-8-8s-8 3.59-8 8c0 2.95 1.61 5.53 4 6.92v2.24C4.47 19.61 2 16.1 2 12 2 6.5 6.5 2 12 2s10 4.5 10 10c0 3.53-1.83 6.62-4.6 8.4"/></svg></span></p>
-<p aria-level="3" class="oak-card-title" role="heading">Atomic Updates</p>
-<p>Immutable system images with OSTree and composefs enable A/B updates, rollback, and tamper-proofing. Bootc brings container-native OS lifecycle management.</p>
-</div>
-<div class="oak-card">
-<p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 4a8 8 0 0 1 8 8 8 8 0 0 1-8 8 8 8 0 0 1-8-8 8 8 0 0 1 8-8m0 2a6 6 0 0 0-6 6 6 6 0 0 0 6 6 6 6 0 0 0 6-6 6 6 0 0 0-6-6m-1 2h1.5v3.78l2.33 2.33-1.06 1.06L14 12.4zM2 18a1 1 0 0 1-1-1 1 1 0 0 1 1-1h3.83c.31.71.71 1.38 1.17 2zm1-5a1 1 0 0 1-1-1 1 1 0 0 1 1-1h2.05L5 12l.05 1zm1-5a1 1 0 0 1-1-1 1 1 0 0 1 1-1h3c-.46.62-.86 1.29-1.17 2z"/></svg></span></p>
-<p aria-level="3" class="oak-card-title" role="heading">Real-Time Kernel</p>
-<p>RT-optimized automotive kernel with deterministic scheduling for time-critical autonomous driving functions.</p>
-</div>
-<div class="oak-card">
-<p><span class="twemoji oak-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.81 10.25c-.06-.04-.56-.43-1.64-.43-.28 0-.56.03-.84.08-.21-1.4-1.38-2.11-1.43-2.14l-.29-.17-.18.27c-.24.36-.43.77-.51 1.19-.2.8-.08 1.56.33 2.21-.49.28-1.29.35-1.46.35H2.62c-.34 0-.62.28-.62.63 0 1.15.18 2.3.58 3.38.45 1.19 1.13 2.07 2 2.61.98.6 2.59.94 4.42.94.79 0 1.61-.07 2.42-.22 1.12-.2 2.2-.59 3.19-1.16A8.3 8.3 0 0 0 16.78 16c1.05-1.17 1.67-2.5 2.12-3.65h.19c1.14 0 1.85-.46 2.24-.85.26-.24.45-.53.59-.87l.08-.24zm-17.96.99h1.76c.08 0 .16-.07.16-.16V9.5c0-.08-.07-.16-.16-.16H3.85c-.09 0-.16.07-.16.16v1.58c.01.09.07.16.16.16m2.43 0h1.76c.08 0 .16-.07.16-.16V9.5c0-.08-.07-.16-.16-.16H6.28c-.09 0-.16.07-.16.16v1.58c.01.09.07.16.16.16m2.47 0h1.75c.1 0 .17-.07.17-.16V9.5c0-.08-.06-.16-.17-.16H8.75c-.08 0-.15.07-.15.16v1.58c0 .09.06.16.15.16m2.44 0h1.77c.08 0 .15-.07.15-.16V9.5c0-.08-.06-.16-.15-.16h-1.77c-.08 0-.15.07-.15.16v1.58c0 .09.07.16.15.16M6.28 9h1.76c.08 0 .16-.09.16-.18V7.25c0-.09-.07-.16-.16-.16H6.28c-.09 0-.16.06-.16.16v1.57c.01.09.07.18.16.18m2.47 0h1.75c.1 0 .17-.09.17-.18V7.25c0-.09-.06-.16-.17-.16H8.75c-.08 0-.15.06-.15.16v1.57c0 .09.06.18.15.18m2.44 0h1.77c.08 0 .15-.09.15-.18V7.25c0-.09-.07-.16-.15-.16h-1.77c-.08 0-.15.06-.15.16v1.57c0 .09.07.18.15.18m0-2.28h1.77c.08 0 .15-.07.15-.16V5c0-.1-.07-.17-.15-.17h-1.77c-.08 0-.15.06-.15.17v1.56c0 .08.07.16.15.16m2.46 4.52h1.76c.09 0 .16-.07.16-.16V9.5c0-.08-.07-.16-.16-.16h-1.76c-.08 0-.15.07-.15.16v1.58c0 .09.07.16.15.16"/></svg></span></p>
-<p aria-level="3" class="oak-card-title" role="heading">Container-Native</p>
-<p>Built around Podman, Quadlet (systemd container units), and BlueChi orchestration. No Docker daemon required.</p>
-</div>
-</div>
-<h2 id="repository-layout">Repository layout<a class="headerlink" href="#repository-layout" title="Permanent link">#</a></h2>
-<p>Runnable AutoSD assets live under
-<a href="https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd"><code>platforms/autosd/</code></a>
-in the Open AD Kit repository. Each use-case directory contains at least:</p>
+<h1 id="autosd">AutoSD<a class="headerlink" href="#autosd" title="Permanent link">#</a></h1>
+<p>AutoSD (Automotive Stream Distribution) is the public, in-development preview of
+<strong>Red Hat In-Vehicle OS</strong>. It is built on CentOS Stream with an automotive
+kernel and provides:</p>
 <ul>
-<li><strong>Quadlet files</strong> to define containerized services managed by Podman and systemd</li>
-<li><strong>Automotive Image Builder files</strong> to build an AutoSD image</li>
+<li><strong>Mixed criticality</strong>: safety-critical containers in the root partition,
+  non-critical ones in an isolated QM partition</li>
+<li><strong>Atomic updates</strong>: immutable OSTree images with A/B updates and rollback</li>
+<li><strong>Real-time kernel</strong> for deterministic scheduling</li>
+<li><strong>Container-native runtime</strong>: Podman, Quadlet (systemd container units), and
+  BlueChi orchestration, with no Docker daemon</li>
 </ul>
-<p>Build and run commands on this page assume you are inside a use-case directory
-such as <code>platforms/autosd/planning-simulator/</code>.</p>
+<h2 id="in-this-repository">In This Repository<a class="headerlink" href="#in-this-repository" title="Permanent link">#</a></h2>
+<p>AutoSD assets live under
+<a href="https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd"><code>platforms/autosd/</code></a>.
+Each use case contains Quadlet files for its services and Automotive Image
+Builder files for its OS image.</p>
 <ul>
-<li><a href="planning-simulator/">Planning Simulator</a>: Platform demo that runs
-  Autoware planning and TIER IV Scenario Simulator under Podman/Quadlet</li>
+<li><a href="planning-simulator/">Planning Simulator</a>: Autoware planning and
+  Scenario Simulator under Podman and Quadlet</li>
 <li><a href="https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/x5h">R-Car X5H</a>:
-  AutoSD 10 rootfs for the R-Car X5H board, netbooted under the BSP or a rebuilt
-  AutoSD-aligned kernel and QEMU-gated before board bring-up</li>
+  AutoSD 10 image for the R-Car X5H board, tested in QEMU before board bring-up</li>
 </ul>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">#</a></h2>
-<table>
-<thead>
-<tr>
-<th>Path</th>
-<th>Needs</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Container script (recommended)</td>
-<td>Docker or Podman, QEMU</td>
-</tr>
-<tr>
-<td>Automotive Image Builder on the host</td>
-<td>RPM-based Linux (Fedora, CentOS, or RHEL), Automotive Image Builder, OSBuild, QEMU</td>
-</tr>
-</tbody>
-</table>
-<h2 id="building-an-autosd-image">Building an AutoSD Image<a class="headerlink" href="#building-an-autosd-image" title="Permanent link">#</a></h2>
-<p>This section guides you through running <code>automotive-image-builder</code> from a
-container. From a clone of this repository, <code>cd</code> into a use-case directory
-(for example <code>platforms/autosd/planning-simulator/</code>) before running the
-commands below.</p>
-<p>First, download the runner script and build the builder container:</p>
+<div class="admonition note">
+<p class="admonition-title">Current scope</p>
+<p>These are platform demos. They run upstream Autoware images, not the modular
+Open AD Kit component images. Mapping the components onto AutoSD's
+root and QM partitions is on the <a href="../../releases/">roadmap</a>.</p>
+</div>
+<h2 id="building-an-autosd-image">Build an Image<a class="headerlink" href="#building-an-autosd-image" title="Permanent link">#</a></h2>
+<p>You need Docker or Podman and QEMU. Run these commands from a use-case directory
+such as <code>platforms/autosd/planning-simulator/</code>.</p>
+<p>Download the Automotive Image Builder runner and build its container:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fL<span class="w"> </span>-o<span class="w"> </span>auto-image-builder.sh<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="s2">"https://gitlab.com/CentOS/automotive/src/automotive-image-builder/-/raw/main/auto-image-builder.sh?ref_type=heads"</span>
 chmod<span class="w"> </span>+x<span class="w"> </span>auto-image-builder.sh
 sudo<span class="w"> </span>bash<span class="w"> </span>./auto-image-builder.sh<span class="w"> </span>build-builder<span class="w"> </span>--distro<span class="w"> </span>autosd10-sig
 </code></pre></div>
-<p>Now build the image (requires sudo/root). The positionals are the manifest,
-the container image, and the optional bootable disk image:</p>
+<p>Build the image. The arguments are the manifest, the container image name, and
+the disk image to write:</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>bash<span class="w"> </span>./auto-image-builder.sh<span class="w"> </span>build<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--distro<span class="w"> </span>autosd10-sig<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--target<span class="w"> </span>qemu<span class="w"> </span><span class="se">\</span>
@@ -2032,100 +1946,30 @@ the container image, and the optional bootable disk image:</p>
 <span class="w">  </span>aib/image.aib.yml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>localhost/awf-oak:latest<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>disk.qcow2
+sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>logname<span class="k">)</span><span class="s2">"</span><span class="w"> </span>disk.qcow2
 </code></pre></div>
-<p>You may want to change the owner of <code>disk.qcow2</code>:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>chown<span class="w"> </span><span class="k">$(</span>logname<span class="k">)</span><span class="w"> </span>disk.qcow2
-</code></pre></div>
-<p>You can now use QEMU to run the image from a mounted QEMU disk.</p>
-<h2 id="running-the-image">Running the Image<a class="headerlink" href="#running-the-image" title="Permanent link">#</a></h2>
-<p>If you have <code>air</code> available:</p>
+<p>To run Automotive Image Builder directly instead, use an RPM-based host (Fedora,
+CentOS, or RHEL) with Automotive Image Builder, OSBuild, and QEMU installed.</p>
+<h2 id="run-the-image">Run the Image<a class="headerlink" href="#run-the-image" title="Permanent link">#</a></h2>
+<p>With <code>air</code> installed:</p>
 <div class="highlight"><pre><span></span><code>air<span class="w"> </span>disk.qcow2
 </code></pre></div>
-<p>Otherwise, use the following example QEMU command:</p>
+<p>Or with QEMU directly:</p>
 <div class="highlight"><pre><span></span><code>/usr/bin/qemu-system-x86_64<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span>/usr/share/OVMF/OVMF_CODE.fd,if<span class="o">=</span>pflash,format<span class="o">=</span>raw,unit<span class="o">=</span><span class="m">0</span>,readonly<span class="o">=</span>on<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span>/usr/share/OVMF/OVMF_VARS.fd,if<span class="o">=</span>pflash,format<span class="o">=</span>raw,unit<span class="o">=</span><span class="m">1</span>,snapshot<span class="o">=</span>on,readonly<span class="o">=</span>off<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-smp<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-nographic<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-enable-kvm<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-m<span class="w"> </span>2G<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-m<span class="w"> </span><span class="m">16384</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-machine<span class="w"> </span>q35<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-cpu<span class="w"> </span>host<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-device<span class="w"> </span>virtio-net-pci,netdev<span class="o">=</span>n0,mac<span class="o">=</span>FE:00:e2:0d:ba:4d<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-netdev<span class="w"> </span>user,id<span class="o">=</span>n0,net<span class="o">=</span><span class="m">10</span>.0.2.0/24,hostfwd<span class="o">=</span>tcp::2222-:22<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-drive<span class="w"> </span><span class="nv">file</span><span class="o">=</span>disk.qcow2,index<span class="o">=</span><span class="m">0</span>,media<span class="o">=</span>disk,format<span class="o">=</span>qcow2,if<span class="o">=</span>virtio,id<span class="o">=</span>rootdisk,snapshot<span class="o">=</span>off
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Memory sizing</p>
-<p><code>-m 2G</code> only boots and explores the AutoSD image. The full Open AD Kit stack
-needs much more — see the <a href="../hardware/">hardware requirements</a>
-(16 GB minimum, 32 GB recommended) — so raise <code>-m</code> accordingly: start at
-<code>-m 16384</code>, or <code>-m 32768</code> for heavier workloads.</p>
-</div>
-<h2 id="current-demo-vs-target-architecture">Current demo vs target architecture<a class="headerlink" href="#current-demo-vs-target-architecture" title="Permanent link">#</a></h2>
-<div class="admonition note">
-<p class="admonition-title">Platform demo, not modular Open AD Kit images</p>
-<p>The in-repo <a href="planning-simulator/">Planning Simulator</a> path is a
-<strong>platform demo</strong>. It does <strong>not</strong> run the modular
-<code>ghcr.io/autowarefoundation/openadkit:*</code> component images used by Docker
-Compose deployments. Automotive Image Builder pins two upstream images:</p>
-<ul>
-<li><code>ghcr.io/autowarefoundation/autoware:universe-0.45.1-amd64</code> → <code>localhost/autoware:latest</code></li>
-<li><code>ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime</code> → <code>localhost/scenario_simulator_v2:runtime</code></li>
-</ul>
-<p>After boot, systemd runs two containers in one pod (<code>awf-oak-planning</code> and
-<code>awf-oak-simulator</code>) plus a map extraction oneshot. That is not the full
-map/planning/control/vehicle/api/visualizer split, and not BlueChi
-multi-host orchestration.</p>
-</div>
-<p>AutoSD's mixed-criticality features remain a natural <strong>target</strong> home for Open AD
-Kit's component model on production profiles (see
-<a href="../../releases/">Releases &amp; Roadmap</a>):</p>
-<div class="oak-component-grid oak-component-grid--four">
-
-<div class="oak-component-item">
-<strong>Root Partition</strong>
-<span>Higher-criticality workloads (planning, control, vehicle interface) can map to the privileged root partition with RT scheduling.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>QM Partition</strong>
-<span>Non-critical workloads (visualizer, simulator, development tools) can be isolated in the QM partition for safety containment.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>OSTree / Bootc</strong>
-<span>Atomic, rollback-capable updates. The entire OS is versioned and updated as a unit, matching Open AD Kit's container-native philosophy.</span>
-</div>
-
-<div class="oak-component-item">
-<strong>BlueChi + Quadlet</strong>
-<span>Container orchestration via systemd units. Production profiles may map each Open AD Kit component to a Quadlet service; BlueChi is available for multi-host orchestration.</span>
-</div>
-
-</div>
-
-<pre class="mermaid"><code>flowchart LR
-    subgraph Today["Current demo (in repo)"]
-        direction TB
-        M[awf-oak-map oneshot] --&gt; P[awf-oak-planning&lt;br/&gt;autoware:universe]
-        P --- S[awf-oak-simulator&lt;br/&gt;scenario_simulator_v2]
-    end
-
-    subgraph Target["Target mixed-criticality mapping"]
-        direction TB
-        subgraph Root["Root partition"]
-            R1[Planning]
-            R2[Control]
-            R3[Vehicle System]
-        end
-        subgraph QM["QM partition"]
-            Q1[Visualizer]
-            Q2[Simulator]
-        end
-    end
-
-    Today -.-&gt; Target</code></pre>
+<p><code>-m 16384</code> (16 GB) is the minimum for the Autoware stack; use <code>-m 32768</code> for
+heavier workloads. <code>-m 2G</code> is enough only to boot and explore the OS.</p>
 
 
 
@@ -2180,13 +2024,13 @@ Kit's component model on production profiles (see
         
         
           
-          <a href="planning-simulator/" class="md-footer__link md-footer__link--next" aria-label="Next: AutoSD + Planning + Simulator">
+          <a href="planning-simulator/" class="md-footer__link md-footer__link--next" aria-label="Next: AutoSD Planning Simulator">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                AutoSD + Planning + Simulator
+                AutoSD Planning Simulator
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -2230,7 +2074,7 @@ Kit's component model on production profiles (see
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

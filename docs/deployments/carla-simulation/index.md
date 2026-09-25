@@ -4,57 +4,42 @@ Run the full modular Autoware stack against CARLA 0.9.16 in closed loop.
 
 ## Requirements
 
-Host (no ROS install required):
+- amd64 host with Ubuntu 22.04 (CARLA 0.9.16 is not validated on 24.04)
+- NVIDIA GPU with the Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
+- ROS 2 Humble images; this deployment does not support Jazzy
 
-- amd64 and Ubuntu 22.04
-- Docker with NVIDIA Container Toolkit
-- NVIDIA GPU and Vulkan ICD at `/usr/share/vulkan/icd.d/nvidia_icd.json`
-- Host X access only for optional windowed rendering; offscreen mode is default
-
-Container images use ROS 2 Humble (including the default
-`sensing-perception-cuda` Autoware image). CARLA 0.9.16 uses Unreal Engine 4.26
-and is not validated on Ubuntu 24.04.
-
-## Setup
-
---8<-- "includes/cli-command-context.md"
-
-Install Docker and the NVIDIA toolkit once:
+Install Docker and the NVIDIA toolkit once, as described in the
+[Quickstart](../../getting-started/index.md), with GPU support:
 
 ```bash
 openadkit setup --gpu --verify
 ```
 
---8<-- "includes/docker-group-activation.md"
-
-CARLA is a curated CLI deployment in both installed and source-checkout
-runtimes. It is Humble-only and requires `--gpu`. Setup configures NVIDIA and
-the DDS UDP buffers; `run` downloads the Town01 map.
-
 ## Run
+
+--8<-- "includes/cli-command-context.md"
 
 ```bash
 openadkit run carla-simulation --gpu
 ```
 
-`run` checksum-validates the Town01 assets, starts CARLA and the modular stack,
-and waits for Compose readiness. If startup fails after containers are created,
-use the stop command below to release their GPU and host resources.
+`run` downloads and verifies the Town01 map, then starts CARLA and the Autoware
+stack. CARLA renders offscreen by default.
 
-`config/sensor_mapping.yaml` enables LiDAR, IMU, and GNSS by default. Camera
-entries are available but commented out.
+`config/sensor_mapping.yaml` enables LiDAR, IMU, and GNSS. Camera entries are
+available but commented out.
 
 --8<-- "includes/visualizer-remote-access.md"
 
-Set a goal with **2D Goal Pose** and select **Auto** in RViz2.
+In RViz2, set a goal with **2D Goal Pose** and select **Auto**.
 
-## Stop
+## Stop and Recover
 
 ```bash
 openadkit stop carla-simulation
 ```
 
-If autonomous mode is unavailable, inspect `/system/command_mode/availability`
-and `/diagnostics_graph/status` rather than overriding availability. For common
-Docker, GPU, and visualizer issues, see
+Run `stop` also after a failed start, to release the GPU. If autonomous mode is
+unavailable, inspect `/system/command_mode/availability` and
+`/diagnostics_graph/status`. For other issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

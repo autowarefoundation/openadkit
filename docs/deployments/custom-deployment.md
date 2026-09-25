@@ -1,8 +1,22 @@
 # Custom Deployment
 
-Start from an existing deployment in a source checkout and adapt it to your task.
-Each deployment selects shared services using native Docker Compose `include`;
-its Compose file defines the dependencies and deployment-specific overrides.
+Build your own stack by copying an existing deployment in a source checkout.
+
+## How Deployments Are Built
+
+Each service is defined once in
+[`deployments/shared/services/`](https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services),
+one file per service. A deployment directory contains:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yaml` | Selects services with `include`, sets `depends_on`, and adds deployment-specific settings or services. It is the source of truth for the service set. |
+| `config.env` | Values the selected services need, such as map paths and simulator settings. |
+| `config.gpu.env` | GPU settings loaded with `--gpu`. Required when `deployment.json` lists `gpuFiles`. |
+| `deployment.json` | Supported architectures, ROS distros, GPU requirement, data downloads, and one-shot services to reset on each run. |
+
+Container ROS and DDS settings shared by all deployments live in
+`deployments/shared/runtime.env`.
 
 ## Start from Planning Simulation
 
@@ -13,10 +27,8 @@ cp -r deployments/planning-simulation deployments/my-simulation
 ```
 
 In the copied `deployment.json`, set `name` to `my-simulation` and update
-`description`. Keep the other settings for this planning-based example, including
-`"shared": ["shared"]`, the map download, and `resetServices`.
-
-Add this entry to the `deployments` object in the root `openadkit.json`:
+`description`. Then register it in the `deployments` object of the root
+`openadkit.json`:
 
 ```json
 "my-simulation": {
@@ -24,21 +36,10 @@ Add this entry to the `deployments` object in the root `openadkit.json`:
 }
 ```
 
-The inventory entry makes the deployment available to the CLI.
-
 ## Customize the Stack
 
-| File | What to change |
-|------|----------------|
-| `docker-compose.yaml` | Select services with `include`, define `depends_on`, and add deployment-specific settings or services. |
-| `config.env` | Supply the parameters needed by the selected services, such as map paths and simulator settings. Use ignored `config.local.env` for personal overrides. |
-| `config.gpu.env` | Required when `deployment.json` lists `gpuFiles`. Loaded after `config.env` for `openadkit validate <deployment> --gpu` and `openadkit run <deployment> --gpu`; override interpolations here instead of restating a shared service command. |
-| `deployment.json` | Declare supported architectures, ROS distros, GPU requirements, downloads, and one-shot services to reset on each run. |
-
-Shared service definitions live in
-[`deployments/shared/services/`](https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services).
-For example, these excerpts from the copied Compose file select the visualizer
-and define its dependency:
+Add or remove services in `docker-compose.yaml`. A block under `services:`
+customizes an included service; it does not create a second container:
 
 ```yaml
 include:
@@ -51,30 +52,22 @@ services:
       - map
 ```
 
-The `visualizer` block customizes the included service; it does not create a
-second container. Add only the settings that differ. Deployment-only services
-can be defined directly in the same file.
+Add only the settings that differ. Deployment-only services can be defined
+directly in the same file. When removing a service, also check `depends_on`,
+`pid`, and `resetServices`: most shared services use `pid: service:map` and need
+the `map` service.
 
-Compose is the source of truth for the service set; there is no service list in
-`deployment.json`. When removing a service, check references from `depends_on`,
-`pid`, and `resetServices`. Most shared services use `pid: service:map` and need
-the `map` service in the project.
-
-Shared ROS/DDS settings live in `shared/runtime.env`, loaded inside containers
-via `env_file`. Keep communicating services on the same ROS domain and middleware.
-Keep the visualizer's entrypoint and command intact so noVNC and RViz start
-together; use `config.local.env` to set `REMOTE_PASSWORD`.
+Keep communicating services on the same ROS domain and middleware. For the
+order in which env files are loaded, see
+[Configuration](../getting-started/cli.md#configuration).
 
 ## Validate and Run
 
 ```bash
 ./openadkit validate my-simulation
 ./openadkit run my-simulation
-./openadkit logs my-simulation --follow
 ./openadkit stop my-simulation
 ```
 
-Validate each distro and GPU mode you declare. See
-[Logging Simulation](logging-simulation/index.md) for a GPU overlay
-(`config.gpu.env` plus image/runtime overrides) and
-[CARLA Simulation](carla-simulation/index.md) for deployment-specific services.
+Validate every distro and GPU mode you declare. Logging Simulation is an example
+of a GPU overlay; CARLA Simulation is an example of deployment-only services.

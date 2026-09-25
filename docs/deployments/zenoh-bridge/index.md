@@ -1,11 +1,8 @@
 # Zenoh Bridge
 
-Bridge an edge Autoware domain to a separate visualization and control domain
-inside one Compose project. The edge runs Autoware and simulation; the cloud
-side runs browser-based RViz2. Zenoh carries selected ROS 2 topics between the
-isolated domains without publishing its transport port to the host.
-
-## Architecture
+Split Autoware and its visualization into separate ROS 2 domains and connect
+them with Zenoh. The edge side runs Autoware and the simulator; the cloud side
+runs browser-based RViz2. Both run on one host in one Compose project.
 
 ```mermaid
 flowchart LR
@@ -19,55 +16,41 @@ flowchart LR
     EB -->|Internal TCP 7448| CB
 ```
 
-The separate ROS domain IDs prevent native DDS cross-traffic. Configure topic
-filters and namespaces in `config/zenoh-bridge-ros2dds.json5`.
+This deployment needs a source checkout. It is not part of the release bundle
+and is not managed by `openadkit run`.
 
 ## Setup
 
+From the repository root, after the [Quickstart](../../getting-started/index.md)
+setup:
+
 ```bash
-./openadkit setup --verify
-./openadkit fetch scenario-simulation
+./openadkit fetch scenario-simulation   # the Kashiwanoha map
 cd deployments/zenoh-bridge
 ```
 
---8<-- "includes/docker-group-activation.md"
-
-This standalone deployment requires a source checkout and is not included in
-the unified release bundle or manifest-driven CLI. Override these in the
-environment or `config.env` before invoking the helpers:
+Set these in the shell or in `config.env`:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `MAP_PATH` | Kashiwanoha map directory | `$HOME/autoware_map/kashiwanoha_map` |
-| `REMOTE_PASSWORD` | Required noVNC password | `openadkit` |
+| `REMOTE_PASSWORD` | noVNC password | `openadkit` |
 
-The deployment uses wall time and does not bridge `/clock`.
-
-!!! note "Internal Zenoh transport"
-    TCP 7448 has no authentication or encryption, so it remains inside the
-    dedicated Compose network and is not published to the host.
+Topic filters and namespaces are in `config/zenoh-bridge-ros2dds.json5`.
 
 ## Run
 
-### Full Project
-
 ```bash
 ./cloud.sh up -d
-./edge.sh up -d
+./edge.sh up -d            # add --no-sim to skip the scenario simulator
 ```
 
-### Selected Groups
-
-```bash
-./cloud.sh up -d
-./edge.sh up -d --no-sim
-```
-
-The edge helper starts Autoware, the edge bridge, and Scenario Simulator unless
-`--no-sim` is selected. The cloud helper starts the cloud bridge and visualizer.
-
-Open the visualizer at `https://localhost:6081/vnc.html` and use
+Open the visualizer at `https://localhost:6081/vnc.html` and sign in with
 `REMOTE_PASSWORD`.
+
+The Zenoh link (TCP 7448) has no authentication or encryption, so it stays
+inside the Compose network and is not published to the host. The bridge does not
+forward `/clock`; both sides use wall time.
 
 ## Teleoperation
 
@@ -77,38 +60,30 @@ Open the visualizer at `https://localhost:6081/vnc.html` and use
 ./run_teleop.sh
 ```
 
-Use `./edge.sh up -d --no-sim` to run Autoware without the scenario simulator.
+Start the edge with `--no-sim` to drive Autoware without the scenario simulator.
 
 | Key | Action |
 |-----|--------|
 | `W` / `S` | Throttle / brake |
 | `A` / `D` | Steer |
-| `Z` | Toggle the operation mode between `STOP` and the configured `operator_mode` (`REMOTE` by default) |
+| `Z` | Toggle between `STOP` and the configured `operator_mode` (`REMOTE` by default) |
 | `X` / `C` / `V` | Drive / reverse / park |
 | `M` | Cycle drive mode |
-| `R` | Cycle the configured initial-pose presets and seed the pose |
+| `R` | Cycle the initial-pose presets and set the pose |
 | `Space` | Emergency stop or resume |
 | `Q` | Quit |
 
-For a fresh `--no-sim` session, press `R` to cycle the initial-pose presets,
-`Z` to leave `STOP`, choose a gear with `X` or `C`, select the drive mode with
-`M`, then use the movement keys.
+In a `--no-sim` session: press `R` to set a pose, `Z` to leave `STOP`, choose a gear
+with `X` or `C`, select a drive mode with `M`, then steer and accelerate.
 
 ## Stop and Troubleshoot
 
 ```bash
-./cloud.sh ps
-./edge.sh ps
-./cloud.sh logs
 ./edge.sh logs
+./cloud.sh logs
 ./edge.sh down
 ./cloud.sh down
 ```
 
-If a bridge is not ready, inspect the helper logs. Host port **6081** must be
-free; Zenoh ports **7447** and **7448** stay inside the Compose networks.
-Re-fetch the map from the repository root with
-`./openadkit fetch scenario-simulation --force`.
-
-The `autoware` service uses the digest-pinned upstream image declared directly
-in `docker-compose.yaml`.
+Host port 6081 must be free. If the map is missing, run
+`./openadkit fetch scenario-simulation --force` from the repository root.

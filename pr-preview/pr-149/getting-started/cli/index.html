@@ -2094,6 +2094,8 @@ openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 </code></pre></div>
 <p>Pass the deployment name. Without it, these commands only list what is running.
 One deployment runs at a time; <code>run</code> asks you to stop the current one first.
+After starting, <code>run</code> watches the services for 10 seconds and fails if one
+crashes.
 <code>openadkit run &lt;deployment&gt; --pull always</code> refreshes images before starting,
 and <code>openadkit --version</code> prints the installed version.</p>
 <h2 id="validate-before-running">Validate Before Running<a class="headerlink" href="#validate-before-running" title="Permanent link">#</a></h2>

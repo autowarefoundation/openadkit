@@ -26,6 +26,9 @@ openadkit run carla-simulation --gpu
 `run` downloads and verifies the Town01 map, then starts CARLA and the Autoware
 stack. CARLA renders offscreen by default.
 
+To run Autoware and CARLA on separate hosts, see
+[Split-host simulation](../split-host.md).
+
 `config/sensor_mapping.yaml` enables LiDAR, IMU, and GNSS. Camera entries are
 available but commented out.
 

@@ -1,0 +1,63 @@
+# Autoware-side services for scenario simulation.
+#
+# Shared by the single-host entry point (docker-compose.yaml) and the
+# `--role autoware` view (this file plus deployments/shared/compose.zenoh.yaml,
+# attached by the CLI). The scenario runner lives in services.scenario.yaml.
+include:
+  - ../shared/services/map-check.yaml
+  - ../shared/services/map.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/simulator.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
+
+services:
+  map:
+    depends_on:
+      map-check:
+        condition: service_completed_successfully
+
+  planning:
+    depends_on:
+      - map
+
+  vehicle:
+    depends_on:
+      - map
+
+  system:
+    depends_on:
+      - map
+    volumes:
+      - ./config/mrm_handler.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro
+
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
+  # Scenario Simulator V2 adapter. Stays on the Autoware host in split mode:
+  # only the TIER IV runner and its simple sensor simulator move to the scenario
+  # host.
+  simulator:
+    depends_on:
+      map:
+        condition: service_started
+      system:
+        condition: service_started
+      vehicle:
+        condition: service_started
+
+  api:
+    depends_on:
+      - map
+    volumes:
+      - ./config/default_adapi.param.yaml:/opt/autoware/autoware_default_adapi_universe/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro
+
+  visualizer:
+    depends_on:
+      - map

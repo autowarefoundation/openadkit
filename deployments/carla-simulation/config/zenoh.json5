@@ -1,0 +1,63 @@
+// Zenoh bridge allowlist for split-host carla-simulation.
+//
+// Applied by both role graphs (--role autoware and --role carla): either host
+// can own an endpoint, so publishers/subscribers and service servers/clients
+// list the same routes. Entries are full-name regular expressions, not globs.
+// When `allow` is set, an omitted/empty type list means none.
+//
+// This is the documented starting inventory derived from the pinned
+// carla-interface image and sensor_mapping.yaml. It covers the interface
+// inputs that only exist on the Autoware host (localization odometry and the
+// RViz initial pose), the enabled lidar/IMU/GNSS sensors, clock, control,
+// vehicle status, and transforms. Cameras are disabled. Reconcile with the
+// live ROS graph and add any remaining service endpoints before the two-host
+// acceptance gate.
+{
+  plugins: {
+    ros2dds: {
+      allow: {
+        publishers: [
+          "/clock",
+          "/tf",
+          "/tf_static",
+          "/vehicle/status/.*",
+          "/control/command/.*",
+          "/localization/kinematic_state",
+          "/initialpose",
+          "/sensing/lidar/top/pointcloud_before_sync",
+          "/sensing/imu/tamagawa/imu_raw",
+          "/sensing/gnss/pose_with_covariance",
+        ],
+        subscribers: [
+          "/clock",
+          "/tf",
+          "/tf_static",
+          "/vehicle/status/.*",
+          "/control/command/.*",
+          "/localization/kinematic_state",
+          "/initialpose",
+          "/sensing/lidar/top/pointcloud_before_sync",
+          "/sensing/imu/tamagawa/imu_raw",
+          "/sensing/gnss/pose_with_covariance",
+        ],
+        service_servers: [
+          "/control/control_mode_request",
+        ],
+        service_clients: [
+          "/control/control_mode_request",
+        ],
+        action_servers: [],
+        action_clients: [],
+      },
+
+      // Keep bridge-side query timeouts generous enough for the vehicle
+      // control-mode request; add endpoints from the live-graph audit here.
+      queries_timeout: {
+        services: [
+          "/control/control_mode_request=30.0",
+          ".*=10.0",
+        ],
+      },
+    },
+  },
+}

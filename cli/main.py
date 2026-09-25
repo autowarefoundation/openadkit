@@ -40,6 +40,14 @@ class OpenADKitParser(argparse.ArgumentParser):
         list_deployments(root, kit)
 
 
+def add_role_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--role",
+        metavar="ROLE",
+        help="split-host role from this deployment's manifest (omit for single host)",
+    )
+
+
 def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> None:
     parser.add_argument(
         "deployment",
@@ -115,6 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
         "validate", help="validate a deployment without starting it"
     )
     add_run_arguments(validate)
+    add_role_argument(validate)
     validate.add_argument(
         "--data",
         action="store_true",
@@ -137,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = subparsers.add_parser("run", help="fetch data and start a deployment")
     add_run_arguments(run)
+    add_role_argument(run)
     run.add_argument(
         "--pull",
         choices=("missing", "always", "never"),
@@ -412,6 +422,7 @@ def main() -> int:
             kit,
             args.ros_distro,
             getattr(args, "gpu", False),
+            role=getattr(args, "role", None),
             require_gpu=args.command != "fetch",
         )
         if args.command == "fetch":
@@ -436,6 +447,7 @@ def main() -> int:
                             "manifestValid": True,
                             "rosDistro": selection.ros_distro,
                             "gpu": selection.gpu,
+                            "role": selection.role,
                             "dataValid": (
                                 None
                                 if results is None
@@ -475,6 +487,9 @@ def main() -> int:
                 f"{', '.join(others)} is already running; stop it first: "
                 f"openadkit stop {others[0]}"
             )
+        conflict = compose.live_state_conflict(deployment, selection)
+        if conflict:
+            raise OpenADKitError(conflict)
         data.install_data(deployment, selection, args.force)
         compose.create_writable_mounts(deployment, selection)
         compose.start(deployment, selection, args.pull)
@@ -493,7 +508,14 @@ def main() -> int:
         return show_running(root, kit, args.command, running, extra=extra)
     deployment = get_deployment(root, kit, args.deployment)
     warn_if_modified(root, deployment, kit)
-    selection = deployment.select(kit, None, False, operational=True)
+    role = compose.live_role(deployment)
+    if role is not None and not deployment.has_role(role):
+        print(
+            f"warning: saved role {role} is no longer defined; using the default view",
+            file=sys.stderr,
+        )
+        role = None
+    selection = deployment.select(kit, None, False, role=role, operational=True)
     if args.command == "status":
         compose.status(deployment, selection)
     elif args.command == "logs":

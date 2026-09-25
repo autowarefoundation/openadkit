@@ -156,11 +156,18 @@ def selected_resources(
     include_gpu: bool | None = None,
 ) -> list[dict[str, Any]]:
     want_gpu = selection.gpu if include_gpu is None else include_gpu
-    return [
+    resources = [
         resource
         for resource in deployment.data
         if want_gpu or not resource.get("gpu", False)
     ]
+    if selection.role is not None:
+        resources = [
+            resource
+            for resource in resources
+            if not resource.get("roles") or selection.role in resource["roles"]
+        ]
+    return resources
 
 
 def resolve_destination(resource: dict[str, Any], selection: Selection) -> Path:

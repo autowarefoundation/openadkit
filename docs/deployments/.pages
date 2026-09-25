@@ -4,5 +4,5 @@ nav:
   - Scenario Simulation: scenario-simulation
   - Logging Simulation: logging-simulation
   - CARLA Simulation: carla-simulation
-  - Zenoh Bridge: zenoh-bridge
+  - Split-host simulation: split-host.md
   - Custom Deployment: custom-deployment.md

@@ -88,9 +88,15 @@ openadkit clean planning-simulation            # report only
 openadkit clean planning-simulation --data     # delete
 ```
 
-`clean --data` refuses while that deployment is running. Scenario Simulation's
-Kashiwanoha map is shared with the Zenoh bridge; restore it with
+`clean --data` refuses while that deployment is running. If Scenario
+Simulation's Kashiwanoha map is removed, restore it with
 `openadkit fetch scenario-simulation --force`.
+
+## Split-host roles
+
+`validate` and `run` accept `--role` for
+[split-host simulation](../deployments/split-host.md). `status`, `logs`, and
+`stop` restore the live role from the Compose project and do not take `--role`.
 
 ## Verify a Release Bundle Manually
 

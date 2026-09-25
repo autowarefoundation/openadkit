@@ -1,0 +1,95 @@
+# Autoware-side services for CARLA simulation.
+#
+# Shared by the single-host entry point (docker-compose.yaml, which restores
+# the carla-interface edges) and the `--role autoware` view (this file plus
+# deployments/shared/compose.zenoh.yaml, attached by the CLI). No service here
+# depends on a CARLA service: the sim-local edges are added back only by the
+# default entry file.
+include:
+  - ../shared/services/map-check.yaml
+  - ../shared/services/map.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/sensing.yaml
+  - ../shared/services/perception.yaml
+  - ../shared/services/localization.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
+
+services:
+  map:
+    depends_on:
+      map-check:
+        condition: service_completed_successfully
+
+  # SYSTEM_DIAGNOSTICS_GRAPH=autoware-carla.yaml (config.env) selects the
+  # CARLA diagnostics graph; the shared system definition is unchanged.
+  system:
+    depends_on:
+      - map
+
+  sensing:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    depends_on:
+      - map
+      - system
+
+  perception:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    depends_on:
+      - map
+      - sensing
+      - system
+
+  localization:
+    depends_on:
+      - map
+      - sensing
+      - perception
+      - system
+
+  planning:
+    depends_on:
+      - map
+      - localization
+      - perception
+      - system
+
+  vehicle:
+    depends_on:
+      - map
+
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
+  api:
+    depends_on:
+      - map
+      - system
+
+  # The visualizer renders CARLA on the GPU, so it needs the graphics caps.
+  visualizer:
+    container_name: autoware-e2e-visualizer
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
+      - RVIZ_GPU=auto
+    depends_on:
+      - map
+      - api
+      - planning
+      - control

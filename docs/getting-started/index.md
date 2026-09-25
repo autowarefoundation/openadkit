@@ -137,8 +137,8 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 ## Next Steps
 
 **[Explore the other deployments](../deployments/index.md)** - scenario testing,
-rosbag replay, and CARLA, plus a standalone source-checkout workflow for
-distributed cloud-edge operation with Zenoh.
+rosbag replay, and CARLA. Split-host (`--role` over Zenoh) is documented but
+unreleased until the remaining two-host gates land.
 
 - [CLI & Maintenance](cli.md) - Runtime controls, validation, upgrades, and cleanup
 - [Components](../components/index.md) - The architecture behind what you just ran

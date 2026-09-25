@@ -1,64 +1,38 @@
 # Logging Simulation
 
-Replay a demo rosbag through sensing, perception, and localization while map,
-system, and visualization services provide the supporting runtime. An NVIDIA
-GPU with at least 4 GB VRAM is strongly recommended; CPU operation is supported
-but substantially slower.
+Replay a demo rosbag through sensing, perception, and localization. An NVIDIA
+GPU with at least 4 GB VRAM is recommended; CPU mode works but is much slower.
 
-## Setup
+Complete the [Quickstart](../../getting-started/index.md) setup first. For GPU
+mode, run `openadkit setup --gpu --verify`.
+
+## Run
 
 --8<-- "includes/cli-command-context.md"
 
 ```bash
-openadkit setup --verify
+openadkit run logging-simulation         # CPU: clustering-based detection
+openadkit run logging-simulation --gpu   # GPU: CenterPoint on CUDA (amd64 only)
 ```
 
-Use `openadkit setup --gpu --verify` to install and verify the NVIDIA
-Container Toolkit. GPU mode downloads the pinned CenterPoint models into
-`~/autoware_data/lidar_centerpoint`; CPU mode uses clustering and does not
-select those models.
+--8<-- "includes/ros-distro.md"
 
---8<-- "includes/docker-group-activation.md"
+`run` downloads the sample map and rosbag, and with `--gpu` also the CenterPoint
+models (to `~/autoware_data/lidar_centerpoint`). The rosbag starts playing once
+Autoware is ready.
 
-The demo rosbag is Copyright 2020 TIER IV, Inc. It contains no camera images,
-so traffic-light recognition is unavailable and object detection is less
-complete than with a full recording.
-
-## Start the Stack
-
-```bash
-openadkit run logging-simulation
-```
-
-For NVIDIA acceleration:
-
-```bash
-openadkit run logging-simulation --gpu
-```
-
-The CUDA image is amd64-only.
-Add `--ros-distro jazzy` to either run command to select Jazzy; Humble is the
-default.
+The demo rosbag is Copyright 2020 TIER IV, Inc. It has no camera images, so
+traffic-light recognition is unavailable and detection is less complete than
+with a full recording.
 
 --8<-- "includes/visualizer-remote-access.md"
-
-## Play the Rosbag
-
-The rosbag profile starts automatically with the deployment.
-
-Playback waits for `ROSBAG_READY_TOPIC` for up to `ROSBAG_READY_TIMEOUT` seconds
-before starting.
 
 ## Stop and Recover
 
 ```bash
-openadkit status logging-simulation
-openadkit logs logging-simulation --follow
 openadkit stop logging-simulation
 ```
 
-The rosbag service uses a digest-pinned upstream `autoware:universe` image in a
-release. Put local overrides in
-`deployments/logging-simulation/config.local.env`. To replace missing sample
-data, run `openadkit fetch logging-simulation --force`. For common issues, see
+To replace missing sample data, run `openadkit fetch logging-simulation --force`;
+it also refreshes the CenterPoint models. For other issues, see
 [Troubleshooting](../../getting-started/troubleshooting.md).

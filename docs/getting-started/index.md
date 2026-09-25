@@ -74,26 +74,11 @@ From zero to a running Autoware planning simulation in about 10 minutes. No GPU 
       | bash -s -- install --version vX.Y.Z
     ```
 
-    To inspect the bundle before running anything, download and verify it
-    manually against the release metadata:
+    To verify the bundle yourself before running it, see
+    [Verify a Release Bundle Manually](cli.md#verify-a-release-bundle-manually).
 
-    ```bash
-    VERSION=$(curl -fsSL \
-      https://api.github.com/repos/autowarefoundation/openadkit/releases/latest \
-      | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')
-    curl -fLO "https://github.com/autowarefoundation/openadkit/releases/download/${VERSION}/openadkit-${VERSION}.tar.gz"
-    curl -fLO "https://github.com/autowarefoundation/openadkit/releases/download/${VERSION}/release-metadata.json"
-    EXPECTED=$(python3 -c 'import json; print(json.load(open("release-metadata.json"))["bundles"][0]["sha256"])')
-    printf '%s  %s\n' "$EXPECTED" "openadkit-${VERSION}.tar.gz" | sha256sum --check -
-    tar -xzf "openadkit-${VERSION}.tar.gz"
-    cd "openadkit-${VERSION}"
-    ```
-
-    The extracted bundle is the same runtime; run it with `./openadkit` from the
-    extracted directory.
-
-The release bundle contains only the runtime entry point and deployment assets.
-A source checkout also contains `components/`, CI, tests, and development tools.
+The release bundle contains only the runtime and deployment assets. A source
+checkout also contains the image sources, CI, and development tools.
 
 ## 2. Set Up the Host {: #set-up-the-host }
 
@@ -120,9 +105,8 @@ openadkit run planning-simulation
 Add `--ros-distro jazzy` to select Jazzy. Humble is the default in both source
 checkouts and release bundles.
 
-`run` downloads and verifies the sample map, pulls missing images, waits for
-Compose readiness, and verifies the running deployment. A verification failure
-leaves the containers running so their logs remain available.
+`run` downloads and verifies the sample map, pulls missing images, starts the
+services, and waits until they are ready.
 
 ## 4. Open the Visualizer {: #open-the-visualizer }
 
@@ -150,49 +134,13 @@ In RViz2, follow the [Autoware planning simulation instructions](https://autowar
 2. Set a **goal pose** on the map
 3. Watch the vehicle plan and drive the route
 
-## Upgrading
-
-An installed release upgrades to the latest stable version with:
-
-```bash
-openadkit upgrade
-```
-
-The new release is verified, installed alongside the old one, and the
-`openadkit` launcher is repointed. The previous version is kept in the install
-destination (by default `~/.local/share/openadkit/`), so you can roll back:
-
-```bash
-openadkit install --version vOLD --force
-```
-
-`--force` replaces the kept version directory. To switch to a version that is
-not installed, omit `--force`. Source checkouts update with `git pull` or
-`git checkout` instead.
-
-## Runtime Controls
-
-```bash
-openadkit status planning-simulation
-openadkit logs planning-simulation --follow
-openadkit stop planning-simulation
-```
-
-Use `deployments/<name>/config.local.env` for host-specific settings. Source
-checkouts also accept component image overrides there; release component refs
-remain pinned by the release context. The file is ignored by Git.
-
-For source builds and local image development, use the separate
-[Build from Source](../development/build-from-source.md) workflow.
-
-If something goes wrong, see [Troubleshooting](troubleshooting.md).
-
 ## Next Steps
 
-**[Explore the other deployments](../deployments/index.md)** - curated scenario
-testing, rosbag replay, and CARLA, plus a standalone source-checkout workflow
-for distributed cloud-edge operation with Zenoh.
+**[Explore the other deployments](../deployments/index.md)** - scenario testing,
+rosbag replay, and CARLA, plus a standalone source-checkout workflow for
+distributed cloud-edge operation with Zenoh.
 
+- [CLI & Maintenance](cli.md) - Runtime controls, validation, upgrades, and cleanup
 - [Components](../components/index.md) - The architecture behind what you just ran
 - [Container Images & Versioning](container-images.md) - Tag schema and pinning guidance
 - [Custom Deployment](../deployments/custom-deployment.md) - Compose your own stack

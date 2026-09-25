@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shlex
 import shutil
 import subprocess
@@ -86,29 +85,6 @@ def capture_process(
         ) from error
 
 
-# Compose env-file substitution: $VAR, ${VAR}, ${VAR:-default}, ${VAR-default}, $$.
-_ENV_REF = re.compile(
-    r"\$\$"
-    r"|\$\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)(?:(?P<op>:-|-)(?P<default>[^}]*))?\}"
-    r"|\$(?P<bare>[A-Za-z_][A-Za-z0-9_]*)"
-)
-
-
-def _expand_env_value(value: str, environment: dict[str, str]) -> str:
-    def replace(match: re.Match[str]) -> str:
-        if match.group(0) == "$$":
-            return "$"
-        name = match.group("braced") or match.group("bare")
-        current = environment.get(name)
-        if match.group("op") == ":-":
-            return current if current else (match.group("default") or "")
-        if match.group("op") == "-":
-            return current if current is not None else (match.group("default") or "")
-        return "" if current is None else current
-
-    return _ENV_REF.sub(replace, value)
-
-
 def process_environment(selection: Selection) -> dict[str, str]:
     environment = dict(os.environ)
     for name in COMPOSE_CONTROL_ENV:
@@ -124,14 +100,14 @@ def compose_process_environment(
 
     Compose prefers the process environment over ``--env-file``, so a shell
     export would otherwise hide ``config.gpu.env`` and ``config.local.env``.
-    Apply those files on top of the shell, later files winning, and expand
-    ``$VAR`` while loading so values such as ``$HOME/...`` stay paths.
+    Drop shell values for names the env files define and let Compose read
+    the files itself, so quoting and ``$VAR`` expansion follow Compose rules.
     CLI injections (distro and component images) still win.
     """
     environment = dict(os.environ)
     for path in deployment.env_files(selection.gpu):
-        for name, value in parse_dotenv(path).items():
-            environment[name] = _expand_env_value(value, environment)
+        for name in parse_dotenv(path):
+            environment.pop(name, None)
     environment.update(selection.injections)
     for name in COMPOSE_CONTROL_ENV:
         environment.pop(name, None)

@@ -1009,7 +1009,9 @@ def test_compose_env_files_override_shell(tmp_path):
         "MAP_PATH=$HOME/autoware_map/sample\nLIDAR_DETECTION_MODEL=clustering\n"
     )
     (deployment / "config.gpu.env").write_text("LIDAR_DETECTION_MODEL=centerpoint\n")
-    (deployment / "config.local.env").write_text("LIDAR_DETECTION_MODEL=from-local\n")
+    (deployment / "config.local.env").write_text(
+        "LIDAR_DETECTION_MODEL=from-local\nREMOTE_PASSWORD='pa$word'\n"
+    )
     bin_dir = tmp_path / "env-docker"
     bin_dir.mkdir()
     seen = tmp_path / "seen-env"
@@ -1017,8 +1019,8 @@ def test_compose_env_files_override_shell(tmp_path):
         bin_dir / "docker",
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        f'printf "%s\\n" "${{MAP_PATH:-}}" "${{LIDAR_DETECTION_MODEL:-}}" '
-        f"> {json.dumps(str(seen))}\n"
+        f'printf "%s\\n" "${{MAP_PATH-unset}}" "${{LIDAR_DETECTION_MODEL-unset}}" '
+        f'"${{REMOTE_PASSWORD-unset}}" "$*" > {json.dumps(str(seen))}\n'
         "exit 0\n",
     )
     result = run_cli(
@@ -1026,13 +1028,22 @@ def test_compose_env_files_override_shell(tmp_path):
         ["validate", "example", "--gpu"],
         env={
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "LIDAR_DETECTION_MODEL": "clustering",
+            "MAP_PATH": "/tmp/from-shell",
+            "LIDAR_DETECTION_MODEL": "from-shell",
+            "REMOTE_PASSWORD": "from-shell",
         },
     )
     assert result.returncode == 0, result.stderr
     recorded = seen.read_text().splitlines()
-    assert recorded[0] == str(root.parent / "home" / "autoware_map/sample")
-    assert recorded[1] == "from-local"
+    # Shell values for file-defined names are dropped; Compose reads the
+    # env files itself, so quoting and $VAR expansion follow Compose rules.
+    assert recorded[:3] == ["unset", "unset", "unset"]
+    env_files = recorded[3].split("--env-file ")[1:]
+    assert [Path(item.split()[0]).name for item in env_files] == [
+        "config.env",
+        "config.gpu.env",
+        "config.local.env",
+    ]
 
 
 def test_gpu_overlay_requires_gpu_env(tmp_path):

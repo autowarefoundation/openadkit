@@ -21,8 +21,6 @@ COPY --parents --chown=${USERNAME}:${USERNAME} \
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
-    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs || true)" && \
-    if [ -n "${security_packages}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages}; fi && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     . /opt/autoware/setup.sh && \
     rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
@@ -86,6 +84,16 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       --dependency-types=exec && \
     rm -rf /tmp/autoware
 
+# Refresh the security packages that the pinned upstream base image may lag
+# on. Kept as the last step of the stage so a per-build SECURITY_REFRESH
+# change only re-runs this layer, not the acados and colcon layers above.
+ARG SECURITY_REFRESH=0
+RUN --mount=type=bind,source=components/security-refresh.sh,target=/tmp/security-refresh.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "openadkit security refresh ${SECURITY_REFRESH}" && \
+    bash /tmp/security-refresh.sh
+
 # =============================================================================
 # Stage: universe-common
 # Runtime variant: exec deps + the compiled tree, on top of the lean base.
@@ -115,8 +123,6 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
-    security_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(libssl-dev|libssl3|libssl3t64|linux-libc-dev|openssl|rsync)(:.*)?$' | xargs || true)" && \
-    if [ -n "${security_packages}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --no-install-recommends ${security_packages}; fi && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       geographiclib-tools \
       "ros-${ROS_DISTRO}-topic-tools" && \
@@ -127,3 +133,12 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
       --skip-keys "${internal_packages}" && \
     bash /tmp/runtime-cleanup.sh
+
+# Same refresh as the devel stage, as the final layer: a per-build
+# SECURITY_REFRESH change only re-runs this step.
+ARG SECURITY_REFRESH=0
+RUN --mount=type=bind,source=components/security-refresh.sh,target=/tmp/security-refresh.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "openadkit security refresh ${SECURITY_REFRESH}" && \
+    bash /tmp/security-refresh.sh

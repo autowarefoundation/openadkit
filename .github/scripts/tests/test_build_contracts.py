@@ -125,6 +125,7 @@ def test_component_changes_select_required_targets(changed, expected, flags):
 def test_shared_build_inputs_select_all_targets():
     expected = {image["target"] for image in INVENTORY["images"]}
     for changed in (
+        "components/security-refresh.sh",
         ".github/scripts/registry_lookup.sh",
         ".github/scripts/resolve_registry_contexts.sh",
         ".github/scripts/resolve_upstream_images.sh",

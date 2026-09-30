@@ -228,6 +228,7 @@ jobs:
           push: true
           set: |
             *.platform=${{ matrix.platform }}
+            *.args.SECURITY_REFRESH=${{ needs.prepare.outputs.build_tag }}
             *.contexts.autoware-core-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['core-devel'].uri }}
             *.contexts.autoware-base=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro].base.uri }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
@@ -338,6 +339,7 @@ jobs:
           set: |
             *.platform=${{ matrix.platform }}
             *.args.ROS_DISTRO=${{ matrix.ros-distro }}
+            sensing-perception-cuda.args.SECURITY_REFRESH=${{ needs.prepare.outputs.build_tag }}
             sensing-perception-cuda.contexts.autoware-base-cuda-runtime=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['base-cuda-runtime'].uri }}
             sensing-perception-cuda.contexts.autoware-base-cuda-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['base-cuda-devel'].uri }}
             *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}

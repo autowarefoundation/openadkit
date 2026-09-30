@@ -15,6 +15,12 @@ services:
     # Writes results to ${OUTPUT_HOST_PATH}; run as the host user so they are
     # not root-owned. The CLI injects the ids; HOME must be writable for ROS logs.
     user: ${OPENADKIT_UID:-1000}:${OPENADKIT_GID:-1000}
+    # The Jazzy image ships /home/ubuntu as 0750 (tier4/scenario_simulator_v2#1856),
+    # so its entrypoint cannot source the workspace for other UIDs. Joining the
+    # image's ubuntu group (gid 1000) grants traversal only: the process and its
+    # outputs stay on the host user. Harmless once the image ships 0755.
+    group_add:
+      - "1000"
     env_file:
       - ../shared/runtime.env
     environment:

@@ -1,17 +1,21 @@
 # Split-host simulation (Zenoh)
 
 Run the Autoware stack on one lab machine and the simulator on another.
-Each workload keeps its catalog name; the split is selected per machine with
-`--role`.
+Each workload keeps its catalog name and declares its **nodes** in
+`deployment.json`; each machine starts one node with `--node`.
 
-- `scenario-simulation`: `--role autoware` on one host, `--role scenario` on
+- `scenario-simulation`: `--node autoware` on one host, `--node scenario` on
   the other.
-- `carla-simulation`: `--role autoware` on one GPU host, `--role carla` on
+- `carla-simulation`: `--node autoware` on one GPU host, `--node carla` on
   the other.
 
-Omitting `--role` keeps today's single-host graph. One role per machine; two
-hosts (or two VMs) are required. On a single machine the two roles would share
-local DDS and bypass the bridge, so that is not the supported path.
+Omitting `--node` keeps today's single-host graph.
+
+Each node is isolated: its own Compose project (`openadkit-<deployment>-<node>`),
+its own container names, and its own ROS domain (`rosDomainId` in the
+manifest). The nodes only see each other through the Zenoh bridge, so both
+nodes can also run on **one machine** for testing, as long as each listens on
+its own port (see below).
 
 DDS stays local (`CYCLONEDDS_NETWORK_INTERFACE=lo`, applied by both the
 workload containers and the bridge). Only ROS traffic selected by the
@@ -20,12 +24,12 @@ commands, transforms, ADAPI calls, and the enabled sensors. Map blobs, camera
 images, and the visualization/teleop traffic are not routed.
 
 !!! warning "Verification status"
-    Both role views are rendered and validated in CI (`docker compose config`).
+    Both node views are rendered and validated in CI (`docker compose config`).
     The scenario-simulation and CARLA closed loops have been exercised end to
     end on a lab pair: sample scenarios pass, and a CARLA goal reaches
     `ArrivedGoal` over the bridge. DDS isolation, bridge restart resilience,
     and recorded CARLA throughput/latency evidence are still open. Treat
-    split-host roles as unreleased until the remaining gates land with the
+    split-host nodes as unreleased until the remaining gates land with the
     release notes.
 
 ## Prerequisites
@@ -52,12 +56,21 @@ Create or edit `deployments/<workload>/config.local.env` on each host
 
 | Host | Variables |
 | --- | --- |
-| Autoware (`--role autoware`) | `ZENOH_LISTEN=tcp/<autoware-host-ip>:7447` |
-| Simulator (`--role scenario` or `--role carla`) | `ZENOH_LISTEN=tcp/<sim-host-ip>:7447` and `ZENOH_PEER=tcp/<autoware-host-ip>:7447` |
+| Autoware (`--node autoware`) | `ZENOH_LISTEN=tcp/<autoware-host-ip>:7447` |
+| Simulator (`--node scenario` or `--node carla`) | `ZENOH_LISTEN=tcp/<sim-host-ip>:7447` and `ZENOH_PEER=tcp/<autoware-host-ip>:7447` |
 
-The Autoware role is listen-only and starts first. `validate` and `run` on the
-connecting role fail fast when `ZENOH_PEER` is unset; `stop`, `status`, and
+The Autoware node is listen-only and starts first. `validate` and `run` on the
+connecting node fail fast when `ZENOH_PEER` is unset; `stop`, `status`, and
 `logs` never need either variable.
+
+To run both nodes on one machine, pass the endpoints per command instead, with
+a separate port for each node:
+
+```bash
+ZENOH_LISTEN=tcp/127.0.0.1:7447 openadkit run scenario-simulation --node autoware
+ZENOH_LISTEN=tcp/127.0.0.1:7448 ZENOH_PEER=tcp/127.0.0.1:7447 \
+  openadkit run scenario-simulation --node scenario
+```
 
 ## Scenario simulation
 
@@ -65,13 +78,13 @@ Start Autoware first:
 
 ```bash
 # Autoware host
-openadkit run scenario-simulation --role autoware
+openadkit run scenario-simulation --node autoware
 ```
 
 Then the scenario host:
 
 ```bash
-openadkit run scenario-simulation --role scenario
+openadkit run scenario-simulation --node scenario
 ```
 
 The runner waits up to `SCENARIO_READY_TIMEOUT` for Autoware readiness over
@@ -80,7 +93,7 @@ host under `OUTPUT_HOST_PATH` (`./output`). The visualizer stays on the
 Autoware host; noVNC is loopback-only (`WEBSOCKIFY_BIND`), so remote desks use
 an SSH tunnel.
 
-Stop each host with its role restored from the live Compose project:
+Stop each host; the CLI finds the live node from its Compose project:
 
 ```bash
 openadkit stop scenario-simulation
@@ -92,13 +105,13 @@ Both hosts need an NVIDIA GPU. Start Autoware first:
 
 ```bash
 # Autoware host
-openadkit run carla-simulation --role autoware --gpu
+openadkit run carla-simulation --node autoware --gpu
 ```
 
 Then the CARLA host:
 
 ```bash
-openadkit run carla-simulation --role carla --gpu
+openadkit run carla-simulation --node carla --gpu
 ```
 
 CARLA RPC (`127.0.0.1:2000`) and map loading stay local to the CARLA host.
@@ -110,8 +123,8 @@ throughput update.
 ## Allowlist
 
 Each workload ships its Zenoh allowlist in
-`deployments/<workload>/config/zenoh.json5`, mounted into the bridge for
-role views. Entries are full-name regular expressions, not globs. Both
+`deployments/<workload>/config/zenoh.json5`, mounted into the bridge of
+every node. Entries are full-name regular expressions, not globs. Both
 hosts use the same file: either side can own an endpoint. Review the list
 before routing anything new, and keep the host boundary on the lab LAN:
 the allowlist is not authentication.
@@ -130,16 +143,15 @@ LAN; WAN and VPN links are best-effort and are not the supported setup.
 
 ## Lifecycle notes
 
-- `--role` is only on `validate` and `run`. The live Compose project records
-  the role as an `openadkit.role` label on the Zenoh bridge container.
-  `stop`, `status`, and `logs` restore it; you never pass `--role` to them.
-- Re-running the same role against a live project keeps the current behavior
-  (`up` again). Switching roles or omitting `--role` while a role stack is
-  live is refused: stop the project first.
-- A running project with no role label uses the single-host compose graph.
+- `stop`, `status`, and `logs` find the live node from its Compose project, so
+  you normally omit `--node`. When several nodes of one deployment run on the
+  same machine, pass `--node` to choose one.
+- Re-running a live node updates it in place. Starting the single-host graph
+  while a node is live, or a node while the single-host graph is live, is
+  refused: stop it first.
 - Do not restart a single bridge or interface container while the split is
   live: route churn can leave a bridged topic half-connected until both hosts
-  restart. Stop and start the role instead (see Troubleshooting).
+  restart. Stop and start the node instead (see Troubleshooting).
 
 ## Troubleshooting
 
@@ -153,6 +165,6 @@ available", a bridged vehicle-status topic has stopped flowing:
 - Cause: restarting a single bridge or interface container in a live split
   can leave Zenoh routes half-created (a route is removed and not recreated),
   so the topic no longer crosses.
-- Remedy: stop the workload on both hosts and start the roles again
-  (`openadkit stop <name>`, then `openadkit run <name> --role ...`). A
+- Remedy: stop the workload on both hosts and start the nodes again
+  (`openadkit stop <name>`, then `openadkit run <name> --node ...`). A
   clean restart restores the routes.

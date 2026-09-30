@@ -28,13 +28,14 @@ openadkit stop planning-simulation
 - Add `--ros-distro jazzy` to `validate`, `fetch`, or `run` to select Jazzy;
   Humble is the default.
 - Add `--gpu` for GPU mode. CARLA requires it and is Humble-only.
-- Add `--role` to `validate` or `run` to start one side of a
-  [split-host](split-host.md) run. `status`, `logs`, and `stop` read the
-  running deployment and take none of these flags.
+- Add `--node` to `validate` or `run` to start one node of a
+  [split-host](split-host.md) run. `status`, `logs`, and `stop` find the
+  running node themselves; they take `--node` only when several nodes of one
+  deployment run on the same machine.
 - Put local settings in `config.local.env`; see
   [Configuration](../getting-started/cli.md#configuration).
 
-Split-host roles are documented but unreleased until the remaining two-host
+Split-host nodes are documented but unreleased until the remaining two-host
 runtime gates land.
 
 To build your own stack, see [Custom Deployment](custom-deployment.md).

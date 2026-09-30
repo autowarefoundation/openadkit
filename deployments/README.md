@@ -15,7 +15,7 @@ CLI and release bundle:
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
 - [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation --gpu`)
 
-Split-host (`--role` over Zenoh) is documented but unreleased until the
+Split-host (`--node` over Zenoh) is documented but unreleased until the
 two-host runtime gates land. See the
 [split-host guide](https://autowarefoundation.github.io/openadkit/deployments/split-host/).
 

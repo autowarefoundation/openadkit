@@ -43,16 +43,16 @@ def manifest_validation_matrix():
             (ROOT / kit["deployments"][name]["path"] / "deployment.json").read_text()
         )
         gpu = manifest["requirements"]["gpu"]
-        roles = [""] + sorted((manifest["compose"].get("roles") or {}).keys())
+        nodes = [""] + sorted((manifest.get("nodes") or {}).keys())
         for distro in manifest["requirements"]["rosDistros"]:
-            for role in roles:
+            for node in nodes:
                 if gpu in ("none", "optional"):
                     rows.append(
                         {
                             "deployment": name,
                             "gpu": False,
                             "rosDistro": distro,
-                            "role": role,
+                            "node": node,
                         }
                     )
                 if gpu in ("required", "optional"):
@@ -61,11 +61,11 @@ def manifest_validation_matrix():
                             "deployment": name,
                             "gpu": True,
                             "rosDistro": distro,
-                            "role": role,
+                            "node": node,
                         }
                     )
     rows.sort(
-        key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"], row["role"])
+        key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"], row["node"])
     )
     return rows
 

@@ -1,7 +1,7 @@
 # Autoware-side services for scenario simulation.
 #
 # Shared by the single-host entry point (docker-compose.yaml) and the
-# `--role autoware` view (this file plus deployments/shared/compose.zenoh.yaml,
+# `--node autoware` view (this file plus deployments/shared/compose.zenoh.yaml,
 # attached by the CLI). The scenario runner lives in services.scenario.yaml.
 include:
   - ../shared/services/map-check.yaml

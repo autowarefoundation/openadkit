@@ -1,7 +1,7 @@
 # CARLA-side services for carla simulation.
 #
 # Shared by the single-host entry point (docker-compose.yaml) and the
-# `--role carla` view (this file plus deployments/shared/compose.zenoh.yaml,
+# `--node carla` view (this file plus deployments/shared/compose.zenoh.yaml,
 # attached by the CLI). All cross-service edges here are sim-local
 # (carla-interface waits on CARLA and the map loader), so they stay in this
 # file. CARLA RPC and map loading are host-local and never cross Zenoh. No

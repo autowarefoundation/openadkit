@@ -1,6 +1,6 @@
 // Zenoh bridge allowlist for split-host carla-simulation.
 //
-// Applied by both role graphs (--role autoware and --role carla): either host
+// Applied by both node graphs (--node autoware and --node carla): either host
 // can own an endpoint, so publishers/subscribers and service servers/clients
 // list the same routes. Entries are full-name regular expressions, not globs.
 // When `allow` is set, an omitted/empty type list means none.

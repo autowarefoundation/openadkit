@@ -92,11 +92,12 @@ openadkit clean planning-simulation --data     # delete
 Simulation's Kashiwanoha map is removed, restore it with
 `openadkit fetch scenario-simulation --force`.
 
-## Split-host roles
+## Split-host nodes
 
-`validate` and `run` accept `--role` for
+`validate` and `run` accept `--node` for
 [split-host simulation](../deployments/split-host.md). `status`, `logs`, and
-`stop` restore the live role from the Compose project and do not take `--role`.
+`stop` find the live node from its Compose project; pass `--node` only when
+several nodes of one deployment run on the same machine.
 
 ## Verify a Release Bundle Manually
 

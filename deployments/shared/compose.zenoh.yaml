@@ -1,8 +1,8 @@
 # Zenoh bridge fragment for split-host deployments.
 #
-# The CLI appends this file (via --file) only for role views, after the
-# deployment's service file. The default single-host graph never includes it.
-# The role view also injects ZENOH_CONFIG_PATH pointing at the deployment's
+# The CLI appends this file (via --file) only when a node is selected, after
+# the node's service file. The default single-host graph never includes it.
+# The CLI also injects ZENOH_CONFIG_PATH pointing at the deployment's
 # config/zenoh.json5; `-c` below must match the mounted target path.
 #
 # Host networking is required so the bridge can reach the LAN listen address
@@ -12,17 +12,15 @@
 # Do not add ROS_LOCALHOST_ONLY here: the plugin's discovery manager reuses the
 # same Cyclone config and rejects the duplicated `lo` selection at startup.
 #
-# openadkit.role labels the live project so status/logs/stop restore the view
-# without a persisted runtime.json. Docker remains the source of truth.
+# Each node is its own Compose project (openadkit-<deployment>-<node>) with its
+# own ROS domain, so no fixed container_name: two nodes may share one host.
+# Give each node on a shared host its own ZENOH_LISTEN port.
 services:
   zenoh-bridge:
     image: ${ZENOH_BRIDGE_IMAGE:-eclipse/zenoh-bridge-ros2dds:1.10.1@sha256:74fae6a9d4f449c53d1ee6f0faaca97d01c1e68dfcafd785b657f01907157d22}
-    container_name: autoware-zenoh-bridge
     network_mode: host
     ipc: host
     restart: unless-stopped
-    labels:
-      openadkit.role: ${OPENADKIT_ROLE:-}
     # Runtime env (RMW_IMPLEMENTATION, ROS_DOMAIN_ID, CYCLONEDDS_URI,
     # CYCLONEDDS_NETWORK_INTERFACE=lo). Without the URI the interface pin is a
     # no-op and DDS would leak onto the LAN. Absolute paths: this file is passed

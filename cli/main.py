@@ -40,12 +40,12 @@ class OpenADKitParser(argparse.ArgumentParser):
         list_deployments(root, kit)
 
 
-def add_role_argument(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--role",
-        metavar="ROLE",
-        help="split-host role from this deployment's manifest (omit for single host)",
-    )
+def add_node_argument(parser: argparse.ArgumentParser, help_text: str) -> None:
+    parser.add_argument("--node", metavar="NODE", help=help_text)
+
+
+NODE_HELP = "node from this deployment's manifest (omit for single host)"
+LIVE_NODE_HELP = "node to act on when several nodes of the deployment run here"
 
 
 def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> None:
@@ -123,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
         "validate", help="validate a deployment without starting it"
     )
     add_run_arguments(validate)
-    add_role_argument(validate)
+    add_node_argument(validate, NODE_HELP)
     validate.add_argument(
         "--data",
         action="store_true",
@@ -146,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = subparsers.add_parser("run", help="fetch data and start a deployment")
     add_run_arguments(run)
-    add_role_argument(run)
+    add_node_argument(run, NODE_HELP)
     run.add_argument(
         "--pull",
         choices=("missing", "always", "never"),
@@ -194,6 +194,8 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="curated deployment name; required when one is running",
     )
+    for operational in (status, logs, stop):
+        add_node_argument(operational, LIVE_NODE_HELP)
     return parser
 
 
@@ -349,12 +351,13 @@ def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> 
         )
 
 
-def print_run_next_steps(deployment, services: set[str]) -> None:
-    print(f"running: {deployment.name}")
+def print_run_next_steps(deployment, services: set[str], node: str | None) -> None:
+    target = deployment.name if node is None else f"{deployment.name} --node {node}"
+    print(f"running: {target}")
     if "visualizer" in services:
         print("visualizer: https://localhost:6080/vnc.html")
         print("password: REMOTE_PASSWORD (default openadkit; override in config.local.env)")
-    print(f"stop with: openadkit stop {deployment.name}")
+    print(f"stop with: openadkit stop {target}")
 
 
 def main() -> int:
@@ -422,7 +425,7 @@ def main() -> int:
             kit,
             args.ros_distro,
             getattr(args, "gpu", False),
-            role=getattr(args, "role", None),
+            node=getattr(args, "node", None),
             require_gpu=args.command != "fetch",
         )
         if args.command == "fetch":
@@ -447,7 +450,7 @@ def main() -> int:
                             "manifestValid": True,
                             "rosDistro": selection.ros_distro,
                             "gpu": selection.gpu,
-                            "role": selection.role,
+                            "node": selection.node,
                             "dataValid": (
                                 None
                                 if results is None
@@ -475,8 +478,9 @@ def main() -> int:
             return 0
 
         compose.check_daemon(selection)
-        # Shared services use fixed container names, so only one deployment
-        # can run at a time. Rerunning the same deployment updates it in place.
+        # Deployments share host networking, fixed container names and the
+        # default DDS domain, so only one runs at a time. Rerunning the same
+        # view updates it in place; other nodes of it may share this host.
         others = [
             name
             for name in compose.running_names(kit.deployments)
@@ -493,7 +497,7 @@ def main() -> int:
         data.install_data(deployment, selection, args.force)
         compose.create_writable_mounts(deployment, selection)
         compose.start(deployment, selection, args.pull)
-        print_run_next_steps(deployment, configured_services)
+        print_run_next_steps(deployment, configured_services, selection.node)
         return 0
 
     compose.ensure_runtime_user()
@@ -508,14 +512,16 @@ def main() -> int:
         return show_running(root, kit, args.command, running, extra=extra)
     deployment = get_deployment(root, kit, args.deployment)
     warn_if_modified(root, deployment, kit)
-    role = compose.live_role(deployment)
-    if role is not None and not deployment.has_role(role):
-        print(
-            f"warning: saved role {role} is no longer defined; using the default view",
-            file=sys.stderr,
-        )
-        role = None
-    selection = deployment.select(kit, None, False, role=role, operational=True)
+    node = args.node
+    if node is None:
+        live = compose.live_nodes(deployment)
+        if len(live) > 1:
+            names = ", ".join(compose.view_label(item) for item in live)
+            raise OpenADKitError(
+                f"{deployment.name} runs as {names}; choose one with --node"
+            )
+        node = live[0] if live else None
+    selection = deployment.select(kit, None, False, node=node, operational=True)
     if args.command == "status":
         compose.status(deployment, selection)
     elif args.command == "logs":

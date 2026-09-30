@@ -1,10 +1,10 @@
 # Scenario-host service for scenario simulation.
 #
 # Shared by the single-host entry point (docker-compose.yaml, which adds
-# pid/depends_on and WAIT_FOR_POINTCLOUD_MAP back) and the `--role scenario`
+# pid/depends_on and WAIT_FOR_POINTCLOUD_MAP back) and the `--node scenario`
 # view (this file plus deployments/shared/compose.zenoh.yaml, attached by the
 # CLI). Autoware edges and pid: service:map live in the default entry point,
-# not here: the role view has no Autoware services and no map.
+# not here: the node view has no Autoware services and no map.
 services:
   scenario_simulator:
     image: ${SCENARIO_SIMULATOR_IMAGE:-ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime@sha256:80dc759586c0aa55b5c49b120635b9bda8d52ae4fe3ad96478dd0f5a5bfec5ad}

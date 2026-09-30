@@ -8,18 +8,22 @@
     "gpuFiles": [],
     "profiles": [],
     "resetServices": ["map-check", "carla-map-loader"],
-    "waitTimeout": 480,
-    "roles": {
-      "autoware": {
-        "files": ["services.autoware.yaml"],
-        "resetServices": ["map-check"],
-        "requiredEnv": ["ZENOH_LISTEN"]
-      },
-      "carla": {
-        "files": ["services.carla.yaml"],
-        "resetServices": ["carla-map-loader"],
-        "requiredEnv": ["ZENOH_LISTEN", "ZENOH_PEER"]
-      }
+    "waitTimeout": 480
+  },
+  "nodes": {
+    "autoware": {
+      "backend": "compose",
+      "rosDomainId": 1,
+      "files": ["services.autoware.yaml"],
+      "resetServices": ["map-check"],
+      "requiredEnv": ["ZENOH_LISTEN"]
+    },
+    "carla": {
+      "backend": "compose",
+      "rosDomainId": 2,
+      "files": ["services.carla.yaml"],
+      "resetServices": ["carla-map-loader"],
+      "requiredEnv": ["ZENOH_LISTEN", "ZENOH_PEER"]
     }
   },
   "requirements": {
@@ -52,7 +56,7 @@
         "pointcloud_map.pcd",
         "map_projector_info.yaml"
       ],
-      "roles": ["autoware"]
+      "nodes": ["autoware"]
     }
   ]
 }

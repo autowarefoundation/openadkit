@@ -158,9 +158,9 @@ def runtime_tree(
             "services:\n  app:\n    environment:\n      GPU: 'true'\n"
         )
         (deployment / "config.gpu.env").write_text("GPU_MODE=true\n")
-    for role in (manifest["compose"].get("roles") or {}).values():
-        for role_file in role.get("files", []):
-            (deployment / role_file).write_text(
+    for node in (manifest.get("nodes") or {}).values():
+        for node_file in node.get("files", []):
+            (deployment / node_file).write_text(
                 "services:\n  app:\n    image: busybox:1.36.1\n"
             )
     for shared_name in manifest.get("shared", []):
@@ -171,7 +171,7 @@ def runtime_tree(
             (shared / "compose.zenoh.yaml").write_text(
                 "services:\n  app:\n    image: busybox:1.36.1\n"
             )
-    if manifest["compose"].get("roles"):
+    if manifest.get("nodes"):
         (deployment / "config").mkdir(exist_ok=True)
         (deployment / "config/zenoh.json5").write_text("{}\n")
     (root / "openadkit.json").write_text(
@@ -190,17 +190,23 @@ def edit_kit(root, change):
 def fake_docker(
     tmp_path, *, configured="app\n", daemon_returncode=0, config_returncode=0,
     runtimes='{"nvidia": {}}', compose_ls="[]", config_json='{"services": {}}',
-    container_ids="", inspect="", wait_returncode=0, role_label="",
+    container_ids="", inspect="", wait_returncode=0,
 ):
     """Record docker calls as distro|value|api|localization|gpu-image|args."""
     bin_dir = tmp_path / "bin"
     calls = tmp_path / "docker-calls"
     ids = tmp_path / "docker-ids"
+    domains = tmp_path / "docker-domains"
     ls_path = tmp_path / "compose-ls.json"
     ls_path.write_text(compose_ls + "\n")
-    role_path = tmp_path / "role-label"
-    if role_label:
-        role_path.write_text(role_label + "\n")
+    # `up` marks its own Compose project live, as Docker would.
+    mark_live = (
+        "import json, sys; path, project = sys.argv[1:]; "
+        "live = json.load(open(path)); "
+        "live += [] if any(p['Name'] == project for p in live) "
+        "else [{'Name': project, 'Status': 'running(1)'}]; "
+        "json.dump(live, open(path, 'w'))"
+    )
     config_path = tmp_path / "compose-config.json"
     config_path.write_text(config_json + "\n")
     responses = {
@@ -212,14 +218,9 @@ def fake_docker(
         '*"config --quiet"*': f"exit {config_returncode}",
         '*"ps --all --quiet"*': f"printf '%b' {json.dumps(container_ids)}",
         'inspect" "*': f"printf '%b' {json.dumps(inspect)}",
-        '*"ps --filter"*': (
-            f"if [[ -f {json.dumps(str(role_path))} ]]; then "
-            f"cat {json.dumps(str(role_path))}; fi; exit 0"
-        ),
         '*"up --detach"*': (
-            f"printf '%s\\n' {json.dumps(RUNNING)} > {json.dumps(str(ls_path))}; "
-            'if [[ -n "${OPENADKIT_ROLE:-}" ]]; then '
-            f'printf "%s\\n" "$OPENADKIT_ROLE" > {json.dumps(str(role_path))}; fi; '
+            'project=$(sed -n "s/.*--project-name \\([^ ]*\\).*/\\1/p" <<< "$*"); '
+            f'python3 -c {json.dumps(mark_live)} {json.dumps(str(ls_path))} "$project"; '
             f'if [[ "$*" == *"--wait"* ]]; then exit {wait_returncode}; fi'
         ),
     }
@@ -231,6 +232,8 @@ def fake_docker(
         f'"${{SENSING_PERCEPTION_GPU_IMAGE:-}}" "$*" >> {json.dumps(str(calls))}\n'
         'printf "%s:%s\\n" "${OPENADKIT_UID:-}" "${OPENADKIT_GID:-}" '
         f">> {json.dumps(str(ids))}\n"
+        'printf "%s\\n" "${OPENADKIT_ROS_DOMAIN_ID:-}" '
+        f">> {json.dumps(str(domains))}\n"
         + "".join(
             f'if [[ "$*" == {pattern} ]]; then {action}; fi\n'
             for pattern, action in responses.items()
@@ -441,14 +444,14 @@ def test_top_level_help_and_usage():
             "run",
             ("planning-simulation", "--gpu", "--ros-distro", "--force",
              "replace existing data", "image pull policy", "GPU compose overlay",
-             "--role"),
+             "--node"),
             (),
         ),
-        ("validate", ("--ros-distro", "--role"), ()),
-        ("fetch", ("--ros-distro", "--force"), ("--gpu", "--role")),
-        ("status", (), ("--ros-distro", "--gpu", "--role")),
-        ("logs", (), ("--ros-distro", "--gpu", "--role")),
-        ("stop", (), ("--ros-distro", "--gpu", "--role")),
+        ("validate", ("--ros-distro", "--node"), ()),
+        ("fetch", ("--ros-distro", "--force"), ("--gpu", "--node")),
+        ("status", ("--node",), ("--ros-distro", "--gpu")),
+        ("logs", ("--node",), ("--ros-distro", "--gpu")),
+        ("stop", ("--node",), ("--ros-distro", "--gpu")),
     ],
 )
 def test_command_help(command, present, absent):
@@ -1399,7 +1402,7 @@ def test_validate_json_output(tmp_path):
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {
         "schemaVersion": 1, "deployment": "example", "manifestValid": True,
-        "rosDistro": "humble", "gpu": False, "role": None, "dataValid": None, "data": [],
+        "rosDistro": "humble", "gpu": False, "node": None, "dataValid": None, "data": [],
     }
     result = run_cli(root, "validate", "example", "--data", "--json")
     assert result.returncode == 1
@@ -1488,101 +1491,119 @@ def test_permission_errors_are_reported_without_traceback(tmp_path):
     assert "Traceback" not in result.stderr
 
 
-# --- Split-host roles ----------------------------------------------------------
+# --- Split-host nodes ----------------------------------------------------------
 
 
-def role_manifest():
+def node_manifest():
     manifest = minimal_manifest()
     manifest["shared"] = ["shared"]
-    manifest["compose"]["roles"] = {
+    manifest["nodes"] = {
         "primary": {
+            "backend": "compose",
+            "rosDomainId": 1,
             "files": ["compose.primary.yaml"],
             "resetServices": [],
             "requiredEnv": [],
         },
         "secondary": {
+            "rosDomainId": 2,
             "files": ["compose.secondary.yaml"],
             "resetServices": [],
-            "requiredEnv": ["ROLE_TOKEN"],
+            "requiredEnv": ["NODE_TOKEN"],
         },
     }
     return manifest
 
 
-def test_role_lookup_errors(tmp_path):
+def live(*projects):
+    return json.dumps([{"Name": name, "Status": "running(1)"} for name in projects])
+
+
+def test_node_lookup_errors(tmp_path):
     root, _ = runtime_tree(tmp_path / "plain")
-    result = run_cli(root, "validate", "example", "--role", "scenario")
+    result = run_cli(root, "validate", "example", "--node", "scenario")
     assert result.returncode != 0
-    assert "has no role scenario" in result.stderr
-    assert "available roles: none" in result.stderr
+    assert "has no node scenario" in result.stderr
+    assert "available nodes: none" in result.stderr
 
-    root, _ = runtime_tree(tmp_path / "roles", manifest=role_manifest())
-    result = run_cli(root, "validate", "example", "--role", "carla")
+    root, _ = runtime_tree(tmp_path / "nodes", manifest=node_manifest())
+    result = run_cli(root, "validate", "example", "--node", "carla")
     assert result.returncode != 0
-    assert "has no role carla" in result.stderr
-    assert "available roles: primary, secondary" in result.stderr
+    assert "has no node carla" in result.stderr
+    assert "available nodes: primary, secondary" in result.stderr
 
 
-def test_role_view_selects_service_file_and_appends_shared_fragment(tmp_path):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
+def test_node_is_its_own_project_with_its_own_domain(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
     _, calls = fake_docker(tmp_path)
-    result = run_cli(root, "validate", "example", "--role", "primary")
+    result = run_cli(
+        root, "validate", "example", "--node", "secondary", NODE_TOKEN="token"
+    )
     assert result.returncode == 0, result.stderr
     text = calls.read_text()
-    assert "compose.primary.yaml" in text
-    assert "compose.secondary.yaml" not in text
+    assert "--project-name openadkit-example-secondary" in text
+    assert "compose.secondary.yaml" in text
+    assert "compose.primary.yaml" not in text
     assert "docker-compose.yaml" not in text
     assert "deployments/shared/compose.zenoh.yaml" in text
+    assert set((tmp_path / "docker-domains").read_text().split()) == {"2"}
 
     calls.write_text("")
+    (tmp_path / "docker-domains").write_text("")
     result = run_cli(root, "validate", "example")
     assert result.returncode == 0, result.stderr
-    assert "compose.zenoh.yaml" not in calls.read_text()
+    text = calls.read_text()
+    assert "--project-name openadkit-example " in text
+    assert "compose.zenoh.yaml" not in text
+    assert (tmp_path / "docker-domains").read_text().split() == []
 
 
-def test_role_required_environment_is_checked(tmp_path):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
+def test_node_required_environment_is_checked(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
     _, calls = fake_docker(tmp_path)
-    result = run_cli(root, "validate", "example", "--role", "secondary")
+    result = run_cli(root, "validate", "example", "--node", "secondary")
     assert result.returncode != 0
-    assert "ROLE_TOKEN" in result.stderr
+    assert "NODE_TOKEN" in result.stderr
     assert not calls.exists()
     result = run_cli(
-        root, "validate", "example", "--role", "secondary", ROLE_TOKEN="token"
+        root, "validate", "example", "--node", "secondary", NODE_TOKEN="token"
     )
     assert result.returncode == 0, result.stderr
 
 
-def test_operational_commands_restore_live_role(tmp_path):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
+def test_operational_commands_find_the_live_node(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
     _, calls = fake_docker(tmp_path)
     result = run_cli(
-        root, "run", "example", "--role", "secondary", "--pull", "never",
-        ROLE_TOKEN="token",
+        root, "run", "example", "--node", "secondary", "--pull", "never",
+        NODE_TOKEN="token",
     )
     assert result.returncode == 0, result.stderr
+    assert "stop with: openadkit stop example --node secondary" in result.stdout
     calls.write_text("")
     result = run_cli(root, "status", "example")
     assert result.returncode == 0, result.stderr
-    assert "compose.secondary.yaml" in calls.read_text()
+    text = calls.read_text()
+    assert "--project-name openadkit-example-secondary" in text
+    assert "compose.secondary.yaml" in text
 
 
 @pytest.mark.parametrize(
-    ("saved_role", "args", "expected_code", "expected_message"),
+    ("running", "args", "expected_code", "expected_message"),
     [
-        ("primary", ["--role", "secondary"], 1, "already running as primary"),
-        ("primary", [], 1, "before starting single-host"),
-        (None, ["--role", "primary"], 1, "already running as single-host"),
-        ("primary", ["--role", "primary"], 0, "up --detach"),
+        (["openadkit-example-primary"], ["--node", "secondary"], 0, "up --detach"),
+        (["openadkit-example-primary"], ["--node", "primary"], 0, "up --detach"),
+        (["openadkit-example-primary"], [], 1, "already running as node primary"),
+        (["openadkit-example"], ["--node", "primary"], 1, "already running as single-host"),
     ],
 )
 def test_run_live_state_guard(
-    tmp_path, saved_role, args, expected_code, expected_message
+    tmp_path, running, args, expected_code, expected_message
 ):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
-    _, calls = fake_docker(tmp_path, compose_ls=RUNNING, role_label=saved_role or "")
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
+    _, calls = fake_docker(tmp_path, compose_ls=live(*running))
     result = run_cli(
-        root, "run", "example", "--pull", "never", *args, ROLE_TOKEN="token"
+        root, "run", "example", "--pull", "never", *args, NODE_TOKEN="token"
     )
     assert result.returncode == expected_code, result.stderr
     if expected_code == 0:
@@ -1592,23 +1613,25 @@ def test_run_live_state_guard(
         assert started_nothing(calls)
 
 
-def test_wait_timeout_still_records_live_role(tmp_path):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
+def test_wait_timeout_still_leaves_the_node_findable(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
     _, calls = fake_docker(tmp_path, wait_returncode=1)
     result = run_cli(
-        root, "run", "example", "--role", "secondary", "--pull", "never",
-        ROLE_TOKEN="token",
+        root, "run", "example", "--node", "secondary", "--pull", "never",
+        NODE_TOKEN="token",
     )
     assert result.returncode != 0
     assert "up --detach --wait" in calls.read_text()
     calls.write_text("")
-    result = run_cli(root, "status", "example")
+    result = run_cli(root, "stop", "example")
     assert result.returncode == 0, result.stderr
-    assert "compose.secondary.yaml" in calls.read_text()
+    text = calls.read_text()
+    assert "--project-name openadkit-example-secondary" in text
+    assert "down --remove-orphans" in text
 
 
-def test_status_without_role_label_uses_default_view(tmp_path):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
+def test_single_host_project_uses_default_view(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
     _, calls = fake_docker(tmp_path, compose_ls=RUNNING)
     result = run_cli(root, "status", "example")
     assert result.returncode == 0, result.stderr
@@ -1618,18 +1641,44 @@ def test_status_without_role_label_uses_default_view(tmp_path):
     assert "compose.primary.yaml" not in text
 
 
-def test_vanished_live_role_stops_by_project_name(tmp_path):
-    root, _ = runtime_tree(tmp_path, manifest=role_manifest())
-    _, calls = fake_docker(tmp_path, compose_ls=RUNNING, role_label="gone")
+def test_several_live_nodes_need_an_explicit_node(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
+    _, calls = fake_docker(
+        tmp_path,
+        compose_ls=live("openadkit-example-primary", "openadkit-example-secondary"),
+    )
     result = run_cli(root, "stop", "example")
+    assert result.returncode != 0
+    assert "runs as node primary, node secondary; choose one with --node" in result.stderr
+    assert "down" not in calls.read_text()
+
+    result = run_cli(root, "stop", "example", "--node", "primary")
     assert result.returncode == 0, result.stderr
-    assert "warning: saved role gone is no longer defined" in result.stderr
-    assert "down --remove-orphans" in calls.read_text()
+    text = calls.read_text()
+    assert "--project-name openadkit-example-primary" in text
+    assert "down --remove-orphans" in text
 
 
-def test_role_data_applicability_skips_other_roles(tmp_path):
-    manifest = role_manifest()
-    manifest["data"] = [files_resource("role-map", path="keep.txt", roles=["primary"])]
+def test_node_projects_count_as_their_deployment_running(tmp_path):
+    root, _ = runtime_tree(tmp_path, manifest=node_manifest())
+    fake_docker(tmp_path, compose_ls=live("openadkit-example-primary"))
+    result = run_cli(root, "status")
+    assert result.returncode == 2
+    assert "example" in result.stdout
+
+
+def test_project_owner_prefers_the_longest_deployment_name():
+    names = ["planning", "planning-simulation"]
+    owner = cli_compose.owner
+    assert owner("openadkit-planning-simulation", names) == "planning-simulation"
+    assert owner("openadkit-planning-simulation-autoware", names) == "planning-simulation"
+    assert owner("openadkit-planning-autoware", names) == "planning"
+    assert owner("openadkit-other", names) is None
+
+
+def test_node_data_applicability_skips_other_nodes(tmp_path):
+    manifest = node_manifest()
+    manifest["data"] = [files_resource("node-map", path="keep.txt", nodes=["primary"])]
     root, _ = runtime_tree(
         tmp_path, manifest=manifest, config_env="REMOTE_PASSWORD=default\n"
     )
@@ -1639,28 +1688,28 @@ def test_role_data_applicability_skips_other_roles(tmp_path):
     fake_docker(tmp_path)
 
     result = run_cli(
-        root, "run", "example", "--role", "secondary", "--pull", "never", "--force",
-        ROLE_TOKEN="token",
+        root, "run", "example", "--node", "secondary", "--pull", "never", "--force",
+        NODE_TOKEN="token",
     )
     assert result.returncode == 0, result.stderr
     assert (target / "keep.txt").read_text() == "keep"
 
     result = run_cli(
-        root, "validate", "example", "--role", "primary", ROLE_TOKEN="token"
+        root, "validate", "example", "--node", "primary", NODE_TOKEN="token"
     )
     assert result.returncode != 0
     assert "MAP_PATH is required" in result.stderr
 
-    result = run_cli(root, "fetch", "example", ROLE_TOKEN="token")
+    result = run_cli(root, "fetch", "example", NODE_TOKEN="token")
     assert result.returncode != 0
     assert "MAP_PATH is required" in result.stderr
 
 
-def test_role_scoped_data_cannot_share_a_destination(tmp_path):
-    manifest = role_manifest()
+def test_node_scoped_data_cannot_share_a_destination(tmp_path):
+    manifest = node_manifest()
     manifest["data"] = [
-        files_resource("primary-map", roles=["primary"]),
-        files_resource("secondary-map", roles=["secondary"]),
+        files_resource("primary-map", nodes=["primary"]),
+        files_resource("secondary-map", nodes=["secondary"]),
     ]
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     assert "duplicate data destination environment: MAP_PATH" in run_cli(
@@ -1668,29 +1717,35 @@ def test_role_scoped_data_cannot_share_a_destination(tmp_path):
     ).stdout
 
 
-def test_role_schema_errors_are_reported(tmp_path):
-    unknown = role_manifest()
-    unknown["compose"]["roles"]["primary"]["image"] = "busybox"
-    root, _ = runtime_tree(tmp_path / "unknown", manifest=unknown)
-    assert "unknown compose.roles.primary field(s): image" in run_cli(root, "list").stdout
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda m: m["nodes"]["primary"].update(image="busybox"),
+         "unknown nodes.primary field(s): image"),
+        (lambda m: m["nodes"]["primary"].update(files=["../outside.yaml"]),
+         "safe relative path"),
+        (lambda m: m["nodes"]["primary"].update(backend="k8s"),
+         "nodes.primary.backend must be one of: compose"),
+        (lambda m: m["nodes"]["primary"].pop("rosDomainId"),
+         "nodes.primary.rosDomainId must be an integer from 0 to 101"),
+        (lambda m: m["nodes"]["primary"].update(rosDomainId=250),
+         "nodes.primary.rosDomainId must be an integer from 0 to 101"),
+        (lambda m: m["nodes"]["secondary"].update(rosDomainId=1),
+         "nodes.secondary.rosDomainId 1 is used by another node"),
+        (lambda m: m.update(data=[files_resource("node-map", nodes=["ghost"])]),
+         "undeclared node(s): ghost"),
+        (lambda m: m.update(shared=[]),
+         "nodes require the shared deployment assets"),
+    ],
+)
+def test_node_schema_errors_are_reported(tmp_path, change, message):
+    manifest = node_manifest()
+    change(manifest)
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    assert message in run_cli(root, "list").stdout
 
-    root, deployment = runtime_tree(tmp_path / "missing", manifest=role_manifest())
+
+def test_missing_node_compose_file_is_reported(tmp_path):
+    root, deployment = runtime_tree(tmp_path, manifest=node_manifest())
     (deployment / "compose.primary.yaml").unlink()
     assert "missing Compose file" in run_cli(root, "list").stdout
-
-    escape = role_manifest()
-    escape["compose"]["roles"]["primary"]["files"] = ["../outside.yaml"]
-    root, _ = runtime_tree(tmp_path / "escape", manifest=escape)
-    assert "safe relative path" in run_cli(root, "list").stdout
-
-    undeclared = role_manifest()
-    undeclared["data"] = [files_resource("role-map", roles=["ghost"])]
-    root, _ = runtime_tree(tmp_path / "undeclared", manifest=undeclared)
-    assert "undeclared role(s): ghost" in run_cli(root, "list").stdout
-
-    no_shared = role_manifest()
-    no_shared["shared"] = []
-    root, _ = runtime_tree(tmp_path / "no-shared", manifest=no_shared)
-    assert "compose.roles requires the shared deployment assets" in run_cli(
-        root, "list"
-    ).stdout

@@ -2,7 +2,7 @@
 #
 # Assembles the shared Autoware and CARLA service files and restores the
 # single-host wiring: vehicle/sensing/visualizer wait on carla-interface. The
-# split views remove those edges: --role autoware / --role carla select one
+# split views remove those edges: --node autoware / --node carla select one
 # service file plus the shared Zenoh fragment. This file never includes the
 # Zenoh bridge.
 #

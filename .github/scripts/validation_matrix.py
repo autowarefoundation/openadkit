@@ -2,9 +2,9 @@
 """Enumerate package validation cells shared by lint and release planning.
 
 One cell is one `./openadkit validate` invocation: a deployment, ROS distro,
-GPU mode, and optional split-host role. Both the lint workflow (via this
+GPU mode, and optional split-host node. Both the lint workflow (via this
 script) and `.github/scripts/release_plan.py` (which imports
-`validation_cells`) read the same enumeration, so a new deployment or role is
+`validation_cells`) read the same enumeration, so a new deployment or node is
 walked everywhere without editing a hardcoded list.
 """
 
@@ -43,7 +43,7 @@ def validation_cells(
     source_root: Path,
     kit: Any | None = None,
 ) -> list[dict[str, Any]]:
-    """Return sorted validation cells for every deployment and role view."""
+    """Return sorted validation cells for every deployment and node view."""
     kit = kit if kit is not None else runtime.load_kit(source_root)
     if not kit.deployments:
         fail("release source has no deployments")
@@ -53,17 +53,17 @@ def validation_cells(
     for name in sorted(kit.deployments):
         deployment = runtime.get_deployment(source_root, kit, name)
         gpu = deployment.requirements["gpu"]
-        views = [""] + sorted(deployment.roles)
+        views = [""] + sorted(deployment.nodes)
         for distro in deployment.requirements["rosDistros"]:
             distros.add(distro)
-            for role in views:
+            for node in views:
                 if gpu in ("none", "optional"):
                     rows.append(
                         {
                             "deployment": name,
                             "gpu": False,
                             "rosDistro": distro,
-                            "role": role,
+                            "node": node,
                         }
                     )
                 if gpu in ("required", "optional"):
@@ -72,7 +72,7 @@ def validation_cells(
                             "deployment": name,
                             "gpu": True,
                             "rosDistro": distro,
-                            "role": role,
+                            "node": node,
                         }
                     )
     if not distros:
@@ -84,7 +84,7 @@ def validation_cells(
             row["deployment"],
             row["rosDistro"],
             row["gpu"],
-            row["role"],
+            row["node"],
         )
     )
     return rows
@@ -103,7 +103,7 @@ def main() -> int:
             cell["deployment"],
             cell["rosDistro"],
             "true" if cell["gpu"] else "false",
-            cell["role"],
+            cell["node"],
         )
         print("\t".join(fields))
     return 0

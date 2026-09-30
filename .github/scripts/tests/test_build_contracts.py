@@ -204,11 +204,12 @@ def _compose_config(files, directory, extra_env=None):
     return json.loads(result.stdout)
 
 
-def _role_compose_env(directory, role):
+def _node_compose_env(directory, node):
     shared = ROOT / "deployments/shared"
+    manifest = json.loads((directory / "deployment.json").read_text())
     return {
         "ROS_DISTRO": "humble",
-        "OPENADKIT_ROLE": role,
+        "OPENADKIT_ROS_DOMAIN_ID": str(manifest["nodes"][node]["rosDomainId"]),
         "ZENOH_BASE_DIR": str(shared),
         "ZENOH_CONFIG_PATH": str(directory / "config/zenoh.json5"),
         "ZENOH_LISTEN": "tcp/127.0.0.1:7447",
@@ -218,7 +219,7 @@ def _role_compose_env(directory, role):
 
 
 @pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is required")
-def test_real_compose_views_keep_default_and_role_graphs_isolated():
+def test_real_compose_views_keep_default_and_node_graphs_isolated():
     scenario = ROOT / "deployments/scenario-simulation"
     default = _compose_config([scenario / "docker-compose.yaml"], scenario)
     assert "zenoh-bridge" not in default["services"]
@@ -231,22 +232,28 @@ def test_real_compose_views_keep_default_and_role_graphs_isolated():
             ROOT / "deployments/shared/compose.zenoh.yaml",
         ],
         scenario,
-        _role_compose_env(scenario, "autoware"),
+        _node_compose_env(scenario, "autoware"),
     )
     assert "zenoh-bridge" in autoware["services"]
     assert "scenario_simulator" not in autoware["services"]
     assert "map" in autoware["services"]
 
-    scenario_role = _compose_config(
+    scenario_node = _compose_config(
         [
             scenario / "services.scenario.yaml",
             ROOT / "deployments/shared/compose.zenoh.yaml",
         ],
         scenario,
-        _role_compose_env(scenario, "scenario"),
+        _node_compose_env(scenario, "scenario"),
     )
-    assert set(scenario_role["services"]) == {"scenario_simulator", "zenoh-bridge"}
-    assert "pid" not in scenario_role["services"]["scenario_simulator"]
+    assert set(scenario_node["services"]) == {"scenario_simulator", "zenoh-bridge"}
+    assert "pid" not in scenario_node["services"]["scenario_simulator"]
+    # Nodes share one host only when names and DDS domains stay apart.
+    for view, domain in ((autoware, "1"), (scenario_node, "2")):
+        bridge = view["services"]["zenoh-bridge"]
+        assert "container_name" not in bridge
+        assert bridge["environment"]["ROS_DOMAIN_ID"] == domain
+    assert default["services"]["map"]["environment"]["ROS_DOMAIN_ID"] == "1"
 
     carla = ROOT / "deployments/carla-simulation"
     carla_default = _compose_config(
@@ -265,7 +272,7 @@ def test_real_compose_views_keep_default_and_role_graphs_isolated():
             ROOT / "deployments/shared/compose.zenoh.yaml",
         ],
         carla,
-        _role_compose_env(carla, "autoware"),
+        _node_compose_env(carla, "autoware"),
     )
     assert "zenoh-bridge" in carla_autoware["services"]
     assert "carla" not in carla_autoware["services"]
@@ -273,15 +280,15 @@ def test_real_compose_views_keep_default_and_role_graphs_isolated():
     vehicle_deps = carla_autoware["services"]["vehicle"].get("depends_on") or {}
     assert "carla-interface" not in vehicle_deps
 
-    carla_role = _compose_config(
+    carla_node = _compose_config(
         [
             carla / "services.carla.yaml",
             ROOT / "deployments/shared/compose.zenoh.yaml",
         ],
         carla,
-        _role_compose_env(carla, "carla"),
+        _node_compose_env(carla, "carla"),
     )
-    assert set(carla_role["services"]) == {
+    assert set(carla_node["services"]) == {
         "carla",
         "carla-interface",
         "carla-map-loader",

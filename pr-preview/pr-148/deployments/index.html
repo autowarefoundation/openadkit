@@ -1933,13 +1933,14 @@ openadkit<span class="w"> </span>stop<span class="w"> </span>planning-simulation
 <li>Add <code>--ros-distro jazzy</code> to <code>validate</code>, <code>fetch</code>, or <code>run</code> to select Jazzy;
   Humble is the default.</li>
 <li>Add <code>--gpu</code> for GPU mode. CARLA requires it and is Humble-only.</li>
-<li>Add <code>--role</code> to <code>validate</code> or <code>run</code> to start one side of a
-  <a href="split-host/">split-host</a> run. <code>status</code>, <code>logs</code>, and <code>stop</code> read the
-  running deployment and take none of these flags.</li>
+<li>Add <code>--node</code> to <code>validate</code> or <code>run</code> to start one node of a
+  <a href="split-host/">split-host</a> run. <code>status</code>, <code>logs</code>, and <code>stop</code> find the
+  running node themselves; they take <code>--node</code> only when several nodes of one
+  deployment run on the same machine.</li>
 <li>Put local settings in <code>config.local.env</code>; see
   <a href="../getting-started/cli/#configuration">Configuration</a>.</li>
 </ul>
-<p>Split-host roles are documented but unreleased until the remaining two-host
+<p>Split-host nodes are documented but unreleased until the remaining two-host
 runtime gates land.</p>
 <p>To build your own stack, see <a href="custom-deployment/">Custom Deployment</a>.</p>
 

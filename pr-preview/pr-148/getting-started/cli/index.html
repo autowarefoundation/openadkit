@@ -750,10 +750,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#split-host-roles" class="md-nav__link">
+  <a href="#split-host-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Split-host roles
+        Split-host nodes
       
     </span>
   </a>
@@ -2014,10 +2014,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#split-host-roles" class="md-nav__link">
+  <a href="#split-host-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Split-host roles
+        Split-host nodes
       
     </span>
   </a>
@@ -2125,10 +2125,11 @@ openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulatio
 <p><code>clean --data</code> refuses while that deployment is running. If Scenario
 Simulation's Kashiwanoha map is removed, restore it with
 <code>openadkit fetch scenario-simulation --force</code>.</p>
-<h2 id="split-host-roles">Split-host roles<a class="headerlink" href="#split-host-roles" title="Permanent link">#</a></h2>
-<p><code>validate</code> and <code>run</code> accept <code>--role</code> for
+<h2 id="split-host-nodes">Split-host nodes<a class="headerlink" href="#split-host-nodes" title="Permanent link">#</a></h2>
+<p><code>validate</code> and <code>run</code> accept <code>--node</code> for
 <a href="../../deployments/split-host/">split-host simulation</a>. <code>status</code>, <code>logs</code>, and
-<code>stop</code> restore the live role from the Compose project and do not take <code>--role</code>.</p>
+<code>stop</code> find the live node from its Compose project; pass <code>--node</code> only when
+several nodes of one deployment run on the same machine.</p>
 <h2 id="verify-a-release-bundle-manually">Verify a Release Bundle Manually<a class="headerlink" href="#verify-a-release-bundle-manually" title="Permanent link">#</a></h2>
 <p>To inspect a release before running anything, download the bundle and check it
 against the release metadata:</p>

@@ -23,14 +23,19 @@ workload allowlist crosses Zenoh: simulation time, vehicle status and
 commands, transforms, ADAPI calls, and the enabled sensors. Map blobs, camera
 images, and the visualization/teleop traffic are not routed.
 
-!!! warning "Verification status"
-    Both node views are rendered and validated in CI (`docker compose config`).
-    The scenario-simulation and CARLA closed loops have been exercised end to
-    end on a lab pair: sample scenarios pass, and a CARLA goal reaches
-    `ArrivedGoal` over the bridge. DDS isolation, bridge restart resilience,
-    and recorded CARLA throughput/latency evidence are still open. Treat
-    split-host nodes as unreleased until the remaining gates land with the
-    release notes.
+!!! warning "Experimental"
+    Split-host nodes ship in the release as experimental and become supported
+    once their evidence passes the release gate. So far:
+
+    - Both node views are rendered and validated in CI (`docker compose config`).
+    - On one host, the two scenario-simulation nodes pass the sample scenario
+      over Zenoh, and the scenario node's ROS domain sees no Autoware nodes,
+      only the bridged topics.
+    - On a lab pair, sample scenarios pass and a CARLA goal reaches
+      `ArrivedGoal` over the bridge.
+
+    Bridge restart resilience and recorded CARLA throughput and latency
+    evidence are still open.
 
 ## Prerequisites
 

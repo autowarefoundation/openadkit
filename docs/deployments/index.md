@@ -35,7 +35,7 @@ openadkit stop planning-simulation
 - Put local settings in `config.local.env`; see
   [Configuration](../getting-started/cli.md#configuration).
 
-Split-host nodes are documented but unreleased until the remaining two-host
-runtime gates land.
+Split-host nodes are experimental: they ship in the release and become
+supported once their evidence passes the release gate.
 
 To build your own stack, see [Custom Deployment](custom-deployment.md).

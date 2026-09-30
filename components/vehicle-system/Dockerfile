@@ -27,10 +27,8 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    . /opt/autoware/setup.sh && \
-    colcon build \
-      --base-paths \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_vehicle_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description \
@@ -45,9 +43,28 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/autoware_universe/localization/autoware_pose2twist \
         /tmp/autoware/src/universe/autoware_universe/planning/planning_validator \
         /tmp/autoware/src/sensor_component/external/sensor_component_description \
+      > /opt/openadkit/colcon-base-paths && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths $(cat /opt/openadkit/colcon-base-paths) \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
+
+# Align the packages the compiled tree links against with the current apt feed
+# and rebuild when any of them moved; the first compile above stays cached when
+# nothing did. Re-runs every build via ROS_REFRESH (components/ros-align.sh).
+ARG ROS_REFRESH=0
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/link-lock.sh,target=/tmp/link-lock.sh \
+    --mount=type=bind,source=components/ros-refresh.sh,target=/tmp/ros-refresh.sh \
+    --mount=type=bind,source=components/ros-align.sh,target=/tmp/ros-align.sh \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "ros align ${ROS_REFRESH}" && \
+    bash /tmp/ros-align.sh
 
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
@@ -83,3 +100,13 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
       --skip-keys "${internal_packages}" && \
     bash /tmp/runtime-cleanup.sh
+
+# Install the exact package versions the matching devel stage compiled
+# against and verify them (components/ros-refresh.sh, components/link-lock.sh).
+RUN --mount=from=vehicle-system-devel,source=/opt/openadkit/link-lock.txt,target=/tmp/link-lock.txt \
+    --mount=type=bind,source=components/link-lock.sh,target=/tmp/link-lock.sh \
+    --mount=type=bind,source=components/ros-refresh.sh,target=/tmp/ros-refresh.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    bash /tmp/ros-refresh.sh install --lock /tmp/link-lock.txt && \
+    bash /tmp/link-lock.sh verify /tmp/link-lock.txt

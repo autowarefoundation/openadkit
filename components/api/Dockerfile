@@ -34,10 +34,11 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/autoware_universe/system/autoware_default_adapi_universe \
         /tmp/autoware/src/universe/autoware_universe/system/autoware_diagnostic_graph_utils \
       > /opt/openadkit/colcon-base-paths && \
+    colcon_base_paths=$(tr '\n' ' ' < /opt/openadkit/colcon-base-paths) && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
     . /opt/autoware/setup.sh && \
     colcon build \
-      --base-paths $(cat /opt/openadkit/colcon-base-paths) \
+      --base-paths ${colcon_base_paths} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log

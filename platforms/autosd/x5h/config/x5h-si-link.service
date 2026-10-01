@@ -1,0 +1,18 @@
+[Unit]
+Description=X5H Safety Island channel (rpmsg-si): CR52 heartbeat log and fault input
+ConditionKernelCommandLine=x5h.role=demo
+ConditionPathExists=/usr/local/bin/rpmsg-ping
+After=cr52-remoteproc.service rpmsg-eth.service
+# The CR52 announces rpmsg-si once per SoC reset; rpmsg-ping retries the
+# endpoint creation itself, so no Requires= here.
+
+[Service]
+ExecStart=/usr/local/bin/rpmsg-ping -s rpmsg-si -l 0
+Restart=always
+RestartSec=2
+# Fault injection for the demo: systemctl kill -s USR1 x5h-si-link.service
+# (USR2 clears). The listener echoes RPMSG_SI_TX fault=1 into the journal.
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

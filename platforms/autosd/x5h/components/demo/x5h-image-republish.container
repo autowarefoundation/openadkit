@@ -1,0 +1,40 @@
+[Unit]
+Description=X5H CES 2027 demo camera decoder (compressed to raw)
+Wants=network-online.target
+After=network-online.target
+ConditionKernelCommandLine=x5h.role=demo
+# Ordering only, like the restamp node: with no bench publisher this simply
+# sees nothing and does not fail.
+Before=x5h-vp.service
+
+[Install]
+WantedBy=multi-user.target
+
+[Container]
+ContainerName=x5h-image-republish
+Image=localhost/x5h-image-republish:latest
+# See the Pull=never note in x5h-vp.container.
+Pull=never
+Network=host
+Volume=/etc/containers/systemd/cyclonedds-x5h-demo.xml:/etc/x5h/cyclonedds.xml:ro,z
+Environment=ROS_DOMAIN_ID=1
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file:///etc/x5h/cyclonedds.xml
+Entrypoint=/bin/bash
+# The output topic is deliberately NOT the bench's own camera topic name.
+# CARLA still publishes the raw 3.69 MB topic on domain 1, and if VisionPilot
+# subscribed to that name it would match the bench publisher as well as this
+# one and pull the raw stream across the LAN again, which is the whole defect
+# gate D5 was blocked on. DDS only sends to matched subscribers, so a distinct
+# local name leaves the raw topic on the bench host with no subscriber at all.
+# vision_pilot_ros2.conf must name the same topic.
+#
+# republish takes its transports as PARAMETERS in Jazzy, not as positional
+# arguments. Passed positionally they are silently ignored: the node comes up
+# with in_transport=raw and an empty out_transport, logs nothing wrong, and
+# publishes no output at all.
+Exec=-c "source /opt/ros/jazzy/setup.bash && exec ros2 run image_transport republish --ros-args -p in_transport:=compressed -p out_transport:=raw -r in/compressed:=/carla/hero/main_cam/image/compressed -r out:=/x5h/main_cam/image"
+
+[Service]
+Restart=on-failure
+RestartSec=5

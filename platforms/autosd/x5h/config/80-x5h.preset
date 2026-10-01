@@ -1,8 +1,9 @@
 # systemd presets for the Open AD Kit X5H image (issue #120 M7).
 # Installed by aib/x5h-rootfs.aib.yml to /etc/systemd/system-preset/.
 #
-# This file enables six units: SSH daemon, role banner, container store
-# mount, NPU work partition mount, NPU service, and CR52 remoteproc.
+# This file enables seven units: SSH daemon, role banner, container store
+# mount, NPU work partition mount, NPU service, CR52 remoteproc, and the
+# CES 2027 demo stack bring-up.
 #
 # THE QUADLET UNITS ARE NOT LISTED, and adding them would be a no-op that
 # reads like a decision. Quadlet generates their .service units at boot and
@@ -37,9 +38,19 @@
 # CR52_RPROC_SKIP reason=no_firmware and exits 0, and under yocto its
 # condition skips it. rpmsg-eth.service is still NOT enabled (standing
 # ruling: its binary is hand-staged).
+#
+# x5h-demo.service is the only demo-role unit that needs a preset line.
+# It gates on x5h.role=demo and its ExecStart (x5h-demo-up.sh) starts the
+# other five demo units itself, in order -- x5h-si-link.service is a plain
+# unit with no other enable path, and the four demo .container units are
+# Quadlet-generated and would self-enable via their own [Install] section
+# regardless of this file (see the Quadlet note above), so the script's
+# `systemctl start` on them is a deterministic no-op when they are already
+# up and the actual bring-up when the generator did not run at boot.
 enable sshd.service
 enable x5h-role-banner.service
 enable var-lib-containers.mount
 enable var-opt-npu.mount
 enable x5h-npu.service
 enable cr52-remoteproc.service
+enable x5h-demo.service

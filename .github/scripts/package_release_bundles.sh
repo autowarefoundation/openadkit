@@ -78,13 +78,21 @@ python3 "${planner}" \
 (cd "${bundle_root}" && ./openadkit list)
 cp -a "$installer" dist/openadkit
 
-while IFS=$'\t' read -r deployment ros_distro gpu; do
+# Split-host node views require Zenoh endpoints. These dummies only render and
+# validate the Compose graphs; they never start a bridge.
+export ZENOH_LISTEN="${ZENOH_LISTEN:-tcp/127.0.0.1:7447}"
+export ZENOH_PEER="${ZENOH_PEER:-tcp/127.0.0.1:7447}"
+
+while IFS=$'\t' read -r deployment ros_distro gpu node; do
   validate_args=(./openadkit validate "${deployment}" --ros-distro "${ros_distro}")
   if [ "${gpu}" = true ]; then
     validate_args+=(--gpu)
   fi
+  if [ -n "${node}" ]; then
+    validate_args+=(--node "${node}")
+  fi
   (cd "${bundle_root}" && "${validate_args[@]}")
-done < <(jq -r '.bundle.validation[] | [.deployment, .rosDistro, (.gpu | tostring)] | @tsv' "${plan_file}")
+done < <(jq -r '.bundle.validation[] | [.deployment, .rosDistro, (.gpu | tostring), .node] | @tsv' "${plan_file}")
 
 if cache=$(find "${bundle_root}" \( -type d -name __pycache__ -o -type f -name '*.pyc' \) -print -quit) \
   && [ -n "${cache}" ]; then

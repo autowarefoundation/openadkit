@@ -10,6 +10,22 @@
     "resetServices": ["map-check", "scenario_simulator"],
     "waitTimeout": 420
   },
+  "nodes": {
+    "autoware": {
+      "backend": "compose",
+      "rosDomainId": 1,
+      "files": ["services.autoware.yaml"],
+      "resetServices": ["map-check"],
+      "requiredEnv": ["ZENOH_LISTEN"]
+    },
+    "scenario": {
+      "backend": "compose",
+      "rosDomainId": 2,
+      "files": ["services.scenario.yaml"],
+      "resetServices": ["scenario_simulator"],
+      "requiredEnv": ["ZENOH_LISTEN", "ZENOH_PEER"]
+    }
+  },
   "requirements": {
     "architectures": ["amd64", "arm64"],
     "rosDistros": ["humble", "jazzy"],

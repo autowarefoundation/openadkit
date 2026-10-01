@@ -40,6 +40,7 @@ ALLOWED_DEPLOYMENT_KEYS = {
     "distroEnvironment",
     "data",
     "shared",
+    "nodes",
 }
 ALLOWED_COMPOSE_KEYS = {
     "files",
@@ -48,6 +49,16 @@ ALLOWED_COMPOSE_KEYS = {
     "resetServices",
     "waitTimeout",
 }
+ALLOWED_NODE_KEYS = {
+    "backend",
+    "files",
+    "resetServices",
+    "requiredEnv",
+    "rosDomainId",
+}
+NODE_BACKENDS = {"compose"}
+# Linux keeps DDS ports for domains 0-101 clear of the ephemeral port range.
+MAX_ROS_DOMAIN_ID = 101
 ALLOWED_REQUIREMENT_KEYS = {
     "architectures",
     "rosDistros",
@@ -65,6 +76,7 @@ ALLOWED_DATA_KEYS = {
     "generatedFiles",
     "requiredFiles",
     "gpu",
+    "nodes",
 }
 ALLOWED_DATA_FILE_KEYS = {"path", "url", "sha256"}
 
@@ -289,6 +301,7 @@ class RuntimeContext:
 class Selection:
     ros_distro: str
     gpu: bool
+    node: str | None
     injections: dict[str, str]
     environment: dict[str, str]
 
@@ -301,11 +314,16 @@ class Deployment:
         self.manifest = manifest
         self.name: str = manifest["name"]
         self.compose: dict[str, Any] = manifest["compose"]
+        self.nodes: dict[str, dict[str, Any]] = manifest["nodes"]
         self.requirements: dict[str, Any] = manifest["requirements"]
         self.distro_environment: dict[str, dict[str, str]] = manifest["distroEnvironment"]
         self.data: list[dict[str, Any]] = manifest["data"]
         self.shared: list[str] = manifest["shared"]
         self.project = f"openadkit-{self.name}"
+
+    def project_name(self, node: str | None = None) -> str:
+        """Each node is its own Compose project, so nodes never share state."""
+        return self.project if node is None else f"{self.project}-{node}"
 
     def env_files(self, gpu: bool = False) -> list[Path]:
         result = [
@@ -343,13 +361,48 @@ class Deployment:
             values.update(parse_dotenv(path))
         return values
 
-    def compose_files(self, gpu: bool) -> list[Path]:
-        names = list(self.compose["files"])
+    def compose_files(self, gpu: bool, node: str | None = None) -> list[Path]:
+        if node is None:
+            names = list(self.compose["files"])
+            if gpu:
+                names.extend(self.compose["gpuFiles"])
+            return [
+                ensure_safe_existing(self.directory, name, "Compose file")
+                for name in names
+            ]
+        names = list(self.nodes[node]["files"])
         if gpu:
             names.extend(self.compose["gpuFiles"])
-        return [
+        files = [
             ensure_safe_existing(self.directory, name, "Compose file") for name in names
         ]
+        files.append(
+            ensure_safe_existing(
+                self.root / "deployments",
+                "shared/compose.zenoh.yaml",
+                "Compose file",
+            )
+        )
+        return files
+
+    def reset_services(self, node: str | None = None) -> list[str]:
+        if node is None:
+            return list(self.compose["resetServices"])
+        return list(self.nodes[node]["resetServices"])
+
+    def _node_injections(self, node: str | None, injections: dict[str, str]) -> dict[str, str]:
+        if node is None:
+            return injections
+        injections["ZENOH_BASE_DIR"] = str(
+            (self.root / "deployments" / "shared").resolve()
+        )
+        injections["ZENOH_CONFIG_PATH"] = str(
+            (self.directory / "config" / "zenoh.json5").resolve()
+        )
+        # runtime.env reads this, so each node joins its own DDS domain and
+        # two nodes on one host stay isolated until the Zenoh bridge links them.
+        injections["OPENADKIT_ROS_DOMAIN_ID"] = str(self.nodes[node]["rosDomainId"])
+        return injections
 
     def select(
         self,
@@ -357,9 +410,15 @@ class Deployment:
         ros_distro: str | None,
         gpu: bool,
         *,
+        node: str | None = None,
         operational: bool = False,
         require_gpu: bool = True,
     ) -> Selection:
+        if node is not None and node not in self.nodes:
+            valid = ", ".join(sorted(self.nodes)) if self.nodes else "none"
+            raise OpenADKitError(
+                f"{self.name} has no node {node}\navailable nodes: {valid}"
+            )
         distro = ros_distro or current_context.default_ros_distro
 
         # Operational commands (status/logs/stop) do not select images or
@@ -369,11 +428,13 @@ class Deployment:
         if operational:
             injections = {"ROS_DISTRO": distro, **host_user_environment()}
             injections.update(self.distro_environment.get(distro, {}))
+            injections = self._node_injections(node, injections)
             environment = self.configuration_environment()
             environment.update(injections)
             return Selection(
                 ros_distro=distro,
                 gpu=False,
+                node=node,
                 injections=injections,
                 environment=environment,
             )
@@ -411,6 +472,8 @@ class Deployment:
                     f"{', '.join(gpu_architectures)}"
                 )
 
+        view = self.nodes.get(node) if node is not None else None
+        required_environment = list(view["requiredEnv"]) if view else []
         environment = self.configuration_environment(gpu)
         injections: dict[str, str] = {"ROS_DISTRO": distro, **host_user_environment()}
         injections.update(self.distro_environment.get(distro, {}))
@@ -427,12 +490,27 @@ class Deployment:
         else:
             injections.update(component_environment)
         injections["ROS_DISTRO"] = distro
+        injections = self._node_injections(node, injections)
 
         environment.update(injections)
+        # Env files and injections stay authoritative for data paths and
+        # Compose interpolation. Shell values only fill requiredEnv gaps such
+        # as CI dummy ZENOH_LISTEN exports; they cannot hide MAP_PATH.
+        present = dict(os.environ)
+        present.update(environment)
+        missing_environment = [
+            name for name in required_environment if not present.get(name)
+        ]
+        if missing_environment:
+            raise OpenADKitError(
+                "required environment variable(s) are missing: "
+                + ", ".join(missing_environment)
+            )
 
         return Selection(
             ros_distro=distro,
             gpu=gpu,
+            node=node,
             injections=injections,
             environment=environment,
         )
@@ -529,12 +607,70 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     if not isinstance(wait_timeout, int) or isinstance(wait_timeout, bool) or wait_timeout <= 0:
         raise OpenADKitError("compose.waitTimeout must be a positive integer")
     compose["waitTimeout"] = wait_timeout
+
     manifest["compose"] = compose
+
+    nodes = manifest.get("nodes", {})
+    if not isinstance(nodes, dict):
+        raise OpenADKitError("nodes must be an object")
+    domain_ids: set[int] = set()
+    for node_name, node in nodes.items():
+        where = f"nodes.{node_name}"
+        if not NAME_RE.fullmatch(node_name):
+            raise OpenADKitError(f"invalid node name: {node_name}")
+        if not isinstance(node, dict):
+            raise OpenADKitError(f"{where} must be an object")
+        reject_unknown(node, ALLOWED_NODE_KEYS, where)
+        node["backend"] = node.get("backend", "compose")
+        if node["backend"] not in NODE_BACKENDS:
+            raise OpenADKitError(
+                f"{where}.backend must be one of: {', '.join(sorted(NODE_BACKENDS))}"
+            )
+        node["files"] = require_string_list(
+            node.get("files"), f"{where}.files", nonempty=True
+        )
+        node["resetServices"] = require_string_list(
+            node.get("resetServices", []), f"{where}.resetServices"
+        )
+        node["requiredEnv"] = require_string_list(
+            node.get("requiredEnv", []), f"{where}.requiredEnv"
+        )
+        invalid_node_env = [
+            item for item in node["requiredEnv"] if not ENV_NAME_RE.fullmatch(item)
+        ]
+        if invalid_node_env:
+            raise OpenADKitError(
+                f"{where}.requiredEnv contains invalid environment names: "
+                + ", ".join(invalid_node_env)
+            )
+        domain_id = node.get("rosDomainId")
+        if (
+            not isinstance(domain_id, int)
+            or isinstance(domain_id, bool)
+            or not 0 <= domain_id <= MAX_ROS_DOMAIN_ID
+        ):
+            raise OpenADKitError(
+                f"{where}.rosDomainId must be an integer from 0 to {MAX_ROS_DOMAIN_ID}"
+            )
+        if domain_id in domain_ids:
+            raise OpenADKitError(f"{where}.rosDomainId {domain_id} is used by another node")
+        domain_ids.add(domain_id)
+        for file_name in node["files"]:
+            ensure_safe_existing(directory, file_name, "Compose file")
+    if nodes:
+        if "shared" not in shared:
+            raise OpenADKitError("nodes require the shared deployment assets")
+        ensure_safe_existing(
+            root / "deployments", "shared/compose.zenoh.yaml", "Zenoh Compose file"
+        )
+        ensure_safe_existing(directory, "config/zenoh.json5", "Zenoh configuration")
+    manifest["nodes"] = nodes
 
     data = manifest.get("data", [])
     if not isinstance(data, list):
         raise OpenADKitError("data must be an array")
     names: set[str] = set()
+    destinations: set[str] = set()
     for index, resource in enumerate(data):
         where = f"data[{index}]"
         if not isinstance(resource, dict):
@@ -549,8 +685,23 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
         if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
             raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
+        if resource["destinationEnv"] in destinations:
+            raise OpenADKitError(
+                f"duplicate data destination environment: {resource['destinationEnv']}"
+            )
+        destinations.add(resource["destinationEnv"])
         if "gpu" in resource and not isinstance(resource["gpu"], bool):
             raise OpenADKitError(f"{where}.gpu must be a boolean")
+        if "nodes" in resource:
+            resource["nodes"] = require_string_list(
+                resource["nodes"], f"{where}.nodes", nonempty=True
+            )
+            unknown_nodes = sorted(set(resource["nodes"]) - set(nodes))
+            if unknown_nodes:
+                raise OpenADKitError(
+                    f"{where}.nodes contains undeclared node(s): "
+                    + ", ".join(unknown_nodes)
+                )
         resource["requiredFiles"] = require_string_list(
             resource.get("requiredFiles", []), f"{where}.requiredFiles"
         )
@@ -604,6 +755,10 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         ensure_safe_existing(
             directory, "config.gpu.env", "GPU environment file"
         )
+    for node_name in nodes:
+        deployment.compose_files(False, node_name)
+        if compose["gpuFiles"]:
+            deployment.compose_files(True, node_name)
     deployment.env_files()
     return deployment
 

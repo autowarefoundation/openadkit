@@ -226,6 +226,7 @@ jobs:
             --cells-dir evidence-cells/cells \
             --build-metadata build-metadata/build-metadata.json \
             --source-root . \
+            --quarantine .github/evidence-quarantine.json \
             --expected-cells '${{ needs.prepare.outputs.cells }}' \
             --output-dir attestation
 
@@ -274,6 +275,17 @@ jobs:
                       result=cell["result"],
                   )
               )
+          if summary.get("quarantine"):
+              print()
+              print("Quarantined cells:")
+              for note in summary["quarantine"]:
+                  state = "expired" if note["expired"] else "quarantined"
+                  print(f"- {note['cell']} ({state}, expires {note['expires']}): {note['reason']}")
+          if summary.get("missing"):
+              print()
+              print("Missing cells:")
+              for name in summary["missing"]:
+                  print(f"- {name}")
           PY
           } >> "$GITHUB_STEP_SUMMARY"
         shell: bash
@@ -283,7 +295,9 @@ jobs:
         run: |
           set -euo pipefail
           result=$(jq -r '.result' attestation/evidence-summary.json)
-          if [ "${result}" != "PASSED" ]; then
+          if [ "${result}" = "WARNED" ]; then
+            echo "::warning title=evidence warned::quarantined cells did not pass; see .github/evidence-quarantine.json"
+          elif [ "${result}" != "PASSED" ]; then
             echo "evidence result is ${result}" >&2
             exit 1
           fi

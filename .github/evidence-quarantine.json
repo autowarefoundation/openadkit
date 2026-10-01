@@ -1,0 +1,4 @@
+{
+  "_comment": "Time-boxed evidence quarantine. A failing cell whose name matches an entry (glob) is reported as warned instead of failed until 'expires' (YYYY-MM-DD); expired entries no longer suppress failure. Keep entries short, justified and dated.",
+  "quarantine": []
+}

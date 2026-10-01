@@ -510,6 +510,7 @@ verify_evidence() (
   result=$(jq -r '
     [.[].verificationResult.statement.predicate.result] |
     if index("FAILED") then "FAILED"
+    elif index("WARNED") then "WARNED"
     elif index("PASSED") then "PASSED"
     else "UNKNOWN" end
   ' "${verify_json}")
@@ -518,9 +519,11 @@ verify_evidence() (
   jq -r '.[].verificationResult.statement.subject[] | .digest.sha256 + " " + .name' "${verify_json}" | sort -u >"${attested}"
   awk '{print $1" "$2}' "${subjects_file}" | sort -u >"${local_subjects}"
 
-  if [ "${result}" != "PASSED" ]; then
+  if [ "${result}" = "FAILED" ]; then
     problems=$((problems + 1))
-    echo "evidence gate (shadow): the attested test result is ${result}" >&2
+    echo "evidence gate (shadow): the attested test result is FAILED" >&2
+  elif [ "${result}" = "WARNED" ]; then
+    echo "evidence gate (shadow): the attested test result is WARNED (quarantined cells; see .github/evidence-quarantine.json)"
   fi
   if ! cmp -s "${local_subjects}" "${attested}"; then
     problems=$((problems + 1))
@@ -529,7 +532,7 @@ verify_evidence() (
   fi
 
   if [ "${problems}" -eq 0 ]; then
-    echo "evidence gate (shadow): PASSED (${cells} cells, $(wc -l <"${local_subjects}" | tr -d ' ') subjects)"
+    echo "evidence gate (shadow): ${result} (${cells} cells, $(wc -l <"${local_subjects}" | tr -d ' ') subjects)"
   else
     echo "evidence gate (shadow): ${problems} finding(s); the gate blocks once blocking mode lands" >&2
   fi

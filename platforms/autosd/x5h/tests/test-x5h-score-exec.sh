@@ -13,7 +13,7 @@ for s in "$board" "$sil" "$here/../scripts/x5h-score-camera.sh" "$here/../score/
     [ -f "$s" ] || fail "missing_$(basename "$s")"
 done
 boundary='--rm --replace --network=host --cgroups=split --log-driver=passthrough --pull=never'
-vp_boundary="$boundary --ipc=host --pid=host -v /tmp:/tmp"
+vp_boundary="$boundary --ipc=host --pid=host --privileged -v /tmp:/tmp"
 # Each forwarded variable is checked as "-e NAME" on a code line: the bare
 # name also appears in the script's own rm -f line.
 vp_env='IDENTIFIER LCM_ALIVE_INTERFACE_PATH SCORE_VP_FRAME_MAX_MS SCORE_VP_READY_FILE'

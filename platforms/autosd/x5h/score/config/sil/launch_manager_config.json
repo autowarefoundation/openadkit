@@ -1,0 +1,104 @@
+{
+    "schema_version": 1,
+    "defaults": {
+        "deployment_config": {
+            "bin_dir": "/var/tmp/score-sil/bin",
+            "ready_timeout": 5.0,
+            "shutdown_timeout": 5.0,
+            "environmental_variables": {
+                "PATH": "/usr/sbin:/usr/bin"
+            },
+            "sandbox": {
+                "uid": 0,
+                "gid": 0,
+                "supplementary_group_ids": [],
+                "scheduling_policy": "SCHED_OTHER",
+                "scheduling_priority": 0
+            }
+        },
+        "component_properties": {
+            "application_profile": {
+                "application_type": "Native",
+                "is_self_terminating": false
+            },
+            "depends_on": [],
+            "process_arguments": []
+        },
+        "run_target": {
+            "recovery_action": {
+                "switch_run_target": {
+                    "run_target": "fallback_run_target"
+                }
+            }
+        }
+    },
+    "components": {
+        "camera": {
+            "component_properties": {
+                "binary_name": "sil-camera.sh"
+            }
+        },
+        "visionpilot": {
+            "component_properties": {
+                "binary_name": "sil-vp.sh",
+                "application_profile": {
+                    "application_type": "Reporting_And_Supervised",
+                    "alive_supervision": {
+                        "reporting_cycle": 0.2,
+                        "min_indications": 1,
+                        "max_indications": 10,
+                        "failed_cycles_tolerance": 1
+                    }
+                },
+                "ready_condition": {
+                    "file_state": {
+                        "file_path": "/run/score-sil/vp.ready",
+                        "state": "Exists",
+                        "polling_interval": 0.1
+                    }
+                }
+            },
+            "deployment_config": {
+                "ready_timeout": 60.0,
+                "environmental_variables": {
+                    "PATH": "/usr/sbin:/usr/bin",
+                    "IDENTIFIER": "visionpilot",
+                    "SCORE_VP_FRAME_MAX_MS": "80",
+                    "SCORE_VP_READY_FILE": "/run/score-sil/vp.ready"
+                }
+            }
+        },
+        "si_fault": {
+            "component_properties": {
+                "binary_name": "sil-fault.sh",
+                "application_profile": {
+                    "application_type": "Native",
+                    "is_self_terminating": true
+                },
+                "process_arguments": [],
+                "ready_condition": {
+                    "process_state": "Terminated"
+                }
+            }
+        }
+    },
+    "run_targets": {
+        "Startup": {
+            "depends_on": [
+                "camera",
+                "visionpilot"
+            ],
+            "transition_timeout": 90.0
+        }
+    },
+    "initial_run_target": "Startup",
+    "fallback_run_target": {
+        "depends_on": [
+            "si_fault"
+        ],
+        "transition_timeout": 5.0
+    },
+    "alive_supervision": {
+        "evaluation_cycle": 0.1
+    }
+}

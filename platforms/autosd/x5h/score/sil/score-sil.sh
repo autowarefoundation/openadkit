@@ -45,7 +45,8 @@ stub_fault_at() { journalctl -u score-sil-stub.service -o cat --no-pager --after
 read_pids() {
     vp_pid=$(podman inspect -f '{{.State.Pid}}' sil-vp 2>/dev/null)
     cam_pid=$(podman inspect -f '{{.State.Pid}}' sil-camera 2>/dev/null)
-    [ "${vp_pid:-0}" -gt 0 ] 2>/dev/null && [ "${cam_pid:-0}" -gt 0 ] 2>/dev/null
+    [ "${vp_pid:-0}" -gt 0 ] 2>/dev/null && [ "${cam_pid:-0}" -gt 0 ] 2>/dev/null \
+        && ! gone "$vp_pid" && ! gone "$cam_pid"  # a record left by a SIGKILL keeps the dead pid
 }
 gone() { local p; for p in "$@"; do kill -0 "$p" 2>/dev/null && return 1; done; return 0; }
 no_containers() { gone "$vp_pid" "$cam_pid"; }

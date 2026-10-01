@@ -1,0 +1,23 @@
+# Planning — computes a safe, feasible trajectory to the goal.
+services:
+  planning:
+    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
+    container_name: autoware-planning
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    command: >
+      ros2 launch autoware_launch tier4_planning_component.launch.xml
+      component_wise_launch:=true
+      enable_all_modules_auto_mode:=${ENABLE_ALL_MODULES_AUTO_MODE}
+      is_simulation:=${IS_SIMULATION_MODE}
+      module_preset:=${PLANNING_MODULE_PRESET}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

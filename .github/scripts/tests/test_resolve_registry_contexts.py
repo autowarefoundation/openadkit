@@ -96,31 +96,24 @@ def source_repository(tmp_path, changed_source=None):
     return repo, image_sha
 
 
-def resolver_env(
-    tmp_path,
-    targets,
-    *,
-    common_matches=True,
-    simulator_matches=True,
-    changed_source=None,
-    plain_labels=False,
-    common_lock_sha256=LOCK_SHA256,
-    simulator_lock_sha256=LOCK_SHA256,
-    docker_fail_ref=None,
-    docker_fail_mode="notfound",
+def run_resolver(
+    tmp_path, targets, *, common_matches=True, simulator_matches=True,
+    changed_source=None, plain_labels=False, common_lock_sha256=LOCK_SHA256,
+    simulator_lock_sha256=LOCK_SHA256, fail_ref="", fail_mode="notfound",
 ):
+    """Run the resolver against a fake registry; return result, outputs, lookups."""
     docker_log = tmp_path / "docker.log"
     fake_docker = tmp_path / "docker"
     fake_docker.write_text(
         """#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' "$4" >> "${DOCKER_LOG}"
-if [ -n "${DOCKER_FAIL_REF:-}" ] && [[ "$4" == *"${DOCKER_FAIL_REF}"* ]]; then
-  if [ "${DOCKER_FAIL_MODE:-notfound}" = "notfound" ]; then
+if [ -n "${DOCKER_FAIL_REF}" ] && [[ "$4" == *"${DOCKER_FAIL_REF}"* ]]; then
+  if [ "${DOCKER_FAIL_MODE}" = "notfound" ]; then
     printf 'ERROR: %s: not found\\n' "$4" >&2
-    exit 1
+  else
+    printf 'connection reset\\n' >&2
   fi
-  printf 'connection reset\\n' >&2
   exit 1
 fi
 if [[ "$4" == *":simulator-"* ]]; then
@@ -136,16 +129,14 @@ fi
     env = os.environ | {
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
         "DOCKER_LOG": str(docker_log),
+        "DOCKER_FAIL_REF": fail_ref,
+        "DOCKER_FAIL_MODE": fail_mode,
         "COMMON_METADATA": registry_metadata(
-            openadkit_sha,
-            matches=common_matches,
-            plain_labels=plain_labels,
+            openadkit_sha, matches=common_matches, plain_labels=plain_labels,
             lock_sha256=common_lock_sha256,
         ),
         "SIMULATOR_METADATA": registry_metadata(
-            openadkit_sha,
-            matches=simulator_matches,
-            plain_labels=plain_labels,
+            openadkit_sha, matches=simulator_matches, plain_labels=plain_labels,
             lock_sha256=simulator_lock_sha256,
         ),
         "GITHUB_OUTPUT": str(output),
@@ -161,210 +152,85 @@ fi
         "USE_LOCAL_SIMULATOR": "false",
         "ROS_DISTRO": "humble",
     }
-    if docker_fail_ref is not None:
-        env["DOCKER_FAIL_REF"] = docker_fail_ref
-        env["DOCKER_FAIL_MODE"] = docker_fail_mode
-    return repo, env, output, docker_log
-
-
-def run_resolver(
-    tmp_path,
-    targets,
-    *,
-    common_matches=True,
-    simulator_matches=True,
-    changed_source=None,
-    plain_labels=False,
-    common_lock_sha256=LOCK_SHA256,
-    simulator_lock_sha256=LOCK_SHA256,
-):
-    repo, env, output, docker_log = resolver_env(
-        tmp_path,
-        targets,
-        common_matches=common_matches,
-        simulator_matches=simulator_matches,
-        changed_source=changed_source,
-        plain_labels=plain_labels,
-        common_lock_sha256=common_lock_sha256,
-        simulator_lock_sha256=simulator_lock_sha256,
-    )
-    subprocess.run(["bash", str(SCRIPT)], cwd=repo, env=env, check=True)
-    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
-    inspected = docker_log.read_text().splitlines() if docker_log.exists() else []
-    return outputs, inspected
-
-
-def run_resolver_failure(
-    tmp_path,
-    targets,
-    *,
-    docker_fail_ref,
-    docker_fail_mode="notfound",
-    common_matches=True,
-):
-    repo, env, output, docker_log = resolver_env(
-        tmp_path,
-        targets,
-        common_matches=common_matches,
-        docker_fail_ref=docker_fail_ref,
-        docker_fail_mode=docker_fail_mode,
-    )
     result = subprocess.run(
         ["bash", str(SCRIPT)], cwd=repo, env=env, text=True, capture_output=True
     )
-    inspected = docker_log.read_text().splitlines() if docker_log.exists() else []
-    return result.returncode, inspected, result.stderr
+    outputs = (
+        dict(line.split("=", 1) for line in output.read_text().splitlines())
+        if output.exists() else {}
+    )
+    lookups = docker_log.read_text().splitlines() if docker_log.exists() else []
+    return result, outputs, lookups
 
 
 def test_empty_target_plan_does_not_inspect_registry(tmp_path):
-    outputs, inspected = run_resolver(tmp_path, [])
-    assert outputs == {
-        "use_local_common": "false",
-        "use_local_simulator": "false",
-    }
-    assert inspected == []
+    result, outputs, lookups = run_resolver(tmp_path, [])
+    assert result.returncode == 0, result.stderr
+    assert outputs == {"use_local_common": "false", "use_local_simulator": "false"}
+    assert lookups == []
 
 
-def test_same_autoware_commit_reuses_branch_labeled_common_contexts(tmp_path):
-    outputs, inspected = run_resolver(
-        tmp_path, ["api"], common_matches="same-commit-branch"
-    )
-    assert outputs["devel_context"].endswith(f"@{DIGEST}")
-    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
-    assert outputs["use_local_common"] == "false"
-    assert len(inspected) == 2
-
-
-def test_non_carla_target_uses_digest_pinned_common_contexts(tmp_path):
-    outputs, inspected = run_resolver(tmp_path, ["api"])
-    assert outputs["devel_context"].endswith(f"@{DIGEST}")
-    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
-    assert outputs["use_local_common"] == "false"
-    assert all(":universe-common" in ref for ref in inspected)
-
-
-def test_common_mismatch_selects_local_common_build(tmp_path):
-    outputs, inspected = run_resolver(tmp_path, ["api"], common_matches=False)
-    assert outputs == {
-        "use_local_common": "true",
-        "use_local_simulator": "false",
-    }
-    assert len(inspected) == 1
-
-
-@pytest.mark.parametrize("lock_sha256", ["", "c" * 64])
-def test_common_lock_mismatch_selects_local_common_build(tmp_path, lock_sha256):
-    outputs, inspected = run_resolver(
-        tmp_path, ["api"], common_lock_sha256=lock_sha256
-    )
-    assert outputs == {
-        "use_local_common": "true",
-        "use_local_simulator": "false",
-    }
-    assert len(inspected) == 1
-
-
-def test_carla_only_uses_simulator_without_common_contexts(tmp_path):
-    outputs, inspected = run_resolver(tmp_path, ["carla-interface"])
-    assert outputs["simulator_context"].endswith(f"@{DIGEST}")
-    assert outputs["use_local_simulator"] == "false"
-    assert not {"devel_context", "runtime_context"} & outputs.keys()
-    assert len(inspected) == 1
-    assert ":simulator-" in inspected[0]
-
-
-def test_simulator_lock_mismatch_falls_back_to_local_simulator(tmp_path):
-    outputs, inspected = run_resolver(
-        tmp_path, ["carla-interface"], simulator_lock_sha256="c" * 64
-    )
-    assert outputs["use_local_simulator"] == "true"
-    assert outputs["use_local_common"] == "false"
-    assert outputs["devel_context"].endswith(f"@{DIGEST}")
-    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
-    assert len(inspected) == 3
-
-
-def test_simulator_mismatch_falls_back_then_resolves_common(tmp_path):
-    outputs, inspected = run_resolver(
-        tmp_path, ["carla-interface"], simulator_matches=False
-    )
-    assert outputs["use_local_simulator"] == "true"
-    assert outputs["use_local_common"] == "false"
-    assert outputs["devel_context"].endswith(f"@{DIGEST}")
-    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
-    assert len(inspected) == 3
-
-
-def test_common_source_mismatch_selects_local_common_build(tmp_path):
-    outputs, _ = run_resolver(
-        tmp_path, ["api"], changed_source="components/universe-common/input"
-    )
-    assert outputs == {
-        "use_local_common": "true",
-        "use_local_simulator": "false",
-    }
-
-
-def test_simulator_source_mismatch_reuses_matching_common_contexts(tmp_path):
-    outputs, inspected = run_resolver(
-        tmp_path,
-        ["carla-interface"],
-        changed_source="components/simulator/input",
-    )
-    assert outputs["use_local_simulator"] == "true"
-    assert outputs["use_local_common"] == "false"
-    assert outputs["devel_context"].endswith(f"@{DIGEST}")
-    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
-    assert len(inspected) == 3
+SHARED_SOURCES = (
+    "components/docker-bake.hcl",
+    "components/runtime-cleanup.sh",
+    "components/universe-common/input",
+)
 
 
 @pytest.mark.parametrize(
-    "changed_source",
+    ("targets", "options", "common", "simulator", "lookups"),
     [
-        "components/docker-bake.hcl",
-        "components/runtime-cleanup.sh",
-        "components/universe-common/input",
+        # common/simulator: "registry" reuses the pinned image, "local" builds it.
+        (["api"], {}, "registry", None, 2),
+        (["api"], {"common_matches": "same-commit-branch"}, "registry", None, 2),
+        (["api"], {"plain_labels": True}, "registry", None, 2),
+        (["api"], {"common_matches": False}, "local", None, 1),
+        (["api"], {"common_lock_sha256": ""}, "local", None, 1),
+        (["api"], {"common_lock_sha256": "c" * 64}, "local", None, 1),
+        (["api"], {"changed_source": "components/universe-common/input"}, "local", None, None),
+        (["carla-interface"], {}, None, "registry", 1),
+        (["carla-interface"], {"simulator_lock_sha256": "c" * 64}, "registry", "local", 3),
+        (["carla-interface"], {"simulator_matches": False}, "registry", "local", 3),
+        (["carla-interface"], {"changed_source": "components/simulator/input"}, "registry", "local", 3),
+        *((["carla-interface"], {"changed_source": path}, "local", "local", 2) for path in SHARED_SOURCES),
     ],
 )
-def test_carla_shared_source_mismatch_selects_all_local_dependencies(
-    tmp_path, changed_source
+def test_resolver_reuses_registry_images_only_when_they_match(
+    tmp_path, targets, options, common, simulator, lookups
 ):
-    outputs, inspected = run_resolver(
-        tmp_path, ["carla-interface"], changed_source=changed_source
-    )
-    assert outputs == {
-        "use_local_common": "true",
-        "use_local_simulator": "true",
-    }
-    assert len(inspected) == 2
-
-
-def test_plain_key_labels_still_resolve(tmp_path):
-    outputs, inspected = run_resolver(
-        tmp_path, ["api"], plain_labels=True
-    )
-    assert outputs["devel_context"].endswith(f"@{DIGEST}")
-    assert outputs["runtime_context"].endswith(f"@{DIGEST}")
-    assert outputs["use_local_common"] == "false"
-    assert len(inspected) == 2
+    result, outputs, inspected = run_resolver(tmp_path, targets, **options)
+    assert result.returncode == 0, result.stderr
+    if common == "registry":
+        assert outputs["use_local_common"] == "false"
+        assert outputs["devel_context"].endswith(f"@{DIGEST}")
+        assert outputs["runtime_context"].endswith(f"@{DIGEST}")
+    else:
+        assert not {"devel_context", "runtime_context"} & outputs.keys()
+        if common == "local":
+            assert outputs["use_local_common"] == "true"
+    if simulator == "registry":
+        assert outputs["use_local_simulator"] == "false"
+        assert outputs["simulator_context"].endswith(f"@{DIGEST}")
+    else:
+        assert "simulator_context" not in outputs
+        assert outputs["use_local_simulator"] == ("true" if simulator == "local" else "false")
+    if lookups is not None:
+        assert len(inspected) == lookups
+    if targets == ["api"]:
+        assert all(":universe-common" in ref for ref in inspected)
 
 
 def test_not_found_context_falls_back_with_diagnostic(tmp_path):
-    returncode, inspected, stderr = run_resolver_failure(
-        tmp_path, ["api"], docker_fail_ref=":universe-common-devel-"
-    )
-    assert returncode == 0
+    result, _, inspected = run_resolver(tmp_path, ["api"], fail_ref=":universe-common-devel-")
+    assert result.returncode == 0, result.stderr
     assert len(inspected) == 1
-    assert "not found" in stderr
+    assert "not found" in result.stderr
 
 
 def test_persistent_context_error_aborts_after_retries(tmp_path):
-    returncode, inspected, stderr = run_resolver_failure(
-        tmp_path,
-        ["api"],
-        docker_fail_ref=":universe-common-devel-",
-        docker_fail_mode="transient",
+    result, _, inspected = run_resolver(
+        tmp_path, ["api"], fail_ref=":universe-common-devel-", fail_mode="transient"
     )
-    assert returncode != 0
+    assert result.returncode != 0
     assert len(inspected) == 3
-    assert "unavailable after retries" in stderr
+    assert "unavailable after retries" in result.stderr

@@ -1,0 +1,22 @@
+# Visualizer — RViz behind noVNC.
+# `ports:` is ignored under `network_mode: host`. Websockify binds to loopback by
+# default (`WEBSOCKIFY_BIND=127.0.0.1`). To expose noVNC remotely, set
+# WEBSOCKIFY_BIND=0.0.0.0 and front the port with an authenticated reverse proxy.
+services:
+  visualizer:
+    image: ${VISUALIZER_IMAGE:-ghcr.io/autowarefoundation/openadkit:visualizer}
+    container_name: autoware-visualizer
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    environment:
+      - RVIZ_CONFIG=${RVIZ_CONFIG}
+      - USE_SIM_TIME=${USE_SIM_TIME}
+      - REMOTE_DISPLAY=${REMOTE_DISPLAY}
+      - REMOTE_PASSWORD=${REMOTE_PASSWORD}
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    restart: on-failure

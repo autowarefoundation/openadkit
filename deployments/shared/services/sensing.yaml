@@ -1,0 +1,24 @@
+# Sensing — captures and preprocesses raw sensor data.
+# Only the mount shared by every deployment lives here; logging-simulation adds
+# its ${DATA_PATH} bind in its own override.
+services:
+  sensing:
+    image: ${SENSING_PERCEPTION_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception}
+    container_name: autoware-sensing
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    command: >
+      ros2 launch autoware_launch tier4_sensing_component.launch.xml
+      launch_pointcloud_container:=${LAUNCH_POINTCLOUD_CONTAINER_SENSING}
+      launch_sensing_driver:=${LAUNCH_SENSING_DRIVER}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

@@ -2,25 +2,11 @@
   "schemaVersion": 1,
   "name": "carla-simulation",
   "description": "Run Autoware closed-loop against CARLA 0.9.16",
-  "shared": ["base"],
+  "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],
     "gpuFiles": [],
     "profiles": [],
-    "services": [
-      "carla",
-      "map",
-      "system",
-      "carla-interface",
-      "sensing",
-      "perception",
-      "localization",
-      "planning",
-      "vehicle",
-      "control",
-      "api",
-      "visualizer"
-    ],
     "resetServices": ["map-check", "carla-map-loader"],
     "waitTimeout": 480
   },

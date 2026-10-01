@@ -35,10 +35,14 @@ else
     diff -u "${before}" "${after}" || true
 
     mapfile -t paths < "${base_paths}"
+    # ROS setup scripts reference variables that may be unset, which `set -u`
+    # rejects (e.g. AMENT_TRACE_SETUP_FILES); relax it while sourcing.
+    set +u
     # shellcheck source=/dev/null
     . "/opt/ros/${ROS_DISTRO}/setup.sh"
     # shellcheck source=/dev/null
     . /opt/autoware/setup.sh
+    set -u
     colcon build \
         --base-paths "${paths[@]}" \
         --install-base /opt/autoware \

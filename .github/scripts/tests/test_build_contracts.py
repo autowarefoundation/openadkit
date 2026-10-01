@@ -132,6 +132,9 @@ def test_shared_build_inputs_select_all_targets():
         ".github/scripts/resolve_upstream_images.sh",
         ".github/actions/inject-ccache/action.yaml",
         ".trivyignore",
+        "components/link-lock.sh",
+        "components/ros-align.sh",
+        "components/ros-refresh.sh",
     ):
         plan = matrices.build_single_image_plan(INVENTORY, [changed])
         assert set(plan["targets_json"]) == expected

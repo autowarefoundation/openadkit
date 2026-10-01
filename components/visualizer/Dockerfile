@@ -43,20 +43,6 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
 
-# Align the packages the compiled tree links against with the current apt feed
-# and rebuild when any of them moved; the first compile above stays cached when
-# nothing did. Re-runs every build via ROS_REFRESH (components/ros-align.sh).
-ARG ROS_REFRESH=0
-RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
-    --mount=type=bind,source=components/link-lock.sh,target=/tmp/link-lock.sh \
-    --mount=type=bind,source=components/ros-refresh.sh,target=/tmp/ros-refresh.sh \
-    --mount=type=bind,source=components/ros-align.sh,target=/tmp/ros-align.sh \
-    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
-    echo "ros align ${ROS_REFRESH}" && \
-    bash /tmp/ros-align.sh
-
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
@@ -65,6 +51,18 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       --ignore-src --rosdistro "${ROS_DISTRO}" \
       --dependency-types=exec && \
     rm -rf /tmp/autoware
+
+# Align the packages the compiled tree links against with the current apt feed
+# and rebuild when any of them moved; the first compile above stays cached when
+# nothing did. Re-runs every build via ROS_ALIGN_STAMP (components/link-lock).
+ARG ROS_ALIGN_STAMP=0
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/link-lock,target=/tmp/link-lock \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "ros align ${ROS_ALIGN_STAMP}" && \
+    bash /tmp/link-lock/align.sh
 
 # =============================================================================
 # Runtime stage: visualizer
@@ -139,14 +137,13 @@ COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualize
 RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
 
 # Install the exact package versions the matching devel stage compiled
-# against and verify them (components/ros-refresh.sh, components/link-lock.sh).
+# against and verify them (components/link-lock).
 RUN --mount=from=visualizer-devel,source=/opt/openadkit/link-lock.txt,target=/tmp/link-lock.txt \
-    --mount=type=bind,source=components/link-lock.sh,target=/tmp/link-lock.sh \
-    --mount=type=bind,source=components/ros-refresh.sh,target=/tmp/ros-refresh.sh \
+    --mount=type=bind,source=components/link-lock,target=/tmp/link-lock \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
-    bash /tmp/ros-refresh.sh install --lock /tmp/link-lock.txt && \
-    bash /tmp/link-lock.sh verify /tmp/link-lock.txt
+    bash /tmp/link-lock/lock.sh install --lock /tmp/link-lock.txt && \
+    bash /tmp/link-lock/lock.sh verify --lock /tmp/link-lock.txt
 
 # In remote mode, report unhealthy if noVNC (6080) or VNC (5999) stops accepting
 # connections. Local mode has no endpoints; PID 1 exits if its command fails.

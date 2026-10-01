@@ -86,9 +86,7 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
     all_targets = set(images_by_target)
     shared_build_inputs = (
         "components/runtime-cleanup.sh",
-        "components/link-lock.sh",
-        "components/ros-align.sh",
-        "components/ros-refresh.sh",
+        "components/link-lock/*",
         ".github/image-inventory.json",
         ".github/scripts/export_autoware_lock.py",
         ".github/scripts/resolve_image_matrices.py",

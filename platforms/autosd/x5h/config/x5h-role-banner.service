@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish the X5H boot role (/run/x5h/role, MOTD)
+DefaultDependencies=no
+After=local-fs.target
+Before=sshd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/x5h-role-banner.sh
+
+[Install]
+WantedBy=multi-user.target

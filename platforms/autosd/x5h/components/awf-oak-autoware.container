@@ -58,6 +58,8 @@ After=awf-oak-bridge.service
 # is optional.
 ConditionPathExists=/var/lib/awf/scenario-sim/map/lanelet2_map.osm
 ConditionPathExists=/var/lib/awf/scenario-sim/map/pointcloud_map.pcd
+# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
+ConditionKernelCommandLine=x5h.role=cr52
 
 [Install]
 WantedBy=default.target

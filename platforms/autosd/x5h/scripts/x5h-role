@@ -1,0 +1,82 @@
+#!/bin/sh
+# x5h-role -- show or set this board's boot role.
+#
+#   x5h-role                     show current (from the kernel cmdline) and next (from x5h-boot)
+#   x5h-role set <cr52|npu|yocto> [--reboot]
+#
+# The role is a one-line file, x5h-role.txt on the x5h-boot partition, that
+# U-Boot imports on every boot (uboot/x5h-env.tmpl). It is sticky: it stays
+# until set again, so a panic or watchdog reset returns to the same role.
+# Roles:
+#   cr52  -- uio dtb, CR52 remoteproc + rpmsg-eth + the component stack (MRM)
+#   npu   -- vendor NPU dtb, /opt/npu mounted, cmemdrv loaded (VisionPilot)
+#   yocto -- vendor kernel from the second LUN (boards with HAS_YOCTO=1 only)
+# See selfboot.md, "Roles".
+set -u
+BOOT_DIR=${X5H_BOOT_DIR:-}
+BOARD_CONF=${X5H_BOARD_CONF:-/etc/x5h/board.conf}
+CMDLINE=${X5H_CMDLINE:-/proc/cmdline}
+ROLE_FILE=x5h-role.txt
+
+current_role() {
+    r=$(tr ' ' '\n' < "$CMDLINE" | sed -n 's/^x5h\.role=//p' | head -1)
+    echo "${r:-unknown}"
+}
+
+mounted=0
+mount_boot() {
+    [ -n "$BOOT_DIR" ] && return 0
+    BOOT_DIR=$(mktemp -d) || return 1
+    if ! mount -o "$1" /dev/disk/by-partlabel/x5h-boot "$BOOT_DIR" 2>/dev/null; then
+        rmdir "$BOOT_DIR"; BOOT_DIR=; return 1
+    fi
+    mounted=1
+}
+umount_boot() {
+    [ "$mounted" -eq 1 ] || return 0
+    sync; umount "$BOOT_DIR" && rmdir "$BOOT_DIR"; mounted=0
+}
+
+next_role() {
+    if [ -r "$BOOT_DIR/$ROLE_FILE" ]; then
+        sed -n 's/^role=//p' "$BOOT_DIR/$ROLE_FILE" | head -1
+    fi
+}
+
+show() {
+    echo "current=$(current_role)"
+    if mount_boot ro; then
+        n=$(next_role); echo "next=${n:-unset}"; umount_boot
+    else
+        echo "next=unreadable"
+    fi
+}
+
+set_role() {
+    role=$1
+    case "$role" in
+        cr52|npu) ;;
+        yocto)
+            has=$(sed -n 's/^HAS_YOCTO=//p' "$BOARD_CONF" 2>/dev/null | head -1)
+            [ "$has" = 1 ] || { echo "ROLE_SET_FAIL reason=yocto_absent"; exit 1; } ;;
+        *) echo "ROLE_SET_FAIL reason=bad_role role=$role"; exit 1 ;;
+    esac
+    mount_boot rw || { echo "ROLE_SET_FAIL reason=mount_failed"; exit 1; }
+    tmp="$BOOT_DIR/.$ROLE_FILE.tmp"
+    if ! printf 'role=%s\n' "$role" > "$tmp" 2>/dev/null || ! mv -f "$tmp" "$BOOT_DIR/$ROLE_FILE" 2>/dev/null; then
+        rm -f "$tmp" 2>/dev/null; umount_boot
+        echo "ROLE_SET_FAIL reason=write_failed"; exit 1
+    fi
+    umount_boot
+    echo "ROLE_SET next=$role"
+}
+
+case "${1:-show}" in
+    show) show ;;
+    set)
+        [ $# -ge 2 ] || { echo "ROLE_SET_FAIL reason=bad_role role="; exit 1; }
+        set_role "$2"
+        if [ "${3:-}" = --reboot ]; then exec systemctl reboot; fi
+        ;;
+    *) echo "usage: x5h-role [set <cr52|npu|yocto> [--reboot]]" >&2; exit 2 ;;
+esac

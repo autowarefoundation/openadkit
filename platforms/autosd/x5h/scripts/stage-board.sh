@@ -122,7 +122,7 @@ need_yes() { [ "$yes" = --yes ] || { mark "PLAN ONLY: re-run with --yes to execu
 check_inputs() {
     local missing=0 f cfg ftype needle
     for f in Image-autosd extract-ikconfig r8a78000-ironhide-uio-autosd.dtb r8a78000-ironhide-npu.dtb \
-             x5h-rootfs.ext4 rpmsg-eth "$CR52_ELF" npu/ort-rootfs npu/cmemdrv.ko npu/renesas_ep_eval_latency.py; do
+             x5h-rootfs.ext4 rpmsg-eth score-x5h-aarch64.tar "$CR52_ELF" npu/ort-rootfs npu/cmemdrv.ko npu/renesas_ep_eval_latency.py; do
         [ -e "$inputs/$f" ] || { echo "MISSING $inputs/$f"; missing=1; }
     done
     [ $missing -eq 0 ] || die "STAGE_CHECK_FAIL reason=missing_inputs"
@@ -192,6 +192,13 @@ prepare_root() {
     (cd "$mnt" && sudo cpio -idmu < "$WORK/keys.cpio") || die "STAGE_ROOT_FAIL reason=key_restore_failed"
     sudo install -D -m 0755 "$inputs/rpmsg-eth" "$mnt/var/usrlocal/bin/rpmsg-eth" \
         || die "STAGE_ROOT_FAIL reason=rpmsg_eth_install_failed"   # /usr/local -> ../var/usrlocal on this rootfs
+    # The S-CORE binaries come from CI (build-score.sh), not from aib, which
+    # takes only checkout sources and /etc or /usr destinations.
+    sudo mkdir -p "$mnt/var/usrlocal" || die "STAGE_ROOT_FAIL reason=usrlocal_mkdir_failed"
+    sudo tar -xf "$inputs/score-x5h-aarch64.tar" -C "$mnt/var/usrlocal" \
+        || die "STAGE_ROOT_FAIL reason=score_extract_failed"   # /usr/local -> ../var/usrlocal on this rootfs
+    sudo test -x "$mnt/var/usrlocal/score/bin/launch_manager" \
+        || die "STAGE_ROOT_FAIL reason=no_launch_manager"
     sudo install -D -m 0644 "$inputs/$CR52_ELF" "$mnt/lib/firmware/$CR52_ELF" \
         || die "STAGE_ROOT_FAIL reason=cr52_elf_install_failed"
     printf 'CR52_FIRMWARE=%s\n' "$CR52_ELF" | sudo tee "$mnt/etc/default/cr52-remoteproc" >/dev/null \

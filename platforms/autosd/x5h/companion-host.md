@@ -830,6 +830,24 @@ reboot, panic and watchdog reset until someone sets it back.
 Comparing `/proc/sys/kernel/random/boot_id` either side of the reset is a
 cheap way to prove the board actually reset rather than merely stayed up.
 
+## S-CORE demo: time and DLT on rog-amd
+
+The boards of the `demo` role need two services from the companion host. `chrony` serves the time to the boards. The DLT viewer reads the datarouter logs.
+
+```sh
+sudo apt-get install -y chrony dlt-tools dlt-viewer
+printf 'allow 192.168.0.0/24\nlocal stratum 10\n' | sudo tee /etc/chrony/conf.d/x5h-bench.conf
+sudo systemctl restart chrony
+```
+
+Add this line to the `input` chain of the `x5h` table in `/etc/nftables.conf`, next to the DDS rule:
+
+```
+  iifname $BIF udp dport { 123, 3490 } accept
+```
+
+Then load it with `sudo nft -f /etc/nftables.conf`. UDP 123 is NTP from the boards. UDP 3490 is DLT from the datarouter.
+
 ## Failure modes paid for in hardware
 
 **The bench link can come up unusable after returning from a netboot

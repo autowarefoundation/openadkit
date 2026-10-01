@@ -13,6 +13,11 @@
 # The ready file goes first: a file left by the previous run would tell the
 # launch manager that VisionPilot is ready before it is.
 #
+# The host PID namespace (pid=host): mw::log writes the client's own PID into
+# the datarouter's shared memory, and the datarouter drops a client whose PID
+# is not the peer PID it sees on the socket. In a private PID namespace the
+# client would write 1.
+#
 # Board-verified notes, copied from the former Quadlet unit. A comment cannot
 # sit between the continued lines of one command, so each is introduced by
 # the option it explains.
@@ -49,7 +54,7 @@
 rm -f "$SCORE_VP_READY_FILE"
 mkdir -p /run/score
 exec /usr/bin/systemd-cat -t x5h-vp /usr/bin/podman run --rm --replace --name x5h-vp \
-    --network=host --ipc=host --cgroups=split --log-driver=passthrough --privileged \
+    --network=host --ipc=host --pid=host --cgroups=split --log-driver=passthrough --privileged \
     -v /tmp:/tmp -v /run/score:/run/score \
     -e IDENTIFIER -e LCM_ALIVE_INTERFACE_PATH -e SCORE_VP_FRAME_MAX_MS -e SCORE_VP_READY_FILE \
     -e SCORE_VP_LIB=/opt/score/lib/libscore_vp.so \

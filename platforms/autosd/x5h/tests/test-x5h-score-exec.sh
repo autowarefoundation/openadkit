@@ -13,7 +13,7 @@ for s in "$board" "$sil" "$here/../scripts/x5h-score-camera.sh" "$here/../score/
     [ -f "$s" ] || fail "missing_$(basename "$s")"
 done
 boundary='--rm --replace --network=host --cgroups=split --log-driver=passthrough'
-vp_boundary="$boundary --ipc=host -v /tmp:/tmp -e IDENTIFIER -e LCM_ALIVE_INTERFACE_PATH -e SCORE_VP_FRAME_MAX_MS -e SCORE_VP_READY_FILE"
+vp_boundary="$boundary --ipc=host --pid=host -v /tmp:/tmp -e IDENTIFIER -e LCM_ALIVE_INTERFACE_PATH -e SCORE_VP_FRAME_MAX_MS -e SCORE_VP_READY_FILE"
 for s in "$board" "$sil"; do
     for tok in $vp_boundary; do
         grep -q -- "$tok" "$s" || fail "$(basename "$s")_missing_$tok"

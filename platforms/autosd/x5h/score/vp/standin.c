@@ -1,7 +1,7 @@
 /* VisionPilot stand-in for the SIL harness: 10 Hz frames through
  * libscore_vp.so, 30 ms of work and 70 ms idle. SIGUSR1 adds 200 ms of work to
- * every later frame (D-slow). SIGTERM ends it. It runs as PID 1 in a
- * container, where a signal without a handler is dropped.
+ * every later frame (D-slow). SIGTERM ends it. Both need handlers: SIGUSR1's
+ * default action ends the process, and SIGTERM must end the loop cleanly.
  * Env: SCORE_VP_FRAME_MAX_MS (required). */
 #include "score_vp.h"
 

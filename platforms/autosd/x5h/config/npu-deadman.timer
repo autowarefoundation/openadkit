@@ -1,0 +1,8 @@
+[Unit]
+Description=Run the NPU session deadman every 5 minutes
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+AccuracySec=30s
+[Install]
+WantedBy=timers.target

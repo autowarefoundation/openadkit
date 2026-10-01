@@ -1,0 +1,5 @@
+[Unit]
+Description=NPU session deadman (reboot to Yocto if no heartbeat)
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/npu-deadman.sh

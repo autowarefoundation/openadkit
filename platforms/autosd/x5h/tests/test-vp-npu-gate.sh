@@ -56,4 +56,16 @@ exact "$out" 'VP_NPU_FAIL reason=bad_args' missing_value_reason
 out=$(bash "$s" --frames 0 --log "$fx") && fail zero_frames_accepted
 exact "$out" 'VP_NPU_FAIL reason=bad_args' zero_frames_reason
 
+# The journal path grades this boot only: a persistent journal still holds an
+# earlier boot's stream, which must not be read as this run.
+bin=$(mktemp -d); trap 'rm -f "$tmp"; rm -rf "$bin"' EXIT
+cat > "$bin/journalctl" <<'EOT'
+#!/bin/sh
+case " $* " in *" -b "*) exit 0 ;; esac
+echo '    _PID=4242'
+EOT
+chmod +x "$bin/journalctl"
+out=$(PATH="$bin:$PATH" bash "$s" --frames 10) && fail earlier_boot_accepted
+exact "$out" 'VP_NPU_FAIL reason=no_log' no_log_reason
+
 echo "TEST_PASS $name"

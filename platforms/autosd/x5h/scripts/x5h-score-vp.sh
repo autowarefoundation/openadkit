@@ -54,7 +54,7 @@
 rm -f "$SCORE_VP_READY_FILE"
 mkdir -p /run/score
 exec /usr/bin/systemd-cat -t x5h-vp /usr/bin/podman run --rm --replace --name x5h-vp \
-    --network=host --ipc=host --pid=host --cgroups=split --log-driver=passthrough --privileged \
+    --network=host --ipc=host --pid=host --cgroups=split --log-driver=passthrough --pull=never --privileged \
     -v /tmp:/tmp -v /run/score:/run/score \
     -e IDENTIFIER -e LCM_ALIVE_INTERFACE_PATH -e SCORE_VP_FRAME_MAX_MS -e SCORE_VP_READY_FILE \
     -e SCORE_VP_LIB=/opt/score/lib/libscore_vp.so \

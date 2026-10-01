@@ -1085,7 +1085,7 @@ Two exec scripts start the containers:
 
 Each script runs `systemd-cat -t <tag> podman run --log-driver=passthrough`. For this reason `podman logs` shows nothing. Use `journalctl -t x5h-vp` instead.
 
-`score-lm.service` has `Restart=no`. The Safety Island clears its staleness stop when it sees a fresh heartbeat. An automatic LM restart would drive the vehicle again with no operator present. Only the booth `reset` restarts the LM. `chrony` on the board syncs to rog-amd and steps the clock only in the first three updates after boot. See [companion-host.md](companion-host.md), "S-CORE demo: time and DLT on rog-amd".
+`score-lm.service` has `Restart=no`. The Safety Island clears its staleness stop when it sees a fresh heartbeat. An automatic LM restart would drive the vehicle again with no operator present. Only the booth `reset` starts the LM again. `chrony` on the board syncs to rog-amd and steps the clock only in the first three updates after boot. See [companion-host.md](companion-host.md), "S-CORE demo: time and DLT on rog-amd".
 
 The booth commands inject the faults:
 
@@ -1094,13 +1094,13 @@ The booth commands inject the faults:
 | `fault kill` | `podman kill x5h-vp`. VisionPilot dies. |
 | `fault slow` | `podman kill --signal USR1 x5h-vp`. VisionPilot runs slow and misses the frame deadline. |
 | `fault lm` | `systemctl kill -s KILL score-lm.service`. The LM dies. |
-| `reset` | `systemctl kill -s USR2 x5h-si-link.service && systemctl restart score-lm.service`. Clears the fault and restarts the LM. |
+| `reset` | `systemctl stop score-lm.service && systemctl kill -s USR2 x5h-si-link.service && systemctl start score-lm.service`. Stops the LM, clears the fault, and starts the LM again. The stop comes first, so a `si_fault` that the LM starts during the stop cannot latch the Safety Island after the clear. |
 
 Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. `score-soak-gate.sh` is gate SG2 and `vp-npu-gate.sh` is gate D5. D5 reads the journal.
 
-After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp` and `x5h-image-republish` as running, even with `--sync`, because conmon died with them. The next `reset` removes these stale records with `--replace`. To check that no container is left, look at the processes (for example `pgrep -f /usr/bin/VisionPilot`) or the cgroup. Do not use `podman ps`.
+After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp` and `x5h-image-republish` as running, even with `--sync`, because conmon died with them. The next `reset` removes these stale records with `--replace`. To check that no container is left, look at the processes (for example `pgrep -x VisionPilot`) or the cgroup. Do not use `podman ps`.
 
-`/run/score/vp.ready` stays after a VisionPilot kill until the next VisionPilot start. A `check` before `reset` can therefore report READY while VisionPilot is stopped. Run the steps in this order: fault, reset, check.
+`/run/score/vp.ready` stays after a VisionPilot kill until the next VisionPilot start. For this reason `check` also needs a running VisionPilot process (`pgrep -x VisionPilot`) and a heartbeat with `fault=0`. After a fault, `check` reports a FAIL marker until `reset`. Run the steps in this order: fault, reset, check.
 
 ### The six markers
 
@@ -1108,7 +1108,7 @@ After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp
 - `RPMSG_LISTEN_PASS n=<n> gaps=<n>`: `rpmsg-ping -l` on the board. The CR52 heartbeat arrived on `rpmsg-si` with consecutive sequence numbers.
 - `VP_NPU_PASS frames=<n> wall_avg_ms=<ms> wall_max_ms=<ms>`: `vp-npu-gate.sh`, gate D5.
 - `SI_STOP_PASS`: `si_stop_gate.py` on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1 within the latency budget.
-- `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=6 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together (or `X5H_CES_DEMO_FAIL reason=<slug>`).
+- `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=6 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together. It also needs `/run/score/vp.ready`, a running VisionPilot process, and `fault=0` in the heartbeat (the Safety Island is not latched). Otherwise it prints `X5H_CES_DEMO_FAIL reason=<slug>`.
 - `DEMO_ROLE_PASS role=demo carveout=0x5da00000 vdev=0x5dc00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact, the CR52 carveout relocated, and all four carveouts `cr52_1` lists present under the names remoteproc looks them up by.
 
 ### The four CR52 carveouts
@@ -1147,15 +1147,18 @@ booth script itself needs only `ssh` to the board:
 
 ```
 x5h-ces2027-demo.sh check                 # ready? prints the READY/FAIL marker above
-x5h-ces2027-demo.sh run                   # prints the compose + board commands to bring the stack up
+x5h-ces2027-demo.sh run                   # prints the compose, board and reset commands to bring the stack up
 x5h-ces2027-demo.sh fault kill|slow|lm [--at <epoch-s>]   # the demo moment
 x5h-ces2027-demo.sh reset                 # fault cleared, launch manager and VisionPilot back
 ```
 
 `run` does not shell out to `docker` itself. That choice avoids mounting the host's
 `/var/run/docker.sock` into the `demo` container just to start its own compose siblings.
-Bringing the stack up is `docker compose`'s job. This script only prints the two commands
+Bringing the stack up is `docker compose`'s job. This script only prints the three commands
 the operator (or the `demo` container) needs.
+
+A board that booted before CARLA falls back after `ready_timeout` (60 s), and the board
+restart does not recover it. Run `reset` after CARLA is up: it is the last command `run` prints.
 
 ### Recording the demo reel
 

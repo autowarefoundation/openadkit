@@ -40,5 +40,6 @@ if [ -d sil ]; then
     install -d "$s/sil"
     cp -a sil/. "$s/sil/"
 fi
-tar -C "$stage" -cf "$OUT/score-x5h-$ARCH.tar" score
+# Owned by root on the board, not by the build uid.
+tar --owner=0 --group=0 --numeric-owner -C "$stage" -cf "$OUT/score-x5h-$ARCH.tar" score
 echo "OK: $OUT/score-x5h-$ARCH.tar"

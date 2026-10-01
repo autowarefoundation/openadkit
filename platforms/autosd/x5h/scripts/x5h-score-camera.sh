@@ -22,7 +22,7 @@
 # with in_transport=raw and an empty out_transport, logs nothing wrong, and
 # publishes no output at all.
 exec /usr/bin/systemd-cat -t x5h-camera /usr/bin/podman run --rm --replace --name x5h-image-republish \
-    --network=host --cgroups=split --log-driver=passthrough \
+    --network=host --cgroups=split --log-driver=passthrough --pull=never \
     -v /etc/containers/systemd/cyclonedds-x5h-demo.xml:/etc/x5h/cyclonedds.xml:ro,z \
     -e ROS_DOMAIN_ID=1 -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
     -e CYCLONEDDS_URI=file:///etc/x5h/cyclonedds.xml \

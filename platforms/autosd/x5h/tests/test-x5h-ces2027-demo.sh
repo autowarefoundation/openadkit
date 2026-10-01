@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # x5h-ces2027-demo.sh check with a fake ssh: composes the READY line from the
 # package sha, route.env and the board's unit states, and names a missing
-# unit, a corrupt route.env, or a failed ssh transport distinctly.
+# unit, a corrupt route.env, a dead VisionPilot, a latched Safety Island, or a
+# failed ssh transport distinctly.
 set -u
 name=test-x5h-ces2027-demo
 here=$(cd "$(dirname "$0")" && pwd); s="$here/../scripts/x5h-ces2027-demo.sh"
@@ -25,8 +26,12 @@ case "$*" in
   *is-active*)
     [ -z "${SSH_FAIL:-}" ] || exit 1
     printf 'active\nactive\nactive\nactive\nactive\n%s\n' "${LM_STATE:-active}" ;;
-  *vp.ready*) exit "${VP_READY_RC:-0}" ;;
-  *journalctl*) echo 'RPMSG_SI_RX hb seq=41 uptime_ms=42000 fault=0' ;;
+  *vp.ready*)
+    [ -z "${PROBE_RC:-}" ] || exit "$PROBE_RC"
+    [ -z "${VP_READY_RC:-}" ] || exit "$VP_READY_RC"
+    # The ready file is there; VisionPilot itself may not be.
+    case "$*" in *'pgrep -x VisionPilot'*) [ -z "${VP_DEAD:-}" ] || exit 1 ;; esac ;;
+  *journalctl*) echo "RPMSG_SI_RX hb seq=41 uptime_ms=42000 fault=${HB_FAULT:-0}" ;;
   *) exit "${CMD_RC:-0}" ;;
 esac
 EOF
@@ -68,6 +73,24 @@ out=$(VP_READY_RC=1 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s
 exact "$out" 'X5H_CES_DEMO_FAIL reason=vp_not_ready' vp_not_ready_reason
 [ "$rc" -ne 0 ] || fail vp_not_ready_exit_zero
 
+# vp.ready outlives a killed VisionPilot, so the process must be there too.
+rc=0
+out=$(VP_DEAD=1 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=vp_not_ready' vp_dead_reason
+[ "$rc" -ne 0 ] || fail vp_dead_exit_zero
+
+# fault=1 in the heartbeat is the Safety Island's latch: not ready until reset.
+rc=0
+out=$(HB_FAULT=1 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=si_latched' si_latched_reason
+[ "$rc" -ne 0 ] || fail si_latched_exit_zero
+
+# ssh exits 255 on a transport failure: that is not a missing VisionPilot.
+rc=0
+out=$(PROBE_RC=255 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=ssh_failed' probe_ssh_failed_reason
+[ "$rc" -ne 0 ] || fail probe_ssh_failed_exit_zero
+
 # Each fault route runs one board command and prints the bench time of it.
 for r in kill:'podman kill x5h-vp' slow:'podman kill --signal USR1 x5h-vp' lm:'systemctl kill -s KILL score-lm.service'; do
     route=${r%%:*}; cmd=${r#*:}
@@ -91,10 +114,14 @@ out=$(CMD_RC=1 SSH="$tmp/ssh" bash "$s" fault kill) || rc=$?
 exact "$out" 'X5H_CES_DEMO_FAIL reason=fault_failed' fault_failed_reason
 [ "$rc" -ne 0 ] || fail fault_failed_exit_zero
 
-# reset clears the latch, then restarts the launch manager.
+# reset stops the launch manager, clears the latch, then starts it again.
 : > "$LOG"
 out=$(SSH="$tmp/ssh" bash "$s" reset) || fail "reset_failed $out"
 exact "$out" 'X5H_CES_DEMO_RESET' reset_line
-grep -qF 'systemctl kill -s USR2 x5h-si-link.service && systemctl restart score-lm.service' "$LOG" || fail "reset_cmd log=$(cat "$LOG")"
+grep -qF 'systemctl stop score-lm.service && systemctl kill -s USR2 x5h-si-link.service && systemctl start score-lm.service' "$LOG" || fail "reset_cmd log=$(cat "$LOG")"
+
+# run ends with the booth reset: a board that booted before CARLA has fallen back.
+out=$(COMPOSE_FILE=/c/docker-compose.yaml bash "$s" run) || fail "run_failed $out"
+exact "$(tail -n 1 <<<"$out")" "$s reset" run_last_line
 
 echo "TEST_PASS $name"

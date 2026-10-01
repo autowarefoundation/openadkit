@@ -50,7 +50,8 @@ read_pids() {
 }
 gone() { local p; for p in "$@"; do kill -0 "$p" 2>/dev/null && return 1; done; return 0; }
 no_containers() { gone "$vp_pid" "$cam_pid"; }
-fell_back() { lm_log | grep 'State fallback' >/dev/null; }
+# A fallback transition that fails logs only 'activating recovery state'.
+fell_back() { lm_log | grep -e 'State fallback' -e 'activating recovery state' >/dev/null; }
 stub_faulted() { [ -n "$(stub_fault_at)" ]; }
 start_lm() {
     systemctl reset-failed score-sil-lm.service 2>/dev/null
@@ -111,7 +112,10 @@ boundary)
     cleanup; echo "SIL_BOUNDARY_PASS" ;;
 soak)
     min=${4:-10}; start_lm; sleep $(( min * 60 ))
-    lm_log | grep -e 'switched to FAILED' -e 'State fallback' >/dev/null && fail fallback
+    lm_log | grep -e 'switched to FAILED' -e 'State fallback' -e 'activating recovery state' >/dev/null && fail fallback
+    # A dead LM logs no fallback line at all.
+    systemctl is-active --quiet score-sil-lm.service || fail lm_inactive
+    stub_faulted && fail stub_fault
     cleanup; echo "SIL_SOAK_PASS minutes=$min" ;;
 kill|slow)
     start_lm; sleep 3
@@ -122,6 +126,7 @@ kill|slow)
     cleanup; echo "SIL_${SUB}_PASS ms=$(ms "$t0" "$t1")" ;;
 lm)
     start_lm; sleep 3
+    ! gone "$vp_pid" && ! gone "$cam_pid" || fail payloads_died_early
     t0=$(now); systemctl kill -s KILL score-sil-lm.service
     wait_for 10 no_containers || fail left_containers
     t1=$(now); cleanup; echo "SIL_LM_PASS ms=$(ms "$t0" "$t1")" ;;

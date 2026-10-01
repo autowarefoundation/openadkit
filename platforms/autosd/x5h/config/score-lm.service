@@ -10,8 +10,10 @@ Wants=network-online.target score-datarouter.service
 # Restart=no on purpose. The #147 Safety Island clears its staleness stop
 # when a fresh heartbeat arrives, so an automatic restart would bring
 # VisionPilot back and the vehicle would drive again with no operator. Only
-# the booth reset (x5h-ces2027-demo.sh reset) restarts this unit.
+# the booth reset (x5h-ces2027-demo.sh reset) stops and starts this unit.
 Restart=no
+# A payload stuck in an NPU call must not stall the booth reset for 90 s.
+TimeoutStopSec=15
 Environment=MW_LOG_CONFIG_FILE=/etc/score/lm-logging.json
 ExecStart=/usr/local/score/bin/launch_manager -c /usr/local/score/etc/demo/launch_manager_config.bin
 # KillMode stays control-group: the containers are in this cgroup

@@ -34,6 +34,10 @@ out=$(run "$tmp/vp") || fail "good_failed $out"
 echo 'Alive Supervision ( visionpilot ) switched to FAILED' > "$tmp/lm"
 out=$(run "$tmp/vp") && fail fallback_accepted
 [ "$out" = 'SCORE_SOAK_FAIL reason=alive_failed' ] || fail "alive_line out=$out"
+# A fallback transition that fails logs only its start.
+echo 'activating recovery state: fallback' > "$tmp/lm"
+out=$(run "$tmp/vp") && fail recovery_accepted
+[ "$out" = 'SCORE_SOAK_FAIL reason=fallback' ] || fail "recovery_line out=$out"
 : > "$tmp/lm"
 head -n 100 "$tmp/vp" > "$tmp/vp-short"
 out=$(run "$tmp/vp-short") && fail short_accepted

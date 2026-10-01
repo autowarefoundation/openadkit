@@ -24,7 +24,8 @@ cursor=$("$JOURNALCTL" -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p
 "$SLEEP" $((MIN * 60))
 lm=$("$JOURNALCTL" -u score-lm --after-cursor="$cursor" -o cat --no-pager) || fail journal_unreadable
 grep -q 'switched to FAILED' <<<"$lm" && fail alive_failed
-grep -q 'State fallback' <<<"$lm" && fail fallback
+# A fallback transition that fails logs only 'activating recovery state'.
+grep -q -e 'State fallback' -e 'activating recovery state' <<<"$lm" && fail fallback
 # A hard crash logs neither line above, so the unit must still be running.
 "$SYSTEMCTL" is-active --quiet score-lm.service || fail lm_inactive
 vp=$("$JOURNALCTL" -t x5h-vp --after-cursor="$cursor" -o cat --no-pager) || fail journal_unreadable

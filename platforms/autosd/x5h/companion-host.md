@@ -840,7 +840,7 @@ printf 'allow 192.168.0.0/24\nlocal stratum 10\n' | sudo tee /etc/chrony/conf.d/
 sudo systemctl restart chrony
 ```
 
-Add this line to the `input` chain of the `x5h` table in `/etc/nftables.conf`, next to the DDS rule:
+Add this line to the `input` chain of the `x5h` table in `/etc/nftables.conf`, in the `$BIF` input rules:
 
 ```
   iifname $BIF udp dport { 123, 3490 } accept

@@ -10,7 +10,7 @@
 rm -f "$SCORE_VP_READY_FILE"
 mkdir -p /run/score-sil
 exec /usr/bin/systemd-cat -t sil-vp /usr/bin/podman run --rm --replace --name sil-vp \
-    --network=host --ipc=host --pid=host --cgroups=split --log-driver=passthrough \
+    --network=host --ipc=host --pid=host --cgroups=split --log-driver=passthrough --pull=never \
     -v /tmp:/tmp -v /run/score-sil:/run/score-sil \
     -e IDENTIFIER -e LCM_ALIVE_INTERFACE_PATH -e SCORE_VP_FRAME_MAX_MS -e SCORE_VP_READY_FILE \
     -e MW_LOG_CONFIG_FILE=/opt/score/sil/logging.json -e LD_LIBRARY_PATH=/opt/score/lib \

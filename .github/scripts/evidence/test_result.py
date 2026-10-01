@@ -9,8 +9,12 @@ Outputs, under --output-dir:
 import argparse
 import json
 import os
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from subjects import build_subjects, write_subjects  # noqa: E402
 
 
 def load(path: Path):
@@ -21,12 +25,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cells-dir", required=True)
     parser.add_argument("--build-metadata", required=True)
-    parser.add_argument("--kit-context", required=True)
+    parser.add_argument("--source-root", required=True)
     parser.add_argument("--output-dir", required=True)
     args = parser.parse_args()
 
     metadata = load(Path(args.build_metadata))
-    kit = load(Path(args.kit_context))
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
 
@@ -35,21 +38,8 @@ def main():
         cells.append(load(path))
     cells.sort(key=lambda cell: cell.get("name", ""))
 
-    build_tag = metadata.get("build_tag", "unknown")
-    subjects: list[tuple[str, str]] = []
-    for image in metadata.get("images", []):
-        digest = image.get("digest", "")
-        if digest.startswith("sha256:"):
-            subjects.append(
-                (
-                    digest.removeprefix("sha256:"),
-                    f'{image["repo"]}:{image["target"]}-{image["ros_distro"]}-{build_tag}',
-                )
-            )
-    for name, meta in sorted(kit.get("deployments", {}).items()):
-        subjects.append((meta["checksum"], f"deployment:{name}"))
-    for name, checksum in sorted(kit.get("shared", {}).items()):
-        subjects.append((checksum, f"shared:{name}"))
+    subjects = build_subjects(metadata, Path(args.source_root).resolve())
+    write_subjects(output / "evidence-subjects.txt", subjects)
 
     passed = [cell["name"] for cell in cells if cell.get("result") == "PASSED"]
     failed = [cell["name"] for cell in cells if cell.get("result") != "PASSED"]
@@ -88,12 +78,8 @@ def main():
         json.dumps(predicate, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    (output / "evidence-subjects.txt").write_text(
-        "".join(f"{digest}  {name}\n" for digest, name in subjects), encoding="utf-8"
-    )
-
     summary = {
-        "build_tag": build_tag,
+        "build_tag": metadata.get("build_tag", "unknown"),
         "source_sha": metadata.get("openadkit_sha"),
         "result": result,
         "cells": [

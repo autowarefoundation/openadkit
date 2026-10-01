@@ -37,6 +37,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       actions: read
+      attestations: read
       contents: read
       packages: read
     outputs:

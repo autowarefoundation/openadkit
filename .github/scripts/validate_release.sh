@@ -465,6 +465,77 @@ validate_registry_conflicts() {
   [ "${conflicts}" -eq 0 ] || exit 1
 }
 
+verify_evidence() (
+  # Shadow mode: verify the evidence attestation for this build and report the
+  # outcome without blocking the release yet. Blocking mode lands once the
+  # gate has run in shadow for a while (PR 3).
+  set +e
+  local image_ref subjects_file verify_json attested local_subjects result cells problems=0
+
+  if [ ! -f release-input/build/build-metadata.json ]; then
+    echo "evidence gate (shadow): build metadata is missing; nothing to verify" >&2
+    exit 0
+  fi
+
+  image_ref=$(jq -r '.images[0] | "oci://" + .repo + "@" + .digest' release-input/build/build-metadata.json)
+  subjects_file=release-input/evidence-subjects.txt
+  verify_json=release-input/evidence-verify.json
+  attested=release-input/evidence-subjects-attested.txt
+  local_subjects=release-input/evidence-subjects-local.txt
+
+  # Recompute the expected subject set from the release tree.
+  if [ "$(git rev-parse HEAD 2>/dev/null)" != "${release_sha}" ]; then
+    git fetch --quiet --depth 1 origin "${release_sha}" 2>/dev/null
+    git checkout --quiet "${release_sha}" -- deployments 2>/dev/null
+  fi
+  if ! python3 "${script_dir}/evidence/subjects.py" \
+    --build-metadata release-input/build/build-metadata.json \
+    --source-root "${script_dir}/../.." \
+    --output "${subjects_file}" >/dev/null; then
+    echo "evidence gate (shadow): could not compute the expected subjects" >&2
+    exit 0
+  fi
+
+  if ! gh attestation verify "${image_ref}" \
+    --repo "${GITHUB_REPOSITORY}" \
+    --predicate-type "https://in-toto.io/attestation/test-result/v0.1" \
+    --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/evidence.yaml" \
+    --source-ref "refs/heads/main" \
+    --format json >"${verify_json}" 2>release-input/evidence-verify.err; then
+    echo "evidence gate (shadow): no valid evidence attestation found for ${image_ref}" >&2
+    sed 's/^/  /' release-input/evidence-verify.err >&2
+    exit 0
+  fi
+
+  result=$(jq -r '
+    [.[].verificationResult.statement.predicate.result] |
+    if index("FAILED") then "FAILED"
+    elif index("PASSED") then "PASSED"
+    else "UNKNOWN" end
+  ' "${verify_json}")
+  cells=$(jq -r '[.[].verificationResult.statement.predicate.configuration | length] | max // 0' "${verify_json}")
+
+  jq -r '.[].verificationResult.statement.subject[] | .digest.sha256 + " " + .name' "${verify_json}" | sort -u >"${attested}"
+  awk '{print $1" "$2}' "${subjects_file}" | sort -u >"${local_subjects}"
+
+  if [ "${result}" != "PASSED" ]; then
+    problems=$((problems + 1))
+    echo "evidence gate (shadow): the attested test result is ${result}" >&2
+  fi
+  if ! cmp -s "${local_subjects}" "${attested}"; then
+    problems=$((problems + 1))
+    echo "evidence gate (shadow): attested subjects differ from the release plan" >&2
+    diff -u "${local_subjects}" "${attested}" | head -40 >&2
+  fi
+
+  if [ "${problems}" -eq 0 ]; then
+    echo "evidence gate (shadow): PASSED (${cells} cells, $(wc -l <"${local_subjects}" | tr -d ' ') subjects)"
+  else
+    echo "evidence gate (shadow): ${problems} finding(s); the gate blocks once blocking mode lands" >&2
+  fi
+  exit 0
+)
+
 write_outputs() {
   {
     echo "release_sha=${release_sha}"
@@ -486,6 +557,7 @@ main() {
   validate_upstream_coverage
   validate_scan_coverage
   validate_release_rules
+  verify_evidence
   validate_git_tag
   validate_registry_conflicts
   write_outputs

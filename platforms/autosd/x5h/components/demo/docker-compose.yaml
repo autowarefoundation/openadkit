@@ -141,7 +141,7 @@ services:
     image: ${DEMO_IMAGE:-alpine:3.20}
     container_name: ces-demo
     network_mode: host
-    command: ["/bin/sh", "-c", "apk add --no-cache bash openssh-client >/dev/null && exec sleep infinity"]
+    command: ["/bin/sh", "-c", "apk add --no-cache bash openssh-client coreutils >/dev/null && exec sleep infinity"]
     environment:
       - X5H_BOARD=${X5H_BOARD:-root@192.168.0.20}
       - CARLA_PKG=/carla-pkg

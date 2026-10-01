@@ -20,20 +20,23 @@ printf 'LAP_M=1800\n' > "$tmp/si-nospawn/route.env"
 cat > "$tmp/ssh" <<'EOF'
 #!/bin/sh
 # $1 = host, rest = command
+echo "$*" >> "$LOG"
 case "$*" in
   *is-active*)
     [ -z "${SSH_FAIL:-}" ] || exit 1
-    printf 'active\nactive\nactive\nactive\n%s\n' "${VP_STATE:-active}" ;;
+    printf 'active\nactive\nactive\nactive\nactive\n%s\n' "${LM_STATE:-active}" ;;
+  *vp.ready*) exit "${VP_READY_RC:-0}" ;;
   *journalctl*) echo 'RPMSG_SI_RX hb seq=41 uptime_ms=42000 fault=0' ;;
-  *) true ;;
+  *) exit "${CMD_RC:-0}" ;;
 esac
 EOF
 chmod +x "$tmp/ssh"
+export LOG="$tmp/log"
 
 out=$(SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) || fail "check_failed $out"
-exact "$out" 'X5H_CES_DEMO_READY sha=deadbeef spawn=63 units=5 hb=41' ready_line
+exact "$out" 'X5H_CES_DEMO_READY sha=deadbeef spawn=63 units=6 hb=41' ready_line
 
-out=$(VP_STATE=inactive SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) && fail inactive_accepted
+out=$(LM_STATE=inactive SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) && fail inactive_accepted
 exact "$out" 'X5H_CES_DEMO_FAIL reason=unit_inactive' fail_reason
 
 out=$(bash "$s" bogus 2>&1) && fail bogus_accepted
@@ -59,22 +62,39 @@ out=$(SSH_FAIL=1 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" c
 exact "$out" 'X5H_CES_DEMO_FAIL reason=ssh_failed' ssh_failed_reason
 [ "$rc" -ne 0 ] || fail ssh_failed_exit_zero
 
-# `fault` is the demo moment. A VP_SI with no si_fault.sh must fail loudly,
-# not silently do nothing.
+# vp.ready is the launch manager's own readiness: no file, no READY.
 rc=0
-out=$(VP_SI="$tmp/si" bash "$s" fault kill) || rc=$?
-exact "$out" 'X5H_CES_DEMO_FAIL reason=no_fault_script' fault_missing_reason
-[ "$rc" -ne 0 ] || fail fault_missing_exit_zero
+out=$(VP_READY_RC=1 SSH="$tmp/ssh" CARLA_PKG="$tmp/pkg" VP_SI="$tmp/si" bash "$s" check) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=vp_not_ready' vp_not_ready_reason
+[ "$rc" -ne 0 ] || fail vp_not_ready_exit_zero
 
-mkdir -p "$tmp/si-fault"
-printf '#!/bin/sh\nexit 0\n' > "$tmp/si-fault/si_fault.sh"
-out=$(VP_SI="$tmp/si-fault" bash "$s" fault kill) || fail "fault_ok_failed $out"
-exact "$out" '' fault_ok_no_output
+# Each fault route runs one board command and prints the bench time of it.
+for r in kill:'podman kill x5h-vp' slow:'podman kill --signal USR1 x5h-vp' lm:'systemctl kill -s KILL score-lm.service'; do
+    route=${r%%:*}; cmd=${r#*:}
+    : > "$LOG"
+    out=$(SSH="$tmp/ssh" bash "$s" fault "$route") || fail "fault_${route}_failed $out"
+    [[ $out =~ ^X5H_CES_DEMO_FAULT\ route=$route\ at=[0-9]+\.[0-9]+$ ]] || fail "fault_${route}_line out=$out"
+    grep -qF "$cmd" "$LOG" || fail "fault_${route}_cmd log=$(cat "$LOG")"
+done
 
-printf '#!/bin/sh\nexit 1\n' > "$tmp/si-fault/si_fault.sh"
+# --at in the past injects at once.
+out=$(SSH="$tmp/ssh" bash "$s" fault kill --at 1) || fail "fault_at_failed $out"
+[[ $out =~ ^X5H_CES_DEMO_FAULT\ route=kill ]] || fail "fault_at_line out=$out"
+
 rc=0
-out=$(VP_SI="$tmp/si-fault" bash "$s" fault kill) || rc=$?
-exact "$out" 'X5H_CES_DEMO_FAIL reason=fault_failed' fault_script_fail_reason
-[ "$rc" -ne 0 ] || fail fault_script_fail_exit_zero
+out=$(SSH="$tmp/ssh" bash "$s" fault bogus) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=usage' fault_usage_reason
+[ "$rc" -ne 0 ] || fail fault_usage_exit_zero
+
+rc=0
+out=$(CMD_RC=1 SSH="$tmp/ssh" bash "$s" fault kill) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=fault_failed' fault_failed_reason
+[ "$rc" -ne 0 ] || fail fault_failed_exit_zero
+
+# reset clears the latch, then restarts the launch manager.
+: > "$LOG"
+out=$(SSH="$tmp/ssh" bash "$s" reset) || fail "reset_failed $out"
+exact "$out" 'X5H_CES_DEMO_RESET' reset_line
+grep -qF 'systemctl kill -s USR2 x5h-si-link.service && systemctl restart score-lm.service' "$LOG" || fail "reset_cmd log=$(cat "$LOG")"
 
 echo "TEST_PASS $name"

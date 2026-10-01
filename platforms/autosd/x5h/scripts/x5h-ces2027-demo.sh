@@ -4,9 +4,10 @@
 #   x5h-ces2027-demo.sh check            everything ready? prints the package sha
 #   x5h-ces2027-demo.sh run              print the compose command that brings
 #                                         the stack up, then restart the board
-#   x5h-ces2027-demo.sh fault kill|channel   inject the fault (the demo moment)
-#   x5h-ces2027-demo.sh reset            VisionPilot back, fault cleared
-# Markers: X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=5 hb=<seq> | X5H_CES_DEMO_FAIL reason=<slug>
+#   x5h-ces2027-demo.sh fault kill|slow|lm [--at <epoch-s>]   inject a fault
+#   x5h-ces2027-demo.sh reset            clear the SI latch, restart the launch manager
+# Markers: X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=6 hb=<seq>
+#        | X5H_CES_DEMO_FAULT route=<r> at=<epoch.ns> | X5H_CES_DEMO_FAIL reason=<slug>
 #
 # Compose (components/demo/docker-compose.yaml) owns starting carla-server and
 # bridge: this script does not shell out to `docker` to start its own
@@ -24,7 +25,7 @@ CARLA_PKG="${CARLA_PKG:-$HOME/carla-pkg}"; VP_SI="${VP_SI:-$HOME/vp-ros2/si}"
 # "Running the demo". Do not resolve a directory that is not there: an empty
 # `cd` result used to silently become "/docker-compose.yaml".
 COMPOSE_FILE="${COMPOSE_FILE:-}"
-UNITS="x5h-si-link x5h-demo-bridge x5h-demo-restamp x5h-demo-hb x5h-vp"
+UNITS="x5h-si-link x5h-demo-bridge x5h-demo-restamp x5h-demo-hb score-datarouter score-lm"
 fail() { echo "X5H_CES_DEMO_FAIL reason=$1"; exit 1; }
 cmd="${1:-}"
 case "$cmd" in
@@ -42,14 +43,15 @@ case "$cmd" in
     [ -n "$spawn" ] || fail bad_route
     states=$($SSH "$BOARD" "systemctl is-active $UNITS")
     # A transport failure (no ssh binary, connection refused, a dropped
-    # connection mid-output) shows up here as fewer than 5 lines, including
+    # connection mid-output) shows up here as fewer than 6 lines, including
     # zero. That must be reported as its own reason: sending the operator to
     # check the board's units when the real problem is the network wastes
     # the minutes a booth doesn't have.
     n_lines=$(grep -c '.' <<<"$states")
-    [ "$n_lines" -eq 5 ] || fail ssh_failed
+    [ "$n_lines" -eq 6 ] || fail ssh_failed
     n=$(grep -c '^active$' <<<"$states")
-    [ "$n" -eq 5 ] || fail unit_inactive
+    [ "$n" -eq 6 ] || fail unit_inactive
+    $SSH "$BOARD" 'test -e /run/score/vp.ready' || fail vp_not_ready
     hb=$($SSH "$BOARD" 'journalctl -u x5h-si-link -n 1 --no-pager -o cat') || true
     seq=$(sed -n 's/.*hb seq=\([0-9]*\).*/\1/p' <<<"$hb"); [ -n "$seq" ] || fail no_heartbeat
     echo "X5H_CES_DEMO_READY sha=$sha spawn=$spawn units=$n hb=$seq" ;;
@@ -63,15 +65,23 @@ case "$cmd" in
     echo "$SSH $BOARD 'systemctl restart x5h-demo.service && systemctl status x5h-demo.service --no-pager | grep X5H_DEMO_UP'" ;;
   fault)
     case "${2:-}" in
-      kill|channel)
-        # This is the demo moment: a missing or failing fault script must
-        # say so, not do nothing.
-        [ -f "$VP_SI/si_fault.sh" ] || fail no_fault_script
-        bash "$VP_SI/si_fault.sh" "$2" || fail fault_failed ;;
+      kill) remote='podman kill x5h-vp' ;;
+      slow) remote='podman kill --signal USR1 x5h-vp' ;;
+      lm)   remote='systemctl kill -s KILL score-lm.service' ;;
       *) fail usage ;;
-    esac ;;
+    esac
+    # --at <epoch-s> waits for that second, so si_stop_gate.py can be started
+    # first with the same value as --fault-at. The ssh round trip after it
+    # counts against the gate, which only makes the gate stricter.
+    if [ "${3:-}" = --at ]; then
+        [[ ${4:-} =~ ^[0-9]+$ ]] || fail usage
+        while [ "$(date +%s)" -lt "$4" ]; do sleep 0.05; done
+    fi
+    at=$(date +%s.%N)
+    $SSH "$BOARD" "$remote" >/dev/null || fail fault_failed
+    echo "X5H_CES_DEMO_FAULT route=$2 at=$at" ;;
   reset)
-    $SSH "$BOARD" 'systemctl kill -s USR2 x5h-si-link.service; systemctl start x5h-vp.service' || fail reset
+    $SSH "$BOARD" 'systemctl kill -s USR2 x5h-si-link.service && systemctl restart score-lm.service' || fail reset
     echo "X5H_CES_DEMO_RESET" ;;
   *) fail usage ;;
 esac

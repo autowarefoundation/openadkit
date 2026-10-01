@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gate D5: VisionPilot runs on the NPU under 30 ms end to end for N frames.
 #   vp-npu-gate.sh [--frames 396] [--max-wall-ms 30] [--log <file>]
-# Reads podman logs x5h-vp unless --log names a file. Requires the merged
+# Reads the x5h-vp journal stream unless --log names a file. Requires the merged
 # backend's "Offload gate PASSED" line (a run that completes on the CPU
 # fallback is not a pass) and N consecutive Latency lines under the limit.
 set -uo pipefail
@@ -25,7 +25,13 @@ while [ $# -gt 0 ]; do case "$1" in
     [ $# -ge 2 ] || bad_args
     LOG=$2; shift 2 ;;
   *) bad_args ;; esac; done
-if [ -n "$LOG" ]; then text=$(cat "$LOG"); else text=$(podman logs x5h-vp 2>&1); fi
+if [ -n "$LOG" ]; then text=$(cat "$LOG")
+else
+    # The launch manager starts VisionPilot through systemd-cat, so each run
+    # is one journal stream with its own _PID. The last stream is this run.
+    pid=$(journalctl -t x5h-vp -n 1 -o verbose --no-pager | sed -n 's/^ *_PID=//p')
+    text=$(journalctl -t x5h-vp "_PID=$pid" -o cat --no-pager 2>&1)
+fi
 grep -q 'Offload gate PASSED' <<<"$text" || { echo "VP_NPU_FAIL reason=no_offload"; exit 1; }
 # "N consecutive frames under the limit", which is what this gate has always
 # claimed to measure. It used to veto on the first over-budget line anywhere,

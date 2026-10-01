@@ -236,8 +236,6 @@ content:
     # --- demo role: S-CORE launch manager runs the driving function --------
     # The camera and VisionPilot containers start from these exec scripts
     # under the launch manager; there is no Quadlet for either.
-    - source_path: ../config/chrony-x5h.conf
-      path: /etc/chrony.conf
     - source_path: ../config/score/datarouter-logging.json
       path: /etc/score/datarouter-logging.json
     - source_path: ../config/score/lm-logging.json
@@ -255,15 +253,20 @@ content:
     - source_path: ../scripts/x5h-score-vp.sh
       path: /usr/sbin/x5h-score-vp
     # Gate D5's instrument (see README.md, "CES 2027 demo role"): its default
-    # log source is `podman logs x5h-vp`, so it only runs on the board and
-    # has to ship in the image rather than be hand-copied on.
+    # log source is the x5h-vp journal stream, so it only runs on the board and
+    # has to ship in the image rather than be hand-copied on. The soak gate
+    # (SG2) reads the same journal.
     - source_path: ../scripts/vp-npu-gate.sh
       path: /usr/sbin/vp-npu-gate.sh
-    # --- role-independent: container store, watchdog, manifest -------------
+    - source_path: ../scripts/score-soak-gate.sh
+      path: /usr/sbin/score-soak-gate.sh
+    # --- role-independent: container store, watchdog, clock, manifest -------------
     - source_path: ../config/var-lib-containers.mount
       path: /etc/systemd/system/var-lib-containers.mount
     - source_path: ../config/10-watchdog.conf
       path: /etc/systemd/system.conf.d/10-watchdog.conf
+    - source_path: ../config/chrony-x5h.conf
+      path: /etc/chrony.conf
     - source_path: ../scripts/x5h-manifest.sh
       path: /usr/sbin/x5h-manifest.sh
     # selfboot-smoke.sh is the branch's primary acceptance instrument:
@@ -522,6 +525,8 @@ content:
     - path: /usr/sbin/x5h-demo-up.sh
       mode: "0755"
     - path: /usr/sbin/vp-npu-gate.sh
+      mode: "0755"
+    - path: /usr/sbin/score-soak-gate.sh
       mode: "0755"
     - path: /usr/sbin/x5h-score-camera
       mode: "0755"

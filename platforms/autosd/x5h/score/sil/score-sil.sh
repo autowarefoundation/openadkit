@@ -68,8 +68,10 @@ boundary)
     if lm_log | grep 'switched to FAILED' >/dev/null; then echo SIL_ALIVE_FAIL; fail alive; fi
     echo SIL_ALIVE_OK
     n_tag=$(journalctl -t sil-vp -o cat --no-pager --after-cursor="$cursor" | grep -c 'standin running')
-    n_lm=$(lm_log | grep -c 'standin running')
-    [ "$n_tag" -ge 1 ] && [ "$n_lm" -eq 0 ] || { echo "SIL_JOURNAL_ONCE_FAIL tag=$n_tag lm=$n_lm"; fail journal; }
+    # journald files a systemd-cat stream under the unit whose cgroup the writer is in,
+    # so -u cannot tell a duplicate; a real one (podman printing it again) is a second entry.
+    n_all=$(journalctl --after-cursor="$cursor" -o cat --no-pager | grep -c 'standin running')
+    [ "$n_tag" -ge 1 ] && [ "$n_all" -eq "$n_tag" ] || { echo "SIL_JOURNAL_ONCE_FAIL tag=$n_tag all=$n_all"; fail journal; }
     echo SIL_JOURNAL_ONCE_OK
     systemctl stop score-sil-lm.service
     wait_for 10 no_containers || fail stop_left_containers

@@ -81,7 +81,9 @@ jobs:
             {"deployment":"planning-simulation","distro":"humble"},
             {"deployment":"planning-simulation","distro":"jazzy"},
             {"deployment":"scenario-simulation","distro":"humble"},
-            {"deployment":"scenario-simulation","distro":"jazzy"}
+            {"deployment":"scenario-simulation","distro":"jazzy"},
+            {"deployment":"scenario-simulation","distro":"humble","node":"split"},
+            {"deployment":"scenario-simulation","distro":"jazzy","node":"split"}
           ]}'
           cells=$(printf '%s' "${cells}" | jq -c .)
 
@@ -152,14 +154,15 @@ jobs:
           runner="$GITHUB_WORKSPACE/.github/scripts/evidence/run_cell.sh"
           deployment="${{ matrix.deployment }}"
           distro="${{ matrix.distro }}"
+          node="${{ matrix.node }}"
           output="$GITHUB_WORKSPACE/cell-output"
-          cell_name="${deployment}-${distro}-linux-amd64"
+          cell_name="${deployment}-${distro}${node:+-${node}}-linux-amd64"
 
           mkdir -p "$output"
-          if ! bash "$runner" "$deployment" "$distro" "$output/attempt-1"; then
+          if ! bash "$runner" "$deployment" "$distro" "$output/attempt-1" "$node"; then
             echo "::warning title=evidence retry::${cell_name} failed on the first attempt; retrying once"
             rm -rf "$output/attempt-2"
-            if ! bash "$runner" "$deployment" "$distro" "$output/attempt-2"; then
+            if ! bash "$runner" "$deployment" "$distro" "$output/attempt-2" "$node"; then
               echo "cell ${cell_name} failed after the retry" >&2
               exit 1
             fi
@@ -175,7 +178,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: evidence-cell-${{ matrix.deployment }}-${{ matrix.distro }}
+          name: evidence-cell-${{ matrix.deployment }}-${{ matrix.distro }}${{ matrix.node && format('-{0}', matrix.node) || '' }}
           path: |
             cells
             cell-output

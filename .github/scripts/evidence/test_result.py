@@ -21,11 +21,25 @@ def load(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def expected_cell_names(matrix):
+    """Cell names as the evidence workflow composes them (deployment-distro[-node]-linux-amd64)."""
+    names = []
+    for entry in matrix:
+        node = entry.get("node") or ""
+        suffix = f"-{node}" if node else ""
+        names.append(f"{entry['deployment']}-{entry['distro']}{suffix}-linux-amd64")
+    return names
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cells-dir", required=True)
     parser.add_argument("--build-metadata", required=True)
     parser.add_argument("--source-root", required=True)
+    parser.add_argument(
+        "--expected-cells",
+        help="JSON matrix of the cells the run was supposed to produce",
+    )
     parser.add_argument("--output-dir", required=True)
     args = parser.parse_args()
 
@@ -34,7 +48,7 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
 
     cells = []
-    for path in sorted(Path(args.cells_dir).rglob("*.cell.json")):
+    for path in sorted(Path(args.cells_dir).rglob("cell.json")):
         cells.append(load(path))
     cells.sort(key=lambda cell: cell.get("name", ""))
 
@@ -44,6 +58,14 @@ def main():
     passed = [cell["name"] for cell in cells if cell.get("result") == "PASSED"]
     failed = [cell["name"] for cell in cells if cell.get("result") != "PASSED"]
     result = "PASSED" if cells and not failed else "FAILED"
+    expected = json.loads(args.expected_cells) if args.expected_cells else []
+    seen = {cell["name"] for cell in cells}
+    missing = [name for name in expected_cell_names(expected) if name not in seen]
+    if missing:
+        result = "FAILED"
+        failed.extend(name for name in missing if name not in failed)
+        for name in missing:
+            print(f"::error title=evidence missing::{name} produced no cell result")
 
     configuration = []
     for cell in cells:
@@ -82,6 +104,7 @@ def main():
         "build_tag": metadata.get("build_tag", "unknown"),
         "source_sha": metadata.get("openadkit_sha"),
         "result": result,
+        "missing": missing,
         "cells": [
             {
                 "name": cell["name"],

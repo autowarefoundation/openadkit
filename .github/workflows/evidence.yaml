@@ -159,19 +159,23 @@ jobs:
           cell_name="${deployment}-${distro}${node:+-${node}}-linux-amd64"
 
           mkdir -p "$output"
+          status=0
           if ! bash "$runner" "$deployment" "$distro" "$output/attempt-1" "$node"; then
             echo "::warning title=evidence retry::${cell_name} failed on the first attempt; retrying once"
             rm -rf "$output/attempt-2"
             if ! bash "$runner" "$deployment" "$distro" "$output/attempt-2" "$node"; then
               echo "cell ${cell_name} failed after the retry" >&2
-              exit 1
+              status=1
             fi
           fi
 
+          # Collect the final attempt even when it failed: the attestation must
+          # carry a FAILED cell instead of silently missing one.
           final="$output/attempt-2"
           [ -d "$final" ] || final="$output/attempt-1"
           mkdir -p "$GITHUB_WORKSPACE/cells"
           cp -a "$final" "$GITHUB_WORKSPACE/cells/${cell_name}"
+          exit "$status"
         shell: bash
 
       - name: Upload cell artifacts
@@ -219,9 +223,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 .github/scripts/evidence/test_result.py \
-            --cells-dir evidence-cells \
+            --cells-dir evidence-cells/cells \
             --build-metadata build-metadata/build-metadata.json \
             --source-root . \
+            --expected-cells '${{ needs.prepare.outputs.cells }}' \
             --output-dir attestation
 
       - name: Attest the test result

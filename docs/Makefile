@@ -3,8 +3,6 @@
 
 # Repo root is one level above this Makefile (docs/)
 REPO_ROOT := $(shell cd .. && pwd)
-OPENADKIT_CLI_REF := $(shell git -C "$(REPO_ROOT)" rev-parse HEAD)
-DOCS_CONTAINER_ENV := -e OPENADKIT_CLI_REF=$(OPENADKIT_CLI_REF)
 
 .PHONY: help prepare prepare-if-missing serve build clean
 
@@ -19,11 +17,11 @@ help:
 
 # Serve documentation locally
 serve: prepare-if-missing
-	docker run --rm -p 8000:8000 -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) $(DOCS_CONTAINER_ENV) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev
+	docker run --rm -p 8000:8000 -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev
 
 # Build static documentation
 build: prepare-if-missing
-	docker run --rm -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) $(DOCS_CONTAINER_ENV) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev mkdocs build
+	docker run --rm -v $(REPO_ROOT):/app --user $$(id -u):$$(id -g) -e NO_MKDOCS_2_WARNING=1 mkdocs-dev mkdocs build
 
 # Clean build artifacts
 clean:

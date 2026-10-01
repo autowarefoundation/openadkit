@@ -16,13 +16,18 @@ esac
 EOT
 cat > "$tmp/chronyc" <<'EOT'
 #!/bin/sh
+echo "Leap status     : ${LEAP:-Normal}"
 echo "System time     : ${OFFSET:-0.000200} seconds fast of NTP time"
 EOT
-chmod +x "$tmp/journalctl" "$tmp/chronyc"
+cat > "$tmp/systemctl" <<'EOT'
+#!/bin/sh
+[ -z "${LM_DOWN:-}" ]
+EOT
+chmod +x "$tmp/journalctl" "$tmp/chronyc" "$tmp/systemctl"
 : > "$tmp/lm"
 for i in $(seq 1 6000); do echo '[INFO]  frame_ms=40.0'; done > "$tmp/vp"
 for i in 1 2 3; do echo '[INFO]  frame_ms=50.0'; done >> "$tmp/vp"
-run() { LMLOG="$tmp/lm" VPLOG="$1" JOURNALCTL="$tmp/journalctl" CHRONYC="$tmp/chronyc" SLEEP=true bash "$s" --minutes 10 --max-frame-ms 80; }
+run() { LMLOG="$tmp/lm" VPLOG="$1" JOURNALCTL="$tmp/journalctl" CHRONYC="$tmp/chronyc" SYSTEMCTL="$tmp/systemctl" SLEEP=true bash "$s" --minutes "${MINUTES:-10}" --max-frame-ms 80; }
 out=$(run "$tmp/vp") || fail "good_failed $out"
 # Three slow frames in 6003 sit above the 99.9th percentile.
 [ "$out" = 'SCORE_SOAK_PASS frames=6003 p999_ms=40.0 over=0 longest_over=0 offset_ms=0.2' ] || fail "pass_line out=$out"
@@ -38,4 +43,10 @@ out=$(run "$tmp/vp") && fail margin_accepted
 case "$out" in 'SCORE_SOAK_FAIL reason=deadline_margin p999_ms=70.0'*) ;; *) fail "margin_line out=$out" ;; esac
 out=$(OFFSET=0.020000 run "$tmp/vp") && fail offset_accepted
 [ "$out" = 'SCORE_SOAK_FAIL reason=clock_offset offset_ms=20.0' ] || fail "offset_line out=$out"
+out=$(LEAP='Not synchronised' run "$tmp/vp") && fail unsynced_accepted
+[ "$out" = 'SCORE_SOAK_FAIL reason=clock_unsynced' ] || fail "unsynced_line out=$out"
+out=$(MINUTES=0 run "$tmp/vp") && fail zero_minutes_accepted
+[ "$out" = 'SCORE_SOAK_FAIL reason=usage' ] || fail "zero_minutes_line out=$out"
+out=$(LM_DOWN=1 run "$tmp/vp") && fail lm_down_accepted
+[ "$out" = 'SCORE_SOAK_FAIL reason=lm_inactive' ] || fail "lm_down_line out=$out"
 echo "TEST_PASS $name"

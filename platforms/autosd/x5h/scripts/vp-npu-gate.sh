@@ -30,6 +30,7 @@ else
     # The launch manager starts VisionPilot through systemd-cat, so each run
     # is one journal stream with its own _PID. The last stream is this run.
     pid=$(journalctl -t x5h-vp -n 1 -o verbose --no-pager | sed -n 's/^ *_PID=//p')
+    [ -n "$pid" ] || { echo "VP_NPU_FAIL reason=no_log"; exit 1; }
     text=$(journalctl -t x5h-vp "_PID=$pid" -o cat --no-pager 2>&1)
 fi
 grep -q 'Offload gate PASSED' <<<"$text" || { echo "VP_NPU_FAIL reason=no_offload"; exit 1; }

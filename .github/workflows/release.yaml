@@ -277,6 +277,7 @@ jobs:
             .github/scripts/manage_github_release.sh
             .github/scripts/release_tag.sh
             .github/scripts/write_release_notes.sh
+            .github/scripts/evidence/upgrade_report.py
 
       - name: Download validated release metadata
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -296,6 +297,38 @@ jobs:
         run: |
           test "$(sha256sum release-plan.json | cut -d ' ' -f1)" \
             = "${EXPECTED_PLAN_SHA256}"
+
+      - name: Fetch evidence summaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_TAG: ${{ inputs.build_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("evidence-attestation-")) | [.id, .name, .created_at] | @tsv' \
+            > evidence/artifacts.tsv
+          current_id=$(awk -F'\t' -v name="evidence-attestation-${BUILD_TAG}" '$2 == name {print $1; exit}' evidence/artifacts.tsv)
+          previous_id=$(sort -t$'\t' -k3,3r evidence/artifacts.tsv | awk -F'\t' -v name="evidence-attestation-${BUILD_TAG}" '$2 != name {print $1; exit}')
+          fetch_summary() {
+            local id="$1" dir="$2" summary
+            mkdir -p "${dir}"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" >"${dir}/artifact.zip"
+            unzip -q -o "${dir}/artifact.zip" -d "${dir}/unpacked"
+            summary=$(find "${dir}/unpacked" -name evidence-summary.json -print -quit)
+            [ -n "${summary}" ] && printf '%s\n' "${summary}"
+          }
+          if [ -n "${current_id}" ]; then
+            summary=$(fetch_summary "${current_id}" evidence/current)
+            [ -n "${summary}" ] && echo "EVIDENCE_CURRENT_SUMMARY=${summary}" >>"$GITHUB_ENV"
+          else
+            echo "No evidence artifact found for ${BUILD_TAG}" >&2
+          fi
+          if [ -n "${previous_id}" ]; then
+            summary=$(fetch_summary "${previous_id}" evidence/previous)
+            [ -n "${summary}" ] && echo "EVIDENCE_PREVIOUS_SUMMARY=${summary}" >>"$GITHUB_ENV"
+          fi
+        shell: bash
 
       - name: Create release metadata and notes
         env:

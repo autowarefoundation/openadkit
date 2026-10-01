@@ -1,0 +1,22 @@
+[Unit]
+Description=S-CORE launch manager: the CES 2027 demo driving function (camera, VisionPilot)
+ConditionKernelCommandLine=x5h.role=demo
+ConditionPathExists=/usr/local/score/bin/launch_manager
+Requires=x5h-npu.service
+After=x5h-npu.service score-datarouter.service network-online.target
+Wants=network-online.target score-datarouter.service
+
+[Service]
+# Restart=no on purpose. The #147 Safety Island clears its staleness stop
+# when a fresh heartbeat arrives, so an automatic restart would bring
+# VisionPilot back and the vehicle would drive again with no operator. Only
+# the booth reset (x5h-ces2027-demo.sh reset) restarts this unit.
+Restart=no
+Environment=MW_LOG_CONFIG_FILE=/etc/score/lm-logging.json
+ExecStart=/usr/local/score/bin/launch_manager -c /usr/local/score/etc/demo/launch_manager_config.bin
+# KillMode stays control-group: the containers are in this cgroup
+# (podman --cgroups=split), so a SIGKILL of the launch manager takes them
+# down with it.
+
+[Install]
+WantedBy=multi-user.target

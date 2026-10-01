@@ -77,13 +77,18 @@ for s in selfboot-smoke.sh npu-contract-smoke.sh cr52-rproc-up.sh x5h-role demo-
         grep -Eq "(^|[[:space:]|(])${role}[|)]" "$here/../scripts/$s" || fail "no_${role}_arm_$s"
     done
 done
-for u in x5h-si-link.service x5h-demo.service; do
+for u in x5h-si-link.service x5h-demo.service score-lm.service score-datarouter.service; do
     [ "$(grep -c '^ConditionKernelCommandLine=x5h\.role=demo$' "$cfg/$u")" = 1 ] || fail "no_demo_gate_$u"
 done
-for u in x5h-vp x5h-demo-bridge x5h-demo-restamp x5h-demo-hb; do
+for u in x5h-demo-bridge x5h-demo-restamp x5h-demo-hb; do
     f="$here/../components/demo/$u.container"
     [ -f "$f" ] || fail "missing_$u"
     [ "$(grep -c '^ConditionKernelCommandLine=x5h\.role=demo$' "$f")" = 1 ] || fail "no_demo_gate_$u"
     grep -q '^ConditionKernelCommandLine=|' "$f" && fail "piped_gate_on_demo_only_unit_$u"
+done
+# The S-CORE launch manager is the only orchestrator of the driving function.
+# A Quadlet for either container would start a second copy beside it.
+for u in x5h-vp x5h-image-republish; do
+    [ -e "$here/../components/demo/$u.container" ] && fail "quadlet_still_present_$u"
 done
 echo "TEST_PASS $name"

@@ -413,6 +413,8 @@ reused — GATE6 and GATE7 are new, not GATE5's successor under a new name.
 | `GATE7_SELINUX_BOOLS_FAILED` | `selinux-bools.service` failed even with SELinux present — a real regression, not the benign BSP-kernel failure the Troubleshooting row documents. | no |
 | `GATE7_SELINUX_BOOLS_ABSENT` | `selinux-bools.service`'s `LoadState` reads `not-found` — the unit is missing from this image entirely. Disambiguates from `GATE7_SELINUX_BOOLS_OK`: `systemctl is-failed` alone exits nonzero both for "healthy" and for "does not exist", so without this check a dropped unit could otherwise print `_OK`. | no |
 | `GATE_RPMSG_ETH_UNIT_PASS` | GATE8: the `rpmsg-eth` TAP bridge daemon's own unit test (`rpmsg-eth/test-rpmsg-eth.sh`) passed inside its dedicated Fedora test container — real tap0 on the guest kernel under test, a mock endpoint (socat pty), `--network=none`. Requires both a zero `podman run` exit status and a literal `TEST_PASS` in its output (see `gate-guest.sh`'s GATE8 comment for why exit-status-alone is not sufficient). | yes |
+| `GATE9_SCORE_LM_OK` | The S-CORE launch manager reaches run target `Startup` with the gate configuration (one self-terminating Native component). The guest has no `x5h.role`, so `gate-guest.sh` runs `score/bin/launch_manager` directly. | yes |
+| `GATE9_SCORE_LM_FAIL` | The launch manager never logged `Completed the request for PG to State Startup`; the last 20 log lines follow. | no |
 | `GATE_RPMSG_ETH_UNIT_FAIL` | The `rpmsg-eth` unit test failed — either the container/build step itself failed, or `test-rpmsg-eth.sh` ran and reported a `TEST_FAIL`. Not part of the pass path. | no |
 | `GATE_DONE` | `gate-guest.sh` reached the end of its run. | yes |
 
@@ -634,6 +636,9 @@ kernel/build-bsp-kernel.sh /tmp/x5h-kernel
 #    GATE2 finding. The third, rpmsg-eth-docker.tar, carries the daemon
 #    source and its pty-mock unit test for GATE8 to run in-guest.
 scripts/make-test-images.sh /tmp/x5h-testimages
+
+# 4. The S-CORE tar for GATE9 (x86_64 host; builds the aarch64 launch manager).
+score/build-score.sh /tmp/x5h-score aarch64
 ```
 
 Three things to know before running these, because CI runs no single host
@@ -769,7 +774,7 @@ rmdir "$mnt"
 #    redundant overwrite for a tar built from this branch, since the aib
 #    manifest already carries the file; it is kept so a replay against an
 #    older tar still gets it.
-./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR"
+./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR" /tmp/x5h-score/score-x5h-aarch64.tar
 
 # 3. Start the host listener GATE6_SNAT_OK probes. The guest reaches it as
 #    http://10.0.2.2:8099/, which slirp maps onto the host's

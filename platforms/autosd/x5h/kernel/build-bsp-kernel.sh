@@ -165,6 +165,19 @@ if [ ! -d "$SRC" ]; then
   rm -f "$OUT/src.tar.gz"
 fi
 cd "$SRC"
+# Local patches, applied idempotently: a re-run against an already patched
+# tree must not fail, and a patch that no longer applies must stop the build
+# rather than silently ship the unpatched driver.
+for p in "$HERE"/patches/*.patch; do
+  [ -e "$p" ] || continue
+  if patch -p1 -N --dry-run < "$p" >/dev/null 2>&1; then
+    patch -p1 -N < "$p"
+  elif patch -p1 -R --dry-run < "$p" >/dev/null 2>&1; then
+    echo "patch already applied: $(basename "$p")"
+  else
+    echo "FATAL: patch does not apply: $p" >&2; exit 1
+  fi
+done
 # Path-independent build-ids, so the reproducibility promise above holds
 # across build DIRECTORIES and not just across machines. The two embedded
 # vDSOs and every module are linked with --build-id=sha1, and a build-id

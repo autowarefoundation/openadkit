@@ -25,7 +25,7 @@
 #                    the vendor procedure. On a board with HAS_YOCTO=1 (board
 #                    2) treat this as a one-time conversion step, not as a
 #                    step to repeat when re-staging.
-#   write-boot --yes replace x5h-boot contents (kernel, both dtbs, env, role)
+#   write-boot --yes replace x5h-boot contents (kernel, all three dtbs, env, role)
 #   stage-payload --yes  rsync inputs/npu -> npu-work (MIRROR: --delete)
 #   stage-stack      container images + scenario map (existing scripts)
 #   print-uboot      the exact console lines to import the environment
@@ -126,6 +126,7 @@ check_inputs() {
         [ -e "$inputs/$f" ] || { echo "MISSING $inputs/$f"; missing=1; }
     done
     [ $missing -eq 0 ] || die "STAGE_CHECK_FAIL reason=missing_inputs"
+    command -v dtc >/dev/null || die "STAGE_CHECK_FAIL reason=no_dtc"
     chmod +x "$inputs/extract-ikconfig" || die "STAGE_CHECK_FAIL reason=extract_ikconfig_not_executable"
     # Capture, then match on the string. The old `extract-ikconfig … | grep -qxF`
     # let grep exit at the match, the producer take a SIGPIPE, and pipefail turn
@@ -357,8 +358,18 @@ write_boot() {
     mkdir -p "$d" || die "STAGE_BOOT_FAIL reason=work_dir_unwritable dir=$d"
     cp "$inputs/Image-autosd" "$inputs/r8a78000-ironhide-uio-autosd.dtb" "$inputs/r8a78000-ironhide-npu.dtb" "$d/" \
         || die "STAGE_BOOT_FAIL reason=input_copy_failed"
+    # demo and dev boot a derived tree: the vendor NPU tree plus the relocated
+    # CR52 carveout. Derive it here rather than by hand, because the staged
+    # default role is dev and a board whose role has no device tree on the
+    # partition does not boot at all. make-demo-dtb.sh refuses to derive twice
+    # and never writes into <inputs>, so the vendor blob stays untouched.
+    bash "$X5H/uboot/make-demo-dtb.sh" "$inputs/r8a78000-ironhide-npu.dtb" \
+        "$d/r8a78000-ironhide-demo.dtb" || die "STAGE_BOOT_FAIL reason=demo_dtb_derive_failed"
     bash "$X5H/uboot/render-env.sh" "$vars" > "$d/x5h-env.txt" || die "STAGE_BOOT_FAIL reason=render_env_failed"
-    printf 'role=npu\n' > "$d/x5h-role.txt" || die "STAGE_BOOT_FAIL reason=role_file_write_failed"
+    # dev, not demo: a freshly staged board should come up quiet, with the
+    # platform layer running and no application containers. Switch it with
+    # `x5h-role set demo --reboot` once the board is ready to show something.
+    printf 'role=dev\n' > "$d/x5h-role.txt" || die "STAGE_BOOT_FAIL reason=role_file_write_failed"
     for f in "$d"/*; do
         [ -s "$f" ] || die "STAGE_BOOT_FAIL reason=empty_staged_file file=${f##*/}"
         case "${f##*/}" in *[:[:space:]]*) die "STAGE_BOOT_FAIL reason=unsafe_staged_filename file=${f##*/}" ;; esac
@@ -437,7 +448,7 @@ REMOTE
         esac
     done <<<"$out"
     case "$rc" in
-        0)   mark "STAGE_BOOT_PASS role=npu" ;;
+        0)   mark "STAGE_BOOT_PASS role=dev" ;;
         40)  mark "STAGE_BOOT_FAIL ${mline:-reason=remote_failed_without_reason}"; exit 1 ;;
         255) mark "STAGE_BOOT_FAIL reason=transport_lost rc=255 boot_state=unknown"; exit 1 ;;
         *)   mark "STAGE_BOOT_FAIL reason=remote_update_failed rc=$rc boot_state=unknown"; exit 1 ;;

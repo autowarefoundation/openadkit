@@ -44,8 +44,8 @@ LUN 1, the AutoSD LUN:
 
 | # | partlabel | size | fs | PARTUUID | contents |
 |---|---|---|---|---|---|
-| 1 | `x5h-boot` | 1 GiB | ext4 | `…5e01` | `Image-autosd`, both dtbs, `x5h-env.txt`, `x5h-role.txt` |
-| 2 | `x5h-root` | 12 GiB | ext4 | `…5e02` | AutoSD rootfs, root of the `cr52` and `npu` roles |
+| 1 | `x5h-boot` | 1 GiB | ext4 | `…5e01` | `Image-autosd`, all three dtbs, `x5h-env.txt`, `x5h-role.txt` |
+| 2 | `x5h-root` | 12 GiB | ext4 | `…5e02` | AutoSD rootfs, root of the `demo` and `dev` roles |
 | 3 | `autosd-store` | rest | btrfs | `…5e03` | `/var/lib/containers` |
 
 LUN 2:
@@ -60,7 +60,7 @@ A board with `HAS_YOCTO=0` in its variables file still gets the whole LUN 2
 map, with `yocto-boot` and `yocto-root` formatted and left empty. That is
 what lets one environment template serve both boards: the `yocto` role is
 defined everywhere, and on a board that has no Yocto image its loader
-simply fails and the fallback boots `npu` instead.
+simply fails and the fallback boots `dev` instead.
 
 The PARTUUIDs are fixed constants, not generated, and they are consumed in
 four places that must agree with the partition tables: `uboot/x5h-env.tmpl`
@@ -118,17 +118,38 @@ which root filesystem is mounted, and which units start.
 
 | Role | Boots | Root | Enables |
 |---|---|---|---|
-| `cr52` | `Image-autosd` + `r8a78000-ironhide-uio-autosd.dtb` | `…5e02` | CR52 remoteproc, `rpmsg-eth`, the component stack (MRM) |
-| `npu` | `Image-autosd` + `r8a78000-ironhide-npu.dtb` | `…5e02` | `var-opt-npu.mount`, `cmemdrv`, `/dev/npuc*` (VisionPilot) |
+| `demo` | `Image-autosd` + `r8a78000-ironhide-demo.dtb` | `…5e02` | the platform layer, plus the CES 2027 demo stack, which starts itself |
+| `dev` | the same kernel and the same derived tree | `…5e02` | the platform layer only, and no application containers |
 | `yocto` | `Image-yocto` + the vendor dtb | `…5e12` | the vendor Yocto appliance, on boards with `HAS_YOCTO=1` |
 
-`npu` is the default on both boards. There are three roles rather than one
-boot because the shipped memory map does not let the NPU and the realtime
-core coexist: the NPU's model-binary region contains the CR52's shared
-window and all three of its small RAM regions outright, and under the
-vendor NPU device tree a remoteproc `start` panics the kernel by
-construction. Reconciling them is a vendor question, not a configuration
-one ([npu-bringup.md](npu-bringup.md), "Where this stops").
+The **platform layer** is `var-opt-npu.mount`, `x5h-npu.service`
+(`cmemdrv`, `/dev/npuc*`), `cr52-remoteproc.service` and
+`rpmsg-eth.service`: the NPU and the CR52 link. Both AD Kit roles bring all
+of it up. The derived blob is produced from the vendor NPU tree at staging
+time by `uboot/make-demo-dtb.sh` and is never committed.
+
+`dev` is the default. `stage-board.sh` writes it onto a freshly staged
+board, and an invalid or unreadable role file falls back to it, on the
+principle that a board whose role nobody can read must come up quiet rather
+than start a demo in front of people.
+
+**`demo` and `dev` boot the identical kernel, device tree and root
+filesystem.** They differ only in which application units start, so
+switching between them costs a reboot but never changes the memory map.
+
+There were four roles before this one: `cr52` booted a UIO tree for the
+realtime core and `npu` booted the vendor NPU tree for VisionPilot, because
+the shipped memory map does not let the NPU and the realtime core coexist.
+The NPU's model-binary region contains the CR52's shared window and all
+three of its small RAM regions outright, and under the vendor NPU device
+tree a remoteproc `start` panics the kernel by construction. Reconciling
+that map is still a vendor question, not a configuration one
+([npu-bringup.md](npu-bringup.md), "Where this stops"). The derived tree
+does not reconcile it either. It relocates the CR52 carveout instead, which
+is enough to run both halves in one boot, and that is what made `cr52` and
+`npu` redundant. Both are gone, and `tests/test-render-env.sh` and
+`tests/test-role-gates.sh` both fail if either name comes back, because a
+unit gated on a role that no longer boots is skipped in silence.
 
 The split is enforced twice, deliberately. Which `bootcmd_<role>` runs
 decides which device tree is loaded, and each role's units carry a
@@ -137,6 +158,26 @@ in `bootargs`. Both halves are needed: `systemd.mask=` on the kernel
 command line was measured **not** to stop `cr52-remoteproc.service`, so
 the unit condition is what actually holds, and the device-tree selection
 is what makes the condition's verdict safe.
+
+### Which stack owns a boot
+
+The MRM component stack (`awf-oak-*`) and the CES 2027 demo stack each bind
+domain 1 and domain 2, and each runs its own `domain_bridge`. Two of them
+in one boot is a collision, so exactly one may own a boot, and the role is
+what decides. `demo` starts the demo stack through `x5h-demo.service`. The
+five `awf-oak-*.container` units are gated to `dev` and carry **no
+`[Install]` section**, so Quadlet never writes a `default.target.wants`
+symlink for them and a `dev` boot comes up with no application containers
+at all. Start the MRM stack by hand when you want it:
+
+```
+systemctl start awf-oak-autoware awf-oak-bridge awf-oak-relay awf-oak-restamp
+```
+
+That is also why a role, rather than a `systemctl enable`, draws the line:
+a power cut at the booth has to return to the running demo with nobody at
+the board, and the sticky role file below is what makes that survive a
+panic or a watchdog reset too.
 
 **A root booted with no `x5h.role=` word at all has no role, and every one
 of the nine role-gated units is skipped.** The condition tests for a
@@ -157,7 +198,7 @@ board"). If you need the CR52 chain up on a netbooted root, supply the role
 in the rescue bootargs before booting:
 
 ```
-=> setenv bootargs_autosd "${bootargs_autosd} x5h.role=cr52"
+=> setenv bootargs_autosd "${bootargs_autosd} x5h.role=dev"
 => run bootcmd_autosd
 ```
 
@@ -175,7 +216,7 @@ warning next to the CR52 bring-up procedure it affects.
 `env import`s it on every boot, so it survives power cycles, and it is
 **sticky**: it stays until something rewrites it. A one-shot variant was
 considered and rejected, because silently returning an external developer
-to `npu` in the middle of MRM work is the worse failure. The practical
+to `dev` in the middle of a demo is the worse failure. The practical
 consequence is that a panic, a watchdog reset or an unattended reboot all
 come back in the same role the board was left in.
 
@@ -183,8 +224,8 @@ From Linux, `/usr/sbin/x5h-role` reads and writes it:
 
 ```
 x5h-role                          # current= from /proc/cmdline, next= from x5h-boot
-x5h-role set cr52                 # write the next role, stay up
-x5h-role set npu --reboot         # write it and reboot into it
+x5h-role set demo                 # write the next role, stay up
+x5h-role set dev --reboot         # write it and reboot into it
 ```
 
 `set` mounts `x5h-boot` by partlabel, writes a temporary file and `mv`s it
@@ -224,14 +265,12 @@ Everything is preceded by `ufs init; scsi rescan` in `bootcmd`. `ufs init`
 brings up both UFS controllers and `scsi rescan` enumerates their logical
 units; without both, no `scsi` device exists to load from.
 
-### Load addresses, and why `npu` cannot use the stock pair
+### Load addresses, and why the stock pair cannot be used
 
-`cr52` loads at the stock `${kernel_addr_r}` / `${fdt_addr_r}`. Those are
-the addresses every CR52 and RPMsg result on this board was taken at, so
-they are kept rather than unified for tidiness.
-
-`npu` loads at `0x61080000` / `0x61000000`, the vendor-documented pair. The
-stock kernel address sits **inside** `npu_region@8e400000`, so the region's
+`load_adk`, shared by `demo` and `dev`, loads at `0x61080000` /
+`0x61000000`, the vendor-documented pair. The retired `cr52` role used the
+stock `${kernel_addr_r}` / `${fdt_addr_r}`, which the derived tree cannot:
+the stock kernel address sits **inside** `npu_region@8e400000`, so the region's
 whole-area contiguous allocation fails with `-EBUSY`. The symptom is one
 contiguous-memory device missing while the others appear, and `/proc/iomem`
 showing `Kernel code` inside the region; nothing names the load address as
@@ -242,20 +281,20 @@ the cause. Note also that U-Boot marks every DRAM bank above the first
 ### The fallback
 
 ```
-check_role=if test "${role}" = cr52; then true; elif ... else
-  echo "x5h: role '${role}' invalid or unreadable, falling back to npu"
-  setenv role npu; fi
+check_role=if test "${role}" = demo; then true; elif ... else
+  echo "x5h: role '${role}' invalid or unreadable, falling back to dev"
+  setenv role dev; fi
 ```
 
 `load_role` clears `role` before trying to import the file, so a failed
 read leaves it empty rather than stale, and `check_role` then accepts only
-the three known names and otherwise falls back to `npu` with a console
+the three known names and otherwise falls back to `dev` with a console
 line saying so. A deleted, empty, truncated or garbage role file therefore
 boots the default role rather than stopping at the prompt.
 
 `bootcmd_yocto` has a fallback of its own: if `find_yocto` finds no
-`Image-yocto` on any LU, it prints a line, sets `role=npu` and runs
-`bootcmd_npu`. That is what makes the `yocto` role harmless to define on a
+`Image-yocto` on any LU, it prints a line, sets `role=dev` and runs
+`bootcmd_dev`. That is what makes the `yocto` role harmless to define on a
 board that has no Yocto image.
 
 ### Bootargs every role carries
@@ -271,8 +310,8 @@ root=PARTUUID=<pinned> x5h.role=<role>
 ```
 
 U-Boot expands `${var}` in a value it **runs** but not in a value it
-**substitutes** into a command. `bootcmd_npu` does
-`setenv bootargs ${bootargs_npu}`, which stores that variable's text
+**substitutes** into a command. `bootcmd_dev` does
+`setenv bootargs ${bootargs_dev}`, which stores that variable's text
 verbatim, so a `${bootargs_common}` nested inside it is handed to the
 kernel as those literal characters. A `bootargs_common` factoring shipped
 on this branch and wedged board 2 on 2026-09-02: the kernel logged
@@ -282,7 +321,7 @@ with no oops, no panic and no network. `tests/test-render-env.sh` now
 fails `bootargs_not_flat` if any `bootargs_*` value contains `${`.
 
 The same asymmetry is why the variables that *are* nested work fine:
-`probe_lu`, `load_role`, `load_npu` and friends are reached through `run`,
+`probe_lu`, `load_role`, `load_adk` and friends are reached through `run`,
 which re-parses and expands them.
 
 - `pd_ignore_unused clk_ignore_unused` are mandatory. Omitting them wedges
@@ -335,7 +374,7 @@ host's TFTP and NFS services.
 `selfboot-smoke.sh` there returns
 `SELFBOOT_SMOKE_FAIL reason=unknown_role role=unknown`, correctly. See
 "Roles" above for why and for the `setenv bootargs_autosd "${bootargs_autosd}
-x5h.role=cr52"` line that supplies one when the CR52 chain is needed.
+x5h.role=dev"` line that supplies one when the CR52 chain is needed.
 
 The indirection is not decoration. `bootcmd_yocto` is now the **self-boot**
 Yocto role, from `yocto-root` on LU 2, and the board's saved environment
@@ -377,7 +416,7 @@ exception called out below the table.
 | `prepare-root` | no | copies `x5h-rootfs.ext4` to the work area and injects hostname, `/etc/x5h/board.conf`, the saved keys, `rpmsg-eth` and the CR52 ELF |
 | `write-root` | **yes** | `dd`s the prepared image onto `x5h-root` and verifies it by md5 read-back |
 | `partition-lun2` | **yes** | writes the LUN 2 GPT and the three filesystems; destroys what is there |
-| `write-boot` | **yes** | replaces the contents of `x5h-boot` with the kernel, both dtbs, `x5h-env.txt` and `x5h-role.txt=npu` |
+| `write-boot` | **yes** | replaces the contents of `x5h-boot` with the kernel, all three dtbs (the derived one is built here by `make-demo-dtb.sh`, so the staging host needs `dtc`), `x5h-env.txt` and `x5h-role.txt=dev` |
 | `stage-payload` | **yes** | mirrors `<inputs>/npu/` onto `npu-work` with `rsync --delete` |
 | `stage-stack` | no | container images and the scenario map, via the existing scripts |
 | `print-uboot` | no | prints the console lines that import the environment |
@@ -567,7 +606,7 @@ uses the root filesystem instead.
 `var-lib-containers.mount` (the filename must match the mount point) ships
 in the image and is enabled by `80-x5h.preset`, so this is no longer
 something to write by hand; `config/var-lib-containers.mount` is the
-source. The same reasoning produced `var-opt-npu.mount` for the `npu`
+source. The same reasoning produced `var-opt-npu.mount` for the AD Kit
 role's `npu-work` partition, whose name is `var-opt-npu` and not `opt-npu`
 because `/opt` on this rootfs is a symlink to `var/opt`.
 
@@ -610,8 +649,8 @@ Expect `SELFBOOT_SMOKE_PASS root=… partuuid=… role=…`. The script resolves
 the mounted root back to its PARTUUID rather than trusting `/dev/sdX`,
 rejects an NFS root outright, checks the pieces baked into the image,
 confirms `sshd` is running and `podman` works, asserts that the role's own
-bring-up unit is active (`cr52-remoteproc.service` in the `cr52` role,
-`x5h-npu.service` in the `npu` role) and that `panic_on_oops` reads 1.
+bring-up unit is active (both `cr52-remoteproc.service` and
+`x5h-npu.service` under `demo` and `dev`) and that `panic_on_oops` reads 1.
 Anything else prints `SELFBOOT_SMOKE_FAIL reason=<what>`.
 
 It is deliberately **not** a link test any more. It used to finish by
@@ -673,9 +712,9 @@ This matters in three directions:
   [cr52-slot-update.md](cr52-slot-update.md).
 - **A warm reboot is not a way to keep the realtime core running.** If you
   need the CR52 to survive, do not reboot Linux.
-- **It is what makes a role switch safe.** In the `npu` role the CR52's
+- **It is what makes a role switch safe.** Under the vendor NPU tree the CR52's
   memory lies inside the NPU's regions and must be assumed overwritten;
-  `x5h-role set cr52 --reboot` reloads it from its flashed slot on the way
+  `x5h-role set dev --reboot` reloads it from its flashed slot on the way
   back. Nothing has to be repaired by hand, and equally nothing short of
   that reset repairs it.
 
@@ -687,10 +726,10 @@ systems, plus the reset used in each slot-update cycle.
 ## Related
 
 - [CR52 dual boot + RPMsg](rpmsg-dualboot.md): the realtime payload and
-  the RPMsg link the `cr52` role brings up.
-- [NPU bring-up](npu-bringup.md): what the `npu` role exists for, and the
+  the RPMsg link the AD Kit roles bring up.
+- [NPU bring-up](npu-bringup.md): what the NPU half of the platform layer is for, and the
   container contract it presents.
-- [Component stack](component-stack.md): the MRM demo, `cr52` role only.
+- [Component stack](component-stack.md): the MRM demo, `dev` role only.
 - [CR52 slot update](cr52-slot-update.md): updating the realtime
   firmware from Linux, which self-boot makes remotely reachable.
 - [Companion host](companion-host.md): the bench gateway `stage-board.sh`

@@ -58,11 +58,19 @@ After=awf-oak-bridge.service
 # is optional.
 ConditionPathExists=/var/lib/awf/scenario-sim/map/lanelet2_map.osm
 ConditionPathExists=/var/lib/awf/scenario-sim/map/pointcloud_map.pcd
-# Domain 2 exists only over tap0 (rpmsg-eth), which exists only in the cr52 role.
-ConditionKernelCommandLine=x5h.role=cr52
+# Domain 2 exists only over tap0 (rpmsg-eth), which the demo and dev roles
+# both bring up. Gated to dev alone even so: this stack and the CES 2027
+# demo stack each bind domain 1 and domain 2 and each runs its own
+# domain_bridge, so the two must never run together. demo is the booth
+# boot and owns that pairing; this stack belongs to dev.
+ConditionKernelCommandLine=x5h.role=dev
 
-[Install]
-WantedBy=default.target
+# No [Install] section, deliberately, the same call awf-oak-simulator.container
+# makes and for a related reason. With one, Quadlet writes the
+# default.target.wants symlink itself and this unit comes up on every dev
+# boot. A dev boot has several possible workloads and the role cannot pick
+# among them, so the stack is started by hand:
+#   systemctl start awf-oak-autoware awf-oak-bridge awf-oak-relay awf-oak-restamp
 
 [Container]
 # Host networking, not a pod. Every service in the reference compose file

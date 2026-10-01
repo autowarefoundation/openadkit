@@ -211,8 +211,8 @@ reboot from both Yocto and AutoSD. See
 the CR52's `rpmsg-eth` rpmsg channel to a Linux TAP device (`tap0`), one
 Ethernet frame per RPMsg message in both directions — a normal IP link to
 the safety island, on top of the same remoteproc/RPMsg stack described
-above. Frozen wire constants: service name `rpmsg-eth`; MTU **462** / max
-frame 476 (see `scripts/rpmsg-eth-ifup.sh`); Linux side `172.16.52.1/24`,
+above. Frozen wire constants: service name `rpmsg-eth`; MTU **1500** / max
+frame 1514 (see `scripts/rpmsg-eth-ifup.sh`); Linux side `172.16.52.1/24`,
 MAC `02:5c:52:00:00:01`; CR52 side `172.16.52.2/24`, MAC
 `02:5c:52:00:00:02`; DDS domain 2. The CR52 uses lwIP's `etharp`
 (`NETIF_FLAG_ETHARP`) and resolves peers dynamically, so ARP passes
@@ -350,12 +350,13 @@ than something to remember:
   boot (source: `config/x5h-rpmsg-modules.conf`).
 - `cr52-remoteproc.service` runs `/usr/sbin/cr52-rproc-up.sh`, which does the
   `start` write and polls for `running`. It is enabled by `80-x5h.preset` and
-  carries `ConditionKernelCommandLine=x5h.role=cr52`, so it is skipped
-  outright in the `npu` role. That gating is not optional: under the vendor NPU
+  carries `ConditionKernelCommandLine=|x5h.role=demo` and a second such line
+  for `x5h.role=dev`, so it is skipped outright in the `yocto` role. That
+  gating is not optional: under the vendor NPU
   device tree `cr52_1`'s `memory-region` phandle resolves to no node and a
   `start` write panics the kernel by construction.
 
-**A condition on `x5h.role=cr52` is not satisfied by "not the npu role": it is
+**A role condition is not satisfied by "not some other role": it is
 also unsatisfied whenever `x5h.role=` is absent from the kernel command line
 altogether.** That is not a corner case. `uboot/autosd-boot.env` builds
 `bootargs_autosd` with no `x5h.role=` word, so every netboot rescue
@@ -368,12 +369,12 @@ and `selfboot-smoke.sh` on such a root fails with
 procedure above therefore does nothing on a netbooted root unless the role is
 supplied by hand. Two ways to do that, in order of preference:
 
-- Append `x5h.role=cr52` to the rescue bootargs before booting, which is what
+- Append `x5h.role=dev` to the rescue bootargs before booting, which is what
   the self-boot roles do and what makes every unit behave identically to a
   self-boot:
 
   ```
-  => setenv bootargs_autosd "${bootargs_autosd} x5h.role=cr52"
+  => setenv bootargs_autosd "${bootargs_autosd} x5h.role=dev"
   => run bootcmd_autosd
   ```
 
@@ -417,9 +418,11 @@ now, and a board with no ELF staged yet reports
 `CR52_RPROC_SKIP reason=no_firmware` and exits 0 rather than failing.
 
 `rpmsg-eth.service` remains deliberately absent from `80-x5h.preset`, which is a
-standing ruling and not an oversight. It is still reached on a normal `cr52`
-boot, because `awf-oak-bridge.container` carries `Requires=rpmsg-eth.service`
-and pulls it up.
+standing ruling and not an oversight. It is reached whenever a stack that
+needs the link starts, because both bridges carry
+`Requires=rpmsg-eth.service` and pull it up. Note that this no longer happens
+at boot on its own under `dev`: the `awf-oak-*` units carry no `[Install]`
+section, so nothing starts them until you do.
 
 ### Smoke
 

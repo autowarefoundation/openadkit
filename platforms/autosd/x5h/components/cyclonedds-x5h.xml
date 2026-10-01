@@ -10,7 +10,7 @@
        DDS configuration this file was written to interoperate with, so that
        both ends of the domain-2 link size their receive pools the same way.
        They are internally coherent: 16384 is an exact multiple of 2048, and
-       the chunk size exceeds both tap0's 462-byte MTU and the 1400B
+       the chunk size exceeds both tap0's 1500-byte MTU and the 1400B
        MaxMessageSize. ("MTU" deliberately, not "fragment size": domain 2
        now sets General/FragmentSize explicitly and the two are unrelated
        numbers.) Whether this pool is thin for six bridged
@@ -71,7 +71,7 @@
        carried static peers since M6, so both ends of the link agree.
 
        MaxMessageSize stays at 1400B: RTPS fragmentation down to tap0's
-       462-byte MTU happens below this setting, and lowering it here would
+       1500-byte MTU happens below this setting, and lowering it here would
        double-fragment for no benefit.
 
        FragmentSize is pinned to 1344B, which IS the CycloneDDS default;

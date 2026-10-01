@@ -1,12 +1,13 @@
 #!/bin/sh
-# On-board proof of the NPU container contract (npu role).
+# On-board proof of the NPU container contract (demo and dev roles).
 #   npu-contract-smoke.sh <artifacts-dir-relative-to-/opt/npu> [runs]
 # Builds the ort-rootfs image if absent, runs the R3 latency harness inside it
 # with exactly the device list below, and grades by output, not exit code
 # (renesas_ep_eval_latency.py swallows exceptions and exits 0).
 # Confirmed harness output line (R3 record, 2026-09-01):
 #   Over 20 runs, avg Latency: 21.328 ms, min Latency: 20.612 ms, max Latency: 26.407 ms
-# THE CONTRACT -- what a VisionPilot image gets from a board in the npu role:
+# THE CONTRACT -- what a VisionPilot image gets from a board in either of
+# those roles:
 #   --device /dev/uio2:/dev/npuc0 --device /dev/uio3:/dev/npuc1  (npuc* are udev
 #       symlinks; podman resolves --device /dev/npuc0 to uio2 and the backend's
 #       literal open("/dev/npuc1") then fails -- name the destinations)
@@ -24,7 +25,14 @@ NPU=/opt/npu
 ART=${1:-}; RUNS=${2:-20}
 fail() { echo "NPU_CONTRACT_FAIL reason=$1"; exit 1; }
 [ -n "$ART" ] || fail bad_args
-[ "$(cat /run/x5h/role 2>/dev/null)" = npu ] || fail "wrong_role role=$(cat /run/x5h/role 2>/dev/null)"
+# demo and dev boot the identical derived tree, so the NPU regions this
+# contract depends on are present under both. Refusing either would refuse
+# the roles that exist to run the NPU.
+role=$(cat /run/x5h/role 2>/dev/null)
+case "$role" in
+    demo|dev) ;;
+    *) fail "wrong_role role=$role" ;;
+esac
 systemctl is-active --quiet x5h-npu.service || fail npu_not_ready
 [ -d "$NPU/$ART" ] || fail "no_artifacts path=$NPU/$ART"
 if ! podman image exists "$IMAGE"; then

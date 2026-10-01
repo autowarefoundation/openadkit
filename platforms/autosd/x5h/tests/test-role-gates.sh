@@ -91,4 +91,8 @@ done
 for u in x5h-vp x5h-image-republish; do
     [ -e "$here/../components/demo/$u.container" ] && fail "quadlet_still_present_$u"
 done
+# An automatic restart would drive the vehicle again with no operator, and the
+# containers rely on the control-group kill when the launch manager stops.
+[ "$(grep -c '^Restart=no$' "$cfg/score-lm.service")" = 1 ] || fail score_lm_restart
+grep -q '^KillMode=' "$cfg/score-lm.service" && fail score_lm_killmode
 echo "TEST_PASS $name"

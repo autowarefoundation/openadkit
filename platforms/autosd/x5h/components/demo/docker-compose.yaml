@@ -78,7 +78,8 @@ services:
   # frames; a larger socket buffer did not help, because the wall is the byte
   # count. This subscribes on loopback, where the raw size costs nothing, and
   # publishes JPEG at about 159 KiB per frame for the board to decode with its
-  # x5h-image-republish unit. Both ends must agree on the compressed topic.
+  # LM component `camera`
+  # (started by x5h-score-camera). Both ends must agree on the compressed topic.
   jpeg-bridge:
     image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
     container_name: ces-jpeg-bridge

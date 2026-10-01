@@ -15,6 +15,7 @@
 set -uo pipefail
 sub=${1:-}; src=${2:-}; image=${3:-}
 D=/var/tmp/score-sil
+vp_pid=; cam_pid=
 UNITS="score-sil-lm.service score-sil-stub.service score-sil-dr.service"
 SUB=$(tr '[:lower:]' '[:upper:]' <<<"$sub")
 cleanup() {
@@ -39,7 +40,15 @@ wait_for() {  # wait_for <seconds> <command...>
 lm_log() { journalctl -u score-sil-lm.service -o cat --no-pager --after-cursor="$cursor"; }
 stub_fault_at() { journalctl -u score-sil-stub.service -o cat --no-pager --after-cursor="$cursor" \
     | sed -n 's/^SIL_STUB_FAULT at=//p' | tail -n 1; }
-no_containers() { [ -z "$(podman ps -q --filter name=sil-)" ]; }
+# podman ps cannot say whether the payloads are gone: a SIGKILL of the unit kills
+# conmon with them, so podman keeps listing them as running, even with --sync.
+read_pids() {
+    vp_pid=$(podman inspect -f '{{.State.Pid}}' sil-vp 2>/dev/null)
+    cam_pid=$(podman inspect -f '{{.State.Pid}}' sil-camera 2>/dev/null)
+    [ "${vp_pid:-0}" -gt 0 ] 2>/dev/null && [ "${cam_pid:-0}" -gt 0 ] 2>/dev/null
+}
+gone() { local p; for p in "$@"; do kill -0 "$p" 2>/dev/null && return 1; done; return 0; }
+no_containers() { gone "$vp_pid" "$cam_pid"; }
 fell_back() { lm_log | grep 'State fallback' >/dev/null; }
 stub_faulted() { [ -n "$(stub_fault_at)" ]; }
 start_lm() {
@@ -49,6 +58,7 @@ start_lm() {
         -E MW_LOG_CONFIG_FILE="$D/etc/gate/logging.json" \
         "$D/bin/launch_manager" -c "$D/etc/sil/launch_manager_config.bin" || fail lm_start
     wait_for 60 test -e /run/score-sil/vp.ready || fail vp_never_ready
+    wait_for 10 read_pids || fail no_payload_pids
 }
 
 cleanup
@@ -83,6 +93,12 @@ boundary)
     wait_for 5 fell_back || fail kill_no_fallback
     wait_for 5 stub_faulted || fail kill_no_stub_fault
     echo SIL_KILL_FALLBACK_OK
+    # The fallback makes the launch manager stop the camera through its podman client
+    # while it keeps running: the signal proxy at work, not systemd (the STOP row
+    # cannot show that, because a control-group stop signals the payload directly).
+    wait_for 10 gone "$cam_pid" || fail proxy_camera_left
+    systemctl is-active --quiet score-sil-lm.service || fail lm_died_in_fallback
+    echo SIL_PROXY_OK
     systemctl stop score-sil-lm.service
     systemd-run --quiet --unit=score-sil-dr --working-directory="$D" \
         -E MW_LOG_CONFIG_FILE="$D/etc/gate/logging.json" \

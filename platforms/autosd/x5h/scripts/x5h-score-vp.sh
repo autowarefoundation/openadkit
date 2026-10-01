@@ -27,6 +27,7 @@
 # set is the one inside the vendor ORT rootfs, which is why npu-check-autosd.sh
 # passes on the same board, same artifacts and same devices while this failed.
 # Board-confirmed on board 2, 2026-09-18: with this line VisionPilot reaches
+# 12.9 ms NPU latency and 43 fps; without it, it restart-loops.
 #
 # -v /opt/npu/perf/merged:/home/youtalk/src/openadkit/x5h-work/npu/merged:ro
 # The NNX artifacts were compiled on a workstation and manifest.json records

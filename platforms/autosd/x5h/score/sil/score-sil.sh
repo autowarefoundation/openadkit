@@ -40,7 +40,7 @@ lm_log() { journalctl -u score-sil-lm.service -o cat --no-pager --after-cursor="
 stub_fault_at() { journalctl -u score-sil-stub.service -o cat --no-pager --after-cursor="$cursor" \
     | sed -n 's/^SIL_STUB_FAULT at=//p' | tail -n 1; }
 no_containers() { [ -z "$(podman ps -q --filter name=sil-)" ]; }
-fell_back() { lm_log | grep -q 'State fallback'; }
+fell_back() { lm_log | grep 'State fallback' >/dev/null; }
 stub_faulted() { [ -n "$(stub_fault_at)" ]; }
 start_lm() {
     systemctl reset-failed score-sil-lm.service 2>/dev/null
@@ -57,14 +57,15 @@ if [ -d "$src" ]; then cp -a "$src"/. "$D"/ || fail copy
 else tar -xf "$src" -C "$D" --strip-components=1 || fail untar; fi
 cp "$D"/sil/*.sh "$D/bin/" && chmod +x "$D"/bin/* || fail install_scripts
 podman tag "$image" localhost/score-sil:latest || fail tag_image
-cursor=$(journalctl -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p')
+take_cursor() { cursor=$(journalctl -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p'); }
+take_cursor
 systemd-run --quiet --unit=score-sil-stub "$D/bin/sil-stub.sh" || fail stub_start
 
 case "$sub" in
 boundary)
     start_lm; echo SIL_READY_FILE_OK
     sleep 5
-    if lm_log | grep -q 'switched to FAILED'; then echo SIL_ALIVE_FAIL; fail alive; fi
+    if lm_log | grep 'switched to FAILED' >/dev/null; then echo SIL_ALIVE_FAIL; fail alive; fi
     echo SIL_ALIVE_OK
     n_tag=$(journalctl -t sil-vp -o cat --no-pager --after-cursor="$cursor" | grep -c 'standin running')
     n_lm=$(lm_log | grep -c 'standin running')
@@ -76,7 +77,7 @@ boundary)
     start_lm; systemctl kill -s KILL score-sil-lm.service
     wait_for 10 no_containers || fail lm_kill_left_containers
     echo SIL_LM_KILL_OK
-    start_lm; podman kill sil-vp >/dev/null
+    start_lm; take_cursor; podman kill sil-vp >/dev/null
     wait_for 5 fell_back || fail kill_no_fallback
     wait_for 5 stub_faulted || fail kill_no_stub_fault
     echo SIL_KILL_FALLBACK_OK
@@ -91,11 +92,11 @@ boundary)
     cleanup; echo "SIL_BOUNDARY_PASS" ;;
 soak)
     min=${4:-10}; start_lm; sleep $(( min * 60 ))
-    lm_log | grep -q -e 'switched to FAILED' -e 'State fallback' && fail fallback
+    lm_log | grep -e 'switched to FAILED' -e 'State fallback' >/dev/null && fail fallback
     cleanup; echo "SIL_SOAK_PASS minutes=$min" ;;
 kill|slow)
     start_lm; sleep 3
-    t0=$(now)
+    take_cursor; t0=$(now)
     if [ "$sub" = kill ]; then podman kill sil-vp >/dev/null; else podman kill --signal USR1 sil-vp >/dev/null; fi
     wait_for 5 stub_faulted || fail no_stub_fault
     t1=$(stub_fault_at)

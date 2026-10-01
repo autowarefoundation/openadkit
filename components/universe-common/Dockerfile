@@ -55,10 +55,8 @@ ENV LD_LIBRARY_PATH="/opt/acados/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # colcon build the universe-common slice into /opt/autoware (next to core).
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    . /opt/autoware/setup.sh && \
-    colcon build \
-      --base-paths \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' \
         /tmp/autoware/src/universe/autoware_universe/common \
         /tmp/autoware/src/universe/autoware_universe/evaluator \
         /tmp/autoware/src/universe/external/eagleye \
@@ -72,6 +70,12 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/external/tier4_autoware_msgs \
         /tmp/autoware/src/launcher/autoware_launch/autoware_launch \
         /tmp/autoware/src/middleware/external \
+      > /opt/openadkit/colcon-base-paths && \
+    colcon_base_paths=$(tr '\n' ' ' < /opt/openadkit/colcon-base-paths) && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths ${colcon_base_paths} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
@@ -85,6 +89,18 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       --ignore-src --rosdistro "${ROS_DISTRO}" \
       --dependency-types=exec && \
     rm -rf /tmp/autoware
+
+# Align the packages the compiled tree links against with the current apt feed
+# and rebuild when any of them moved; the first compile above stays cached when
+# nothing did. Re-runs every build via ROS_ALIGN_STAMP (components/link-lock).
+ARG ROS_ALIGN_STAMP=0
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/link-lock,target=/tmp/link-lock \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "ros align ${ROS_ALIGN_STAMP}" && \
+    bash /tmp/link-lock/align.sh
 
 # =============================================================================
 # Stage: universe-common
@@ -127,3 +143,12 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
       --skip-keys "${internal_packages}" && \
     bash /tmp/runtime-cleanup.sh
+
+# Install the exact package versions the matching devel stage compiled
+# against and verify them (components/link-lock).
+RUN --mount=from=universe-common-devel,source=/opt/openadkit/link-lock.txt,target=/tmp/link-lock.txt \
+    --mount=type=bind,source=components/link-lock,target=/tmp/link-lock \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    bash /tmp/link-lock/lock.sh install --lock /tmp/link-lock.txt && \
+    bash /tmp/link-lock/lock.sh verify --lock /tmp/link-lock.txt

@@ -1,0 +1,288 @@
+name: evidence
+
+# Run the verification cells against one build and emit a signed in-toto Test
+# Result attestation. The subjects are the built image digests plus the
+# deployment and shared asset checksums of the staged release kit.
+#
+# Shadow mode for now: a failing cell makes this workflow red, but it does not
+# block releases yet. The release gate consumes these records once blocking
+# mode lands (PR 3).
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows: [build-all-images]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      build_tag:
+        description: 'Build tag to verify (e.g. 123456789-1)'
+        required: true
+  workflow_call:
+    inputs:
+      build_tag:
+        description: 'Build tag to verify (e.g. 123456789-1)'
+        required: true
+        type: string
+
+concurrency:
+  group: evidence-${{ github.event_name == 'workflow_run' && format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) || inputs.build_tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      source_sha: ${{ steps.prepare.outputs.source_sha }}
+      cells: ${{ steps.prepare.outputs.cells }}
+    steps:
+      - name: Resolve build metadata
+        id: prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BUILD_TAG: ${{ inputs.build_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            run_id="${{ github.event.workflow_run.id }}"
+            run_attempt="${{ github.event.workflow_run.run_attempt }}"
+            build_tag="${run_id}-${run_attempt}"
+          else
+            build_tag="${DISPATCH_BUILD_TAG}"
+            if ! printf '%s\n' "${build_tag}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+              echo "Invalid build_tag '${build_tag}': must be RUN_ID-RUN_ATTEMPT" >&2
+              exit 1
+            fi
+            run_id="${build_tag%%-*}"
+          fi
+
+          mkdir -p build-metadata
+          gh run download "${run_id}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "build-metadata-${build_tag}" \
+            --dir build-metadata
+
+          source_sha=$(jq -r '.openadkit_sha' build-metadata/build-metadata.json)
+          if ! printf '%s\n' "${source_sha}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Invalid OpenADKit SHA in build metadata: ${source_sha}" >&2
+            exit 1
+          fi
+
+          cells='{"include":[
+            {"deployment":"planning-simulation","distro":"humble"},
+            {"deployment":"planning-simulation","distro":"jazzy"},
+            {"deployment":"scenario-simulation","distro":"humble"},
+            {"deployment":"scenario-simulation","distro":"jazzy"}
+          ]}'
+          cells=$(printf '%s' "${cells}" | jq -c .)
+
+          {
+            echo "build_tag=${build_tag}"
+            echo "source_sha=${source_sha}"
+            echo "cells=${cells}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ steps.prepare.outputs.source_sha }}
+
+      - name: Stage evidence kit
+        run: |
+          set -euo pipefail
+          bash .github/scripts/evidence/stage_kit.sh \
+            "$PWD" build-metadata/build-metadata.json "$PWD/evidence-kit" \
+            "${{ steps.prepare.outputs.source_sha }}"
+
+      - name: Upload evidence kit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-kit-${{ steps.prepare.outputs.build_tag }}
+          path: evidence-kit
+          retention-days: 7
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-build-metadata-${{ steps.prepare.outputs.build_tag }}
+          path: build-metadata/build-metadata.json
+          retention-days: 7
+
+  cell:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.cells) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+
+      - name: Download evidence kit
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: evidence-kit-${{ needs.prepare.outputs.build_tag }}
+          path: evidence-kit
+
+      - name: Run evidence cell
+        id: cell
+        working-directory: evidence-kit
+        env:
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          PLATFORM: linux/amd64
+        run: |
+          set -uo pipefail
+          runner="$GITHUB_WORKSPACE/.github/scripts/evidence/run_cell.sh"
+          deployment="${{ matrix.deployment }}"
+          distro="${{ matrix.distro }}"
+          output="$GITHUB_WORKSPACE/cell-output"
+          cell_name="${deployment}-${distro}-linux-amd64"
+
+          mkdir -p "$output"
+          if ! bash "$runner" "$deployment" "$distro" "$output/attempt-1"; then
+            echo "::warning title=evidence retry::${cell_name} failed on the first attempt; retrying once"
+            rm -rf "$output/attempt-2"
+            if ! bash "$runner" "$deployment" "$distro" "$output/attempt-2"; then
+              echo "cell ${cell_name} failed after the retry" >&2
+              exit 1
+            fi
+          fi
+
+          final="$output/attempt-2"
+          [ -d "$final" ] || final="$output/attempt-1"
+          mkdir -p "$GITHUB_WORKSPACE/cells"
+          cp -a "$final" "$GITHUB_WORKSPACE/cells/${cell_name}"
+        shell: bash
+
+      - name: Upload cell artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-cell-${{ matrix.deployment }}-${{ matrix.distro }}
+          path: |
+            cells
+            cell-output
+          retention-days: 14
+
+  attest:
+    needs: [prepare, cell]
+    if: ${{ always() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+
+      - name: Download cell artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: evidence-cell-*
+          merge-multiple: true
+          path: evidence-cells
+
+      - name: Download evidence kit context
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: evidence-kit-${{ needs.prepare.outputs.build_tag }}
+          path: evidence-kit
+
+      - name: Download build metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: evidence-build-metadata-${{ needs.prepare.outputs.build_tag }}
+          path: build-metadata
+
+      - name: Build attestation inputs
+        env:
+          EVIDENCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/evidence/test_result.py \
+            --cells-dir evidence-cells \
+            --build-metadata build-metadata/build-metadata.json \
+            --kit-context evidence-kit/openadkit.json \
+            --output-dir attestation
+
+      - name: Attest the test result
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-checksums: attestation/evidence-subjects.txt
+          predicate-path: attestation/evidence-predicate.json
+          predicate-type: https://in-toto.io/attestation/test-result/v0.1
+
+      - name: Upload attestation inputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evidence-attestation-${{ needs.prepare.outputs.build_tag }}
+          path: |
+            attestation
+            ${{ steps.attest.outputs.bundle-path }}
+          retention-days: 90
+
+      - name: Write job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## Evidence for build \`${{ needs.prepare.outputs.build_tag }}\`"
+            echo
+            python3 - <<'PY'
+          import json
+          summary = json.load(open("attestation/evidence-summary.json", encoding="utf-8"))
+          print(f"Result: **{summary['result']}**")
+          print()
+          print("| Cell | Deployment | Distro | Node | Ready (s) | Arrival (s) | Peak MiB | Result |")
+          print("|---|---|---|---|---|---|---|---|")
+          for cell in summary["cells"]:
+              print(
+                  "| {name} | {deployment} | {distro} | {node} | {ready_s} | {arrival_s} | {peak_mib} | {result} |".format(
+                      name=cell["name"],
+                      deployment=cell["deployment"],
+                      distro=cell["distro"],
+                      node=cell["node"] or "-",
+                      ready_s=cell["ready_s"] if cell["ready_s"] is not None else "-",
+                      arrival_s=cell["arrival_s"] if cell["arrival_s"] is not None else "-",
+                      peak_mib=cell["peak_mib"],
+                      result=cell["result"],
+                  )
+              )
+          PY
+          } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: Fail when the evidence did not pass
+        if: always()
+        run: |
+          set -euo pipefail
+          result=$(jq -r '.result' attestation/evidence-summary.json)
+          if [ "${result}" != "PASSED" ]; then
+            echo "evidence result is ${result}" >&2
+            exit 1
+          fi
+        shell: bash

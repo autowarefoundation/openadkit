@@ -1,0 +1,44 @@
+module(name = "x5h_score")
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "flatbuffers", version = "25.12.19")
+# Pinned by reference_integration v0.9.0 for grpc/grpc-java#12165.
+bazel_dep(name = "grpc-java", version = "1.78.0")
+
+# S-CORE modules at the reference_integration v0.9.0 versions (known_good.json).
+bazel_dep(name = "score_baselibs")
+single_version_override(module_name = "score_baselibs", version = "0.2.12")
+bazel_dep(name = "score_communication")
+single_version_override(module_name = "score_communication", version = "0.4.0")
+bazel_dep(name = "score_lifecycle")
+single_version_override(module_name = "score_lifecycle", version = "0.6.1")
+bazel_dep(name = "score_logging")
+single_version_override(module_name = "score_logging", version = "0.2.4")
+bazel_dep(name = "score_crates")
+single_version_override(module_name = "score_crates", version = "0.0.11")
+bazel_dep(name = "score_bazel_platforms")
+single_version_override(module_name = "score_bazel_platforms", version = "1.1.0")
+bazel_dep(name = "score_bazel_cpp_toolchains")
+single_version_override(module_name = "score_bazel_cpp_toolchains", version = "1.0.3")
+
+# Only the root module may use the gcc extension. GCC 12.2 links libstdc++ and
+# libgcc statically by default, which is what lets libscore_vp.so load into a
+# VisionPilot built with another compiler.
+gcc = use_extension("@score_bazel_cpp_toolchains//extensions:gcc.bzl", "gcc", dev_dependency = True)
+gcc.toolchain(name = "score_gcc_x86_64_toolchain", target_cpu = "x86_64", target_os = "linux", use_default_package = True, version = "12.2.0")
+gcc.toolchain(name = "score_gcc_aarch64_toolchain", target_cpu = "aarch64", target_os = "linux", use_default_package = True, version = "12.2.0")
+use_repo(gcc, "score_gcc_aarch64_toolchain", "score_gcc_x86_64_toolchain")
+
+# The health monitor is Rust (Ferrocene).
+bazel_dep(name = "rules_rust", version = "0.68.1-score")
+single_version_override(module_name = "rules_rust", version = "0.68.2-score")
+bazel_dep(name = "score_toolchains_rust", version = "0.8.0", dev_dependency = True)
+single_version_override(module_name = "score_toolchains_rust", version = "0.8.0")
+single_version_override(module_name = "googletest", version = "1.17.0.bcr.2")
+
+# The LM configuration generator is a Python tool.
+bazel_dep(name = "rules_python", version = "1.8.3")
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(is_default = True, python_version = "3.12")

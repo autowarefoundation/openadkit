@@ -94,6 +94,7 @@
     "initial_run_target": "Startup",
     "fallback_run_target": {
         "depends_on": [
+            "camera",
             "si_fault"
         ],
         "transition_timeout": 5.0

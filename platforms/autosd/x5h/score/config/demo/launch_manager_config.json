@@ -62,6 +62,6 @@
         "Startup": {"depends_on": ["camera", "visionpilot"], "transition_timeout": 90.0}
     },
     "initial_run_target": "Startup",
-    "fallback_run_target": {"depends_on": ["si_fault"], "transition_timeout": 5.0},
+    "fallback_run_target": {"depends_on": ["camera", "si_fault"], "transition_timeout": 5.0},
     "alive_supervision": {"evaluation_cycle": 0.1}
 }

@@ -1074,7 +1074,7 @@ not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recove
 
 `score-lm.service` runs the Eclipse S-CORE launch manager (LM). The LM starts and supervises the Open AD Kit containers. CI builds its binaries into `score-x5h-aarch64.tar` with `score/build-score.sh`. `stage-board.sh` unpacks the tar to `/usr/local/score` and refuses to continue without it.
 
-The LM configuration is `score/config/demo/launch_manager_config.json`. Run target `Startup` starts two components, `camera` and `visionpilot`. Only `visionpilot` is supervised. It reports ready with the file `/run/score/vp.ready`, and each frame has a deadline of `SCORE_VP_FRAME_MAX_MS=80`. If VisionPilot fails, the LM switches to `fallback_run_target`, which is `si_fault`. That target runs `systemctl kill -s USR1 x5h-si-link.service` and ends. The Safety Island then stops the vehicle.
+The LM configuration is `score/config/demo/launch_manager_config.json`. Run target `Startup` starts two components, `camera` and `visionpilot`. Only `visionpilot` is supervised. It reports ready with the file `/run/score/vp.ready`, and each frame has a deadline of `SCORE_VP_FRAME_MAX_MS=80`. If VisionPilot fails, the LM switches to `fallback_run_target`, which is `camera` and `si_fault`. `si_fault` runs `systemctl kill -s USR1 x5h-si-link.service` and ends. The camera stays in the fallback because the LM stops every component that the new target does not hold before it starts `si_fault`, and the camera took 0.68-2.17 s to exit on board 2. The Safety Island then stops the vehicle.
 
 Two exec scripts start the containers:
 

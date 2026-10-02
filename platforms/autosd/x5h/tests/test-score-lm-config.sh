@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Invariants of the S-CORE launch manager configurations that the schema does
 # not check: the LM truncates argv at 20 without an error, VisionPilot is the
-# only supervised component, the fallback holds the fault component and never
+# only supervised component, the fallback holds the fault component and the
+# camera (so the switch never waits for the camera to stop) and never
 # VisionPilot, and no Safety Island unit is an LM component.
 set -u
 name=test-score-lm-config
@@ -30,7 +31,7 @@ for k in ("PATH", "IDENTIFIER", "SCORE_VP_FRAME_MAX_MS", "SCORE_VP_READY_FILE"):
     if k not in env:
         print(f"vp_env_missing_{k}"); sys.exit()
 fb = cfg["fallback_run_target"]["depends_on"]
-if fb != ["si_fault"]:
+if sorted(fb) != ["camera", "si_fault"]:
     print("fallback=" + ",".join(fb)); sys.exit()
 if cfg["initial_run_target"] != "Startup":
     print("initial_not_startup"); sys.exit()

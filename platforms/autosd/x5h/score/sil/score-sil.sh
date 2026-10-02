@@ -95,10 +95,16 @@ boundary)
     wait_for 5 fell_back || fail kill_no_fallback
     wait_for 5 stub_faulted || fail kill_no_stub_fault
     echo SIL_KILL_FALLBACK_OK
-    # The fallback makes the launch manager stop the camera through its podman client
-    # while it keeps running: the signal proxy at work, not systemd (the STOP row
-    # cannot show that, because a control-group stop signals the payload directly).
-    wait_for 10 gone "$cam_pid" || fail proxy_camera_left
+    systemctl stop score-sil-lm.service
+    # A slow stand-in makes the launch manager stop a LIVE payload through its
+    # podman client while it keeps running: the signal proxy at work, not
+    # systemd (the STOP row cannot show that, because a control-group stop
+    # signals the payload directly). The camera is in the fallback target too,
+    # so it must survive the switch.
+    start_lm; take_cursor; podman kill --signal USR1 sil-vp >/dev/null
+    wait_for 5 fell_back || fail slow_no_fallback
+    wait_for 10 gone "$vp_pid" || fail proxy_vp_left
+    gone "$cam_pid" && fail fallback_stopped_camera
     systemctl is-active --quiet score-sil-lm.service || fail lm_died_in_fallback
     echo SIL_PROXY_OK
     systemctl stop score-sil-lm.service

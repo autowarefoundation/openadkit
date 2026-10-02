@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# x5h-pull-demo-frames.sh against a fake ssh: it slices the journal at the last
-# unit start, refuses a rate-limited journal, refuses a PNG count that does not
-# match the journal's frame count, and reports the count it pulled.
+# x5h-pull-demo-frames.sh against a fake ssh: it reads the last x5h-vp journal
+# stream by its _PID, refuses a run during which journald dropped messages,
+# refuses a PNG count that does not match the journal's frame count, and
+# reports the count it pulled.
 #
-# The fake ssh answers two commands, journalctl and tar, from files this test
-# writes, which is the whole board contract the script depends on.
+# The fake ssh answers the four journalctl queries the script makes, and the
+# fake rsync copies PNGs: that is the whole board contract it depends on.
 set -u
 name=test-x5h-pull-demo-frames
 here=$(cd "$(dirname "$0")" && pwd); s="$here/../scripts/x5h-pull-demo-frames.sh"
@@ -15,8 +16,12 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/ssh" <<'EOF'
 #!/bin/sh
 # $1 is the board, $2 the remote command.
+echo "$2" >> "$CMDS"
 case "$2" in
-  journalctl*) cat "$JOURNAL" ;;
+  *'-o verbose'*) [ -n "${NO_STREAM:-}" ] || echo "    _PID=4242" ;;
+  *MESSAGE_ID=*) cat "$DROPPED" ;;
+  *'_PID=4242 -o short-unix'*) echo "1790000000.250000 board x5h-vp[4242]: first line" ;;
+  *'_PID=4242 -o short-monotonic'*) cat "$JOURNAL" ;;
   *) exit 1 ;;
 esac
 EOF
@@ -32,13 +37,10 @@ EOF
 chmod +x "$tmp/ssh" "$tmp/rsync"
 
 latency='board podman[1]: [VP] Latency  pre=1.8 ms  wall=23.6 ms  42 fps'
-make_journal() {  # make_journal <starts> <frames-after-last-start>
-    : > "$tmp/journal"
-    for _ in $(seq 1 "$1"); do
-        echo "[    100.000000] board systemd[1]: Started x5h-vp.service - VisionPilot." >> "$tmp/journal"
-        for i in $(seq 1 "$2"); do
-            echo "[    $((100 + i)).000000] $latency" >> "$tmp/journal"
-        done
+make_journal() {  # make_journal <frames>: one stream, one run
+    : > "$tmp/journal"; : > "$tmp/dropped"
+    for i in $(seq 1 "$1"); do
+        echo "[    $((100 + i)).000000] $latency" >> "$tmp/journal"
     done
 }
 make_pngs() {  # make_pngs <n>
@@ -49,45 +51,42 @@ make_pngs() {  # make_pngs <n>
 }
 run() {
     rm -rf "${tmp:?}/run"; mkdir -p "$tmp/run"
-    JOURNAL="$tmp/journal" PNGDIR="$tmp/board" SSH="$tmp/ssh" RSYNC="$tmp/rsync" X5H_BOARD=fake \
-        bash "$s" "$tmp/run"
+    : > "$tmp/cmds"
+    CMDS="$tmp/cmds" DROPPED="$tmp/dropped" JOURNAL="$tmp/journal" PNGDIR="$tmp/board" \
+        SSH="$tmp/ssh" RSYNC="$tmp/rsync" X5H_BOARD=fake bash "$s" "$tmp/run"
 }
 
-# A clean run: one start, five frames, five PNGs.
-make_journal 1 5; make_pngs 5
+# A clean run: one stream, five frames, five PNGs.
+make_journal 5; make_pngs 5
 out=$(run) || fail "clean_run_failed out=$out"
 [ "$out" = "DEMO_FRAMES_PULLED n=5 dir=$tmp/run/hud" ] || fail "marker out=$out"
 [ -f "$tmp/run/hud/vp-journal.txt" ] || fail no_journal_written
 [ -f "$tmp/run/hud/frame_000003.png" ] || fail no_pngs_pulled
 
-# Two starts: only the frames after the last one count, and the PNG directory
-# holds that many, because the sink's index restarted with the process.
-make_journal 2 5; make_pngs 5
-out=$(run) || fail "restart_run_failed out=$out"
-[ "$out" = "DEMO_FRAMES_PULLED n=5 dir=$tmp/run/hud" ] || fail "restart_marker out=$out"
-n=$(grep -c 'Started ' "$tmp/run/hud/vp-journal.txt")
-[ "$n" -eq 1 ] || fail "journal_not_sliced starts=$n"
+# The run is the last stream: the frames come from its _PID, and the drop
+# check starts at that stream's first entry, never at the board's own clock.
+grep -qx 'journalctl -t x5h-vp _PID=4242 -o short-monotonic --no-pager' "$tmp/cmds" || fail "no_stream_query cmds=$(cat "$tmp/cmds")"
+grep -q 'MESSAGE_ID=a596d6fe7bfa4994828e72309e95d61e --since @1790000000 ' "$tmp/cmds" || fail "no_drop_query cmds=$(cat "$tmp/cmds")"
 
-# A journal that never shows the unit starting cannot be sliced at all.
-make_journal 1 5; make_pngs 5
-grep -v 'Started ' "$tmp/journal" > "$tmp/j2"; mv "$tmp/j2" "$tmp/journal"
-out=$(run) && fail no_start_accepted
-[ "$out" = "DEMO_FRAMES_FAIL reason=no_unit_start" ] || fail "no_start_reason out=$out"
+# No x5h-vp stream at all: nothing to pull.
+make_journal 5; make_pngs 5
+out=$(NO_STREAM=1 run) && fail no_stream_accepted
+[ "$out" = "DEMO_FRAMES_FAIL reason=no_unit_start" ] || fail "no_stream_reason out=$out"
 
-# journald dropped messages: the mapping has a hole in it.
-make_journal 1 5; make_pngs 5
-echo "[    110.000000] board systemd-journald[9]: Suppressed 214 messages" >> "$tmp/journal"
+# journald dropped messages during the run: the mapping has a hole in it.
+make_journal 5; make_pngs 5
+echo "score-lm.service: Suppressed 214 messages from score-lm.service" > "$tmp/dropped"
 out=$(run) && fail suppressed_accepted
 case "$out" in DEMO_FRAMES_FAIL\ reason=journal_suppressed*) ;; *) fail "suppressed_reason out=$out" ;; esac
 
 # More PNGs than the journal describes: a directory that was not emptied.
-make_journal 1 5; make_pngs 9
+make_journal 5; make_pngs 9
 out=$(run) && fail count_mismatch_accepted
 case "$out" in DEMO_FRAMES_FAIL\ reason=frame_count*) ;; *) fail "count_reason out=$out" ;; esac
 
 # No run directory at all.
-out=$(JOURNAL="$tmp/journal" PNGDIR="$tmp/board" SSH="$tmp/ssh" RSYNC="$tmp/rsync" X5H_BOARD=fake \
-    bash "$s" "$tmp/nope") && fail missing_dir_accepted
+out=$(CMDS="$tmp/cmds" DROPPED="$tmp/dropped" JOURNAL="$tmp/journal" PNGDIR="$tmp/board" \
+    SSH="$tmp/ssh" RSYNC="$tmp/rsync" X5H_BOARD=fake bash "$s" "$tmp/nope") && fail missing_dir_accepted
 case "$out" in DEMO_FRAMES_FAIL\ reason=no_run_dir*) ;; *) fail "dir_reason out=$out" ;; esac
 
 echo "TEST_PASS $name"

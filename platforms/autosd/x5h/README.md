@@ -1091,12 +1091,12 @@ The booth commands inject the faults:
 
 | Command | Effect |
 | --- | --- |
-| `fault kill` | `podman kill x5h-vp`. VisionPilot dies. |
-| `fault slow` | `podman kill --signal USR1 x5h-vp`. VisionPilot runs slow and misses the frame deadline. |
+| `fault kill` | `pkill -KILL -x VisionPilot`. VisionPilot dies. |
+| `fault slow` | `pkill -USR1 -x VisionPilot`. VisionPilot runs slow and misses the frame deadline. |
 | `fault lm` | `systemctl kill -s KILL score-lm.service`. The LM dies. |
 | `reset` | `systemctl stop score-lm.service && systemctl kill -s USR2 x5h-si-link.service && systemctl start score-lm.service`. Stops the LM, clears the fault, and starts the LM again. The stop comes first, so a `si_fault` that the LM starts during the stop cannot latch the Safety Island after the clear. |
 
-Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. `score-soak-gate.sh` is gate SG2 and `vp-npu-gate.sh` is gate D5. D5 reads the journal.
+Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. The script opens its ssh connection before the wait and fires over that connection, so the fault lands within a few milliseconds of `--at`. A cold ssh handshake and the podman CLI start made each fault land 0.44-0.75 s late on board 2. `score-soak-gate.sh` is gate SG2 and `vp-npu-gate.sh` is gate D5. D5 reads the journal.
 
 After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp` and `x5h-image-republish` as running, even with `--sync`, because conmon died with them. The next `reset` removes these stale records with `--replace`. To check that no container is left, look at the processes (for example `pgrep -x VisionPilot`) or the cgroup. Do not use `podman ps`.
 

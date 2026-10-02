@@ -78,20 +78,27 @@ case "$cmd" in
     echo "$0 reset" ;;
   fault)
     case "${2:-}" in
-      kill) remote='podman kill x5h-vp' ;;
-      slow) remote='podman kill --signal USR1 x5h-vp' ;;
+      # pkill, not the podman CLI: VisionPilot runs in the host PID namespace,
+      # and podman's own start cost 0.3-0.4 s on the board (2026-10-01).
+      kill) remote='pkill -KILL -x VisionPilot' ;;
+      slow) remote='pkill -USR1 -x VisionPilot' ;;
       lm)   remote='systemctl kill -s KILL score-lm.service' ;;
       *) fail usage ;;
     esac
+    # Pay the ssh handshake before the wait and let the fault reuse the
+    # master connection: a cold handshake landed every fault 0.44-0.75 s
+    # after --at on board 2, and the gate measures from --at. ControlPersist
+    # has to outlive the wait.
+    FSSH="$SSH -o ControlMaster=auto -o ControlPath=${TMPDIR:-/tmp}/x5h-demo-%C -o ControlPersist=600"
+    $FSSH "$BOARD" true || fail ssh_failed
     # --at <epoch-s> waits for that second, so si_stop_gate.py can be started
-    # first with the same value as --fault-at. The ssh round trip after it
-    # counts against the gate, which only makes the gate stricter.
+    # first with the same value as --fault-at.
     if [ "${3:-}" = --at ]; then
         [[ ${4:-} =~ ^[0-9]+$ ]] || fail usage
         while [ "$(date +%s)" -lt "$4" ]; do sleep 0.05; done
     fi
     at=$(date +%s.%N)
-    $SSH "$BOARD" "$remote" >/dev/null || fail fault_failed
+    $FSSH "$BOARD" "$remote" >/dev/null || fail fault_failed
     echo "X5H_CES_DEMO_FAULT route=$2 at=$at" ;;
   reset)
     # Stop first, so a si_fault forked during the stop cannot latch after the clear.

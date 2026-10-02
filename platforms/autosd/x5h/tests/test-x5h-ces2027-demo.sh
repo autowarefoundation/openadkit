@@ -32,6 +32,7 @@ case "$*" in
     # The ready file is there; VisionPilot itself may not be.
     case "$*" in *'pgrep -x VisionPilot'*) [ -z "${VP_DEAD:-}" ] || exit 1 ;; esac ;;
   *journalctl*) echo "RPMSG_SI_RX hb seq=41 uptime_ms=42000 fault=${HB_FAULT:-0}" ;;
+  *' true') [ -z "${SSH_FAIL:-}" ] || exit 255 ;;
   *) exit "${CMD_RC:-0}" ;;
 esac
 EOF
@@ -92,13 +93,22 @@ exact "$out" 'X5H_CES_DEMO_FAIL reason=ssh_failed' probe_ssh_failed_reason
 [ "$rc" -ne 0 ] || fail probe_ssh_failed_exit_zero
 
 # Each fault route runs one board command and prints the bench time of it.
-for r in kill:'podman kill x5h-vp' slow:'podman kill --signal USR1 x5h-vp' lm:'systemctl kill -s KILL score-lm.service'; do
+for r in kill:'pkill -KILL -x VisionPilot' slow:'pkill -USR1 -x VisionPilot' lm:'systemctl kill -s KILL score-lm.service'; do
     route=${r%%:*}; cmd=${r#*:}
     : > "$LOG"
     out=$(SSH="$tmp/ssh" bash "$s" fault "$route") || fail "fault_${route}_failed $out"
     [[ $out =~ ^X5H_CES_DEMO_FAULT\ route=$route\ at=[0-9]+\.[0-9]+$ ]] || fail "fault_${route}_line out=$out"
     grep -qF "$cmd" "$LOG" || fail "fault_${route}_cmd log=$(cat "$LOG")"
+    # The handshake comes first, on the same master the fault then reuses.
+    [ "$(grep -c 'ControlMaster=auto' "$LOG")" = 2 ] || fail "fault_${route}_no_master log=$(cat "$LOG")"
+    head -n 1 "$LOG" | grep -q ' true$' || fail "fault_${route}_no_preopen log=$(cat "$LOG")"
 done
+
+# A transport failure before the wait is not a failed injection.
+rc=0
+out=$(SSH_FAIL=1 SSH="$tmp/ssh" bash "$s" fault kill) || rc=$?
+exact "$out" 'X5H_CES_DEMO_FAIL reason=ssh_failed' fault_ssh_failed_reason
+[ "$rc" -ne 0 ] || fail fault_ssh_failed_exit_zero
 
 # --at in the past injects at once.
 out=$(SSH="$tmp/ssh" bash "$s" fault kill --at 1) || fail "fault_at_failed $out"

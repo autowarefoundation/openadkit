@@ -642,8 +642,8 @@ score/build-score.sh /tmp/x5h-score aarch64
 ```
 
 Three things to know before running these, because CI runs no single host
-through all of them — the kernel builds in an x64 `build-kernel` job and
-everything else on native arm64 (`ubicloud-standard-16-arm`):
+through all of them — the kernel and the S-CORE tar build in x64 jobs
+(`build-kernel`, `build-score`) and everything else in a native arm64 job:
 
 - **Step 2 requires an x86_64 host, and brings its own compiler.** ARM ships
   no aarch64-hosted 13.2.Rel1 toolchain, so `build-bsp-kernel.sh`

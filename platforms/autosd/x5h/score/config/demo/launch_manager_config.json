@@ -31,7 +31,7 @@
                     "application_type": "Reporting_And_Supervised",
                     "alive_supervision": {
                         "reporting_cycle": 0.2, "min_indications": 1,
-                        "max_indications": 10, "failed_cycles_tolerance": 1
+                        "max_indications": 10, "failed_cycles_tolerance": 0
                     }
                 },
                 "ready_condition": {

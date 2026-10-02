@@ -47,7 +47,7 @@
                         "reporting_cycle": 0.2,
                         "min_indications": 1,
                         "max_indications": 10,
-                        "failed_cycles_tolerance": 1
+                        "failed_cycles_tolerance": 0
                     }
                 },
                 "ready_condition": {

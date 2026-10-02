@@ -25,6 +25,7 @@ std::optional<HealthMonitor> g_hm;
 std::optional<deadline::DeadlineMonitor> g_monitor;
 std::optional<deadline::Deadline> g_deadline;
 std::optional<deadline::DeadlineHandle> g_running;
+bool g_hm_started = false;
 bool g_failure_logged = false;
 }  // namespace
 
@@ -64,8 +65,7 @@ extern "C" int score_vp_init(uint32_t frame_max_ms)
         return -3;
     }
     g_deadline.emplace(std::move(*deadline));
-    g_hm->start();
-    Log().LogInfo() << "health monitor started, frame budget ms:" << frame_max_ms;
+    Log().LogInfo() << "health monitor ready, frame budget ms:" << frame_max_ms;
     return 0;
 }
 
@@ -75,6 +75,19 @@ extern "C" int score_vp_report_running(void)
     // report_running() checks that the caller is the PID the LM forked, and
     // the container process never is. The LM waits for this file instead
     // (ready_condition.file_state).
+    //
+    // Alive notifications start here, before the file appears, and not in
+    // score_vp_init. The LM reads the alive channel only once this process is
+    // Running, then takes the whole backlog in one cycle into a 100-event
+    // buffer (kDefaultAliveSupCheckpointBufferElements). At one notification
+    // per 50 ms, a startup longer than about 5 s overflows it and the
+    // supervision expires (board 2, 2026-10-01: a 7.6 s Startup).
+    if (g_hm && !g_hm_started)
+    {
+        g_hm->start();
+        g_hm_started = true;
+        Log().LogInfo() << "health monitor started";
+    }
     const char* path = std::getenv("SCORE_VP_READY_FILE");
     if (path == nullptr)
     {

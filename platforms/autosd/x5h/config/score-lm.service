@@ -15,6 +15,12 @@ Restart=no
 # A payload stuck in an NPU call must not stall the booth reset for 90 s.
 TimeoutStopSec=15
 Environment=MW_LOG_CONFIG_FILE=/etc/score/lm-logging.json
+# The last run's VisionPilot leaves its ready file behind. The launch manager
+# tests the ready condition as soon as it forks, before x5h-score-vp.sh
+# removes the file, so a leftover file ends Startup in 1 ms and alive
+# supervision fails before VisionPilot reports (board 2, 2026-10-01: every
+# reset after a ready VisionPilot fell back). Same path as the LM config.
+ExecStartPre=/usr/bin/rm -f /run/score/vp.ready
 ExecStart=/usr/local/score/bin/launch_manager -c /usr/local/score/etc/demo/launch_manager_config.bin
 # KillMode stays control-group: the containers are in this cgroup
 # (podman --cgroups=split), so a SIGKILL of the launch manager takes them

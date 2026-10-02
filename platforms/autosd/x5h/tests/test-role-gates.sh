@@ -95,4 +95,8 @@ done
 # containers rely on the control-group kill when the launch manager stops.
 [ "$(grep -c '^Restart=no$' "$cfg/score-lm.service")" = 1 ] || fail score_lm_restart
 grep -q '^KillMode=' "$cfg/score-lm.service" && fail score_lm_killmode
+# A ready file left by the last run ends Startup before VisionPilot reports.
+ready=$(sed -n 's/.*"file_path": "\([^"]*\)".*/\1/p' "$here/../score/config/demo/launch_manager_config.json")
+[ -n "$ready" ] || fail no_ready_path
+grep -qx "ExecStartPre=/usr/bin/rm -f $ready" "$cfg/score-lm.service" || fail score_lm_stale_ready
 echo "TEST_PASS $name"

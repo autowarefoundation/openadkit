@@ -1100,7 +1100,7 @@ Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. `score-soa
 
 After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp` and `x5h-image-republish` as running, even with `--sync`, because conmon died with them. The next `reset` removes these stale records with `--replace`. To check that no container is left, look at the processes (for example `pgrep -x VisionPilot`) or the cgroup. Do not use `podman ps`.
 
-`/run/score/vp.ready` stays after a VisionPilot kill until the next VisionPilot start. For this reason `check` also needs a running VisionPilot process (`pgrep -x VisionPilot`) and a heartbeat with `fault=0`. After a fault, `check` reports a FAIL marker until `reset`. Run the steps in this order: fault, reset, check.
+`/run/score/vp.ready` stays after a VisionPilot kill until the next LM start. `score-lm.service` removes it in `ExecStartPre`. The LM tests the ready condition as soon as it starts VisionPilot, before `x5h-score-vp.sh` removes the file, so a leftover file ends `Startup` at once and alive supervision then fails. Because the file outlives a killed VisionPilot, `check` also needs a running VisionPilot process (`pgrep -x VisionPilot`) and a heartbeat with `fault=0`. After a fault, `check` reports a FAIL marker until `reset`. Run the steps in this order: fault, reset, check.
 
 ### The six markers
 

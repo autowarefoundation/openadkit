@@ -126,6 +126,7 @@ def kit_document(root, *, release, manifest):
         root / "deployments/example"
     )
     document["version"] = "v1.2.3"
+    document["autoware"] = {"version": "1.8.0", "ref": "a" * 40, "lockSha256": "b" * 64}
     document["images"] = {
         distro: {
             target: f"registry.example/{target}:{distro}@sha256:{'1' * 64}"
@@ -1990,3 +1991,17 @@ def test_evidence_cells_skip_exempt_deployments_and_add_split_cells():
     assert names == {"planning-simulation", "scenario-simulation"}
     assert {"deployment": "scenario-simulation", "distro": "jazzy", "node": "split"} in cells
     assert not any(cell.get("node") for cell in cells if cell["deployment"] == "planning-simulation")
+
+
+def test_version_reports_the_bill_of_materials(tmp_path):
+    root, _ = runtime_tree(tmp_path, release=True)
+    result = run_cli(root, "version", "--json")
+    assert result.returncode == 0, result.stderr
+    bom = json.loads(result.stdout)["bom"]
+    assert bom["autoware"]["version"] == "1.8.0"
+    assert set(bom["images"]) == {"humble", "jazzy"}
+    assert "autoware: 1.8.0" in run_cli(root, "version").stdout
+
+    root, _ = runtime_tree(tmp_path / "source")
+    bom = json.loads(run_cli(root, "version", "--json").stdout)["bom"]
+    assert bom["autoware"] is None and bom["images"] is None

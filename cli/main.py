@@ -305,6 +305,7 @@ def show_version(root, kit, *, json_output: bool = False) -> int:
                     "bundle": kit.kind,
                     "version": version,
                     "commit": commit,
+                    "bom": kit.bom(),
                 }
             )
         )
@@ -312,6 +313,8 @@ def show_version(root, kit, *, json_output: bool = False) -> int:
     if kit.kind == "release":
         print(f"Open AD Kit {kit.version or 'unknown'}")
         print("bundle: release")
+        if kit.autoware:
+            print(f"autoware: {kit.autoware['version']} ({kit.autoware['ref']})")
     else:
         print("Open AD Kit development")
         print(f"commit: {commit or 'unknown'}")

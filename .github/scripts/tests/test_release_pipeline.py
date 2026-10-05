@@ -104,6 +104,9 @@ def write_plan(tmp_path, *, images=None):
             {
                 "build_tag": BUILD_TAG,
                 "openadkit_sha": RELEASE_SHA,
+                "autoware_ref": "d" * 40,
+                "autoware_base_version": "1.8.0",
+                "autoware_lock_sha256": "e" * 64,
                 "images": images if images is not None else build_images(),
             }
         )
@@ -733,6 +736,10 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert f"releases/download/{VERSION}/openadkit" in notes
     assert f"install --version {VERSION}" in notes
     # Deployments without CI evidence ship, and say so in metadata and notes.
+    bom = release_metadata["bom"]
+    assert bom["autoware"] == {"version": "1.8.0", "ref": "d" * 40, "lockSha256": "e" * 64}
+    assert set(bom["images"]) == {"humble", "jazzy"}
+    assert "SCENARIO_SIMULATOR_IMAGE" in bom["artifacts"]
     exempt = {item["deployment"] for item in release_metadata["evidence_exempt"]}
     assert exempt == {"carla-simulation", "logging-simulation"}
     assert "Not verified in CI" in notes

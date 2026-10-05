@@ -69,6 +69,7 @@ jq \
   --argjson publish_latest_aliases "${PUBLISH_LATEST_ALIASES}" \
   --slurpfile scan release-input/scan/scan-metadata.json \
   --argjson evidence_exempt "$(jq -c '.evidence.exempt' "${plan_file}")" \
+  --argjson bom "$(jq -c '.releaseContext | {autoware, images, artifacts}' "${plan_file}")" \
   '. + {
     openadkit_version: $version,
     release_sha: $release_sha,
@@ -78,7 +79,8 @@ jq \
     bundles: [{name: $bundle_name, sha256: $bundle_sha256}],
     latest_aliases_updated: $publish_latest_aliases,
     scan: $scan[0],
-    evidence_exempt: $evidence_exempt
+    evidence_exempt: $evidence_exempt,
+    bom: $bom
   }' \
   release-input/build/build-metadata.json >release-metadata.json
 

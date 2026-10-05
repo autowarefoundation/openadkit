@@ -227,8 +227,14 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
 
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
+    autoware = {
+        "version": require_string(metadata.get("autoware_base_version"), "autoware_base_version"),
+        "ref": require_string(metadata.get("autoware_ref"), "autoware_ref"),
+        "lockSha256": require_string(metadata.get("autoware_lock_sha256"), "autoware_lock_sha256"),
+    }
     release_context = {
         "artifacts": kit.artifacts,
+        "autoware": autoware,
         "componentImages": component_images,
         "defaultRosDistro": args.default_ros_distro,
         "deployments": product["deployments"],

@@ -32,6 +32,7 @@ ALLOWED_KIT_KEYS = {
     "deployments",
     "shared",
     "artifacts",
+    "autoware",
 }
 ALLOWED_ARTIFACT_KEYS = {"workload", "ref", "distros"}
 ALLOWED_DEPLOYMENT_REF_KEYS = {"path", "checksum"}
@@ -275,6 +276,16 @@ class RuntimeContext:
     shared: dict[str, str]
     # Pinned images we consume rather than build: name -> {workload, refs}.
     artifacts: dict[str, dict[str, Any]]
+    # Release only: the Autoware version, commit and lock file it was built from.
+    autoware: dict[str, str] | None = None
+
+    def bom(self) -> dict[str, Any]:
+        """What this kit runs: Autoware, component images and artifacts."""
+        return {
+            "autoware": self.autoware,
+            "images": self.images or None,
+            "artifacts": self.artifacts,
+        }
 
     def artifact_environment(self, ros_distro: str) -> dict[str, str]:
         """Artifact references for one distro; Compose requires them by name."""
@@ -886,6 +897,21 @@ def _parse_artifacts(value: Any, component_images: dict[str, str]) -> dict[str, 
     return value
 
 
+def _parse_autoware(value: Any, kind: str) -> dict[str, str] | None:
+    if value is None:
+        if kind == "release":
+            raise OpenADKitError("release bundles must declare autoware")
+        return None
+    if kind != "release":
+        raise OpenADKitError("repository bundles must not declare autoware")
+    if not isinstance(value, dict):
+        raise OpenADKitError("autoware must be an object")
+    reject_unknown(value, {"version", "ref", "lockSha256"}, "autoware")
+    for field in ("version", "ref", "lockSha256"):
+        require_string(value.get(field), f"autoware.{field}")
+    return value
+
+
 def _require_checksum_map(value: Any, where: str) -> dict[str, str]:
     if not isinstance(value, dict) or any(
         not isinstance(name, str)
@@ -955,6 +981,7 @@ def load_kit(root: Path) -> RuntimeContext:
         deployments=_parse_deployment_refs(value.get("deployments"), kind),
         shared=_require_checksum_map(value.get("shared", {}), "shared"),
         artifacts=_parse_artifacts(value.get("artifacts", {}), component_images),
+        autoware=_parse_autoware(value.get("autoware"), kind),
     )
 
 

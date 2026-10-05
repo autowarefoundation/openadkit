@@ -732,6 +732,11 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert f"| `openadkit` | `{installer_sha256}` |" in notes
     assert f"releases/download/{VERSION}/openadkit" in notes
     assert f"install --version {VERSION}" in notes
+    # Deployments without CI evidence ship, and say so in metadata and notes.
+    exempt = {item["deployment"] for item in release_metadata["evidence_exempt"]}
+    assert exempt == {"carla-simulation", "logging-simulation"}
+    assert "Not verified in CI" in notes
+    assert "- `carla-simulation`: Needs an NVIDIA GPU" in notes
 
 
 def test_release_installer_and_bundle_entrypoint_come_from_the_packager(tmp_path):

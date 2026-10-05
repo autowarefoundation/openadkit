@@ -44,6 +44,7 @@ ALLOWED_DEPLOYMENT_KEYS = {
     "data",
     "shared",
     "nodes",
+    "evidence",
 }
 ALLOWED_COMPOSE_KEYS = {
     "files",
@@ -340,6 +341,8 @@ class Deployment:
         self.requirements: dict[str, Any] = manifest["requirements"]
         self.data: list[dict[str, Any]] = manifest["data"]
         self.shared: list[str] = manifest["shared"]
+        # Why CI cannot produce evidence for this deployment, if it cannot.
+        self.evidence_exemption: str | None = manifest["evidence"].get("exempt")
         self.project = f"openadkit-{self.name}"
 
     def project_name(self, node: str | None = None) -> str:
@@ -696,6 +699,14 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         )
         ensure_safe_existing(directory, "config/zenoh.json5", "Zenoh configuration")
     manifest["nodes"] = nodes
+
+    evidence = manifest.get("evidence", {})
+    if not isinstance(evidence, dict):
+        raise OpenADKitError("evidence must be an object")
+    reject_unknown(evidence, {"exempt"}, "evidence")
+    if "exempt" in evidence:
+        require_string(evidence["exempt"], "evidence.exempt")
+    manifest["evidence"] = evidence
 
     data = manifest.get("data", [])
     if not isinstance(data, list):

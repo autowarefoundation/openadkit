@@ -84,6 +84,7 @@ def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
             for name in sorted(shared_names)
         },
         "validation": validation,
+        "evidenceExempt": validation_matrix.evidence_exemptions(runtime, source_root, kit),
     }
 
 
@@ -274,6 +275,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             "version": args.version,
         },
         "releaseContext": release_context,
+        # Deployments that ship without CI evidence, with the reason.
+        "evidence": {"exempt": product["evidenceExempt"]},
         "schemaVersion": 1,
     }
 

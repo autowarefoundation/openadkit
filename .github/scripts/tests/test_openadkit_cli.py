@@ -1949,3 +1949,44 @@ def test_only_source_checkouts_may_override_an_artifact(tmp_path, release, expec
     result = run_cli(root, "validate", "example")
     assert result.returncode == 0, result.stderr
     assert calls.read_text().split("|", 5)[1] == {"override": override, "pinned": pinned}[expected]
+
+
+# --- Evidence exemptions --------------------------------------------------------
+
+
+def test_running_an_exempt_deployment_warns(tmp_path):
+    manifest = minimal_manifest()
+    manifest["evidence"] = {"exempt": "needs a GPU runner"}
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert "warning: example is not verified in CI: needs a GPU runner" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("evidence", "message"),
+    [
+        ({"exempt": ""}, "evidence.exempt must be a nonempty string"),
+        ({"skip": True}, "unknown evidence field(s): skip"),
+        ("none", "evidence must be an object"),
+    ],
+)
+def test_evidence_schema_errors(tmp_path, evidence, message):
+    manifest = minimal_manifest()
+    manifest["evidence"] = evidence
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    assert message in run_cli(root, "list").stdout
+
+
+def test_evidence_cells_skip_exempt_deployments_and_add_split_cells():
+    result = subprocess.run(
+        [sys.executable, str(ROOT / ".github/scripts/validation_matrix.py"),
+         "--source-root", str(ROOT), "--evidence-cells"],
+        capture_output=True, text=True, check=True,
+    )
+    cells = json.loads(result.stdout)["include"]
+    names = {cell["deployment"] for cell in cells}
+    assert names == {"planning-simulation", "scenario-simulation"}
+    assert {"deployment": "scenario-simulation", "distro": "jazzy", "node": "split"} in cells
+    assert not any(cell.get("node") for cell in cells if cell["deployment"] == "planning-simulation")

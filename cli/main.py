@@ -325,6 +325,12 @@ def warn_if_modified(root, deployment, kit) -> None:
             f"warning: {deployment.name} has been modified from this release",
             file=sys.stderr,
         )
+    if deployment.evidence_exemption:
+        print(
+            f"warning: {deployment.name} is not verified in CI: "
+            f"{deployment.evidence_exemption}",
+            file=sys.stderr,
+        )
     legacy = deployment.directory / "config.local.env"
     if legacy.exists():
         print(

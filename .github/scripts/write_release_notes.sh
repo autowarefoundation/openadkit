@@ -68,6 +68,7 @@ jq \
   --arg bundle_sha256 "${bundle_sha256}" \
   --argjson publish_latest_aliases "${PUBLISH_LATEST_ALIASES}" \
   --slurpfile scan release-input/scan/scan-metadata.json \
+  --argjson evidence_exempt "$(jq -c '.evidence.exempt' "${plan_file}")" \
   '. + {
     openadkit_version: $version,
     release_sha: $release_sha,
@@ -76,7 +77,8 @@ jq \
     release_plan_sha256: $plan_sha256,
     bundles: [{name: $bundle_name, sha256: $bundle_sha256}],
     latest_aliases_updated: $publish_latest_aliases,
-    scan: $scan[0]
+    scan: $scan[0],
+    evidence_exempt: $evidence_exempt
   }' \
   release-input/build/build-metadata.json >release-metadata.json
 
@@ -152,6 +154,14 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
     cat "${temporary}/upgrade-report.md"
   else
     echo "No evidence summary is attached to this build."
+  fi
+  if [ "$(jq '.evidence.exempt | length' "${plan_file}")" -gt 0 ]; then
+    echo ""
+    echo "Not verified in CI (the CLI warns when you run these):"
+    echo ""
+    while IFS=$'\t' read -r deployment reason; do
+      printf '%s\n' "- \`${deployment}\`: ${reason}"
+    done < <(jq -r '.evidence.exempt[] | [.deployment, .reason] | @tsv' "${plan_file}")
   fi
   echo ""
   if [ "${PUBLISH_LATEST_ALIASES}" = true ]; then

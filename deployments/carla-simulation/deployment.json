@@ -2,6 +2,7 @@
   "schemaVersion": 2,
   "name": "carla-simulation",
   "description": "Run Autoware closed-loop against CARLA 0.9.16",
+  "evidence": {"exempt": "Needs an NVIDIA GPU with 16 GB of VRAM; the CI runners have no GPU."},
   "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],

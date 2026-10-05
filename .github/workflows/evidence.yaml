@@ -42,7 +42,7 @@ jobs:
     outputs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       source_sha: ${{ steps.prepare.outputs.source_sha }}
-      cells: ${{ steps.prepare.outputs.cells }}
+      cells: ${{ steps.cells.outputs.cells }}
     steps:
       - name: Resolve build metadata
         id: prepare
@@ -77,20 +77,9 @@ jobs:
             exit 1
           fi
 
-          cells='{"include":[
-            {"deployment":"planning-simulation","distro":"humble"},
-            {"deployment":"planning-simulation","distro":"jazzy"},
-            {"deployment":"scenario-simulation","distro":"humble"},
-            {"deployment":"scenario-simulation","distro":"jazzy"},
-            {"deployment":"scenario-simulation","distro":"humble","node":"split"},
-            {"deployment":"scenario-simulation","distro":"jazzy","node":"split"}
-          ]}'
-          cells=$(printf '%s' "${cells}" | jq -c .)
-
           {
             echo "build_tag=${build_tag}"
             echo "source_sha=${source_sha}"
-            echo "cells=${cells}"
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
@@ -98,6 +87,15 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ steps.prepare.outputs.source_sha }}
+
+      - name: List evidence cells
+        # Every deployment and distro the manifests declare, minus the
+        # deployments with an evidence exemption.
+        id: cells
+        run: |
+          set -euo pipefail
+          cells=$(python3 .github/scripts/validation_matrix.py --source-root . --evidence-cells)
+          echo "cells=${cells}" >> "$GITHUB_OUTPUT"
 
       - name: Stage evidence kit
         run: |

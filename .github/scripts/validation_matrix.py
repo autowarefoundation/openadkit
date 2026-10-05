@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -90,12 +91,56 @@ def validation_cells(
     return rows
 
 
+def evidence_cells(
+    runtime: ModuleType,
+    source_root: Path,
+    kit: Any | None = None,
+) -> list[dict[str, str]]:
+    """Cells the evidence workflow runs: every distro of every deployment that
+    is not exempt, plus one two-node cell where a deployment declares nodes."""
+    kit = kit if kit is not None else runtime.load_kit(source_root)
+    cells: list[dict[str, str]] = []
+    for name in sorted(kit.deployments):
+        deployment = runtime.get_deployment(source_root, kit, name)
+        if deployment.evidence_exemption:
+            continue
+        for distro in deployment.requirements["rosDistros"]:
+            cells.append({"deployment": name, "distro": distro})
+            if deployment.nodes:
+                cells.append({"deployment": name, "distro": distro, "node": "split"})
+    return cells
+
+
+def evidence_exemptions(
+    runtime: ModuleType,
+    source_root: Path,
+    kit: Any | None = None,
+) -> list[dict[str, str]]:
+    kit = kit if kit is not None else runtime.load_kit(source_root)
+    exempt = []
+    for name in sorted(kit.deployments):
+        reason = runtime.get_deployment(source_root, kit, name).evidence_exemption
+        if reason:
+            exempt.append({"deployment": name, "reason": reason})
+    return exempt
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument(
+        "--evidence-cells",
+        action="store_true",
+        help="print the evidence cells as a GitHub matrix instead",
+    )
     args = parser.parse_args()
+    source_root = args.source_root.resolve()
     try:
-        cells = validation_cells(load_runtime(args.source_root.resolve()), args.source_root.resolve())
+        runtime = load_runtime(source_root)
+        if args.evidence_cells:
+            print(json.dumps({"include": evidence_cells(runtime, source_root)}))
+            return 0
+        cells = validation_cells(runtime, source_root)
     except ValueError as error:
         parser.error(str(error))
     for cell in cells:

@@ -1250,7 +1250,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def deployment_checksum(directory: Path) -> str:
+def deployment_checksum(directory: Path, *, exclude_dirs: tuple[str, ...] = ()) -> str:
     digest = hashlib.sha256()
     for candidate in sorted(
         directory.rglob("*"),
@@ -1259,6 +1259,7 @@ def deployment_checksum(directory: Path) -> str:
         relative = candidate.relative_to(directory)
         if (
             relative.name == "config.local.env"
+            or any(part in exclude_dirs for part in relative.parts)
             or "__pycache__" in relative.parts
             or relative.suffix == ".pyc"
         ):

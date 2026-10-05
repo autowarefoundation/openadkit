@@ -40,5 +40,11 @@ python3 "${source_root}/.github/scripts/release_plan.py" \
 cp "${source_root}/openadkit" "${kit}/openadkit"
 cp -r "${source_root}/cli" "${kit}/cli"
 cp -r "${source_root}/deployments" "${kit}/deployments"
+if [ -d "${source_root}/examples" ]; then
+    # Keep the relative extends path intact. Never stage an old workspace build.
+    mkdir -p "${kit}/examples"
+    tar -C "${source_root}/examples" --exclude=build --exclude=install --exclude=log \
+        --exclude=__pycache__ -cf - . | tar -C "${kit}/examples" -xf -
+fi
 
 echo "staged evidence kit at ${kit} (build_tag ${build_tag})"

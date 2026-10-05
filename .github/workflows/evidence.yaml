@@ -94,7 +94,7 @@ jobs:
         id: cells
         run: |
           set -euo pipefail
-          cells=$(python3 .github/scripts/validation_matrix.py --source-root . --evidence-cells)
+          cells=$(python3 .github/scripts/validation_matrix.py --source-root . --evidence-cells --include-example-kits)
           echo "cells=${cells}" >> "$GITHUB_OUTPUT"
 
       - name: Stage evidence kit
@@ -140,6 +140,32 @@ jobs:
           name: evidence-kit-${{ needs.prepare.outputs.build_tag }}
           path: evidence-kit
 
+      - name: Restore launcher permissions
+        # Artifact downloads do not preserve executable bits.
+        run: chmod +x evidence-kit/openadkit
+
+      - name: Download build metadata for the overlay build
+        if: ${{ matrix.kit != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: evidence-build-metadata-${{ needs.prepare.outputs.build_tag }}
+          path: build-metadata
+
+      - name: Build the example workspace in the pinned devel image
+        if: ${{ matrix.kit != '' }}
+        env:
+          KIT_PATH: ${{ matrix.kit }}
+          DEPLOYMENT: ${{ matrix.deployment }}
+          DISTRO: ${{ matrix.distro }}
+        run: |
+          set -euo pipefail
+          DEVEL_IMAGE=$(jq -er --arg distro "$DISTRO" '
+            .images[] | select(.target == "universe-common-devel" and .ros_distro == $distro)
+            | .repo + "@" + .digest
+          ' build-metadata/build-metadata.json)
+          export DEVEL_IMAGE
+          bash "evidence-kit/$KIT_PATH/deployments/$DEPLOYMENT/overlay_ws/build.sh" "$DISTRO"
+
       - name: Run evidence cell
         id: cell
         working-directory: evidence-kit
@@ -147,8 +173,11 @@ jobs:
           BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
           PLATFORM: linux/amd64
+          KIT_PATH: ${{ matrix.kit }}
+          OPENADKIT_CLI: ${{ github.workspace }}/evidence-kit/openadkit
         run: |
           set -uo pipefail
+          if [ -n "$KIT_PATH" ]; then cd "$KIT_PATH"; fi
           runner="$GITHUB_WORKSPACE/.github/scripts/evidence/run_cell.sh"
           deployment="${{ matrix.deployment }}"
           distro="${{ matrix.distro }}"
@@ -258,11 +287,11 @@ jobs:
           summary = json.load(open("attestation/evidence-summary.json", encoding="utf-8"))
           print(f"Result: **{summary['result']}**")
           print()
-          print("| Cell | Deployment | Distro | Node | Ready (s) | Arrival (s) | Peak MiB | Result |")
-          print("|---|---|---|---|---|---|---|---|")
+          print("| Cell | Deployment | Distro | Node | Ready (s) | Arrival (s) | Peak MiB | Overlay conformant | Result |")
+          print("|---|---|---|---|---|---|---|---|---|")
           for cell in summary["cells"]:
               print(
-                  "| {name} | {deployment} | {distro} | {node} | {ready_s} | {arrival_s} | {peak_mib} | {result} |".format(
+                  "| {name} | {deployment} | {distro} | {node} | {ready_s} | {arrival_s} | {peak_mib} | {overlay} | {result} |".format(
                       name=cell["name"],
                       deployment=cell["deployment"],
                       distro=cell["distro"],
@@ -270,6 +299,7 @@ jobs:
                       ready_s=cell["ready_s"] if cell["ready_s"] is not None else "-",
                       arrival_s=cell["arrival_s"] if cell["arrival_s"] is not None else "-",
                       peak_mib=cell["peak_mib"],
+                      overlay=cell["overlayConformant"],
                       result=cell["result"],
                   )
               )

@@ -124,6 +124,32 @@ def write_plan(tmp_path, *, images=None):
     return result, output
 
 
+@pytest.mark.skipif(shutil.which("docker") is None, reason="docker compose is required")
+def test_evidence_stages_the_example_on_the_digest_pinned_base(tmp_path):
+    result, _ = write_plan(tmp_path)
+    assert result.returncode == 0, result.stderr
+    staged = tmp_path / "evidence-kit"
+    result = subprocess.run([
+        "bash", str(ROOT / ".github/scripts/evidence/stage_kit.sh"), str(ROOT),
+        str(tmp_path / "build-metadata.json"), str(staged), RELEASE_SHA,
+    ], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    workspace = staged / "examples/custom-kit/deployments/custom-planning/overlay_ws"
+    assert (workspace / "src/acme_probe/src/probe.cpp").is_file()
+    assert not any((workspace / name).exists() for name in ("build", "install", "log"))
+    env = dict(os.environ)
+    for name in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED"):
+        env.pop(name, None)
+    env.update(OPENADKIT_CONFIG_DIR=str(tmp_path / "config"), OPENADKIT_STATE_DIR=str(tmp_path / "state"))
+    result = subprocess.run([
+        str(staged / "openadkit"), "validate", "custom-planning", "--ros-distro", "jazzy", "--json",
+    ], cwd=staged / "examples/custom-kit", env=env, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["base"] == "planning-simulation"
+    assert report["overlayConformant"] is True
+
+
 def run_validator(tmp_path, function, **env):
     """Run one validate_release.sh check in the release workflow environment."""
     kit = json.loads((ROOT / "openadkit.json").read_text())

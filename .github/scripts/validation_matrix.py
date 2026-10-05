@@ -111,6 +111,18 @@ def evidence_cells(
     return cells
 
 
+def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, str]]:
+    """Exercise the integrator examples against the same build as the base."""
+    cells = []
+    for path in sorted((source_root / "examples").glob("*/openadkit.json")):
+        if runtime.load_json(path).get("kind") != "kit":
+            continue
+        root = path.parent
+        for cell in evidence_cells(runtime, root):
+            cells.append(cell | {"kit": root.relative_to(source_root).as_posix()})
+    return cells
+
+
 def evidence_exemptions(
     runtime: ModuleType,
     source_root: Path,
@@ -133,12 +145,16 @@ def main() -> int:
         action="store_true",
         help="print the evidence cells as a GitHub matrix instead",
     )
+    parser.add_argument("--include-example-kits", action="store_true")
     args = parser.parse_args()
     source_root = args.source_root.resolve()
     try:
         runtime = load_runtime(source_root)
         if args.evidence_cells:
-            print(json.dumps({"include": evidence_cells(runtime, source_root)}))
+            cells = evidence_cells(runtime, source_root)
+            if args.include_example_kits:
+                cells.extend(example_kit_cells(runtime, source_root))
+            print(json.dumps({"include": cells}))
             return 0
         cells = validation_cells(runtime, source_root)
     except ValueError as error:

@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cli"))
 
 import compose as cli_compose  # noqa: E402
+import data as cli_data  # noqa: E402
 import manifest as cli_manifest  # noqa: E402
 
 ENTRYPOINT = ROOT / "openadkit"
@@ -1298,6 +1299,11 @@ def test_run_force_reinstalls_incomplete_data(tmp_path, http):
     assert blocked.returncode != 0
     assert "incomplete data" in blocked.stderr
     assert "rerun with --force" in blocked.stderr
+    # --force replaces only data the CLI installed.
+    refused = run_cli(root, "run", "example", "--pull", "never", "--force")
+    assert refused.returncode != 0
+    assert "refusing to replace" in refused.stderr
+    mark_managed(target)
     result = run_cli(root, "run", "example", "--pull", "never", "--force")
     assert result.returncode == 0, result.stderr
     assert (target / "required.txt").read_text() == "replaced"
@@ -1379,6 +1385,12 @@ def test_validate_data_reports_missing_incomplete_and_ok(tmp_path):
     result = run_cli(root, "validate", "example", "--data")
     assert result.returncode == 1, result.stdout
     assert "data: sample-map incomplete" in result.stdout
+    # Not installed by the CLI, so fetch --force would refuse it.
+    assert "cannot be replaced in place" in result.stderr
+
+    mark_managed(target)
+    result = run_cli(root, "validate", "example", "--data")
+    assert result.returncode == 1, result.stdout
     assert "openadkit fetch example --force" in result.stderr
 
     (target / "lanelet2_map.osm").write_text("map\n")
@@ -1431,8 +1443,13 @@ def test_validate_json_output(tmp_path):
 # --- clean ---------------------------------------------------------------------
 
 
+def mark_managed(target):
+    """Make a data directory look like one the CLI installed."""
+    (target / cli_data.MARKER).write_text('{"resource": "test"}\n')
+
+
 def clean_tree(tmp_path, *, compose_ls="[]"):
-    """Deployment with a map and a GPU model, both present on disk."""
+    """Deployment with a map and a GPU model, both installed by the CLI."""
     root, _ = runtime_tree(tmp_path, manifest=clean_manifest(), config_env=CLEAN_ENV)
     fake_docker(tmp_path, compose_ls=compose_ls)
     home = tmp_path / "home"
@@ -1441,6 +1458,8 @@ def clean_tree(tmp_path, *, compose_ls="[]"):
     (map_dir / "lanelet2_map.osm").write_text("map\n")
     gpu_dir.mkdir()
     (gpu_dir / "model.onnx").write_text("model\n")
+    mark_managed(map_dir)
+    mark_managed(gpu_dir)
     return root, map_dir, gpu_dir
 
 
@@ -1459,14 +1478,29 @@ def test_clean_lists_and_removes_all_declared_data(tmp_path):
     assert not map_dir.exists() and not gpu_dir.exists()
 
 
-def test_clean_removes_a_file_target(tmp_path):
-    root, map_dir, _ = clean_tree(tmp_path)
+@pytest.mark.parametrize("kind", ["directory", "file"])
+def test_clean_refuses_data_it_did_not_install(tmp_path, kind):
+    root, map_dir, gpu_dir = clean_tree(tmp_path)
     shutil.rmtree(map_dir)
-    map_dir.write_text("corrupted\n")
+    if kind == "directory":
+        map_dir.mkdir()
+        (map_dir / "notes.txt").write_text("mine\n")
+    else:
+        map_dir.write_text("mine\n")
     result = run_cli(root, "clean", "example", "--data")
+    assert result.returncode != 0
+    assert f"refusing to remove {map_dir}: it was not installed by openadkit" in result.stderr
+    # Nothing is deleted when any target is refused.
+    assert map_dir.exists() and gpu_dir.is_dir()
+
+
+def test_install_marks_the_data_it_publishes(tmp_path, http):
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=[served_resource(http, "fresh")]))
+    fake_docker(tmp_path)
+    result = run_cli(root, "fetch", "example")
     assert result.returncode == 0, result.stderr
-    assert f"removed data: {map_dir}" in result.stdout
-    assert not map_dir.exists()
+    target = tmp_path / "home/data/example"
+    assert json.loads((target / cli_data.MARKER).read_text()) == {"resource": "dataset"}
 
 
 def test_clean_refuses_a_symlink_before_deleting_anything(tmp_path):

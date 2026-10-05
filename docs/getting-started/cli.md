@@ -102,6 +102,11 @@ openadkit clean planning-simulation --data     # delete
 Simulation's Kashiwanoha map is removed, restore it with
 `openadkit fetch scenario-simulation --force`.
 
+The CLI marks the data it installs with a `.openadkit-resource.json` file.
+`clean --data` and `--force` only delete or replace marked data. Data that was
+already there, such as a map you copied yourself, is still used when it is
+complete, but the CLI never deletes or replaces it; move or remove it yourself.
+
 ## Split-host nodes
 
 `validate` and `run` accept `--node` for

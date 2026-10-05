@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import shutil
 import stat
@@ -22,6 +23,23 @@ from manifest import (
     safe_relative,
     sha256_file,
 )
+
+# Marks a directory the CLI installed. Only marked data is replaced or deleted,
+# so a data variable pointing at, say, $HOME can never lose user files.
+MARKER = ".openadkit-resource.json"
+
+
+def is_managed(target: Path) -> bool:
+    marker = target / MARKER
+    return target.is_dir() and not marker.is_symlink() and marker.is_file()
+
+
+def refuse_unmanaged(target: Path, action: str) -> None:
+    if (target.exists() or target.is_symlink()) and not is_managed(target):
+        raise OpenADKitError(
+            f"refusing to {action} {target}: it was not installed by openadkit "
+            f"(no {MARKER}); move or remove it yourself"
+        )
 
 
 def download(url: str, destination: Path, checksum: str) -> None:
@@ -213,7 +231,7 @@ def check_installed_data(
         if validate_dataset(target, resource["requiredFiles"]):
             status = "ok"
             recovery = None
-        elif target.is_symlink() or (target.exists() and not target.is_dir()):
+        elif target.is_symlink() or (target.exists() and not is_managed(target)):
             # fetch --force refuses these; the operator has to remove them first.
             status = "incomplete"
             recovery = "remove"
@@ -252,16 +270,14 @@ def remove_installed_data(
         seen.add(target)
         if target.is_symlink():
             raise OpenADKitError(f"refusing to remove symlinked data: {target}")
+        refuse_unmanaged(target, "remove")
         targets.append((resource["name"], target))
 
     removed: list[dict[str, Any]] = []
     for name, target in targets:
-        if target.is_dir():
-            shutil.rmtree(target)
-        elif target.is_file():
-            target.unlink()
-        else:
+        if not target.is_dir():
             continue
+        shutil.rmtree(target)
         print(f"removed data: {target}")
         removed.append({"name": name, "destination": target})
     return removed
@@ -287,6 +303,7 @@ def validate_install_targets(
         if force:
             if target.is_symlink() or not target.is_dir():
                 raise OpenADKitError(f"unsafe data target: {target}")
+            refuse_unmanaged(target, "replace")
         elif not validate_dataset(target, resource["requiredFiles"]):
             raise OpenADKitError(f"incomplete data at {target}; rerun with --force")
 
@@ -313,6 +330,7 @@ def install_resource(
             raise OpenADKitError(f"incomplete data at {target}; rerun with --force")
         if target.is_symlink() or not target.is_dir():
             raise OpenADKitError(f"unsafe data target: {target}")
+        refuse_unmanaged(target, "replace")
 
     with tempfile.TemporaryDirectory(
         prefix=f".{resource['name']}.stage.", dir=target.parent
@@ -341,6 +359,10 @@ def install_resource(
             raise OpenADKitError(
                 f"downloaded data failed validation: {resource['name']}"
             )
+        # Written before publication, so the data and its marker appear together.
+        (candidate / MARKER).write_text(
+            json.dumps({"resource": resource["name"]}) + "\n", encoding="utf-8"
+        )
         atomic_publish(candidate, target, force)
         print(f"installed data: {target}")
 

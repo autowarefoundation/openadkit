@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "scenario-simulation",
   "description": "Execute a Scenario Simulator V2 scenario against Autoware",
   "shared": ["shared"],
@@ -30,14 +30,6 @@
     "architectures": ["amd64", "arm64"],
     "rosDistros": ["humble", "jazzy"],
     "gpu": "none"
-  },
-  "distroEnvironment": {
-    "humble": {
-      "SCENARIO_SIMULATOR_IMAGE": "ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime@sha256:80dc759586c0aa55b5c49b120635b9bda8d52ae4fe3ad96478dd0f5a5bfec5ad"
-    },
-    "jazzy": {
-      "SCENARIO_SIMULATOR_IMAGE": "ghcr.io/tier4/scenario_simulator_v2:jazzy-25.0.20-runtime@sha256:be6b5026ee7bcfad091bd365b18690dee3608ed222a2bd128e268405ace63b1d"
-    }
   },
   "data": [
     {

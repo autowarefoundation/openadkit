@@ -17,6 +17,9 @@ ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_REFERENCE_RE = re.compile(r"^\S+@sha256:[0-9a-f]{64}$")
 GPU_COMPONENT_IMAGE = "SENSING_PERCEPTION_GPU_IMAGE"
+# Manifests from before v2.0.0 never shipped in a stable release; they are
+# rejected rather than translated.
+SCHEMA_VERSION = 2
 
 ALLOWED_KIT_KEYS = {
     "schemaVersion",
@@ -28,7 +31,9 @@ ALLOWED_KIT_KEYS = {
     "images",
     "deployments",
     "shared",
+    "artifacts",
 }
+ALLOWED_ARTIFACT_KEYS = {"workload", "ref", "distros"}
 ALLOWED_DEPLOYMENT_REF_KEYS = {"path", "checksum"}
 ALLOWED_DEPLOYMENT_KEYS = {
     "schemaVersion",
@@ -36,7 +41,6 @@ ALLOWED_DEPLOYMENT_KEYS = {
     "description",
     "compose",
     "requirements",
-    "distroEnvironment",
     "data",
     "shared",
     "nodes",
@@ -131,17 +135,6 @@ def require_string_list(
         raise OpenADKitError(f"{where} must not be empty")
     if len(value) != len(set(value)):
         raise OpenADKitError(f"{where} contains duplicate values")
-    return value
-
-
-def require_environment(value: Any, where: str) -> dict[str, str]:
-    if not isinstance(value, dict):
-        raise OpenADKitError(f"{where} must be an object")
-    if any(
-        not ENV_NAME_RE.fullmatch(name) or not isinstance(item, str)
-        for name, item in value.items()
-    ):
-        raise OpenADKitError(f"{where} must map environment names to strings")
     return value
 
 
@@ -279,6 +272,17 @@ class RuntimeContext:
     images: dict[str, dict[str, str]]
     deployments: dict[str, DeploymentRef]
     shared: dict[str, str]
+    # Pinned images we consume rather than build: name -> {workload, refs}.
+    artifacts: dict[str, dict[str, Any]]
+
+    def artifact_environment(self, ros_distro: str) -> dict[str, str]:
+        """Artifact references for one distro; Compose requires them by name."""
+        environment: dict[str, str] = {}
+        for name, artifact in self.artifacts.items():
+            reference = artifact.get("ref") or artifact.get("distros", {}).get(ros_distro)
+            if reference:
+                environment[name] = reference
+        return environment
 
     def component_environment(
         self, ros_distro: str, architecture: str, gpu: bool
@@ -334,7 +338,6 @@ class Deployment:
         self.compose: dict[str, Any] = manifest["compose"]
         self.nodes: dict[str, dict[str, Any]] = manifest["nodes"]
         self.requirements: dict[str, Any] = manifest["requirements"]
-        self.distro_environment: dict[str, dict[str, str]] = manifest["distroEnvironment"]
         self.data: list[dict[str, Any]] = manifest["data"]
         self.shared: list[str] = manifest["shared"]
         self.project = f"openadkit-{self.name}"
@@ -467,7 +470,7 @@ class Deployment:
         injections: dict[str, str]
         if operational:
             injections = self._base_injections(distro)
-            injections.update(self.distro_environment.get(distro, {}))
+            injections.update(current_context.artifact_environment(distro))
             injections = self._node_injections(node, injections)
             environment = self.configuration_environment()
             environment.update(injections)
@@ -517,10 +520,10 @@ class Deployment:
         required_environment = list(view["requiredEnv"]) if view else []
         environment = self.configuration_environment(gpu)
         injections = self._base_injections(distro)
-        injections.update(self.distro_environment.get(distro, {}))
         component_environment = current_context.component_environment(
             distro, architecture, gpu
         )
+        component_environment.update(current_context.artifact_environment(distro))
         if current_context.kind == "repository":
             injections.update(
                 {
@@ -565,8 +568,11 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     )
     manifest = load_json(manifest_path)
     reject_unknown(manifest, ALLOWED_DEPLOYMENT_KEYS, "manifest")
-    if manifest.get("schemaVersion") != 1:
-        raise OpenADKitError("unsupported deployment schemaVersion (expected 1)")
+    if manifest.get("schemaVersion") != SCHEMA_VERSION:
+        raise OpenADKitError(
+            f"unsupported deployment schemaVersion {manifest.get('schemaVersion')!r} "
+            f"(expected {SCHEMA_VERSION})"
+        )
     name = require_string(manifest.get("name"), "name")
     if not NAME_RE.fullmatch(name) or name != directory.name:
         raise OpenADKitError(
@@ -619,22 +625,6 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
             )
     manifest["requirements"] = requirements
 
-    distro_environment = manifest.get("distroEnvironment", {})
-    if not isinstance(distro_environment, dict):
-        raise OpenADKitError("distroEnvironment must be an object")
-    unknown_distros = sorted(
-        set(distro_environment) - set(requirements["rosDistros"])
-    )
-    if unknown_distros:
-        raise OpenADKitError(
-            "distroEnvironment contains undeclared distros: "
-            + ", ".join(unknown_distros)
-        )
-    for distro, environment in distro_environment.items():
-        distro_environment[distro] = require_environment(
-            environment, f"distroEnvironment.{distro}"
-        )
-    manifest["distroEnvironment"] = distro_environment
 
     compose = manifest.get("compose")
     if not isinstance(compose, dict):
@@ -854,6 +844,37 @@ def _parse_deployment_refs(value: Any, kind: str) -> dict[str, DeploymentRef]:
     return refs
 
 
+def _parse_artifacts(value: Any, component_images: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Images we pin but do not build: one ref, or one ref per ROS distro."""
+    if not isinstance(value, dict):
+        raise OpenADKitError("artifacts must be an object")
+    for name, artifact in value.items():
+        where = f"artifacts.{name}"
+        if not ENV_NAME_RE.fullmatch(name):
+            raise OpenADKitError(f"invalid artifact name: {name}")
+        if name in component_images:
+            raise OpenADKitError(f"{where} is already a component image")
+        if not isinstance(artifact, dict):
+            raise OpenADKitError(f"{where} must be an object")
+        reject_unknown(artifact, ALLOWED_ARTIFACT_KEYS, where)
+        workload = require_string(artifact.get("workload"), f"{where}.workload")
+        if not NAME_RE.fullmatch(workload):
+            raise OpenADKitError(f"invalid {where}.workload: {workload}")
+        if ("ref" in artifact) == ("distros" in artifact):
+            raise OpenADKitError(f"{where} needs exactly one of ref or distros")
+        references = (
+            {"*": artifact["ref"]} if "ref" in artifact else artifact["distros"]
+        )
+        if not isinstance(references, dict) or not references:
+            raise OpenADKitError(f"{where}.distros must be a nonempty object")
+        for distro, reference in references.items():
+            if distro != "*" and not NAME_RE.fullmatch(distro):
+                raise OpenADKitError(f"invalid ROS distro in {where}: {distro}")
+            if not isinstance(reference, str) or not IMAGE_REFERENCE_RE.fullmatch(reference):
+                raise OpenADKitError(f"{where} must use digest-pinned image references")
+    return value
+
+
 def _require_checksum_map(value: Any, where: str) -> dict[str, str]:
     if not isinstance(value, dict) or any(
         not isinstance(name, str)
@@ -868,10 +889,12 @@ def _require_checksum_map(value: Any, where: str) -> dict[str, str]:
 def load_kit(root: Path) -> RuntimeContext:
     value = load_json(ensure_safe_existing(root, "openadkit.json", "bundle manifest"))
     reject_unknown(value, ALLOWED_KIT_KEYS, "bundle")
-    if value.get("schemaVersion") != 1 or value.get("kind") not in (
-        "repository",
-        "release",
-    ):
+    if value.get("schemaVersion") != SCHEMA_VERSION:
+        raise OpenADKitError(
+            f"unsupported openadkit.json schemaVersion {value.get('schemaVersion')!r} "
+            f"(expected {SCHEMA_VERSION})"
+        )
+    if value.get("kind") not in ("repository", "release"):
         raise OpenADKitError("invalid Open AD Kit bundle manifest")
     default_ros_distro = require_string(
         value.get("defaultRosDistro", "humble"), "defaultRosDistro"
@@ -920,6 +943,7 @@ def load_kit(root: Path) -> RuntimeContext:
         images=images,
         deployments=_parse_deployment_refs(value.get("deployments"), kind),
         shared=_require_checksum_map(value.get("shared", {}), "shared"),
+        artifacts=_parse_artifacts(value.get("artifacts", {}), component_images),
     )
 
 

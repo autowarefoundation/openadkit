@@ -7,7 +7,7 @@
 # not here: the node view has no Autoware services and no map.
 services:
   scenario_simulator:
-    image: ${SCENARIO_SIMULATOR_IMAGE:-ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime@sha256:80dc759586c0aa55b5c49b120635b9bda8d52ae4fe3ad96478dd0f5a5bfec5ad}
+    image: ${SCENARIO_SIMULATOR_IMAGE:?pinned in openadkit.json artifacts}
     container_name: autoware-scenario-simulator
     network_mode: host
     init: true

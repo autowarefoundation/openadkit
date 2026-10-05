@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "carla-simulation",
   "description": "Run Autoware closed-loop against CARLA 0.9.16",
   "shared": ["shared"],

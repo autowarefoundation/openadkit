@@ -227,12 +227,13 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
     release_context = {
+        "artifacts": kit.artifacts,
         "componentImages": component_images,
         "defaultRosDistro": args.default_ros_distro,
         "deployments": product["deployments"],
         "images": context_images,
         "kind": "release",
-        "schemaVersion": 1,
+        "schemaVersion": runtime.SCHEMA_VERSION,
         "shared": product["shared"],
         "version": args.version,
     }

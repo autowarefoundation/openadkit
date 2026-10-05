@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "repository",
   "defaultRosDistro": "humble",
   "imagePrefixComponent": "ghcr.io/autowarefoundation/openadkit",
@@ -26,6 +26,30 @@
     },
     "carla-simulation": {
       "path": "deployments/carla-simulation"
+    }
+  },
+  "artifacts": {
+    "SCENARIO_SIMULATOR_IMAGE": {
+      "workload": "scenario-simulator",
+      "distros": {
+        "humble": "ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime@sha256:80dc759586c0aa55b5c49b120635b9bda8d52ae4fe3ad96478dd0f5a5bfec5ad",
+        "jazzy": "ghcr.io/tier4/scenario_simulator_v2:jazzy-25.0.20-runtime@sha256:be6b5026ee7bcfad091bd365b18690dee3608ed222a2bd128e268405ace63b1d"
+      }
+    },
+    "AUTOWARE_UNIVERSE_IMAGE": {
+      "workload": "autoware",
+      "distros": {
+        "humble": "ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175",
+        "jazzy": "ghcr.io/autowarefoundation/autoware:universe-jazzy@sha256:a392e1b331a59774f59751f82535e29bf26967ff4601ed78a1770d7dfeed7a02"
+      }
+    },
+    "ZENOH_BRIDGE_IMAGE": {
+      "workload": "zenoh-bridge",
+      "ref": "eclipse/zenoh-bridge-ros2dds:1.10.1@sha256:74fae6a9d4f449c53d1ee6f0faaca97d01c1e68dfcafd785b657f01907157d22"
+    },
+    "CARLA_CONTAINER_IMAGE": {
+      "workload": "carla",
+      "ref": "carlasim/carla:0.9.16@sha256:aaf1df22702780ece072069e23d03c4879b002ae028c79744b09c4c7ddbae953"
     }
   }
 }

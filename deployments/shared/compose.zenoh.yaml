@@ -17,7 +17,7 @@
 # Give each node on a shared host its own ZENOH_LISTEN port.
 services:
   zenoh-bridge:
-    image: ${ZENOH_BRIDGE_IMAGE:-eclipse/zenoh-bridge-ros2dds:1.10.1@sha256:74fae6a9d4f449c53d1ee6f0faaca97d01c1e68dfcafd785b657f01907157d22}
+    image: ${ZENOH_BRIDGE_IMAGE:?pinned in openadkit.json artifacts}
     network_mode: host
     ipc: host
     restart: unless-stopped

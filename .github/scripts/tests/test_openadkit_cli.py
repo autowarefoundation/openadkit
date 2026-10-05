@@ -53,9 +53,12 @@ def executable(path, content):
     path.chmod(0o755)
 
 
+JAZZY_ARTIFACT = f"registry.example/sim:jazzy@sha256:{'c' * 64}"
+
+
 def minimal_manifest(name="example", *, data=None):
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "name": name,
         "description": "Test deployment",
         "compose": {
@@ -110,7 +113,7 @@ def clean_manifest():
 def kit_document(root, *, release, manifest):
     deployments = {"example": {"path": "deployments/example"}}
     document = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "kind": "release" if release else "repository",
         "defaultRosDistro": "humble",
         "componentImages": COMPONENT_IMAGES,
@@ -315,7 +318,7 @@ def standalone_release(base, version="v1.2.3", files=None, *, digest=None, entri
         files = files or {
             "openadkit": ENTRYPOINT.read_bytes(),
             "openadkit.json": json.dumps(
-                {"schemaVersion": 1, "kind": "release", "version": version}
+                {"schemaVersion": 2, "kind": "release", "version": version}
             ).encode(),
             "cli/main.py": b'print("ok")\n',
             # uninstall asks the bundled CLI which projects are live.
@@ -945,15 +948,16 @@ def test_dotenv_follows_compose_comment_and_export_rules(tmp_path):
     ("args", "default", "expected"),
     [
         ((), "humble", distro_line("humble")),
-        (("--ros-distro", "jazzy"), "humble", distro_line("jazzy", "jazzy-value")),
-        ((), "jazzy", distro_line("jazzy", "jazzy-value")),
+        (("--ros-distro", "jazzy"), "humble", distro_line("jazzy", JAZZY_ARTIFACT)),
+        ((), "jazzy", distro_line("jazzy", JAZZY_ARTIFACT)),
     ],
 )
 def test_repository_injects_distro_and_development_images(tmp_path, args, default, expected):
-    manifest = minimal_manifest()
-    manifest["distroEnvironment"] = {"jazzy": {"DISTRO_VALUE": "jazzy-value"}}
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
-    edit_kit(root, lambda kit: kit.update(defaultRosDistro=default))
+    root, _ = runtime_tree(tmp_path)
+    edit_kit(root, lambda kit: kit.update(
+        defaultRosDistro=default,
+        artifacts={"DISTRO_VALUE": {"workload": "sim", "distros": {"jazzy": JAZZY_ARTIFACT}}},
+    ))
     _, calls = fake_docker(tmp_path)
     result = run_cli(root, "validate", "example", *args)
     assert result.returncode == 0, result.stderr
@@ -1878,3 +1882,70 @@ def test_run_prints_the_resolved_output_path(tmp_path):
     assert result.returncode == 0, result.stderr
     expected = root.parent / "home/.local/state/openadkit/example/output"
     assert f"output: {expected}" in result.stdout
+
+
+# --- Manifest v2 and artifacts --------------------------------------------------
+
+
+def test_v1_manifests_are_rejected(tmp_path):
+    root, _ = runtime_tree(tmp_path / "kit")
+    edit_kit(root, lambda kit: kit.update(schemaVersion=1))
+    result = run_cli(root, "list")
+    assert result.returncode != 0
+    assert "unsupported openadkit.json schemaVersion 1 (expected 2)" in result.stderr
+
+    manifest = minimal_manifest()
+    manifest["schemaVersion"] = 1
+    root, _ = runtime_tree(tmp_path / "deployment", manifest=manifest)
+    assert "unsupported deployment schemaVersion 1 (expected 2)" in run_cli(root, "list").stdout
+
+
+@pytest.mark.parametrize(
+    ("artifacts", "message"),
+    [
+        ({"SIM": {"workload": "sim", "ref": "registry.example/sim:latest"}},
+         "artifacts.SIM must use digest-pinned image references"),
+        ({"SIM": {"workload": "sim", "ref": JAZZY_ARTIFACT, "distros": {"jazzy": JAZZY_ARTIFACT}}},
+         "artifacts.SIM needs exactly one of ref or distros"),
+        ({"API_IMAGE": {"workload": "api", "ref": JAZZY_ARTIFACT}},
+         "artifacts.API_IMAGE is already a component image"),
+        ({"SIM": {"workload": "Sim", "ref": JAZZY_ARTIFACT}},
+         "invalid artifacts.SIM.workload: Sim"),
+        ({"SIM": {"workload": "sim", "distros": {}}},
+         "artifacts.SIM.distros must be a nonempty object"),
+    ],
+)
+def test_artifact_schema_errors(tmp_path, artifacts, message):
+    root, _ = runtime_tree(tmp_path)
+    edit_kit(root, lambda kit: kit.update(artifacts=artifacts))
+    result = run_cli(root, "list")
+    assert result.returncode != 0
+    assert message in result.stderr
+
+
+def test_artifacts_follow_the_distro_and_a_single_ref_serves_every_distro(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    edit_kit(root, lambda kit: kit.update(artifacts={
+        "DISTRO_VALUE": {"workload": "bridge", "ref": JAZZY_ARTIFACT},
+    }))
+    _, calls = fake_docker(tmp_path)
+    for distro in ("humble", "jazzy"):
+        calls.write_text("")
+        result = run_cli(root, "validate", "example", "--ros-distro", distro)
+        assert result.returncode == 0, result.stderr
+        assert calls.read_text().split("|", 5)[1] == JAZZY_ARTIFACT
+
+
+@pytest.mark.parametrize(("release", "expected"), [(False, "override"), (True, "pinned")])
+def test_only_source_checkouts_may_override_an_artifact(tmp_path, release, expected):
+    root, _ = runtime_tree(tmp_path, release=release)
+    pinned = f"registry.example/sim@sha256:{'d' * 64}"
+    override = f"registry.example/my-sim@sha256:{'e' * 64}"
+    edit_kit(root, lambda kit: kit.update(artifacts={
+        "DISTRO_VALUE": {"workload": "sim", "ref": pinned},
+    }))
+    site_config(root, f"DISTRO_VALUE={override}\n")
+    _, calls = fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split("|", 5)[1] == {"override": override, "pinned": pinned}[expected]

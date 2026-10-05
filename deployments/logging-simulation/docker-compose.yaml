@@ -51,7 +51,7 @@ services:
 
   # Logging-only service.
   rosbag:
-    image: ${AUTOWARE_UNIVERSE_IMAGE:-ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175}
+    image: ${AUTOWARE_UNIVERSE_IMAGE:?pinned in openadkit.json artifacts}
     container_name: autoware-rosbag
     network_mode: host
     init: true

@@ -187,8 +187,11 @@ COMPOSE_AVAILABLE = shutil.which("docker") is not None
 def _compose_config(files, directory, extra_env=None):
     env = dict(os.environ)
     env.pop("COMPOSE_FILE", None)
-    # The CLI always injects this; config.env defaults OUTPUT_HOST_PATH to it.
+    # The CLI always injects these: the output root and the pinned artifacts.
     env["OPENADKIT_OUTPUT_DIR"] = "/tmp/openadkit-test/output"
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    for name, artifact in kit["artifacts"].items():
+        env[name] = artifact.get("ref") or artifact["distros"]["humble"]
     env.update(extra_env or {})
     command = ["docker", "compose", "--env-file", str(directory / "config.env")]
     for path in files:

@@ -12,9 +12,11 @@ from typing import Any, NoReturn
 
 import validation_matrix
 
+_IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+# Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+    rf"(?:-{_IDENTIFIER}(?:\.{_IDENTIFIER})*)?$"
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")

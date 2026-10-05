@@ -318,6 +318,9 @@ def standalone_release(base, version="v1.2.3", files=None, *, digest=None, entri
                 {"schemaVersion": 1, "kind": "release", "version": version}
             ).encode(),
             "cli/main.py": b'print("ok")\n',
+            # uninstall asks the bundled CLI which projects are live.
+            "cli/compose.py": (ROOT / "cli/compose.py").read_bytes(),
+            "cli/manifest.py": (ROOT / "cli/manifest.py").read_bytes(),
         }
         staging = base / "staging"
         for relative, payload in files.items():

@@ -226,6 +226,25 @@ def expand_home(value: str) -> str:
     return value
 
 
+def _user_root(override: str, xdg: str, fallback: str) -> Path:
+    """An Open AD Kit root outside the release, so upgrades keep it."""
+    explicit = os.environ.get(override)
+    if explicit:
+        return Path(explicit).expanduser()
+    base = os.environ.get(xdg) or str(Path(expand_home("$HOME")) / fallback)
+    return Path(base) / "openadkit"
+
+
+def config_root() -> Path:
+    """Site settings: one ``<deployment>.env`` per deployment."""
+    return _user_root("OPENADKIT_CONFIG_DIR", "XDG_CONFIG_HOME", ".config")
+
+
+def state_root() -> Path:
+    """Run results: ``<deployment>/output``."""
+    return _user_root("OPENADKIT_STATE_DIR", "XDG_STATE_HOME", ".local/state")
+
+
 def host_user_environment() -> dict[str, str]:
     """Host user ids, so files written to host mounts belong to the user.
 
@@ -324,6 +343,15 @@ class Deployment:
         """Each node is its own Compose project, so nodes never share state."""
         return self.project if node is None else f"{self.project}-{node}"
 
+    @property
+    def site_config(self) -> Path:
+        """Host settings for this deployment; loaded last, kept across upgrades."""
+        return config_root() / f"{self.name}.env"
+
+    @property
+    def output_directory(self) -> Path:
+        return state_root() / self.name / "output"
+
     def env_files(self, gpu: bool = False) -> list[Path]:
         result = [
             ensure_safe_existing(self.directory, "config.env", "environment file")
@@ -345,7 +373,11 @@ class Deployment:
                 )
             else:
                 add_optional("config.gpu.env")
-        add_optional("config.local.env")
+        site = self.site_config
+        if site.exists():
+            if not site.is_file():
+                raise OpenADKitError(f"site configuration is not a regular file: {site}")
+            result.append(site)
         return result
 
     def configuration_environment(self, gpu: bool = False) -> dict[str, str]:
@@ -353,7 +385,7 @@ class Deployment:
 
         Compose interpolation uses the same file order. A shell export of
         MAP_PATH would otherwise install data somewhere other than the mount.
-        Host overrides belong in config.local.env, which is loaded last.
+        Host overrides belong in the site configuration, which is loaded last.
         """
         values: dict[str, str] = {}
         for path in self.env_files(gpu):
@@ -388,6 +420,14 @@ class Deployment:
         if node is None:
             return list(self.compose["resetServices"])
         return list(self.nodes[node]["resetServices"])
+
+    def _base_injections(self, distro: str) -> dict[str, str]:
+        # config.env defaults OUTPUT_HOST_PATH to this directory.
+        return {
+            "ROS_DISTRO": distro,
+            "OPENADKIT_OUTPUT_DIR": str(self.output_directory),
+            **host_user_environment(),
+        }
 
     def _node_injections(self, node: str | None, injections: dict[str, str]) -> dict[str, str]:
         if node is None:
@@ -426,7 +466,7 @@ class Deployment:
         # missing default-distro image map can never block a stop.
         injections: dict[str, str]
         if operational:
-            injections = {"ROS_DISTRO": distro, **host_user_environment()}
+            injections = self._base_injections(distro)
             injections.update(self.distro_environment.get(distro, {}))
             injections = self._node_injections(node, injections)
             environment = self.configuration_environment()
@@ -475,7 +515,7 @@ class Deployment:
         view = self.nodes.get(node) if node is not None else None
         required_environment = list(view["requiredEnv"]) if view else []
         environment = self.configuration_environment(gpu)
-        injections = {"ROS_DISTRO": distro, **host_user_environment()}
+        injections = self._base_injections(distro)
         injections.update(self.distro_environment.get(distro, {}))
         component_environment = current_context.component_environment(
             distro, architecture, gpu
@@ -926,7 +966,6 @@ def deployment_checksum(directory: Path) -> str:
             relative.name == "config.local.env"
             or "__pycache__" in relative.parts
             or relative.suffix == ".pyc"
-            or relative.parts[0] in {".cache", "output"}
         ):
             continue
         if candidate.is_symlink():

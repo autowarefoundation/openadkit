@@ -48,6 +48,6 @@ capture/
 # Playwright CLI artifacts
 .playwright-cli/
 
-# Local deployment overrides and runtime state
+# Pre-v2 local overrides; the CLI now reads ~/.config/openadkit/<deployment>.env
 deployments/*/config.local.env
-deployments/*/.cache/
+deployments/*/output/

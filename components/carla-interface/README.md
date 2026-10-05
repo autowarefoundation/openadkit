@@ -23,5 +23,6 @@ docker buildx bake -f components/docker-bake.hcl --load carla-interface
 
 The build is tagged with the `<target>-<arch>-<ros-distro>` reference
 repository-mode `./openadkit` injects, so `./openadkit run carla-simulation
---gpu` picks it up. Override the `*_IMAGE` variables in `config.local.env` if
+--gpu` picks it up. Override the `*_IMAGE` variables in
+`~/.config/openadkit/carla-simulation.env` if
 you tag the image differently.

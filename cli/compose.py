@@ -102,7 +102,7 @@ def compose_process_environment(
     """Environment Compose uses to interpolate the deployment.
 
     Compose prefers the process environment over ``--env-file``, so a shell
-    export would otherwise hide ``config.gpu.env`` and ``config.local.env``.
+    export would otherwise hide ``config.gpu.env`` and the site configuration.
     Drop shell values for names the env files define and let Compose read
     the files itself, so quoting and ``$VAR`` expansion follow Compose rules.
     CLI injections (distro and component images) still win.

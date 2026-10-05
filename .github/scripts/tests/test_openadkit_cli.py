@@ -242,9 +242,25 @@ def fake_docker(
     return bin_dir, calls
 
 
+USER_ROOT_ENV = (
+    "XDG_CONFIG_HOME", "XDG_STATE_HOME", "OPENADKIT_CONFIG_DIR", "OPENADKIT_STATE_DIR",
+)
+
+
+def site_config(root, text, name="example"):
+    """Write the host settings file the CLI loads last for a deployment."""
+    path = root.parent / "home/.config/openadkit" / f"{name}.env"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
 def run_cli(root, *args, **env):
     """Run the tree's entrypoint; a fake docker in <tmp>/bin comes first on PATH."""
     command_env = os.environ | {"HOME": str(root.parent / "home")}
+    # User roots resolve under the fake HOME unless a test sets them.
+    for name in USER_ROOT_ENV:
+        command_env.pop(name, None)
     bin_dir = root.parent / "bin"
     if bin_dir.is_dir():
         command_env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
@@ -854,14 +870,18 @@ def test_gpu_overlay_requires_gpu_env(tmp_path):
     assert "GPU environment file" in result.stderr
 
 
-def test_deployment_checksum_ignores_runtime_output(tmp_path):
+def test_deployment_checksum_ignores_local_leftovers_only(tmp_path):
+    # Results live under the state root now, so any other file in the
+    # deployment directory is a modification.
     (tmp_path / "config.env").write_text("x=1\n")
-    (tmp_path / "output").mkdir()
     baseline = cli_manifest.deployment_checksum(tmp_path)
-    (tmp_path / "output/result.json").write_text("{}\n")
-    (tmp_path / ".cache").mkdir()
-    (tmp_path / ".cache/tmp").write_text("n\n")
+    (tmp_path / "config.local.env").write_text("x=2\n")
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__/m.pyc").write_bytes(b"\0")
     assert cli_manifest.deployment_checksum(tmp_path) == baseline
+    (tmp_path / "output").mkdir()
+    (tmp_path / "output/result.json").write_text("{}\n")
+    assert cli_manifest.deployment_checksum(tmp_path) != baseline
 
 
 # --- Environment files and images --------------------------------------------
@@ -873,9 +893,7 @@ def test_env_files_are_ordered_and_override_the_shell(tmp_path):
         config_env="MAP_PATH=$HOME/autoware_map/sample\nLIDAR_DETECTION_MODEL=clustering\n",
     )
     (deployment / "config.gpu.env").write_text("LIDAR_DETECTION_MODEL=centerpoint\n")
-    (deployment / "config.local.env").write_text(
-        "LIDAR_DETECTION_MODEL=from-local\nREMOTE_PASSWORD='pa$word'\n"
-    )
+    site_config(root, "LIDAR_DETECTION_MODEL=from-local\nREMOTE_PASSWORD='pa$word'\n")
     seen = tmp_path / "seen-env"
     executable(
         tmp_path / "bin/docker",
@@ -894,8 +912,8 @@ def test_env_files_are_ordered_and_override_the_shell(tmp_path):
         assert recorded[:3] == ["unset", "unset", "unset"]
         return [Path(item.split()[0]).name for item in recorded[3].split("--env-file ")[1:]]
 
-    assert env_files() == ["config.env", "config.local.env"]
-    assert env_files("--gpu") == ["config.env", "config.gpu.env", "config.local.env"]
+    assert env_files() == ["config.env", "example.env"]
+    assert env_files("--gpu") == ["config.env", "config.gpu.env", "example.env"]
 
 
 def test_shell_map_path_does_not_redirect_data(tmp_path):
@@ -944,7 +962,7 @@ def test_repository_injects_distro_and_development_images(tmp_path, args, defaul
 def test_repository_component_image_override_is_preserved(tmp_path):
     root, deployment = runtime_tree(tmp_path)
     exact = f"registry.example/custom-api@sha256:{'b' * 64}"
-    (deployment / "config.local.env").write_text(f"API_IMAGE={exact}\n")
+    site_config(root, f"API_IMAGE={exact}\n")
     _, calls = fake_docker(tmp_path)
     assert run_cli(root, "validate", "example").returncode == 0
     assert calls.read_text().split("|", 5)[2] == exact
@@ -956,7 +974,7 @@ def test_release_injects_exact_images_over_env_files(tmp_path):
     edit_kit(root, lambda kit: kit["images"]["humble"].update(api=exact))
     with (deployment / "config.env").open("a") as output:
         output.write("API_IMAGE=registry.example/from-config\n")
-    (deployment / "config.local.env").write_text("API_IMAGE=registry.example/from-local\n")
+    site_config(root, "API_IMAGE=registry.example/from-local\n")
     _, calls = fake_docker(tmp_path)
     result = run_cli(root, "validate", "example")
     assert result.returncode == 0, result.stderr
@@ -1748,3 +1766,77 @@ def test_missing_node_compose_file_is_reported(tmp_path):
     root, deployment = runtime_tree(tmp_path, manifest=node_manifest())
     (deployment / "compose.primary.yaml").unlink()
     assert "missing Compose file" in run_cli(root, "list").stdout
+
+
+# --- User roots -----------------------------------------------------------------
+
+
+def test_user_roots_follow_overrides_then_xdg_then_home(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path)
+    home = root.parent / "home"
+
+    def roots(**env):
+        result = run_cli(root, "validate", "example", "--json", **env)
+        assert result.returncode == 0, result.stderr
+        return (tmp_path / "docker-calls").read_text()
+
+    assert str(home / ".config/openadkit/example.env") not in roots()
+    site_config(root, "VALUE=site\n")
+    assert str(home / ".config/openadkit/example.env") in roots()
+
+    xdg = tmp_path / "xdg"
+    (xdg / "openadkit").mkdir(parents=True)
+    (xdg / "openadkit/example.env").write_text("VALUE=xdg\n")
+    assert str(xdg / "openadkit/example.env") in roots(XDG_CONFIG_HOME=str(xdg))
+
+    explicit = tmp_path / "explicit"
+    explicit.mkdir()
+    (explicit / "example.env").write_text("VALUE=explicit\n")
+    assert str(explicit / "example.env") in roots(
+        XDG_CONFIG_HOME=str(xdg), OPENADKIT_CONFIG_DIR=str(explicit)
+    )
+
+
+def test_output_directory_is_injected_under_the_state_root(tmp_path):
+    root, deployment = runtime_tree(
+        tmp_path, config_env="OUTPUT_HOST_PATH=${OPENADKIT_OUTPUT_DIR}\n"
+    )
+    seen = tmp_path / "seen-output"
+    executable(
+        tmp_path / "bin/docker",
+        f'#!/usr/bin/env bash\nprintf "%s\\n" "${{OPENADKIT_OUTPUT_DIR-unset}}" >> {json.dumps(str(seen))}\n',
+    )
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    home = root.parent / "home"
+    assert seen.read_text().split()[0] == str(home / ".local/state/openadkit/example/output")
+
+    seen.unlink()
+    state = tmp_path / "state"
+    result = run_cli(root, "validate", "example", OPENADKIT_STATE_DIR=str(state))
+    assert result.returncode == 0, result.stderr
+    assert seen.read_text().split()[0] == str(state / "example/output")
+
+
+def test_legacy_local_config_is_ignored_with_a_warning(tmp_path):
+    root, deployment = runtime_tree(tmp_path)
+    (deployment / "config.local.env").write_text("VALUE=legacy\n")
+    _, calls = fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert "config.local.env is no longer read" in result.stderr
+    assert ".config/openadkit/example.env" in result.stderr
+    assert "config.local.env" not in calls.read_text()
+
+
+def test_run_prints_the_resolved_output_path(tmp_path):
+    root, _ = runtime_tree(
+        tmp_path,
+        config_env="REMOTE_PASSWORD=default\nOUTPUT_HOST_PATH=${OPENADKIT_OUTPUT_DIR}\n",
+    )
+    fake_docker(tmp_path)
+    result = run_cli(root, "run", "example", "--pull", "never")
+    assert result.returncode == 0, result.stderr
+    expected = root.parent / "home/.local/state/openadkit/example/output"
+    assert f"output: {expected}" in result.stdout

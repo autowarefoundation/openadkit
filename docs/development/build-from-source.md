@@ -78,7 +78,7 @@ docker buildx bake -f components/docker-bake.hcl --load planning
   `planning-control-amd64-humble`), which is the tag `./openadkit` looks up in a
   source checkout. The arch follows the build host; when cross-building, set tags
   with `--set <target>.tags=...`. To use other images, set the `*_IMAGE`
-  variables in `config.local.env`.
+  variables in `~/.config/openadkit/<deployment>.env`.
 - For Jazzy, build with `ROS_DISTRO=jazzy` and run with `--ros-distro jazzy`.
 
 Other useful targets:

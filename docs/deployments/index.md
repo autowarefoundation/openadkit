@@ -32,7 +32,7 @@ openadkit stop planning-simulation
   [split-host](split-host.md) run. `status`, `logs`, and `stop` find the
   running node themselves; they take `--node` only when several nodes of one
   deployment run on the same machine.
-- Put local settings in `config.local.env`; see
+- Put host settings in `~/.config/openadkit/<name>.env`; see
   [Configuration](../getting-started/cli.md#configuration).
 
 Split-host nodes are experimental: they ship in the release and become

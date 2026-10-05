@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import string
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -324,6 +325,21 @@ def warn_if_modified(root, deployment, kit) -> None:
             f"warning: {deployment.name} has been modified from this release",
             file=sys.stderr,
         )
+    legacy = deployment.directory / "config.local.env"
+    if legacy.exists():
+        print(
+            f"warning: {legacy} is no longer read; move its settings to "
+            f"{deployment.site_config}",
+            file=sys.stderr,
+        )
+
+
+def output_path(selection) -> str | None:
+    """Where the deployment writes results, as Compose will resolve it."""
+    value = selection.environment.get("OUTPUT_HOST_PATH")
+    if not value:
+        return None
+    return string.Template(value).safe_substitute(selection.environment)
 
 
 def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> None:
@@ -353,12 +369,19 @@ def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> 
         )
 
 
-def print_run_next_steps(deployment, services: set[str], node: str | None) -> None:
+def print_run_next_steps(
+    deployment, services: set[str], node: str | None, output: str | None
+) -> None:
     target = deployment.name if node is None else f"{deployment.name} --node {node}"
     print(f"running: {target}")
     if "visualizer" in services:
         print("visualizer: https://localhost:6080/vnc.html")
-        print("password: REMOTE_PASSWORD (default openadkit; override in config.local.env)")
+        print(
+            "password: REMOTE_PASSWORD (default openadkit; override in "
+            f"{deployment.site_config})"
+        )
+    if output:
+        print(f"output: {output}")
     print(f"stop with: openadkit stop {target}")
 
 
@@ -499,7 +522,9 @@ def main() -> int:
         data.install_data(deployment, selection, args.force)
         compose.create_writable_mounts(deployment, selection)
         compose.start(deployment, selection, args.pull)
-        print_run_next_steps(deployment, configured_services, selection.node)
+        print_run_next_steps(
+            deployment, configured_services, selection.node, output_path(selection)
+        )
         return 0
 
     compose.ensure_runtime_user()

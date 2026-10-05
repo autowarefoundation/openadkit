@@ -34,7 +34,7 @@ services:
       # the Zenoh session up but routing no topics. The CLI injects the
       # selected distro into the Compose environment.
       - ROS_DISTRO=${ROS_DISTRO:-humble}
-      # Interpolated from the CLI env files (config.env/config.local.env).
+      # Interpolated from the CLI env files (config.env, then the host file).
       # Empty defaults keep `stop`/`ps`/`logs` parseable; the wrapper below
       # fails only when a listen endpoint is actually required.
       - ZENOH_LISTEN=${ZENOH_LISTEN:-}

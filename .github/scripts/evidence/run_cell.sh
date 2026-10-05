@@ -25,6 +25,9 @@ node=${4:-}
 platform=${PLATFORM:-linux/amd64}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 mkdir -p "${out}"
+# Keep run results with this cell's evidence instead of the runner's home.
+export OPENADKIT_STATE_DIR="${out}/state"
+scenario_output="${OPENADKIT_STATE_DIR}/${deployment}/output"
 
 split=false
 node_args=()
@@ -182,7 +185,7 @@ if [ "${l1_ok}" = true ]; then
             ss_rc=$(timeout 1200 docker wait autoware-scenario-simulator 2>/dev/null || echo timeout)
             docker logs autoware-scenario-simulator >"${out}/scenario.log" 2>&1 || true
             python3 "${script_dir}/scenario_metrics.py" \
-                --output-dir "deployments/scenario-simulation/output" \
+                --output-dir "${scenario_output}" \
                 --log "${out}/scenario.log" \
                 --json "${out}/scenario.json" >"${out}/scenario-metrics.log" 2>&1
             metrics_rc=$?
@@ -245,7 +248,7 @@ if [ "${result}" != "PASSED" ]; then
             docker logs "${container_id}" >"${out}/logs/${container_name}.log" 2>&1 || true
         done
     done
-    cp -a deployments/scenario-simulation/output "${out}/scenario-output" 2>/dev/null || true
+    cp -a "${scenario_output}" "${out}/scenario-output" 2>/dev/null || true
 fi
 
 jq -n \

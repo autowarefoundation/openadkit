@@ -83,7 +83,7 @@ and is not passed on the command line.
 ```
 
 The same command surface is included in the release bundle. Use
-`deployments/<name>/config.local.env` for local overrides.
+`~/.config/openadkit/<name>.env` for local overrides.
 
 For split-host (`--node`) topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployments/split-host/).
 

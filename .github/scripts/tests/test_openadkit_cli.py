@@ -2177,3 +2177,37 @@ def test_kits_extend_one_level_only(tmp_path):
     result = run_in(outer, root, "list")
     assert result.returncode != 0
     assert "is itself a kit; only one level of extends is supported" in result.stderr
+
+
+def test_the_cli_mounts_the_override_layers_of_a_kit_deployment(tmp_path):
+    manifest = minimal_manifest()
+    manifest["shared"] = ["shared"]
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
+    shared_config = root / "deployments/shared/config"
+    shared_config.mkdir()
+    (deployment / "config").mkdir()
+    kit = integrator_kit(tmp_path, root)
+    (kit / "deployments/custom/config").mkdir()
+    (kit / "deployments/custom/overlay_ws").mkdir()
+    seen = tmp_path / "seen-layers"
+    executable(
+        tmp_path / "bin/docker",
+        "#!/usr/bin/env bash\n"
+        'printf "%s|%s|%s|%s\\n" "$OPENADKIT_CONFIG_SHARED" "$OPENADKIT_CONFIG_BASE" '
+        f'"$OPENADKIT_CONFIG_DEPLOYMENT" "$OPENADKIT_OVERLAY_WS" >> {json.dumps(str(seen))}\n'
+        'if [[ "$*" == *"config --services"* ]]; then printf "app\\n"; fi\n',
+    )
+    assert run_in(kit, root, "validate", "custom").returncode == 0
+    assert seen.read_text().splitlines()[0].split("|") == [
+        str(shared_config), str(deployment / "config"),
+        str(kit / "deployments/custom/config"), str(kit / "deployments/custom/overlay_ws"),
+    ]
+
+    # A deployment of our own has no base layer and no overlay workspace.
+    seen.unlink()
+    assert run_cli(root, "validate", "example").returncode == 0
+    empty = str(root.parent / "home/.local/state/openadkit/empty")
+    assert seen.read_text().splitlines()[0].split("|") == [
+        str(shared_config), empty, str(deployment / "config"), empty,
+    ]
+    assert Path(empty).is_dir()

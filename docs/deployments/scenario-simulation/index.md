@@ -46,8 +46,12 @@ example, `SCENARIO=/scenarios/my-scenario.yaml`. Scenarios must match the map: a
 custom map needs matching `MAP_PATH`, `LANELET2_MAP_FILE`, and
 `POINTCLOUD_MAP_FILE` values, and the planning sample map does not work here.
 
-Autoware parameter overrides for this deployment live in
-`config/mrm_handler.param.yaml` and `config/default_adapi.param.yaml`.
+This deployment changes two Autoware parameters, each in a file that holds only
+the changed value. On every start, the images merge these files into the
+upstream parameter files:
+
+- `config/autoware/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml`
+- `config/autoware/autoware_default_adapi_universe/config/default_adapi.param.yaml`
 
 ## Stop and Recover
 

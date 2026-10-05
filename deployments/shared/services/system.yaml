@@ -13,9 +13,14 @@ services:
       - ../runtime.env
     volumes:
       - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      # Integrator layer, applied by the image's entrypoint hook (components/overlay).
+      - ${OPENADKIT_CONFIG_SHARED:?set by the openadkit CLI}:/openadkit/config/shared:ro
+      - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
+      - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
     command: >
       ros2 launch autoware_launch tier4_system_component.launch.xml
-      diagnostic_graph_aggregator_graph_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/system/diagnostics/${SYSTEM_DIAGNOSTICS_GRAPH:-autoware-main.yaml}
+      diagnostic_graph_aggregator_graph_path:=/tmp/openadkit/autoware_launch/share/autoware_launch/config/system/diagnostics/${SYSTEM_DIAGNOSTICS_GRAPH:-autoware-main.yaml}
       launch_system_monitor:=${LAUNCH_SYSTEM_MONITOR}
       launch_dummy_diag_publisher:=${LAUNCH_DUMMY_DIAG_PUBLISHER}
       sensor_model:=${SENSOR_MODEL}

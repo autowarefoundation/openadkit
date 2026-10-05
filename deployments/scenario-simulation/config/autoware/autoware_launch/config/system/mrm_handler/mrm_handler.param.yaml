@@ -1,0 +1,5 @@
+# Scenario simulation: relax the operation-mode availability timeout to reduce
+# false MRM triggers.
+/**:
+  ros__parameters:
+    timeout_operation_mode_availability: 2.5

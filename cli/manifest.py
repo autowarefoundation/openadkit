@@ -510,7 +510,39 @@ class Deployment:
         if self.base is not None:
             # The kit's Compose file includes the base by this path.
             injections[BASE_KIT_ENV] = str(self.base.root)
+        injections.update(self._overlay_mounts())
         return injections
+
+    def _overlay_mounts(self) -> dict[str, str]:
+        """Host directories the entrypoint hook layers over Autoware's files.
+
+        Config overrides apply in order: shared (every deployment that uses
+        the shared services), the base a kit builds on, then this deployment.
+        A missing layer mounts an empty directory, so Docker never creates a
+        root-owned one in its place.
+        """
+        empty = state_root() / "empty"
+
+        def layer(path: Path | None) -> str:
+            if path is not None and path.is_dir():
+                return str(path)
+            empty.mkdir(parents=True, exist_ok=True)
+            return str(empty)
+
+        owner = self.base if self.base is not None else self
+        shared = (
+            owner.root / "deployments" / "shared" / "config"
+            if "shared" in owner.shared
+            else None
+        )
+        return {
+            "OPENADKIT_CONFIG_SHARED": layer(shared),
+            "OPENADKIT_CONFIG_BASE": layer(
+                self.base.directory / "config" if self.base is not None else None
+            ),
+            "OPENADKIT_CONFIG_DEPLOYMENT": layer(self.directory / "config"),
+            "OPENADKIT_OVERLAY_WS": layer(self.directory / "overlay_ws"),
+        }
 
     def _node_injections(self, node: str | None, injections: dict[str, str]) -> dict[str, str]:
         if node is None:

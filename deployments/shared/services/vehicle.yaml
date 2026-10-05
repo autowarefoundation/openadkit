@@ -11,10 +11,15 @@ services:
       - ../runtime.env
     volumes:
       - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      # Integrator layer, applied by the image's entrypoint hook (components/overlay).
+      - ${OPENADKIT_CONFIG_SHARED:?set by the openadkit CLI}:/openadkit/config/shared:ro
+      - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
+      - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
     command: >
       ros2 launch tier4_vehicle_launch vehicle.launch.xml
       launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE}
-      raw_vehicle_cmd_converter_param_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
+      raw_vehicle_cmd_converter_param_path:=/tmp/openadkit/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
       sensor_model:=${SENSOR_MODEL}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_id:=${VEHICLE_ID}

@@ -132,6 +132,7 @@ def test_shared_build_inputs_select_all_targets():
         ".trivyignore",
         "components/link-lock/lock.sh",
         "components/link-lock/align.sh",
+        "components/overlay/overlay.py",
     ):
         plan = matrices.build_single_image_plan(INVENTORY, [changed])
         assert set(plan["targets_json"]) == expected
@@ -187,8 +188,12 @@ COMPOSE_AVAILABLE = shutil.which("docker") is not None
 def _compose_config(files, directory, extra_env=None):
     env = dict(os.environ)
     env.pop("COMPOSE_FILE", None)
-    # The CLI always injects these: the output root and the pinned artifacts.
+    # The CLI always injects these: the output root, the overlay layers and
+    # the pinned artifacts.
     env["OPENADKIT_OUTPUT_DIR"] = "/tmp/openadkit-test/output"
+    for name in ("SHARED", "BASE", "DEPLOYMENT"):
+        env[f"OPENADKIT_CONFIG_{name}"] = "/tmp/openadkit-test/empty"
+    env["OPENADKIT_OVERLAY_WS"] = "/tmp/openadkit-test/empty"
     kit = json.loads((ROOT / "openadkit.json").read_text())
     for name, artifact in kit["artifacts"].items():
         env[name] = artifact.get("ref") or artifact["distros"]["humble"]

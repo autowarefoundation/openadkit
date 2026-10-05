@@ -1,5 +1,5 @@
 # Autoware
-autoware/
+/autoware/
 
 # Vim
 *.swp
@@ -51,3 +51,8 @@ capture/
 # Pre-v2 local overrides; the CLI now reads ~/.config/openadkit/<deployment>.env
 deployments/*/config.local.env
 deployments/*/output/
+
+# Overlay workspace build output (examples/custom-kit/.../overlay_ws/build.sh)
+overlay_ws/build/
+overlay_ws/install/
+overlay_ws/log/

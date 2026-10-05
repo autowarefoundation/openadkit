@@ -13,6 +13,11 @@ services:
     volumes:
       - ${DATA_PATH}:/autoware_data:rw
       - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      # Integrator layer, applied by the image's entrypoint hook (components/overlay).
+      - ${OPENADKIT_CONFIG_SHARED:?set by the openadkit CLI}:/openadkit/config/shared:ro
+      - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
+      - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
     command: >
       ros2 launch autoware_launch tier4_perception_component.launch.xml
       data_path:=/autoware_data

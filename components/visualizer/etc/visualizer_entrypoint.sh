@@ -34,8 +34,8 @@ trap 'exit 130' INT
 
 # Check if RVIZ_CONFIG is provided
 if [ -z "${RVIZ_CONFIG:-}" ]; then
-    echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz\e[0m"
-    RVIZ_CONFIG="/opt/autoware/autoware_launch/share/autoware_launch/rviz/autoware.rviz"
+    echo -e "\e[31mRVIZ_CONFIG is not set defaulting to /tmp/openadkit/autoware_launch/share/autoware_launch/rviz/autoware.rviz\e[0m"
+    RVIZ_CONFIG="/tmp/openadkit/autoware_launch/share/autoware_launch/rviz/autoware.rviz"
     export RVIZ_CONFIG
 fi
 

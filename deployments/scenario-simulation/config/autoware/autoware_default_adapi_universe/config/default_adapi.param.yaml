@@ -1,0 +1,5 @@
+# Scenario simulation: shorten diagnostic_updater.period to avoid STALE flicker.
+/**:
+  ros__parameters:
+    diagnostic_updater:
+      period: 0.2

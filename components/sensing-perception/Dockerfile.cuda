@@ -106,3 +106,10 @@ RUN --mount=from=sensing-perception-cuda-devel,source=/opt/openadkit/link-lock.t
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     bash /tmp/link-lock/lock.sh install --lock /tmp/link-lock.txt && \
     bash /tmp/link-lock/lock.sh verify --lock /tmp/link-lock.txt
+
+# Integrator layer (components/overlay): on every start, layer config overrides
+# and the overlay workspace on top of Autoware, after the upstream entrypoint
+# has sourced ROS and switched to the aw user.
+COPY components/overlay/openadkit-hook.sh components/overlay/overlay.py /opt/openadkit/
+ENTRYPOINT ["/docker-entrypoint.sh", "/opt/openadkit/openadkit-hook.sh"]
+CMD ["/bin/bash"]

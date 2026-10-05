@@ -6,3 +6,4 @@ nav:
   - CARLA Simulation: carla-simulation
   - Split-host simulation: split-host.md
   - Custom Deployment: custom-deployment.md
+  - Integrator Guide: integrator-guide.md

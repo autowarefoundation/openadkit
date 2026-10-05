@@ -2,12 +2,11 @@
   "schemaVersion": 1,
   "name": "scenario-simulation",
   "description": "Execute a Scenario Simulator V2 scenario against Autoware",
-  "shared": ["base"],
+  "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],
     "gpuFiles": [],
     "profiles": [],
-    "services": ["map", "planning", "vehicle", "system", "control", "simulator", "api", "visualizer", "scenario_simulator"],
     "resetServices": ["map-check", "scenario_simulator"],
     "waitTimeout": 420
   },

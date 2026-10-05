@@ -14,10 +14,8 @@ on:
       - '**/*.json5'
       - '.github/image-inventory.json'
       - '.github/ISSUE_TEMPLATE/**'
-      - '.github/DISCUSSION_TEMPLATE/**'
       - '.github/dependabot.yaml'
       - '.github/stale.yml'
-      - '.github/sync-files.yaml'
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/actions/**'
@@ -90,10 +88,8 @@ jobs:
             .github/workflows/ \
             .github/actions/ \
             .github/ISSUE_TEMPLATE/ \
-            .github/DISCUSSION_TEMPLATE/ \
             .github/dependabot.yaml \
             .github/stale.yml \
-            .github/sync-files.yaml \
             deployments/ \
             platforms/ \
             mkdocs.yaml \
@@ -157,6 +153,28 @@ jobs:
           # locals-blocks, typo'd function names, missing ARGs, etc.).
           docker buildx bake -f components/docker-bake.hcl --print universe-common-devel \
             > /dev/null
+          # Repository-mode `./openadkit` looks up
+          # <prefix>:<target>-<arch>-<ros-distro>. Every catalog target must
+          # carry that local tag so a --load build needs no --set overrides.
+          arch=$(uname -m)
+          case "${arch}" in
+            x86_64|amd64) arch=amd64 ;;
+            aarch64|arm64) arch=arm64 ;;
+          esac
+          prefix=$(python3 -c 'import json; print(json.load(open("openadkit.json"))["imagePrefixComponent"])')
+          distro=$(python3 -c 'import json; print(json.load(open("openadkit.json"))["defaultRosDistro"])')
+          for target in $(python3 -c 'import json; print(" ".join(json.load(open("openadkit.json"))["componentImages"].values()))'); do
+            expected="${prefix}:${target}-${arch}-${distro}"
+            tags=$(docker buildx bake -f components/docker-bake.hcl --print "${target}" \
+              | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)["target"][sys.argv[1]].get("tags", [])))' "${target}")
+            case " ${tags} " in
+              *" ${expected} "*) ;;
+              *)
+                echo "::error::${target} is missing local tag ${expected}"
+                fail=1
+                ;;
+            esac
+          done
           exit "${fail}"
 
       - name: Smoke-test Dockerized docs build

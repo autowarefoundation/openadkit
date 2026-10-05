@@ -13,8 +13,6 @@ from types import ModuleType
 from typing import Any
 
 
-CARLA_INTERFACE_ENV = "CARLA_INTERFACE_IMAGE"
-CARLA_INTERFACE_TARGET = "carla-interface"
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
@@ -237,7 +235,6 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
 
     kit = product["kit"]
     component_images = dict(kit.component_images)
-    component_images[CARLA_INTERFACE_ENV] = CARLA_INTERFACE_TARGET
     runtime_targets = sorted(set(component_images.values()))
     context_images: dict[str, dict[str, str]] = {}
     for distro in product["distros"]:

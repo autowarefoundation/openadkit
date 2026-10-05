@@ -12,7 +12,6 @@ on:
       - docs/macros.py
       - .github/image-inventory.json
       - docs/requirements.txt
-      - "docs/scripts/**"
       - "**/*.md"
       - "**/*.svg"
       - "**/*.png"

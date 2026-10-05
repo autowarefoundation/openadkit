@@ -1,0 +1,22 @@
+# Vehicle — bridges vehicle commands to the vehicle or simulator.
+services:
+  vehicle:
+    image: ${VEHICLE_SYSTEM_IMAGE:-ghcr.io/autowarefoundation/openadkit:vehicle-system}
+    container_name: autoware-vehicle
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+    command: >
+      ros2 launch tier4_vehicle_launch vehicle.launch.xml
+      launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE}
+      raw_vehicle_cmd_converter_param_path:=/opt/autoware/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_id:=${VEHICLE_ID}
+      vehicle_model:=${VEHICLE_MODEL}
+    restart: on-failure

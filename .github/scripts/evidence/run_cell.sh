@@ -41,7 +41,15 @@ cell_name="${deployment}-${distro}${node:+-${node}}-${platform//\//-}"
 api_container=autoware-api
 api_services=${API_SERVICES:-/api/localization/initialize /api/routing/set_route_points /api/operation_mode/change_to_autonomous}
 api_topics=${API_TOPICS:-/api/routing/state /api/localization/initialization_state /api/operation_mode/state}
-fresh_topics=${FRESH_TOPICS:-/clock}
+# Topics that flow without a route or an initial pose: the system's operation
+# mode availability in every deployment, plus the simulation clock where the
+# deployment runs on sim time. Planning Simulation runs on wall time and has
+# no /clock.
+default_fresh=/system/operation_mode/availability
+if [ "${deployment}" = scenario-simulation ]; then
+    default_fresh="${default_fresh} /clock"
+fi
+fresh_topics=${FRESH_TOPICS:-${default_fresh}}
 zenoh_autoware=${SPLIT_ZENOH_AUTOWARE:-tcp/127.0.0.1:7447}
 zenoh_scenario=${SPLIT_ZENOH_SCENARIO:-tcp/127.0.0.1:7448}
 zenoh_peer=${SPLIT_ZENOH_PEER:-tcp/127.0.0.1:7447}

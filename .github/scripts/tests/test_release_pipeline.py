@@ -1,13 +1,12 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tarfile
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[3]
 MANAGER = ROOT / ".github/scripts/manage_github_release.sh"
@@ -673,7 +672,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert bundled_context["componentImages"] == kit["componentImages"]
     assert "carla-interface" in bundled_context["images"]["humble"]
     expected_deployments = set(kit["deployments"])
-    for name, reference in kit["deployments"].items():
+    for reference in kit["deployments"].values():
         manifest = json.loads((ROOT / reference["path"] / "deployment.json").read_text())
         expected_deployments.update(manifest["shared"])
     bundled_deployments = {

@@ -8,7 +8,6 @@ import sys
 
 import yaml
 
-
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 

@@ -4,7 +4,6 @@ import json
 import os
 import platform
 import re
-from pathlib import Path
 import shutil
 import signal
 import subprocess
@@ -12,11 +11,11 @@ import sys
 import tarfile
 import threading
 import time
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import zipfile
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cli"))

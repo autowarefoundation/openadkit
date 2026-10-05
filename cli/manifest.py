@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
 import os
 import platform
 import re
 import stat
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
-
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -425,6 +424,7 @@ class Deployment:
         # profiles; they only need the deployment's Compose and env files.
         # Skip requirement validation and component image injection so a
         # missing default-distro image map can never block a stop.
+        injections: dict[str, str]
         if operational:
             injections = {"ROS_DISTRO": distro, **host_user_environment()}
             injections.update(self.distro_environment.get(distro, {}))
@@ -475,7 +475,7 @@ class Deployment:
         view = self.nodes.get(node) if node is not None else None
         required_environment = list(view["requiredEnv"]) if view else []
         environment = self.configuration_environment(gpu)
-        injections: dict[str, str] = {"ROS_DISTRO": distro, **host_user_environment()}
+        injections = {"ROS_DISTRO": distro, **host_user_environment()}
         injections.update(self.distro_environment.get(distro, {}))
         component_environment = current_context.component_environment(
             distro, architecture, gpu

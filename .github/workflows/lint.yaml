@@ -9,6 +9,7 @@ on:
       - '.gitignore'
       - 'openadkit'
       - 'cli/**'
+      - 'pyproject.toml'
       - '**/*.sh'
       - '**/*.json'
       - '**/*.json5'
@@ -63,7 +64,7 @@ jobs:
 
       - name: Install tools
         run: |
-          pip install yamllint pytest
+          pip install yamllint pytest ruff mypy
           curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash
           bash /tmp/actionlint.sh
 
@@ -94,6 +95,13 @@ jobs:
             platforms/ \
             mkdocs.yaml \
             docs/
+
+      - name: Run ruff
+        run: ruff check --output-format github cli .github/scripts
+
+      - name: Run mypy
+        # Settings and the checked paths live in pyproject.toml.
+        run: mypy
 
       - name: Run markdownlint
         run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**' '!platforms/autosd/x5h/**'

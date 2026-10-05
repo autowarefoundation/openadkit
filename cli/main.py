@@ -7,6 +7,8 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Sequence
+from typing import Any, NoReturn
 
 import compose
 import data
@@ -20,9 +22,9 @@ from manifest import (
 
 
 class OpenADKitParser(argparse.ArgumentParser):
-    help_inventory = None
+    help_inventory: str | None = None
 
-    def error(self, message: str) -> None:
+    def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
         print(f"error: {message}", file=sys.stderr)
         raise SystemExit(2)
@@ -199,7 +201,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
+def _print_table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> None:
     widths = [len(header) for header in headers]
     for row in rows:
         for index, cell in enumerate(row):
@@ -395,14 +397,14 @@ def main() -> int:
             return 2
         deployment = get_deployment(root, kit, args.deployment)
         selection = deployment.select(kit, None, False, operational=True)
-        results = data.check_installed_data(
+        installed = data.check_installed_data(
             deployment, selection, include_gpu=True
         )
         if not args.data:
-            if not results:
+            if not installed:
                 print("no data resources declared")
                 return 0
-            for item in results:
+            for item in installed:
                 print(
                     f"{item['name']}: {item['status']} ({item['destination']})"
                 )
@@ -436,7 +438,7 @@ def main() -> int:
         configured_services = compose.render(deployment, selection)
         if args.command == "validate":
             mode = "gpu" if selection.gpu else "cpu"
-            results = (
+            results: list[dict[str, Any]] | None = (
                 data.check_installed_data(deployment, selection)
                 if args.data
                 else None

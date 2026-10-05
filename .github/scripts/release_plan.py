@@ -5,14 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
-import sys
+from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, NoReturn
 
 import validation_matrix
-
 
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
@@ -22,7 +20,7 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise ValueError(message)
 
 
@@ -194,7 +192,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             aliases.extend((f"{repo}:{target}-{distro}", f"{repo}:{target}-{distro}-latest"))
             if distro == args.default_ros_distro:
                 aliases.extend((f"{repo}:{target}", f"{repo}:{target}-latest"))
-        row = {
+        row: dict[str, Any] = {
             "aliases": aliases,
             "digest": digest,
             "platforms": sorted(platforms),
@@ -218,10 +216,10 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     for distro in product["distros"]:
         distro_images: dict[str, str] = {}
         for target in runtime_targets:
-            row = indexed.get((target, distro))
-            if row is None:
+            image = indexed.get((target, distro))
+            if image is None:
                 fail(f"missing runtime image: {target}-{distro}")
-            distro_images[target] = row["releaseExactRef"]
+            distro_images[target] = image["releaseExactRef"]
         context_images[distro] = distro_images
 
     root_name = f"openadkit-{args.version}"

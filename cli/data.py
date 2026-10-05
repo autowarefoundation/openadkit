@@ -91,9 +91,9 @@ def atomic_publish(candidate: Path, target: Path, force: bool) -> None:
     if target.exists() and not force:
         raise OpenADKitError(f"data target already exists: {target}")
     if renameat2(-100, os.fsencode(candidate), -100, os.fsencode(target), flags) != 0:
-        error = ctypes.get_errno()
+        errno = ctypes.get_errno()
         raise OpenADKitError(
-            f"atomic data publication failed for {target}: {os.strerror(error)}"
+            f"atomic data publication failed for {target}: {os.strerror(errno)}"
         )
 
 

@@ -43,7 +43,9 @@ def load_quarantine(path: Path | None):
         try:
             date.fromisoformat(entry["expires"])
         except ValueError:
-            raise SystemExit(f"{path}: quarantine[{index}].expires must be YYYY-MM-DD")
+            raise SystemExit(
+                f"{path}: quarantine[{index}].expires must be YYYY-MM-DD"
+            ) from None
     return entries
 
 

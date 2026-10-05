@@ -245,6 +245,7 @@ def view_label(node: str | None) -> str:
 def live_state_conflict(deployment: Deployment, selection: Selection) -> str | None:
     """Nodes of one deployment may share a host; single-host and nodes may not."""
     live = live_nodes(deployment)
+    clashing: list[str | None]
     if selection.node is None:
         clashing = [node for node in live if node is not None]
     else:

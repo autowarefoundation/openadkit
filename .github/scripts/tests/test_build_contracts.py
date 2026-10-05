@@ -332,3 +332,36 @@ def test_example_kit_includes_the_base_and_adds_its_layer():
         str(ROOT / "deployments/planning-simulation/config.env"),
         str(kit / "deployments/custom-planning/config.env"),
     ]
+    assert json.loads(result.stdout)["overlayConformant"] is True
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is required")
+@pytest.mark.parametrize(("service_override", "config", "artifacts", "rule"), [
+    ("", "VEHICLE_ID=custom\n", {}, None),
+    ('  control:\n    command: ["true"]\n', "", {}, "command"),
+    ('  control:\n    volumes:\n      - ./config:/opt/autoware/config:ro\n', "", {}, "internal-mount"),
+    ("", "TYPO=value\n", {}, "variable"),
+    ("", "", {"PLANNING_CONTROL_IMAGE": {"workload": "planning", "ref": f"example/control@sha256:{'a' * 64}"}}, "image"),
+])
+def test_real_kit_contract_compares_compiled_models(tmp_path, service_override, config, artifacts, rule):
+    kit = tmp_path / "kit"
+    shutil.copytree(ROOT / "examples/custom-kit", kit, ignore=shutil.ignore_patterns("build", "install", "log"))
+    path = kit / "openadkit.json"
+    document = json.loads(path.read_text())
+    document["extends"] = str(ROOT)
+    document["artifacts"].update(artifacts)
+    path.write_text(json.dumps(document))
+    directory = kit / "deployments/custom-planning"
+    (directory / "config.env").write_text(config)
+    with (directory / "docker-compose.yaml").open("a") as stream:
+        stream.write(service_override)
+    env = dict(os.environ)
+    for name in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED"):
+        env.pop(name, None)
+    env.update(OPENADKIT_CONFIG_DIR=str(tmp_path / "config"), OPENADKIT_STATE_DIR=str(tmp_path / "state"), REMOTE_PASSWORD="ci-validate")
+    result = subprocess.run([str(ROOT / "openadkit"), "validate", "custom-planning", "--json"], cwd=kit, env=env, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["overlayConformant"] is (rule is None)
+    assert {warning["rule"] for warning in report["overlayWarnings"]} == ({rule} if rule else set())
+    assert all(warning.get("service") != "acme-probe" for warning in report["overlayWarnings"])

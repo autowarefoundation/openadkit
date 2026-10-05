@@ -522,6 +522,7 @@ def main() -> int:
 
         data.validate_destinations(deployment, selection)
         configured_services = compose.render(deployment, selection)
+        overlay_warnings = compose.check_overlay(deployment, selection, kit)
         if args.command == "validate":
             mode = "gpu" if selection.gpu else "cpu"
             results: list[dict[str, Any]] | None = (
@@ -536,6 +537,9 @@ def main() -> int:
                             "schemaVersion": 1,
                             "deployment": deployment.name,
                             "manifestValid": True,
+                            "base": deployment.base.name if deployment.base else None,
+                            "overlayConformant": not overlay_warnings,
+                            "overlayWarnings": overlay_warnings,
                             "rosDistro": selection.ros_distro,
                             "gpu": selection.gpu,
                             "node": selection.node,

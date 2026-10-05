@@ -1440,6 +1440,7 @@ def test_validate_json_output(tmp_path):
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {
         "schemaVersion": 1, "deployment": "example", "manifestValid": True,
+        "base": None, "overlayConformant": True, "overlayWarnings": [],
         "rosDistro": "humble", "gpu": False, "node": None, "dataValid": None, "data": [],
     }
     result = run_cli(root, "validate", "example", "--data", "--json")
@@ -2063,7 +2064,8 @@ def recording_docker(tmp_path):
         tmp_path / "bin/docker",
         "#!/usr/bin/env bash\n"
         f'printf "%s|%s|%s\\n" "${{KIT_openadkit-unset}}" "${{API_IMAGE-unset}}" "$*" >> {json.dumps(str(seen))}\n'
-        'if [[ "$*" == *"config --services"* ]]; then printf "app\\nacme\\n"; fi\n',
+        'if [[ "$*" == *"config --services"* ]]; then printf "app\\nacme\\n"; fi\n'
+        'if [[ "$*" == *"config --format json"* ]]; then printf \'{"services": {}}\\n\'; fi\n',
     )
     return seen
 
@@ -2195,7 +2197,8 @@ def test_the_cli_mounts_the_override_layers_of_a_kit_deployment(tmp_path):
         "#!/usr/bin/env bash\n"
         'printf "%s|%s|%s|%s\\n" "$OPENADKIT_CONFIG_SHARED" "$OPENADKIT_CONFIG_BASE" '
         f'"$OPENADKIT_CONFIG_DEPLOYMENT" "$OPENADKIT_OVERLAY_WS" >> {json.dumps(str(seen))}\n'
-        'if [[ "$*" == *"config --services"* ]]; then printf "app\\n"; fi\n',
+        'if [[ "$*" == *"config --services"* ]]; then printf "app\\n"; fi\n'
+        'if [[ "$*" == *"config --format json"* ]]; then printf \'{"services": {}}\\n\'; fi\n',
     )
     assert run_in(kit, root, "validate", "custom").returncode == 0
     assert seen.read_text().splitlines()[0].split("|") == [
@@ -2211,3 +2214,38 @@ def test_the_cli_mounts_the_override_layers_of_a_kit_deployment(tmp_path):
         str(shared_config), empty, str(deployment / "config"), empty,
     ]
     assert Path(empty).is_dir()
+
+
+def test_overlay_contract_rules_only_warn_for_changes_to_base_services():
+    mount = {"type": "bind", "source": "/base/dds.xml", "target": "/etc/dds.xml", "read_only": True}
+    base = {"app": {"command": ["launch"], "image": "base@sha256:a", "volumes": [mount]}}
+    assert cli_compose.overlay_warnings(base, base, set()) == []
+    services = {
+        "app": {"command": ["other"], "image": "kit@sha256:b", "volumes": [
+            mount, {"type": "bind", "source": "/kit/config", "target": "/opt/autoware/config"},
+            {"type": "bind", "source": "/kit/overlay", "target": "/openadkit/overlay_ws"},
+        ]},
+        "extra": {"command": ["custom"], "image": "custom", "volumes": []},
+    }
+    warnings = cli_compose.overlay_warnings(base, services, {"TYPO"})
+    assert [item["rule"] for item in warnings] == ["command", "image", "internal-mount", "variable"]
+    assert all(item.get("service") != "extra" for item in warnings)
+    for target in ("/", "/tmp", "/tmp/openadkit/config", "/usr/local/bin"):
+        changed = {"app": {**base["app"], "volumes": [{"type": "bind", "source": "/kit", "target": target}]}}
+        assert [item["rule"] for item in cli_compose.overlay_warnings(base, changed, set())] == ["internal-mount"]
+
+
+def test_kit_validate_records_contract_warnings_without_failing(tmp_path):
+    root, _ = runtime_tree(tmp_path, config_env="VALUE=base\n")
+    kit = integrator_kit(tmp_path, root, config_env="VALUE=kit\nTYPO=value\n")
+    recording_docker(tmp_path)
+    result = run_in(kit, root, "validate", "custom", "--json")
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["base"] == "example"
+    assert report["overlayConformant"] is False
+    assert report["overlayWarnings"] == [{
+        "rule": "variable", "variable": "TYPO",
+        "message": "TYPO: variable is not declared by the base, kit artifacts or data",
+    }]
+    assert "warning: overlay contract" in result.stderr

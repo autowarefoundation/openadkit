@@ -56,8 +56,8 @@ openadkit fetch carla-simulation      # Autoware host only (the map is autoware-
 
 ## Configure the bridge endpoints
 
-Create or edit `deployments/<workload>/config.local.env` on each host
-(gitignored). Use the host's LAN IP, not `0.0.0.0`:
+Create or edit `~/.config/openadkit/<workload>.env` on each host. Use the
+host's LAN IP, not `0.0.0.0`:
 
 | Host | Variables |
 | --- | --- |
@@ -94,7 +94,7 @@ openadkit run scenario-simulation --node scenario
 
 The runner waits up to `SCENARIO_READY_TIMEOUT` for Autoware readiness over
 Zenoh before launching the scenario. Results are written on the **scenario**
-host under `OUTPUT_HOST_PATH` (`./output`). The visualizer stays on the
+host under `~/.local/state/openadkit/scenario-simulation/output`. The visualizer stays on the
 Autoware host; noVNC is loopback-only (`WEBSOCKIFY_BIND`), so remote desks use
 an SSH tunnel.
 
@@ -110,13 +110,13 @@ Both hosts need an NVIDIA GPU. Start Autoware first:
 
 ```bash
 # Autoware host
-openadkit run carla-simulation --node autoware --gpu
+openadkit run carla-simulation --node autoware
 ```
 
 Then the CARLA host:
 
 ```bash
-openadkit run carla-simulation --node carla --gpu
+openadkit run carla-simulation --node carla
 ```
 
 CARLA RPC (`127.0.0.1:2000`) and map loading stay local to the CARLA host.

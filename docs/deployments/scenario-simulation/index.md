@@ -23,19 +23,19 @@ Run Autoware on one host and the TIER IV runner on another with `--node`; see
 
 `run` downloads the Kashiwanoha map. Autoware takes about 90 seconds to
 initialize; the runner then executes the scenario and writes the results to
-`deployments/scenario-simulation/output`.
+`~/.local/state/openadkit/scenario-simulation/output` (`run` prints the path).
 
 --8<-- "includes/visualizer-remote-access.md"
 
 ## Configure
 
-Put overrides in `deployments/scenario-simulation/config.local.env`:
+Put overrides in `~/.config/openadkit/scenario-simulation.env`:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `SCENARIO` | Scenario path inside the container | Bundled example |
 | `SCENARIO_HOST_DIR` | Host scenario directory, mounted at `/scenarios` | `./scenarios` |
-| `OUTPUT_HOST_PATH` | Host results directory | `./output` |
+| `OUTPUT_HOST_PATH` | Host results directory | `~/.local/state/openadkit/scenario-simulation/output` |
 | `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware before running | `300` |
 | `MAP_PATH` | Host map directory | `~/autoware_map/kashiwanoha_map` |
 
@@ -46,8 +46,12 @@ example, `SCENARIO=/scenarios/my-scenario.yaml`. Scenarios must match the map: a
 custom map needs matching `MAP_PATH`, `LANELET2_MAP_FILE`, and
 `POINTCLOUD_MAP_FILE` values, and the planning sample map does not work here.
 
-Autoware parameter overrides for this deployment live in
-`config/mrm_handler.param.yaml` and `config/default_adapi.param.yaml`.
+This deployment changes two Autoware parameters, each in a file that holds only
+the changed value. On every start, the images merge these files into the
+upstream parameter files:
+
+- `config/autoware/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml`
+- `config/autoware/autoware_default_adapi_universe/config/default_adapi.param.yaml`
 
 ## Stop and Recover
 

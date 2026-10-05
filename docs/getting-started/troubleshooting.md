@@ -28,7 +28,8 @@ openadkit fetch <deployment> --force
 ```
 
 `validate --data` reports each resource as `ok`, `missing`, or `incomplete`;
-add `--gpu` to it for CARLA and for Logging Simulation's CenterPoint models.
+add `--gpu` to it for Logging Simulation's CenterPoint models (CARLA always
+runs in GPU mode).
 `fetch` always includes GPU data.
 
 ## GPU

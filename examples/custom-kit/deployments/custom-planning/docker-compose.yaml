@@ -1,0 +1,27 @@
+# Include the pinned Planning Simulation and add services (extension point 4).
+# The CLI sets KIT_openadkit to the Open AD Kit this kit extends.
+include:
+  - ${KIT_openadkit}/deployments/planning-simulation/docker-compose.yaml
+
+services:
+  heartbeat:
+    # A kit artifact (extension point 5), pinned in this kit's openadkit.json.
+    image: ${HEARTBEAT_IMAGE:?pinned in openadkit.json artifacts}
+    network_mode: none
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+  acme-probe:
+    # The kit's own C++ node from overlay_ws (extension point 3), built by
+    # overlay_ws/build.sh. It runs in an Open AD Kit runtime image, whose
+    # entrypoint hook sources the overlay workspace mounted below.
+    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
+    network_mode: host
+    ipc: host
+    env_file:
+      - ${KIT_openadkit}/deployments/shared/runtime.env
+    volumes:
+      - ${KIT_openadkit}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
+    command: ros2 run acme_probe probe
+    restart: on-failure

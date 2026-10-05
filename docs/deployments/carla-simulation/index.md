@@ -20,7 +20,7 @@ openadkit setup --gpu --verify
 --8<-- "includes/cli-command-context.md"
 
 ```bash
-openadkit run carla-simulation --gpu
+openadkit run carla-simulation
 ```
 
 `run` downloads and verifies the Town01 map, then starts CARLA and the Autoware

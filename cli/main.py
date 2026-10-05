@@ -5,24 +5,80 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import string
 import subprocess
 import sys
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any, NoReturn
 
 import compose
 import data
 from manifest import (
     OpenADKitError,
+    RuntimeContext,
     deployment_integrity,
     get_deployment,
+    load_json,
     load_kit,
+    require_string,
+    resolve_extends,
     root_path,
 )
 
 
-class OpenADKitParser(argparse.ArgumentParser):
-    help_inventory = None
+def find_kit(start: Path) -> Path | None:
+    """The integrator kit around the working directory, if any.
 
-    def error(self, message: str) -> None:
+    Like git, the nearest openadkit.json wins; it is a kit only when its kind
+    is "kit". OPENADKIT_KIT names the kit directly.
+    """
+    explicit = os.environ.get("OPENADKIT_KIT")
+    if explicit:
+        return Path(explicit).resolve()
+    for directory in (start, *start.parents):
+        manifest = directory / "openadkit.json"
+        if manifest.is_file():
+            try:
+                kind = json.loads(manifest.read_text(encoding="utf-8")).get("kind")
+            except (OSError, ValueError, AttributeError):
+                return None
+            return directory if kind == "kit" else None
+    return None
+
+
+def read_extends(kit_root: Path) -> str:
+    return require_string(load_json(kit_root / "openadkit.json").get("extends"), "extends")
+
+
+def load_context() -> tuple[Path, RuntimeContext]:
+    """The kit to act on, run by the CLI of the Open AD Kit it pins."""
+    cli_root = root_path()
+    kit_root = find_kit(Path.cwd())
+    if kit_root is None:
+        return cli_root, load_kit(cli_root)
+    # Hand over before reading anything else: only the pinned release's CLI
+    # is guaranteed to understand that release's manifests.
+    base_root = resolve_extends(kit_root, read_extends(kit_root))
+    if base_root != cli_root:
+        if os.environ.get("OPENADKIT_DELEGATED"):
+            raise OpenADKitError(f"{base_root}/openadkit did not run this kit as its own CLI")
+        launcher = base_root / "openadkit"
+        if not launcher.is_file():
+            raise OpenADKitError(f"{base_root} has no openadkit launcher")
+        environment = os.environ | {
+            "OPENADKIT_KIT": str(kit_root),
+            "OPENADKIT_DELEGATED": "1",
+        }
+        os.execve(launcher, [str(launcher), *sys.argv[1:]], environment)
+    return kit_root, load_kit(kit_root)
+
+
+class OpenADKitParser(argparse.ArgumentParser):
+    help_inventory: str | None = None
+
+    def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
         print(f"error: {message}", file=sys.stderr)
         raise SystemExit(2)
@@ -32,8 +88,7 @@ class OpenADKitParser(argparse.ArgumentParser):
         if self.help_inventory != "catalog":
             return
         try:
-            root = root_path()
-            kit = load_kit(root)
+            root, kit = load_context()
         except OpenADKitError:
             return
         print(file=file)
@@ -199,7 +254,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
+def _print_table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> None:
     widths = [len(header) for header in headers]
     for row in rows:
         for index, cell in enumerate(row):
@@ -302,13 +357,20 @@ def show_version(root, kit, *, json_output: bool = False) -> int:
                     "bundle": kit.kind,
                     "version": version,
                     "commit": commit,
+                    "extends": kit.extends,
+                    "bom": kit.bom(),
                 }
             )
         )
         return 0
-    if kit.kind == "release":
+    if kit.extends is not None:
+        print(f"kit: {root}")
+        print(f"extends: Open AD Kit {kit.extends} ({kit.base_root})")
+    elif kit.kind == "release":
         print(f"Open AD Kit {kit.version or 'unknown'}")
         print("bundle: release")
+        if kit.autoware:
+            print(f"autoware: {kit.autoware['version']} ({kit.autoware['ref']})")
     else:
         print("Open AD Kit development")
         print(f"commit: {commit or 'unknown'}")
@@ -322,6 +384,27 @@ def warn_if_modified(root, deployment, kit) -> None:
             f"warning: {deployment.name} has been modified from this release",
             file=sys.stderr,
         )
+    if deployment.evidence_exemption:
+        print(
+            f"warning: {deployment.name} is not verified in CI: "
+            f"{deployment.evidence_exemption}",
+            file=sys.stderr,
+        )
+    legacy = deployment.directory / "config.local.env"
+    if legacy.exists():
+        print(
+            f"warning: {legacy} is no longer read; move its settings to "
+            f"{deployment.site_config}",
+            file=sys.stderr,
+        )
+
+
+def output_path(selection) -> str | None:
+    """Where the deployment writes results, as Compose will resolve it."""
+    value = selection.environment.get("OUTPUT_HOST_PATH")
+    if not value:
+        return None
+    return string.Template(value).safe_substitute(selection.environment)
 
 
 def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> None:
@@ -351,12 +434,19 @@ def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> 
         )
 
 
-def print_run_next_steps(deployment, services: set[str], node: str | None) -> None:
+def print_run_next_steps(
+    deployment, services: set[str], node: str | None, output: str | None
+) -> None:
     target = deployment.name if node is None else f"{deployment.name} --node {node}"
     print(f"running: {target}")
     if "visualizer" in services:
         print("visualizer: https://localhost:6080/vnc.html")
-        print("password: REMOTE_PASSWORD (default openadkit; override in config.local.env)")
+        print(
+            "password: REMOTE_PASSWORD (default openadkit; override in "
+            f"{deployment.site_config})"
+        )
+    if output:
+        print(f"output: {output}")
     print(f"stop with: openadkit stop {target}")
 
 
@@ -364,8 +454,7 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     if args.show_version:
-        root = root_path()
-        kit = load_kit(root)
+        root, kit = load_context()
         return show_version(root, kit)
     if not args.command:
         parser.print_help()
@@ -380,8 +469,7 @@ def main() -> int:
         print(f"error: run: {usage}", file=sys.stderr)
         return 2
 
-    root = root_path()
-    kit = load_kit(root)
+    root, kit = load_context()
 
     if args.command == "list":
         return list_deployments(root, kit, json_output=args.json_output)
@@ -395,14 +483,14 @@ def main() -> int:
             return 2
         deployment = get_deployment(root, kit, args.deployment)
         selection = deployment.select(kit, None, False, operational=True)
-        results = data.check_installed_data(
+        installed = data.check_installed_data(
             deployment, selection, include_gpu=True
         )
         if not args.data:
-            if not results:
+            if not installed:
                 print("no data resources declared")
                 return 0
-            for item in results:
+            for item in installed:
                 print(
                     f"{item['name']}: {item['status']} ({item['destination']})"
                 )
@@ -434,9 +522,10 @@ def main() -> int:
 
         data.validate_destinations(deployment, selection)
         configured_services = compose.render(deployment, selection)
+        overlay_warnings = compose.check_overlay(deployment, selection, kit)
         if args.command == "validate":
             mode = "gpu" if selection.gpu else "cpu"
-            results = (
+            results: list[dict[str, Any]] | None = (
                 data.check_installed_data(deployment, selection)
                 if args.data
                 else None
@@ -448,6 +537,9 @@ def main() -> int:
                             "schemaVersion": 1,
                             "deployment": deployment.name,
                             "manifestValid": True,
+                            "base": deployment.base.name if deployment.base else None,
+                            "overlayConformant": not overlay_warnings,
+                            "overlayWarnings": overlay_warnings,
                             "rosDistro": selection.ros_distro,
                             "gpu": selection.gpu,
                             "node": selection.node,
@@ -497,7 +589,9 @@ def main() -> int:
         data.install_data(deployment, selection, args.force)
         compose.create_writable_mounts(deployment, selection)
         compose.start(deployment, selection, args.pull)
-        print_run_next_steps(deployment, configured_services, selection.node)
+        print_run_next_steps(
+            deployment, configured_services, selection.node, output_path(selection)
+        )
         return 0
 
     compose.ensure_runtime_user()

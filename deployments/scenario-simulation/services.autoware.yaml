@@ -31,8 +31,6 @@ services:
   system:
     depends_on:
       - map
-    volumes:
-      - ./config/mrm_handler.param.yaml:/opt/autoware/autoware_launch/share/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml:ro
 
   control:
     depends_on:
@@ -55,8 +53,6 @@ services:
   api:
     depends_on:
       - map
-    volumes:
-      - ./config/default_adapi.param.yaml:/opt/autoware/autoware_default_adapi_universe/share/autoware_default_adapi_universe/config/default_adapi.param.yaml:ro
 
   visualizer:
     depends_on:

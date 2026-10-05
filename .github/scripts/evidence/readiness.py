@@ -8,7 +8,6 @@ non-zero when an item misses its deadline.
 import argparse
 import json
 import subprocess
-import sys
 import time
 
 

@@ -1,0 +1,7 @@
+# Config override (extension point 2): only the parameters that differ.
+# The entrypoint hook merges them into autoware_launch's file on every start,
+# so upstream changes to the other parameters still arrive on upgrade.
+/**:
+  ros__parameters:
+    nominal:
+      vel_lim: 8.0

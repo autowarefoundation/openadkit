@@ -27,12 +27,13 @@ openadkit stop planning-simulation
 
 - Add `--ros-distro jazzy` to `validate`, `fetch`, or `run` to select Jazzy;
   Humble is the default.
-- Add `--gpu` for GPU mode. CARLA requires it and is Humble-only.
+- Add `--gpu` for the optional GPU mode of Logging Simulation. CARLA needs a GPU,
+  so its GPU mode turns on by itself; it is Humble-only.
 - Add `--node` to `validate` or `run` to start one node of a
   [split-host](split-host.md) run. `status`, `logs`, and `stop` find the
   running node themselves; they take `--node` only when several nodes of one
   deployment run on the same machine.
-- Put local settings in `config.local.env`; see
+- Put host settings in `~/.config/openadkit/<name>.env`; see
   [Configuration](../getting-started/cli.md#configuration).
 
 Split-host nodes are experimental: they ship in the release and become

@@ -151,4 +151,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD bash -c 'if [ "${REMOTE_DISPLAY:-true}" = false ]; then exit 0; fi; exec 3<>/dev/tcp/127.0.0.1/6080 && exec 4<>/dev/tcp/127.0.0.1/5999'
 
 USER aw
-ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]
+# The integrator-layer hook from universe-common runs first (components/overlay).
+ENTRYPOINT ["/opt/openadkit/openadkit-hook.sh", "/usr/local/bin/visualizer_entrypoint.sh"]

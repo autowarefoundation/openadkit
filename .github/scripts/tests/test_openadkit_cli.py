@@ -4,7 +4,6 @@ import json
 import os
 import platform
 import re
-from pathlib import Path
 import shutil
 import signal
 import subprocess
@@ -12,16 +11,17 @@ import sys
 import tarfile
 import threading
 import time
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import zipfile
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cli"))
 
 import compose as cli_compose  # noqa: E402
+import data as cli_data  # noqa: E402
 import manifest as cli_manifest  # noqa: E402
 
 ENTRYPOINT = ROOT / "openadkit"
@@ -53,9 +53,12 @@ def executable(path, content):
     path.chmod(0o755)
 
 
+JAZZY_ARTIFACT = f"registry.example/sim:jazzy@sha256:{'c' * 64}"
+
+
 def minimal_manifest(name="example", *, data=None):
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "name": name,
         "description": "Test deployment",
         "compose": {
@@ -110,7 +113,7 @@ def clean_manifest():
 def kit_document(root, *, release, manifest):
     deployments = {"example": {"path": "deployments/example"}}
     document = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "kind": "release" if release else "repository",
         "defaultRosDistro": "humble",
         "componentImages": COMPONENT_IMAGES,
@@ -123,6 +126,7 @@ def kit_document(root, *, release, manifest):
         root / "deployments/example"
     )
     document["version"] = "v1.2.3"
+    document["autoware"] = {"version": "1.8.0", "ref": "a" * 40, "lockSha256": "b" * 64}
     document["images"] = {
         distro: {
             target: f"registry.example/{target}:{distro}@sha256:{'1' * 64}"
@@ -243,9 +247,25 @@ def fake_docker(
     return bin_dir, calls
 
 
+USER_ROOT_ENV = (
+    "XDG_CONFIG_HOME", "XDG_STATE_HOME", "OPENADKIT_CONFIG_DIR", "OPENADKIT_STATE_DIR",
+)
+
+
+def site_config(root, text, name="example"):
+    """Write the host settings file the CLI loads last for a deployment."""
+    path = root.parent / "home/.config/openadkit" / f"{name}.env"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
 def run_cli(root, *args, **env):
     """Run the tree's entrypoint; a fake docker in <tmp>/bin comes first on PATH."""
     command_env = os.environ | {"HOME": str(root.parent / "home")}
+    # User roots resolve under the fake HOME unless a test sets them.
+    for name in USER_ROOT_ENV:
+        command_env.pop(name, None)
     bin_dir = root.parent / "bin"
     if bin_dir.is_dir():
         command_env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
@@ -299,9 +319,12 @@ def standalone_release(base, version="v1.2.3", files=None, *, digest=None, entri
         files = files or {
             "openadkit": ENTRYPOINT.read_bytes(),
             "openadkit.json": json.dumps(
-                {"schemaVersion": 1, "kind": "release", "version": version}
+                {"schemaVersion": 2, "kind": "release", "version": version}
             ).encode(),
             "cli/main.py": b'print("ok")\n',
+            # uninstall asks the bundled CLI which projects are live.
+            "cli/compose.py": (ROOT / "cli/compose.py").read_bytes(),
+            "cli/manifest.py": (ROOT / "cli/manifest.py").read_bytes(),
         }
         staging = base / "staging"
         for relative, payload in files.items():
@@ -756,11 +779,8 @@ def test_repository_catalog_matches_the_deployments():
     ):
         assert re.search(rf"{name}\s+source\s+{gpu}\s+", result.stdout)
     assert "zenoh" not in result.stdout
-    carla = entry("validate", "carla-simulation", cwd=ROOT)
-    assert carla.returncode != 0
     if ARCH == "amd64":
-        assert "requires --gpu" in carla.stderr
-        jazzy = entry("validate", "carla-simulation", "--gpu", "--ros-distro", "jazzy", cwd=ROOT)
+        jazzy = entry("validate", "carla-simulation", "--ros-distro", "jazzy", cwd=ROOT)
         assert "does not support ROS distro jazzy" in jazzy.stderr
 
 
@@ -855,14 +875,18 @@ def test_gpu_overlay_requires_gpu_env(tmp_path):
     assert "GPU environment file" in result.stderr
 
 
-def test_deployment_checksum_ignores_runtime_output(tmp_path):
+def test_deployment_checksum_ignores_local_leftovers_only(tmp_path):
+    # Results live under the state root now, so any other file in the
+    # deployment directory is a modification.
     (tmp_path / "config.env").write_text("x=1\n")
-    (tmp_path / "output").mkdir()
     baseline = cli_manifest.deployment_checksum(tmp_path)
-    (tmp_path / "output/result.json").write_text("{}\n")
-    (tmp_path / ".cache").mkdir()
-    (tmp_path / ".cache/tmp").write_text("n\n")
+    (tmp_path / "config.local.env").write_text("x=2\n")
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__/m.pyc").write_bytes(b"\0")
     assert cli_manifest.deployment_checksum(tmp_path) == baseline
+    (tmp_path / "output").mkdir()
+    (tmp_path / "output/result.json").write_text("{}\n")
+    assert cli_manifest.deployment_checksum(tmp_path) != baseline
 
 
 # --- Environment files and images --------------------------------------------
@@ -874,9 +898,7 @@ def test_env_files_are_ordered_and_override_the_shell(tmp_path):
         config_env="MAP_PATH=$HOME/autoware_map/sample\nLIDAR_DETECTION_MODEL=clustering\n",
     )
     (deployment / "config.gpu.env").write_text("LIDAR_DETECTION_MODEL=centerpoint\n")
-    (deployment / "config.local.env").write_text(
-        "LIDAR_DETECTION_MODEL=from-local\nREMOTE_PASSWORD='pa$word'\n"
-    )
+    site_config(root, "LIDAR_DETECTION_MODEL=from-local\nREMOTE_PASSWORD='pa$word'\n")
     seen = tmp_path / "seen-env"
     executable(
         tmp_path / "bin/docker",
@@ -895,8 +917,8 @@ def test_env_files_are_ordered_and_override_the_shell(tmp_path):
         assert recorded[:3] == ["unset", "unset", "unset"]
         return [Path(item.split()[0]).name for item in recorded[3].split("--env-file ")[1:]]
 
-    assert env_files() == ["config.env", "config.local.env"]
-    assert env_files("--gpu") == ["config.env", "config.gpu.env", "config.local.env"]
+    assert env_files() == ["config.env", "example.env"]
+    assert env_files("--gpu") == ["config.env", "config.gpu.env", "example.env"]
 
 
 def test_shell_map_path_does_not_redirect_data(tmp_path):
@@ -927,15 +949,16 @@ def test_dotenv_follows_compose_comment_and_export_rules(tmp_path):
     ("args", "default", "expected"),
     [
         ((), "humble", distro_line("humble")),
-        (("--ros-distro", "jazzy"), "humble", distro_line("jazzy", "jazzy-value")),
-        ((), "jazzy", distro_line("jazzy", "jazzy-value")),
+        (("--ros-distro", "jazzy"), "humble", distro_line("jazzy", JAZZY_ARTIFACT)),
+        ((), "jazzy", distro_line("jazzy", JAZZY_ARTIFACT)),
     ],
 )
 def test_repository_injects_distro_and_development_images(tmp_path, args, default, expected):
-    manifest = minimal_manifest()
-    manifest["distroEnvironment"] = {"jazzy": {"DISTRO_VALUE": "jazzy-value"}}
-    root, _ = runtime_tree(tmp_path, manifest=manifest)
-    edit_kit(root, lambda kit: kit.update(defaultRosDistro=default))
+    root, _ = runtime_tree(tmp_path)
+    edit_kit(root, lambda kit: kit.update(
+        defaultRosDistro=default,
+        artifacts={"DISTRO_VALUE": {"workload": "sim", "distros": {"jazzy": JAZZY_ARTIFACT}}},
+    ))
     _, calls = fake_docker(tmp_path)
     result = run_cli(root, "validate", "example", *args)
     assert result.returncode == 0, result.stderr
@@ -945,7 +968,7 @@ def test_repository_injects_distro_and_development_images(tmp_path, args, defaul
 def test_repository_component_image_override_is_preserved(tmp_path):
     root, deployment = runtime_tree(tmp_path)
     exact = f"registry.example/custom-api@sha256:{'b' * 64}"
-    (deployment / "config.local.env").write_text(f"API_IMAGE={exact}\n")
+    site_config(root, f"API_IMAGE={exact}\n")
     _, calls = fake_docker(tmp_path)
     assert run_cli(root, "validate", "example").returncode == 0
     assert calls.read_text().split("|", 5)[2] == exact
@@ -957,7 +980,7 @@ def test_release_injects_exact_images_over_env_files(tmp_path):
     edit_kit(root, lambda kit: kit["images"]["humble"].update(api=exact))
     with (deployment / "config.env").open("a") as output:
         output.write("API_IMAGE=registry.example/from-config\n")
-    (deployment / "config.local.env").write_text("API_IMAGE=registry.example/from-local\n")
+    site_config(root, "API_IMAGE=registry.example/from-local\n")
     _, calls = fake_docker(tmp_path)
     result = run_cli(root, "validate", "example")
     assert result.returncode == 0, result.stderr
@@ -1234,13 +1257,17 @@ def served_resource(http, text, **extra):
 
 def test_fetch_verifies_and_publishes_zip_data(tmp_path, http):
     manifest = minimal_manifest(data=[zip_resource(http, {"dataset/required.txt": "ok"})])
-    # fetch downloads everything, even for a deployment that requires --gpu.
+    # fetch downloads everything, even for a deployment that requires a GPU.
     manifest["requirements"]["gpu"] = "required"
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     result = run_cli(root, "fetch", "example")
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "home/data/example/required.txt").read_text() == "ok"
-    assert "requires --gpu" in run_cli(root, "validate", "example").stderr
+    # GPU mode turns on by itself where a GPU is required.
+    fake_docker(tmp_path)
+    validated = run_cli(root, "validate", "example", "--json")
+    assert validated.returncode == 0, validated.stderr
+    assert json.loads(validated.stdout)["gpu"] is True
 
 
 def test_fetch_checksum_failure_preserves_existing_data(tmp_path, http):
@@ -1281,6 +1308,11 @@ def test_run_force_reinstalls_incomplete_data(tmp_path, http):
     assert blocked.returncode != 0
     assert "incomplete data" in blocked.stderr
     assert "rerun with --force" in blocked.stderr
+    # --force replaces only data the CLI installed.
+    refused = run_cli(root, "run", "example", "--pull", "never", "--force")
+    assert refused.returncode != 0
+    assert "refusing to replace" in refused.stderr
+    mark_managed(target)
     result = run_cli(root, "run", "example", "--pull", "never", "--force")
     assert result.returncode == 0, result.stderr
     assert (target / "required.txt").read_text() == "replaced"
@@ -1362,6 +1394,12 @@ def test_validate_data_reports_missing_incomplete_and_ok(tmp_path):
     result = run_cli(root, "validate", "example", "--data")
     assert result.returncode == 1, result.stdout
     assert "data: sample-map incomplete" in result.stdout
+    # Not installed by the CLI, so fetch --force would refuse it.
+    assert "cannot be replaced in place" in result.stderr
+
+    mark_managed(target)
+    result = run_cli(root, "validate", "example", "--data")
+    assert result.returncode == 1, result.stdout
     assert "openadkit fetch example --force" in result.stderr
 
     (target / "lanelet2_map.osm").write_text("map\n")
@@ -1402,6 +1440,7 @@ def test_validate_json_output(tmp_path):
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {
         "schemaVersion": 1, "deployment": "example", "manifestValid": True,
+        "base": None, "overlayConformant": True, "overlayWarnings": [],
         "rosDistro": "humble", "gpu": False, "node": None, "dataValid": None, "data": [],
     }
     result = run_cli(root, "validate", "example", "--data", "--json")
@@ -1414,8 +1453,13 @@ def test_validate_json_output(tmp_path):
 # --- clean ---------------------------------------------------------------------
 
 
+def mark_managed(target):
+    """Make a data directory look like one the CLI installed."""
+    (target / cli_data.MARKER).write_text('{"resource": "test"}\n')
+
+
 def clean_tree(tmp_path, *, compose_ls="[]"):
-    """Deployment with a map and a GPU model, both present on disk."""
+    """Deployment with a map and a GPU model, both installed by the CLI."""
     root, _ = runtime_tree(tmp_path, manifest=clean_manifest(), config_env=CLEAN_ENV)
     fake_docker(tmp_path, compose_ls=compose_ls)
     home = tmp_path / "home"
@@ -1424,6 +1468,8 @@ def clean_tree(tmp_path, *, compose_ls="[]"):
     (map_dir / "lanelet2_map.osm").write_text("map\n")
     gpu_dir.mkdir()
     (gpu_dir / "model.onnx").write_text("model\n")
+    mark_managed(map_dir)
+    mark_managed(gpu_dir)
     return root, map_dir, gpu_dir
 
 
@@ -1442,14 +1488,29 @@ def test_clean_lists_and_removes_all_declared_data(tmp_path):
     assert not map_dir.exists() and not gpu_dir.exists()
 
 
-def test_clean_removes_a_file_target(tmp_path):
-    root, map_dir, _ = clean_tree(tmp_path)
+@pytest.mark.parametrize("kind", ["directory", "file"])
+def test_clean_refuses_data_it_did_not_install(tmp_path, kind):
+    root, map_dir, gpu_dir = clean_tree(tmp_path)
     shutil.rmtree(map_dir)
-    map_dir.write_text("corrupted\n")
+    if kind == "directory":
+        map_dir.mkdir()
+        (map_dir / "notes.txt").write_text("mine\n")
+    else:
+        map_dir.write_text("mine\n")
     result = run_cli(root, "clean", "example", "--data")
+    assert result.returncode != 0
+    assert f"refusing to remove {map_dir}: it was not installed by openadkit" in result.stderr
+    # Nothing is deleted when any target is refused.
+    assert map_dir.exists() and gpu_dir.is_dir()
+
+
+def test_install_marks_the_data_it_publishes(tmp_path, http):
+    root, _ = runtime_tree(tmp_path, manifest=minimal_manifest(data=[served_resource(http, "fresh")]))
+    fake_docker(tmp_path)
+    result = run_cli(root, "fetch", "example")
     assert result.returncode == 0, result.stderr
-    assert f"removed data: {map_dir}" in result.stdout
-    assert not map_dir.exists()
+    target = tmp_path / "home/data/example"
+    assert json.loads((target / cli_data.MARKER).read_text()) == {"resource": "dataset"}
 
 
 def test_clean_refuses_a_symlink_before_deleting_anything(tmp_path):
@@ -1749,3 +1810,442 @@ def test_missing_node_compose_file_is_reported(tmp_path):
     root, deployment = runtime_tree(tmp_path, manifest=node_manifest())
     (deployment / "compose.primary.yaml").unlink()
     assert "missing Compose file" in run_cli(root, "list").stdout
+
+
+# --- User roots -----------------------------------------------------------------
+
+
+def test_user_roots_follow_overrides_then_xdg_then_home(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path)
+    home = root.parent / "home"
+
+    def roots(**env):
+        result = run_cli(root, "validate", "example", "--json", **env)
+        assert result.returncode == 0, result.stderr
+        return (tmp_path / "docker-calls").read_text()
+
+    assert str(home / ".config/openadkit/example.env") not in roots()
+    site_config(root, "VALUE=site\n")
+    assert str(home / ".config/openadkit/example.env") in roots()
+
+    xdg = tmp_path / "xdg"
+    (xdg / "openadkit").mkdir(parents=True)
+    (xdg / "openadkit/example.env").write_text("VALUE=xdg\n")
+    assert str(xdg / "openadkit/example.env") in roots(XDG_CONFIG_HOME=str(xdg))
+
+    explicit = tmp_path / "explicit"
+    explicit.mkdir()
+    (explicit / "example.env").write_text("VALUE=explicit\n")
+    assert str(explicit / "example.env") in roots(
+        XDG_CONFIG_HOME=str(xdg), OPENADKIT_CONFIG_DIR=str(explicit)
+    )
+
+
+def test_output_directory_is_injected_under_the_state_root(tmp_path):
+    root, deployment = runtime_tree(
+        tmp_path, config_env="OUTPUT_HOST_PATH=${OPENADKIT_OUTPUT_DIR}\n"
+    )
+    seen = tmp_path / "seen-output"
+    executable(
+        tmp_path / "bin/docker",
+        f'#!/usr/bin/env bash\nprintf "%s\\n" "${{OPENADKIT_OUTPUT_DIR-unset}}" >> {json.dumps(str(seen))}\n',
+    )
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    home = root.parent / "home"
+    assert seen.read_text().split()[0] == str(home / ".local/state/openadkit/example/output")
+
+    seen.unlink()
+    state = tmp_path / "state"
+    result = run_cli(root, "validate", "example", OPENADKIT_STATE_DIR=str(state))
+    assert result.returncode == 0, result.stderr
+    assert seen.read_text().split()[0] == str(state / "example/output")
+
+
+def test_legacy_local_config_is_ignored_with_a_warning(tmp_path):
+    root, deployment = runtime_tree(tmp_path)
+    (deployment / "config.local.env").write_text("VALUE=legacy\n")
+    _, calls = fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert "config.local.env is no longer read" in result.stderr
+    assert ".config/openadkit/example.env" in result.stderr
+    assert "config.local.env" not in calls.read_text()
+
+
+def test_run_prints_the_resolved_output_path(tmp_path):
+    root, _ = runtime_tree(
+        tmp_path,
+        config_env="REMOTE_PASSWORD=default\nOUTPUT_HOST_PATH=${OPENADKIT_OUTPUT_DIR}\n",
+    )
+    fake_docker(tmp_path)
+    result = run_cli(root, "run", "example", "--pull", "never")
+    assert result.returncode == 0, result.stderr
+    expected = root.parent / "home/.local/state/openadkit/example/output"
+    assert f"output: {expected}" in result.stdout
+
+
+# --- Manifest v2 and artifacts --------------------------------------------------
+
+
+def test_v1_manifests_are_rejected(tmp_path):
+    root, _ = runtime_tree(tmp_path / "kit")
+    edit_kit(root, lambda kit: kit.update(schemaVersion=1))
+    result = run_cli(root, "list")
+    assert result.returncode != 0
+    assert "unsupported openadkit.json schemaVersion 1 (expected 2)" in result.stderr
+
+    manifest = minimal_manifest()
+    manifest["schemaVersion"] = 1
+    root, _ = runtime_tree(tmp_path / "deployment", manifest=manifest)
+    assert "unsupported deployment schemaVersion 1 (expected 2)" in run_cli(root, "list").stdout
+
+
+@pytest.mark.parametrize(
+    ("artifacts", "message"),
+    [
+        ({"SIM": {"workload": "sim", "ref": "registry.example/sim:latest"}},
+         "artifacts.SIM must use digest-pinned image references"),
+        ({"SIM": {"workload": "sim", "ref": JAZZY_ARTIFACT, "distros": {"jazzy": JAZZY_ARTIFACT}}},
+         "artifacts.SIM needs exactly one of ref or distros"),
+        ({"API_IMAGE": {"workload": "api", "ref": JAZZY_ARTIFACT}},
+         "artifacts.API_IMAGE is already a component image"),
+        ({"SIM": {"workload": "Sim", "ref": JAZZY_ARTIFACT}},
+         "invalid artifacts.SIM.workload: Sim"),
+        ({"SIM": {"workload": "sim", "distros": {}}},
+         "artifacts.SIM.distros must be a nonempty object"),
+    ],
+)
+def test_artifact_schema_errors(tmp_path, artifacts, message):
+    root, _ = runtime_tree(tmp_path)
+    edit_kit(root, lambda kit: kit.update(artifacts=artifacts))
+    result = run_cli(root, "list")
+    assert result.returncode != 0
+    assert message in result.stderr
+
+
+def test_artifacts_follow_the_distro_and_a_single_ref_serves_every_distro(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    edit_kit(root, lambda kit: kit.update(artifacts={
+        "DISTRO_VALUE": {"workload": "bridge", "ref": JAZZY_ARTIFACT},
+    }))
+    _, calls = fake_docker(tmp_path)
+    for distro in ("humble", "jazzy"):
+        calls.write_text("")
+        result = run_cli(root, "validate", "example", "--ros-distro", distro)
+        assert result.returncode == 0, result.stderr
+        assert calls.read_text().split("|", 5)[1] == JAZZY_ARTIFACT
+
+
+@pytest.mark.parametrize(("release", "expected"), [(False, "override"), (True, "pinned")])
+def test_only_source_checkouts_may_override_an_artifact(tmp_path, release, expected):
+    root, _ = runtime_tree(tmp_path, release=release)
+    pinned = f"registry.example/sim@sha256:{'d' * 64}"
+    override = f"registry.example/my-sim@sha256:{'e' * 64}"
+    edit_kit(root, lambda kit: kit.update(artifacts={
+        "DISTRO_VALUE": {"workload": "sim", "ref": pinned},
+    }))
+    site_config(root, f"DISTRO_VALUE={override}\n")
+    _, calls = fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert calls.read_text().split("|", 5)[1] == {"override": override, "pinned": pinned}[expected]
+
+
+# --- Evidence exemptions --------------------------------------------------------
+
+
+def test_running_an_exempt_deployment_warns(tmp_path):
+    manifest = minimal_manifest()
+    manifest["evidence"] = {"exempt": "needs a GPU runner"}
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert "warning: example is not verified in CI: needs a GPU runner" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("evidence", "message"),
+    [
+        ({"exempt": ""}, "evidence.exempt must be a nonempty string"),
+        ({"skip": True}, "unknown evidence field(s): skip"),
+        ("none", "evidence must be an object"),
+    ],
+)
+def test_evidence_schema_errors(tmp_path, evidence, message):
+    manifest = minimal_manifest()
+    manifest["evidence"] = evidence
+    root, _ = runtime_tree(tmp_path, manifest=manifest)
+    assert message in run_cli(root, "list").stdout
+
+
+def test_evidence_cells_skip_exempt_deployments_and_add_split_cells():
+    result = subprocess.run(
+        [sys.executable, str(ROOT / ".github/scripts/validation_matrix.py"),
+         "--source-root", str(ROOT), "--evidence-cells"],
+        capture_output=True, text=True, check=True,
+    )
+    cells = json.loads(result.stdout)["include"]
+    names = {cell["deployment"] for cell in cells}
+    assert names == {"planning-simulation", "scenario-simulation"}
+    assert {"deployment": "scenario-simulation", "distro": "jazzy", "node": "split"} in cells
+    assert not any(cell.get("node") for cell in cells if cell["deployment"] == "planning-simulation")
+
+
+def test_version_reports_the_bill_of_materials(tmp_path):
+    root, _ = runtime_tree(tmp_path, release=True)
+    result = run_cli(root, "version", "--json")
+    assert result.returncode == 0, result.stderr
+    bom = json.loads(result.stdout)["bom"]
+    assert bom["autoware"]["version"] == "1.8.0"
+    assert set(bom["images"]) == {"humble", "jazzy"}
+    assert "autoware: 1.8.0" in run_cli(root, "version").stdout
+
+    root, _ = runtime_tree(tmp_path / "source")
+    bom = json.loads(run_cli(root, "version", "--json").stdout)["bom"]
+    assert bom["autoware"] is None and bom["images"] is None
+
+
+# --- Integrator kits -------------------------------------------------------------
+
+
+def integrator_kit(tmp_path, root, *, extends=None, deployment=None, artifacts=None,
+                   config_env="VALUE=kit\n"):
+    """A kit repo next to the base tree, with one deployment on the base's example."""
+    kit = tmp_path / "acme-kit"
+    document = {
+        "schemaVersion": 2,
+        "kind": "kit",
+        "extends": extends if extends is not None else str(root),
+        "deployments": {"custom": {"path": "deployments/custom"}},
+    }
+    if artifacts is not None:
+        document["artifacts"] = artifacts
+    directory = kit / "deployments/custom"
+    directory.mkdir(parents=True)
+    (kit / "openadkit.json").write_text(json.dumps(document))
+    (directory / "deployment.json").write_text(json.dumps(deployment or {
+        "schemaVersion": 2,
+        "name": "custom",
+        "description": "Acme on the example deployment",
+        "base": "example",
+        "compose": {"files": ["docker-compose.yaml"]},
+    }))
+    if config_env is not None:
+        (directory / "config.env").write_text(config_env)
+    (directory / "docker-compose.yaml").write_text(
+        "include:\n  - ${KIT_openadkit}/deployments/example/docker-compose.yaml\n"
+        "services:\n  acme:\n    image: busybox:1.36.1\n"
+    )
+    return kit
+
+
+def run_in(directory, root, *args, **env):
+    """Run the base tree's CLI from inside a kit directory."""
+    command_env = os.environ | {"HOME": str(root.parent / "home")}
+    for name in USER_ROOT_ENV + ("OPENADKIT_KIT", "OPENADKIT_DELEGATED"):
+        command_env.pop(name, None)
+    bin_dir = root.parent / "bin"
+    if bin_dir.is_dir():
+        command_env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+    command_env.update(env)
+    return subprocess.run(
+        [str(root / "openadkit"), *args],
+        cwd=directory, env=command_env, text=True, capture_output=True,
+    )
+
+
+def recording_docker(tmp_path):
+    """A docker that records its arguments and the kit include variable."""
+    seen = tmp_path / "seen-kit"
+    executable(
+        tmp_path / "bin/docker",
+        "#!/usr/bin/env bash\n"
+        f'printf "%s|%s|%s\\n" "${{KIT_openadkit-unset}}" "${{API_IMAGE-unset}}" "$*" >> {json.dumps(str(seen))}\n'
+        'if [[ "$*" == *"config --services"* ]]; then printf "app\\nacme\\n"; fi\n'
+        'if [[ "$*" == *"config --format json"* ]]; then printf \'{"services": {}}\\n\'; fi\n',
+    )
+    return seen
+
+
+def test_a_kit_runs_its_deployment_on_top_of_the_base(tmp_path):
+    root, _ = runtime_tree(tmp_path, config_env="VALUE=base\n")
+    kit = integrator_kit(tmp_path, root)
+    site_config(root, "VALUE=site\n", name="custom")
+    seen = recording_docker(tmp_path)
+
+    listed = run_in(kit, root, "list")
+    assert listed.returncode == 0, listed.stderr
+    assert re.search(r"^custom\s+source\s+none\s+Acme on the example", listed.stdout, re.M)
+
+    nested = kit / "deployments/custom"
+    result = run_in(nested, root, "validate", "custom")
+    assert result.returncode == 0, result.stderr
+    first = seen.read_text().splitlines()[0]
+    include_root, _, arguments = first.split("|", 2)
+    assert include_root == str(root)
+    assert "--project-name openadkit-custom " in arguments
+    env_files = [Path(item.split()[0]) for item in arguments.split("--env-file ")[1:]]
+    assert env_files == [
+        root / "deployments/example/config.env",
+        kit / "deployments/custom/config.env",
+        root.parent / "home/.config/openadkit/custom.env",
+    ]
+    assert f"--file {kit}/deployments/custom/docker-compose.yaml" in arguments
+
+
+def test_a_kit_inherits_the_base_requirements_and_data(tmp_path):
+    root, _ = runtime_tree(
+        tmp_path, manifest=minimal_manifest(data=[files_resource()]),
+        config_env="MAP_PATH=$HOME/data/example\n",
+    )
+    kit = integrator_kit(tmp_path, root)
+    recording_docker(tmp_path)
+    assert "does not provide a GPU mode" in run_in(kit, root, "validate", "custom", "--gpu").stderr
+    report = run_in(kit, root, "validate", "custom", "--data")
+    assert "data: dataset missing" in report.stdout
+
+    clash = integrator_kit(tmp_path / "clash", root, deployment={
+        "schemaVersion": 2, "name": "custom", "description": "d", "base": "example",
+        "compose": {"files": ["docker-compose.yaml"]},
+        "data": [files_resource("mine")],
+    })
+    result = run_in(clash, root, "list")
+    assert "data reuses a destination of the base deployment: MAP_PATH" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"base": "missing"}, "base deployment missing is not in the pinned kit; available: example"),
+        ({"requirements": {}}, "unknown manifest field(s): requirements"),
+        ({"compose": {"files": ["docker-compose.yaml"], "gpuFiles": []}},
+         "unknown compose field(s): gpuFiles"),
+    ],
+)
+def test_kit_deployment_schema_errors(tmp_path, change, message):
+    root, _ = runtime_tree(tmp_path)
+    deployment = {
+        "schemaVersion": 2, "name": "custom", "description": "d", "base": "example",
+        "compose": {"files": ["docker-compose.yaml"]},
+    }
+    deployment.update(change)
+    kit = integrator_kit(tmp_path, root, deployment=deployment)
+    assert message in run_in(kit, root, "list").stdout
+
+
+def test_a_kit_artifact_replaces_a_component_image(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    vehicle = f"registry.example/acme-api@sha256:{'f' * 64}"
+    kit = integrator_kit(tmp_path, root, artifacts={"API_IMAGE": {"workload": "api", "ref": vehicle}})
+    seen = recording_docker(tmp_path)
+    result = run_in(kit, root, "validate", "custom")
+    assert result.returncode == 0, result.stderr
+    assert seen.read_text().splitlines()[0].split("|")[1] == vehicle
+
+
+def test_a_kit_pinned_to_a_missing_release_says_how_to_install_it(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    kit = integrator_kit(tmp_path, root, extends="v9.9.9")
+    result = run_in(kit, root, "list")
+    assert result.returncode != 0
+    assert "extends Open AD Kit v9.9.9, which is not installed" in result.stderr
+    assert "openadkit install --version v9.9.9" in result.stderr
+
+
+def test_a_kit_runs_with_the_cli_of_the_release_it_pins(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    kit = integrator_kit(tmp_path, root, extends="v1.2.3")
+    pinned = tmp_path / "home/.local/share/openadkit/openadkit-v1.2.3"
+    pinned.mkdir(parents=True)
+    (pinned / "openadkit.json").write_text(json.dumps({"schemaVersion": 2, "kind": "release"}))
+    record = tmp_path / "delegated"
+    executable(
+        pinned / "openadkit",
+        "#!/usr/bin/env bash\n"
+        f'printf "%s|%s|%s\\n" "$OPENADKIT_KIT" "$OPENADKIT_DELEGATED" "$*" > {json.dumps(str(record))}\n',
+    )
+    result = run_in(kit, root, "run", "custom", "--pull", "never")
+    assert result.returncode == 0, result.stderr
+    assert record.read_text().strip() == f"{kit}|1|run custom --pull never"
+
+
+def test_kits_extend_one_level_only(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    inner = integrator_kit(tmp_path, root)
+    outer = integrator_kit(tmp_path / "outer", root, extends=str(inner))
+    result = run_in(outer, root, "list")
+    assert result.returncode != 0
+    assert "is itself a kit; only one level of extends is supported" in result.stderr
+
+
+def test_the_cli_mounts_the_override_layers_of_a_kit_deployment(tmp_path):
+    manifest = minimal_manifest()
+    manifest["shared"] = ["shared"]
+    root, deployment = runtime_tree(tmp_path, manifest=manifest)
+    shared_config = root / "deployments/shared/config"
+    shared_config.mkdir()
+    (deployment / "config").mkdir()
+    kit = integrator_kit(tmp_path, root)
+    (kit / "deployments/custom/config").mkdir()
+    (kit / "deployments/custom/overlay_ws").mkdir()
+    seen = tmp_path / "seen-layers"
+    executable(
+        tmp_path / "bin/docker",
+        "#!/usr/bin/env bash\n"
+        'printf "%s|%s|%s|%s\\n" "$OPENADKIT_CONFIG_SHARED" "$OPENADKIT_CONFIG_BASE" '
+        f'"$OPENADKIT_CONFIG_DEPLOYMENT" "$OPENADKIT_OVERLAY_WS" >> {json.dumps(str(seen))}\n'
+        'if [[ "$*" == *"config --services"* ]]; then printf "app\\n"; fi\n'
+        'if [[ "$*" == *"config --format json"* ]]; then printf \'{"services": {}}\\n\'; fi\n',
+    )
+    assert run_in(kit, root, "validate", "custom").returncode == 0
+    assert seen.read_text().splitlines()[0].split("|") == [
+        str(shared_config), str(deployment / "config"),
+        str(kit / "deployments/custom/config"), str(kit / "deployments/custom/overlay_ws"),
+    ]
+
+    # A deployment of our own has no base layer and no overlay workspace.
+    seen.unlink()
+    assert run_cli(root, "validate", "example").returncode == 0
+    empty = str(root.parent / "home/.local/state/openadkit/empty")
+    assert seen.read_text().splitlines()[0].split("|") == [
+        str(shared_config), empty, str(deployment / "config"), empty,
+    ]
+    assert Path(empty).is_dir()
+
+
+def test_overlay_contract_rules_only_warn_for_changes_to_base_services():
+    mount = {"type": "bind", "source": "/base/dds.xml", "target": "/etc/dds.xml", "read_only": True}
+    base = {"app": {"command": ["launch"], "image": "base@sha256:a", "volumes": [mount]}}
+    assert cli_compose.overlay_warnings(base, base, set()) == []
+    services = {
+        "app": {"command": ["other"], "image": "kit@sha256:b", "volumes": [
+            mount, {"type": "bind", "source": "/kit/config", "target": "/opt/autoware/config"},
+            {"type": "bind", "source": "/kit/overlay", "target": "/openadkit/overlay_ws"},
+        ]},
+        "extra": {"command": ["custom"], "image": "custom", "volumes": []},
+    }
+    warnings = cli_compose.overlay_warnings(base, services, {"TYPO"})
+    assert [item["rule"] for item in warnings] == ["command", "image", "internal-mount", "variable"]
+    assert all(item.get("service") != "extra" for item in warnings)
+    for target in ("/", "/tmp", "/tmp/openadkit/config", "/usr/local/bin"):
+        changed = {"app": {**base["app"], "volumes": [{"type": "bind", "source": "/kit", "target": target}]}}
+        assert [item["rule"] for item in cli_compose.overlay_warnings(base, changed, set())] == ["internal-mount"]
+
+
+def test_kit_validate_records_contract_warnings_without_failing(tmp_path):
+    root, _ = runtime_tree(tmp_path, config_env="VALUE=base\n")
+    kit = integrator_kit(tmp_path, root, config_env="VALUE=kit\nTYPO=value\n")
+    recording_docker(tmp_path)
+    result = run_in(kit, root, "validate", "custom", "--json")
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["base"] == "example"
+    assert report["overlayConformant"] is False
+    assert report["overlayWarnings"] == [{
+        "rule": "variable", "variable": "TYPO",
+        "message": "TYPO: variable is not declared by the base, kit artifacts or data",
+    }]
+    assert "warning: overlay contract" in result.stderr

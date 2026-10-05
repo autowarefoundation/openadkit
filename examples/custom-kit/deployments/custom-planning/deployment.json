@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "name": "custom-planning",
+  "description": "Planning Simulation with an integrator layer on top",
+  "base": "planning-simulation",
+  "compose": {
+    "files": ["docker-compose.yaml"]
+  }
+}

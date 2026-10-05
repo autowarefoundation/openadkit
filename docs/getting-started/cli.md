@@ -36,16 +36,25 @@ CenterPoint models.
 
 ## Configuration
 
-Each deployment reads its settings from environment files in
-`deployments/<name>/`, in this order (later files win):
+Each deployment reads its settings from environment files, in this order
+(later files win):
 
-1. `config.env`: the deployment defaults
-2. `config.gpu.env`: GPU settings, loaded only with `--gpu`
-3. `config.local.env`: your local overrides, ignored by Git
+1. `deployments/<name>/config.env`: the deployment defaults
+2. `deployments/<name>/config.gpu.env`: GPU settings, loaded only with `--gpu`
+3. `~/.config/openadkit/<name>.env`: your host settings
 
 Shell exports do not override variables defined in these files. Put host
-settings such as `MAP_PATH` or `REMOTE_PASSWORD` in `config.local.env`. Source
-checkouts can also override component images there; release images stay pinned.
+settings such as `MAP_PATH` or `REMOTE_PASSWORD` in your host settings file.
+It lives outside the release, so upgrades keep it. Source checkouts can also
+override component images there; release images stay pinned.
+
+| Directory | Default | Override |
+| --- | --- | --- |
+| Host settings | `~/.config/openadkit` | `OPENADKIT_CONFIG_DIR` (or `XDG_CONFIG_HOME`) |
+| Run results | `~/.local/state/openadkit/<name>/output` | `OPENADKIT_STATE_DIR` (or `XDG_STATE_HOME`) |
+
+`deployments/<name>/config.local.env` is no longer read; the CLI warns when it
+finds one. Move its settings to `~/.config/openadkit/<name>.env`.
 
 ## Upgrading
 
@@ -76,8 +85,9 @@ openadkit uninstall          # keep previously installed versions
 openadkit uninstall --all    # remove kept versions too
 ```
 
-`uninstall` is for release installs; remove a source checkout with Git. It also
-removes any `config.local.env` inside the version directory.
+`uninstall` is for release installs; remove a source checkout with Git. Host
+settings in `~/.config/openadkit` and results in `~/.local/state/openadkit` are
+kept.
 
 Downloaded data (maps, rosbags, and perception models) lives under
 `~/autoware_map` and `~/autoware_data` and is kept by `uninstall`. Inspect and
@@ -91,6 +101,11 @@ openadkit clean planning-simulation --data     # delete
 `clean --data` refuses while that deployment is running. If Scenario
 Simulation's Kashiwanoha map is removed, restore it with
 `openadkit fetch scenario-simulation --force`.
+
+The CLI marks the data it installs with a `.openadkit-resource.json` file.
+`clean --data` and `--force` only delete or replace marked data. Data that was
+already there, such as a map you copied yourself, is still used when it is
+complete, but the CLI never deletes or replaces it; move or remove it yourself.
 
 ## Split-host nodes
 

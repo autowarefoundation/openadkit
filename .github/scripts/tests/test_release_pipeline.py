@@ -1,13 +1,12 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tarfile
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[3]
 MANAGER = ROOT / ".github/scripts/manage_github_release.sh"
@@ -105,6 +104,9 @@ def write_plan(tmp_path, *, images=None):
             {
                 "build_tag": BUILD_TAG,
                 "openadkit_sha": RELEASE_SHA,
+                "autoware_ref": "d" * 40,
+                "autoware_base_version": "1.8.0",
+                "autoware_lock_sha256": "e" * 64,
                 "images": images if images is not None else build_images(),
             }
         )
@@ -120,6 +122,32 @@ def write_plan(tmp_path, *, images=None):
         capture_output=True,
     )
     return result, output
+
+
+@pytest.mark.skipif(shutil.which("docker") is None, reason="docker compose is required")
+def test_evidence_stages_the_example_on_the_digest_pinned_base(tmp_path):
+    result, _ = write_plan(tmp_path)
+    assert result.returncode == 0, result.stderr
+    staged = tmp_path / "evidence-kit"
+    result = subprocess.run([
+        "bash", str(ROOT / ".github/scripts/evidence/stage_kit.sh"), str(ROOT),
+        str(tmp_path / "build-metadata.json"), str(staged), RELEASE_SHA,
+    ], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    workspace = staged / "examples/custom-kit/deployments/custom-planning/overlay_ws"
+    assert (workspace / "src/acme_probe/src/probe.cpp").is_file()
+    assert not any((workspace / name).exists() for name in ("build", "install", "log"))
+    env = dict(os.environ)
+    for name in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED"):
+        env.pop(name, None)
+    env.update(OPENADKIT_CONFIG_DIR=str(tmp_path / "config"), OPENADKIT_STATE_DIR=str(tmp_path / "state"))
+    result = subprocess.run([
+        str(staged / "openadkit"), "validate", "custom-planning", "--ros-distro", "jazzy", "--json",
+    ], cwd=staged / "examples/custom-kit", env=env, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["base"] == "planning-simulation"
+    assert report["overlayConformant"] is True
 
 
 def run_validator(tmp_path, function, **env):
@@ -673,7 +701,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert bundled_context["componentImages"] == kit["componentImages"]
     assert "carla-interface" in bundled_context["images"]["humble"]
     expected_deployments = set(kit["deployments"])
-    for name, reference in kit["deployments"].items():
+    for reference in kit["deployments"].values():
         manifest = json.loads((ROOT / reference["path"] / "deployment.json").read_text())
         expected_deployments.update(manifest["shared"])
     bundled_deployments = {
@@ -733,6 +761,15 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     assert f"| `openadkit` | `{installer_sha256}` |" in notes
     assert f"releases/download/{VERSION}/openadkit" in notes
     assert f"install --version {VERSION}" in notes
+    # Deployments without CI evidence ship, and say so in metadata and notes.
+    bom = release_metadata["bom"]
+    assert bom["autoware"] == {"version": "1.8.0", "ref": "d" * 40, "lockSha256": "e" * 64}
+    assert set(bom["images"]) == {"humble", "jazzy"}
+    assert "SCENARIO_SIMULATOR_IMAGE" in bom["artifacts"]
+    exempt = {item["deployment"] for item in release_metadata["evidence_exempt"]}
+    assert exempt == {"carla-simulation", "logging-simulation"}
+    assert "Not verified in CI" in notes
+    assert "- `carla-simulation`: Needs an NVIDIA GPU" in notes
 
 
 def test_release_installer_and_bundle_entrypoint_come_from_the_packager(tmp_path):

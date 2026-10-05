@@ -1,20 +1,18 @@
 import io
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
 
-import resolve_image_matrices as matrices
-
+import resolve_image_matrices as matrices  # noqa: E402
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 BAKE = (ROOT / "components/docker-bake.hcl").read_text()
@@ -134,6 +132,7 @@ def test_shared_build_inputs_select_all_targets():
         ".trivyignore",
         "components/link-lock/lock.sh",
         "components/link-lock/align.sh",
+        "components/overlay/overlay.py",
     ):
         plan = matrices.build_single_image_plan(INVENTORY, [changed])
         assert set(plan["targets_json"]) == expected
@@ -189,6 +188,15 @@ COMPOSE_AVAILABLE = shutil.which("docker") is not None
 def _compose_config(files, directory, extra_env=None):
     env = dict(os.environ)
     env.pop("COMPOSE_FILE", None)
+    # The CLI always injects these: the output root, the overlay layers and
+    # the pinned artifacts.
+    env["OPENADKIT_OUTPUT_DIR"] = "/tmp/openadkit-test/output"
+    for name in ("SHARED", "BASE", "DEPLOYMENT"):
+        env[f"OPENADKIT_CONFIG_{name}"] = "/tmp/openadkit-test/empty"
+    env["OPENADKIT_OVERLAY_WS"] = "/tmp/openadkit-test/empty"
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    for name, artifact in kit["artifacts"].items():
+        env[name] = artifact.get("ref") or artifact["distros"]["humble"]
     env.update(extra_env or {})
     command = ["docker", "compose", "--env-file", str(directory / "config.env")]
     for path in files:
@@ -303,3 +311,57 @@ def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):
     monkeypatch.setattr(sys, "stdin", io.StringIO("components/api/Dockerfile\n"))
     assert matrices.main(["resolver", "single-image", "humble", ""]) == 0
     assert 'targets_json=["api"]' in capsys.readouterr().out
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is required")
+def test_example_kit_includes_the_base_and_adds_its_layer():
+    kit = ROOT / "examples/custom-kit"
+    env = dict(os.environ)
+    for name in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED", "COMPOSE_FILE"):
+        env.pop(name, None)
+    env["REMOTE_PASSWORD"] = "ci-validate"
+    result = subprocess.run(
+        [str(ROOT / "openadkit"), "validate", "custom-planning", "--json"],
+        cwd=kit, env=env, text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["manifestValid"] is True
+    # The kit's values come after the base's.
+    env_files = re.findall(r"--env-file (\S+)", result.stderr)
+    assert env_files[:2] == [
+        str(ROOT / "deployments/planning-simulation/config.env"),
+        str(kit / "deployments/custom-planning/config.env"),
+    ]
+    assert json.loads(result.stdout)["overlayConformant"] is True
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is required")
+@pytest.mark.parametrize(("service_override", "config", "artifacts", "rule"), [
+    ("", "VEHICLE_ID=custom\n", {}, None),
+    ('  control:\n    command: ["true"]\n', "", {}, "command"),
+    ('  control:\n    volumes:\n      - ./config:/opt/autoware/config:ro\n', "", {}, "internal-mount"),
+    ("", "TYPO=value\n", {}, "variable"),
+    ("", "", {"PLANNING_CONTROL_IMAGE": {"workload": "planning", "ref": f"example/control@sha256:{'a' * 64}"}}, "image"),
+])
+def test_real_kit_contract_compares_compiled_models(tmp_path, service_override, config, artifacts, rule):
+    kit = tmp_path / "kit"
+    shutil.copytree(ROOT / "examples/custom-kit", kit, ignore=shutil.ignore_patterns("build", "install", "log"))
+    path = kit / "openadkit.json"
+    document = json.loads(path.read_text())
+    document["extends"] = str(ROOT)
+    document["artifacts"].update(artifacts)
+    path.write_text(json.dumps(document))
+    directory = kit / "deployments/custom-planning"
+    (directory / "config.env").write_text(config)
+    with (directory / "docker-compose.yaml").open("a") as stream:
+        stream.write(service_override)
+    env = dict(os.environ)
+    for name in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED"):
+        env.pop(name, None)
+    env.update(OPENADKIT_CONFIG_DIR=str(tmp_path / "config"), OPENADKIT_STATE_DIR=str(tmp_path / "state"), REMOTE_PASSWORD="ci-validate")
+    result = subprocess.run([str(ROOT / "openadkit"), "validate", "custom-planning", "--json"], cwd=kit, env=env, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["overlayConformant"] is (rule is None)
+    assert {warning["rule"] for warning in report["overlayWarnings"]} == ({rule} if rule else set())
+    assert all(warning.get("service") != "acme-probe" for warning in report["overlayWarnings"])

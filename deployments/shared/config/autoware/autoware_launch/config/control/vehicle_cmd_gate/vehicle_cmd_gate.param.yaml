@@ -1,0 +1,6 @@
+# Simulation default for every deployment: disable the emergency-handling gate
+# so dummy and system diagnostics do not force MRM. Only this parameter differs
+# from autoware_launch; the entrypoint hook merges it into the upstream file.
+/**:
+  ros__parameters:
+    use_emergency_handling: false

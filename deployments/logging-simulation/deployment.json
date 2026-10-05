@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "logging-simulation",
   "description": "Replay recorded sensor data through sensing and perception",
+  "evidence": {"exempt": "Replays a sample rosbag through the full sensing and perception stack, which the hosted CI runners do not run yet."},
   "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],
@@ -15,14 +16,6 @@
     "rosDistros": ["humble", "jazzy"],
     "gpu": "optional",
     "gpuArchitectures": ["amd64"]
-  },
-  "distroEnvironment": {
-    "humble": {
-      "AUTOWARE_UNIVERSE_IMAGE": "ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175"
-    },
-    "jazzy": {
-      "AUTOWARE_UNIVERSE_IMAGE": "ghcr.io/autowarefoundation/autoware:universe-jazzy@sha256:a392e1b331a59774f59751f82535e29bf26967ff4601ed78a1770d7dfeed7a02"
-    }
   },
   "data": [
     {

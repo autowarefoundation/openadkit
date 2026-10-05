@@ -15,16 +15,21 @@ set -uo pipefail
 # Usage: run_cell.sh <deployment> <distro> <output-dir> [node]
 #   node: "" (single host), a node name, or "split"
 # Env:   PLATFORM, BUILD_TAG, SOURCE_SHA, API_SERVICES, API_TOPICS, FRESH_TOPICS,
-#        SPLIT_ZENOH_AUTOWARE, SPLIT_ZENOH_SCENARIO, SPLIT_ZENOH_PEER
+#        SPLIT_ZENOH_AUTOWARE, SPLIT_ZENOH_SCENARIO, SPLIT_ZENOH_PEER,
+#        OPENADKIT_CLI (absolute launcher when running inside an integrator kit)
 
 deployment=${1:?usage: run_cell.sh <deployment> <distro> <output-dir> [node]}
 distro=${2:?}
 out=${3:?}
 node=${4:-}
+cli=${OPENADKIT_CLI:-./openadkit}
 
 platform=${PLATFORM:-linux/amd64}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 mkdir -p "${out}"
+# Keep run results with this cell's evidence instead of the runner's home.
+export OPENADKIT_STATE_DIR="${out}/state"
+scenario_output="${OPENADKIT_STATE_DIR}/${deployment}/output"
 
 split=false
 node_args=()
@@ -45,11 +50,6 @@ api_topics=${API_TOPICS:-/api/routing/state /api/localization/initialization_sta
 # mode availability in every deployment, plus the simulation clock where the
 # deployment runs on sim time. Planning Simulation runs on wall time and has
 # no /clock.
-default_fresh=/system/operation_mode/availability
-if [ "${deployment}" = scenario-simulation ]; then
-    default_fresh="${default_fresh} /clock"
-fi
-fresh_topics=${FRESH_TOPICS:-${default_fresh}}
 zenoh_autoware=${SPLIT_ZENOH_AUTOWARE:-tcp/127.0.0.1:7447}
 zenoh_scenario=${SPLIT_ZENOH_SCENARIO:-tcp/127.0.0.1:7448}
 zenoh_peer=${SPLIT_ZENOH_PEER:-tcp/127.0.0.1:7447}
@@ -62,6 +62,8 @@ ready_s="null"
 arrival_s="null"
 isolation="null"
 scenario_json="null"
+overlay_conformant=false
+behaviour="${deployment}"
 
 sample_memory() {
     local peak=0 ids sum
@@ -90,10 +92,10 @@ cleanup() {
     kill "${sampler_pid:-}" 2>/dev/null
     wait "${sampler_pid:-}" 2>/dev/null
     if [ "${split}" = true ]; then
-        ./openadkit stop "${deployment}" --node scenario >/dev/null 2>&1 || true
-        ./openadkit stop "${deployment}" --node autoware >/dev/null 2>&1 || true
+        "${cli}" stop "${deployment}" --node scenario >/dev/null 2>&1 || true
+        "${cli}" stop "${deployment}" --node autoware >/dev/null 2>&1 || true
     else
-        ./openadkit stop "${deployment}" "${node_args[@]}" >/dev/null 2>&1 || true
+        "${cli}" stop "${deployment}" "${node_args[@]}" >/dev/null 2>&1 || true
     fi
 }
 trap cleanup EXIT
@@ -106,34 +108,45 @@ validate_node_args=()
 [ -n "${node}" ] && [ "${node}" != "split" ] && validate_node_args=(--node "${node}")
 if [ "${split}" = true ]; then
     # Both node views must validate.
-    ./openadkit validate "${deployment}" --node autoware --ros-distro "${distro}" >"${out}/validate-autoware.log" 2>&1
+    "${cli}" validate "${deployment}" --node autoware --ros-distro "${distro}" --json >"${out}/validate-autoware.json" 2>"${out}/validate-autoware.log"
     rc_a=$?
-    ./openadkit validate "${deployment}" --node scenario --ros-distro "${distro}" >"${out}/validate-scenario.log" 2>&1
+    "${cli}" validate "${deployment}" --node scenario --ros-distro "${distro}" --json >"${out}/validate-scenario.json" 2>"${out}/validate-scenario.log"
     rc_b=$?
     l0_rc=$(( rc_a != 0 || rc_b != 0 ))
 else
-    ./openadkit validate "${deployment}" --ros-distro "${distro}" "${validate_node_args[@]}" >"${out}/validate.log" 2>&1
+    "${cli}" validate "${deployment}" --ros-distro "${distro}" "${validate_node_args[@]}" --json >"${out}/validate.json" 2>"${out}/validate.log"
     l0_rc=$?
 fi
 if [ "${l0_rc}" -eq 0 ]; then
     l0_ok=true
+    if [ "${split}" = true ]; then
+        overlay_conformant=$(jq -s 'all(.[]; .overlayConformant == true)' "${out}/validate-autoware.json" "${out}/validate-scenario.json")
+    else
+        overlay_conformant=$(jq -r '.overlayConformant == true' "${out}/validate.json")
+        behaviour=$(jq -r '.base // .deployment' "${out}/validate.json")
+    fi
 else
     result="FAILED"
 fi
 
 # --- L1: start the stack and check readiness ---------------------------------
 if [ "${l0_rc}" -eq 0 ]; then
+    default_fresh=/system/operation_mode/availability
+    if [ "${behaviour}" = scenario-simulation ]; then default_fresh+=" /clock"; fi
+    fresh_topics=${FRESH_TOPICS:-${default_fresh}}
+    # Fresh publication proves the C++ overlay node survived its ABI boundary.
+    if [ "${deployment}" = custom-planning ]; then fresh_topics+=" /acme/probe"; fi
     run_start=$(date +%s)
     if [ "${split}" = true ]; then
         ZENOH_LISTEN="${zenoh_autoware}" \
-            ./openadkit run "${deployment}" --node autoware --ros-distro "${distro}" >"${out}/run-autoware.log" 2>&1
+            "${cli}" run "${deployment}" --node autoware --ros-distro "${distro}" >"${out}/run-autoware.log" 2>&1
         rc_a=$?
         ZENOH_LISTEN="${zenoh_scenario}" ZENOH_PEER="${zenoh_peer}" \
-            ./openadkit run "${deployment}" --node scenario --ros-distro "${distro}" >"${out}/run-scenario.log" 2>&1
+            "${cli}" run "${deployment}" --node scenario --ros-distro "${distro}" >"${out}/run-scenario.log" 2>&1
         rc_b=$?
         run_rc=$(( rc_a != 0 || rc_b != 0 ))
     else
-        ./openadkit run "${deployment}" --ros-distro "${distro}" "${node_args[@]}" >"${out}/run.log" 2>&1
+        "${cli}" run "${deployment}" --ros-distro "${distro}" "${node_args[@]}" >"${out}/run.log" 2>&1
         run_rc=$?
     fi
 
@@ -160,9 +173,31 @@ if [ "${l0_rc}" -eq 0 ]; then
     fi
 fi
 
+# Read every service's hook report; a typo may affect a package outside API.
+if [ "${l0_ok}" = true ]; then
+    report_args=()
+    for name in "${projects[@]}"; do report_args+=(--project "${name}"); done
+    if python3 "${script_dir}/overlay_conformance.py" "${report_args[@]}" --output "${out}/overlay.json" >"${out}/overlay.log" 2>&1; then
+        runtime_conformant=$(jq -r '.overlayConformant == true' "${out}/overlay.json")
+        [ "${runtime_conformant}" = true ] || overlay_conformant=false
+    else
+        overlay_conformant=false
+    fi
+fi
+
+if [ "${l1_ok}" = true ] && [ "${deployment}" = custom-planning ]; then
+    docker cp "${script_dir}/custom_kit.py" "${api_container}:/tmp/openadkit-custom-kit.py" >/dev/null 2>&1
+    if ! docker exec "${api_container}" bash -lc \
+        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-custom-kit.py" >"${out}/custom-kit.log" 2>&1 \
+        || [ "${overlay_conformant}" != true ]; then
+        l1_ok=false
+        result=FAILED
+    fi
+fi
+
 # --- L2: end-to-end behaviour -------------------------------------------------
 if [ "${l1_ok}" = true ]; then
-    case "${deployment}" in
+    case "${behaviour}" in
         planning-simulation)
             docker cp "${script_dir}/golden.py" "${api_container}:/tmp/openadkit-golden.py" >/dev/null 2>&1 || true
             golden_start=$(date +%s)
@@ -182,7 +217,7 @@ if [ "${l1_ok}" = true ]; then
             ss_rc=$(timeout 1200 docker wait autoware-scenario-simulator 2>/dev/null || echo timeout)
             docker logs autoware-scenario-simulator >"${out}/scenario.log" 2>&1 || true
             python3 "${script_dir}/scenario_metrics.py" \
-                --output-dir "deployments/scenario-simulation/output" \
+                --output-dir "${scenario_output}" \
                 --log "${out}/scenario.log" \
                 --json "${out}/scenario.json" >"${out}/scenario-metrics.log" 2>&1
             metrics_rc=$?
@@ -245,7 +280,7 @@ if [ "${result}" != "PASSED" ]; then
             docker logs "${container_id}" >"${out}/logs/${container_name}.log" 2>&1 || true
         done
     done
-    cp -a deployments/scenario-simulation/output "${out}/scenario-output" 2>/dev/null || true
+    cp -a "${scenario_output}" "${out}/scenario-output" 2>/dev/null || true
 fi
 
 jq -n \
@@ -264,6 +299,7 @@ jq -n \
     --argjson arrival_s "${arrival_s}" \
     --argjson peak_mib "${peak_mib}" \
     --argjson scenario "${scenario_json}" \
+    --argjson overlay_conformant "${overlay_conformant}" \
     '{
         name: $name,
         deployment: $deployment,
@@ -273,6 +309,7 @@ jq -n \
         result: $result,
         build_tag: $build_tag,
         source_sha: $source_sha,
+        overlayConformant: $overlay_conformant,
         levels: {
             L0: {ok: $l0},
             L1: {ok: $l1, ready_s: $ready_s},

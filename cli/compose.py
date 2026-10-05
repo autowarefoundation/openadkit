@@ -4,20 +4,30 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
 import sys
 import time
 from collections.abc import Iterable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import Any
 
-from manifest import Deployment, OpenADKitError, Selection, parse_dotenv
+from manifest import (
+    Deployment,
+    OpenADKitError,
+    RuntimeContext,
+    Selection,
+    parse_dotenv,
+)
 
 PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
 # Launch failures show up within seconds; watch this long after `up`.
 SETTLE_SECONDS = 10
+INTERNAL_IMAGE_ROOTS = {"opt", "usr", "etc", "bin", "sbin", "lib", "lib64", "home", "root"}
+OVERLAY_RUNTIME_ROOT = PurePosixPath("/tmp/openadkit")
 
 
 COMPOSE_CONTROL_ENV = {
@@ -102,7 +112,7 @@ def compose_process_environment(
     """Environment Compose uses to interpolate the deployment.
 
     Compose prefers the process environment over ``--env-file``, so a shell
-    export would otherwise hide ``config.gpu.env`` and ``config.local.env``.
+    export would otherwise hide ``config.gpu.env`` and the site configuration.
     Drop shell values for names the env files define and let Compose read
     the files itself, so quoting and ``$VAR`` expansion follow Compose rules.
     CLI injections (distro and component images) still win.
@@ -117,14 +127,16 @@ def compose_process_environment(
     return environment
 
 
-def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
+def compose_command(
+    deployment: Deployment, selection: Selection, *, environment_from: Deployment | None = None
+) -> list[str]:
     command = [
         "docker",
         "compose",
         "--project-name",
         deployment.project_name(selection.node),
     ]
-    for env_file in deployment.env_files(selection.gpu):
+    for env_file in (environment_from or deployment).env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
     for compose_file in deployment.compose_files(selection.gpu, selection.node):
         command.extend(("--file", str(compose_file)))
@@ -245,6 +257,7 @@ def view_label(node: str | None) -> str:
 def live_state_conflict(deployment: Deployment, selection: Selection) -> str | None:
     """Nodes of one deployment may share a host; single-host and nodes may not."""
     live = live_nodes(deployment)
+    clashing: list[str | None]
     if selection.node is None:
         clashing = [node for node in live if node is not None]
     else:
@@ -286,6 +299,104 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
         )
     return configured
+
+
+def compose_model(
+    deployment: Deployment, selection: Selection, *, environment_from: Deployment | None = None
+) -> dict[str, Any]:
+    result = capture_process(
+        compose_command(deployment, selection, environment_from=environment_from)
+        + ["config", "--format", "json"],
+        cwd=deployment.directory,
+        env=compose_process_environment(environment_from or deployment, selection),
+    )
+    try:
+        services = json.loads(result.stdout)["services"]
+        if not isinstance(services, dict):
+            raise ValueError("services must be an object")
+    except (ValueError, KeyError, TypeError) as error:
+        raise OpenADKitError("could not parse the Compose configuration") from error
+    return services
+
+
+def overlay_warnings(
+    base: dict[str, Any], services: dict[str, Any], unknown_variables: set[str]
+) -> list[dict[str, str]]:
+    """Compare resolved services, not YAML text; inherited mounts are allowed.
+
+    Both models use the kit's values, so changing a public value is not mistaken
+    for replacing a command or an internal mount. New services have no base
+    command/image contract.
+    """
+    warnings = []
+    for name in sorted(base.keys() & services.keys()):
+        original, current = base[name], services[name]
+        for field in ("command", "image"):
+            if current.get(field) != original.get(field):
+                warnings.append({
+                    "rule": field, "service": name,
+                    "message": f"{name}: replaces the base {field}",
+                })
+        original_mounts = {item["target"]: item for item in original.get("volumes", [])}
+        for mount in current.get("volumes", []):
+            target = PurePosixPath(mount["target"])
+            internal = (
+                target == PurePosixPath("/")
+                or (len(target.parts) > 1 and target.parts[1] in INTERNAL_IMAGE_ROOTS)
+                or target == OVERLAY_RUNTIME_ROOT
+                or OVERLAY_RUNTIME_ROOT in target.parents
+                or target in OVERLAY_RUNTIME_ROOT.parents
+            )
+            if internal and mount != original_mounts.get(mount["target"]):
+                warnings.append({
+                    "rule": "internal-mount", "service": name,
+                    "message": f"{name}: mounts over an image-internal path: {target}",
+                })
+    for name in sorted(unknown_variables):
+        warnings.append({
+            "rule": "variable", "variable": name,
+            "message": f"{name}: variable is not declared by the base, kit artifacts or data",
+        })
+    return warnings
+
+
+INTERPOLATION_RE = re.compile(r"(?<!\$)\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def check_overlay(
+    deployment: Deployment, selection: Selection, kit: RuntimeContext
+) -> list[dict[str, str]]:
+    if deployment.base is None:
+        return []
+    assert kit.base is not None
+    base = deployment.base
+    base_selection = base.select(kit.base, selection.ros_distro, selection.gpu)
+    # Keep the kit's config/state mounts and public env values in the baseline,
+    # but not its replacement images.
+    injections = dict(selection.injections)
+    image_names = set(kit.base.component_images) | set(kit.base.artifacts)
+    injections.update({name: value for name, value in base_selection.injections.items() if name in image_names})
+    baseline = Selection(selection.ros_distro, selection.gpu, None, injections, selection.environment)
+    original = compose_model(base, baseline, environment_from=deployment)
+    current = compose_model(deployment, selection)
+    declared = set(selection.injections)
+    for path in base._own_env_files(selection.gpu):
+        declared.update(parse_dotenv(path))
+    declared.update(item["destinationEnv"] for item in deployment.data)
+    # Include variables used by shared services, including host values such as
+    # HOME. This remains static: no image pull or inspection is needed.
+    for directory in [base.directory, *(base.root / "deployments" / name for name in base.shared)]:
+        for path in directory.rglob("*"):
+            if path.suffix not in (".yaml", ".yml") or not path.is_file():
+                continue
+            declared.update(INTERPOLATION_RE.findall(path.read_text(encoding="utf-8")))
+    used = set(deployment.configuration_environment(selection.gpu))
+    for path in deployment.compose_files(selection.gpu):
+        used.update(INTERPOLATION_RE.findall(path.read_text(encoding="utf-8")))
+    warnings = overlay_warnings(original, current, used - declared)
+    for warning in warnings:
+        print(f"warning: overlay contract: {warning['message']}", file=sys.stderr)
+    return warnings
 
 
 def create_writable_mounts(deployment: Deployment, selection: Selection) -> None:

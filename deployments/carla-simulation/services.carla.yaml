@@ -8,7 +8,7 @@
 # pid: service:map: the CARLA host has no map service.
 services:
   carla:
-    image: ${CARLA_CONTAINER_IMAGE:-carlasim/carla:0.9.16@sha256:aaf1df22702780ece072069e23d03c4879b002ae028c79744b09c4c7ddbae953}
+    image: ${CARLA_CONTAINER_IMAGE:?pinned in openadkit.json artifacts}
     container_name: ${CARLA_CONTAINER_NAME}
     network_mode: host
     init: true

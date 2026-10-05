@@ -5,24 +5,24 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
-import sys
+from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, NoReturn
 
 import validation_matrix
 
-
+_IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+# Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+    rf"(?:-{_IDENTIFIER}(?:\.{_IDENTIFIER})*)?$"
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise ValueError(message)
 
 
@@ -84,6 +84,7 @@ def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
             for name in sorted(shared_names)
         },
         "validation": validation,
+        "evidenceExempt": validation_matrix.evidence_exemptions(runtime, source_root, kit),
     }
 
 
@@ -194,7 +195,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             aliases.extend((f"{repo}:{target}-{distro}", f"{repo}:{target}-{distro}-latest"))
             if distro == args.default_ros_distro:
                 aliases.extend((f"{repo}:{target}", f"{repo}:{target}-latest"))
-        row = {
+        row: dict[str, Any] = {
             "aliases": aliases,
             "digest": digest,
             "platforms": sorted(platforms),
@@ -218,21 +219,28 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     for distro in product["distros"]:
         distro_images: dict[str, str] = {}
         for target in runtime_targets:
-            row = indexed.get((target, distro))
-            if row is None:
+            image = indexed.get((target, distro))
+            if image is None:
                 fail(f"missing runtime image: {target}-{distro}")
-            distro_images[target] = row["releaseExactRef"]
+            distro_images[target] = image["releaseExactRef"]
         context_images[distro] = distro_images
 
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
+    autoware = {
+        "version": require_string(metadata.get("autoware_base_version"), "autoware_base_version"),
+        "ref": require_string(metadata.get("autoware_ref"), "autoware_ref"),
+        "lockSha256": require_string(metadata.get("autoware_lock_sha256"), "autoware_lock_sha256"),
+    }
     release_context = {
+        "artifacts": kit.artifacts,
+        "autoware": autoware,
         "componentImages": component_images,
         "defaultRosDistro": args.default_ros_distro,
         "deployments": product["deployments"],
         "images": context_images,
         "kind": "release",
-        "schemaVersion": 1,
+        "schemaVersion": runtime.SCHEMA_VERSION,
         "shared": product["shared"],
         "version": args.version,
     }
@@ -273,6 +281,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             "version": args.version,
         },
         "releaseContext": release_context,
+        # Deployments that ship without CI evidence, with the reason.
+        "evidence": {"exempt": product["evidenceExempt"]},
         "schemaVersion": 1,
     }
 

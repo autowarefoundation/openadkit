@@ -1,6 +1,8 @@
 # Custom Deployment
 
-Build your own stack by copying an existing deployment in a source checkout.
+Build your own stack in an integrator repository. Include a pinned Open AD Kit
+deployment and keep only your differences; do not copy its Compose files or
+modify an installed release.
 
 ## How Deployments Are Built
 
@@ -18,56 +20,69 @@ one file per service. A deployment directory contains:
 Container ROS and DDS settings shared by all deployments live in
 `deployments/shared/runtime.env`.
 
-## Start from Planning Simulation
+## Include Planning Simulation
 
-From the repository root:
-
-```bash
-cp -r deployments/planning-simulation deployments/my-simulation
-```
-
-In the copied `deployment.json`, set `name` to `my-simulation` and update
-`description`. Then register it in the `deployments` object of the root
-`openadkit.json`:
+Create an `openadkit.json` at the root of your repository:
 
 ```json
-"my-simulation": {
-  "path": "deployments/my-simulation"
+{
+  "schemaVersion": 2,
+  "kind": "kit",
+  "extends": "v2.0.0",
+  "deployments": {
+    "my-simulation": {"path": "deployments/my-simulation"}
+  }
 }
 ```
 
+Use a published schema-v2 release tag for `extends`; the version above is an
+example, not a claim that it has been released. During development, `extends`
+can instead point to a source checkout. The CLI uses the pinned base's own CLI
+and asks you to install it when it is missing.
+
+Create `deployments/my-simulation/deployment.json`:
+
+```json
+{
+  "schemaVersion": 2,
+  "name": "my-simulation",
+  "description": "My Planning Simulation stack",
+  "base": "planning-simulation",
+  "compose": {"files": ["docker-compose.yaml"]}
+}
+```
+
+The base's architecture, ROS distro and GPU requirements are inherited exactly;
+do not redeclare them. Its data downloads are inherited too.
+
 ## Customize the Stack
 
-Add or remove services in `docker-compose.yaml`. A block under `services:`
-customizes an included service; it does not create a second container:
+Create `deployments/my-simulation/docker-compose.yaml`:
 
 ```yaml
 include:
-  # Other selected services...
-  - ../shared/services/visualizer.yaml
-
-services:
-  visualizer:
-    depends_on:
-      - map
+  - ${KIT_openadkit}/deployments/planning-simulation/docker-compose.yaml
 ```
 
-Add only the settings that differ. Deployment-only services can be defined
-directly in the same file. When removing a service, also check `depends_on`,
-`pid`, and `resetServices`: most shared services use `pid: service:map` and need
-the `map` service.
+The CLI sets `KIT_openadkit` to the resolved base. Add only settings that differ
+in `config.env`, for example `VEHICLE_ID=my-vehicle`. Add your own services under
+`services:` in the same Compose file. A block for an included service overrides
+that service rather than creating another container.
 
-Keep communicating services on the same ROS domain and middleware. For the
-order in which env files are loaded, see
-[Configuration](../getting-started/cli.md#configuration).
+Use parameter-level config differences and an overlay workspace instead of
+mounting files over `/opt/autoware` or replacing a base command. See the
+[Integrator Guide](integrator-guide.md) for all extension points, image
+replacement, configuration order and contract warnings.
 
 ## Validate and Run
 
 ```bash
-./openadkit validate my-simulation
-./openadkit run my-simulation
-./openadkit stop my-simulation
+openadkit validate my-simulation
+openadkit run my-simulation
+openadkit stop my-simulation
 ```
 
-Validate every distro and GPU mode you declare. Logging Simulation is an example
-of a GPU overlay; CARLA Simulation is an example of deployment-only services.
+Run these commands from your kit repository (or set `OPENADKIT_KIT` to its
+root). Validate every distro and GPU mode supported by the base. The
+[custom-kit example](https://github.com/autowarefoundation/openadkit/tree/main/examples/custom-kit)
+is a complete, minimal Planning Simulation integration exercised by CI.

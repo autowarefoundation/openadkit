@@ -47,6 +47,13 @@ def build_subjects(metadata: dict, source_root: Path):
         checksum = manifest.deployment_checksum(source_root / "deployments" / name)
         subjects.append((checksum, f"shared:{name}"))
 
+    # Pin the integrator's source/config, not host-specific colcon products.
+    # Recomputed by the release gate from the same source checkout.
+    for path in sorted((source_root / "examples").glob("*/openadkit.json")):
+        if manifest.load_json(path).get("kind") == "kit":
+            checksum = manifest.deployment_checksum(path.parent, exclude_dirs=("build", "install", "log"))
+            subjects.append((checksum, f"overlay:{path.parent.relative_to(source_root).as_posix()}"))
+
     subjects.sort(key=lambda item: item[1])
     return subjects
 

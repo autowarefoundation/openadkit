@@ -7,7 +7,7 @@ The image has no default launch command. Start the CARLA deployment with:
 
 ```bash
 ./openadkit setup --gpu --verify
-./openadkit run carla-simulation --gpu
+./openadkit run carla-simulation
 ```
 
 Guide: [CARLA Simulation docs](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/)
@@ -22,6 +22,7 @@ docker buildx bake -f components/docker-bake.hcl --load carla-interface
 ```
 
 The build is tagged with the `<target>-<arch>-<ros-distro>` reference
-repository-mode `./openadkit` injects, so `./openadkit run carla-simulation
---gpu` picks it up. Override the `*_IMAGE` variables in `config.local.env` if
+repository-mode `./openadkit` injects, so `./openadkit run carla-simulation`
+picks it up. Override the `*_IMAGE` variables in
+`~/.config/openadkit/carla-simulation.env` if
 you tag the image differently.

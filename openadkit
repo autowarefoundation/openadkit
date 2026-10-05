@@ -3,9 +3,10 @@ set -euo pipefail
 
 readonly OPENADKIT_REPOSITORY=${OPENADKIT_REPOSITORY:-autowarefoundation/openadkit}
 readonly OPENADKIT_RELEASES_URL=${OPENADKIT_RELEASES_URL:-"https://github.com/${OPENADKIT_REPOSITORY}/releases"}
-# SemVer pattern shared with SEMVER_RE in .github/scripts/release_plan.py.
-# Keep the two definitions in sync.
-readonly OPENADKIT_VERSION_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+# Strict SemVer release tag. The same pattern appears in compare_release_versions
+# below, .github/scripts/release_plan.py and validate_release.sh; the bootstrap
+# cannot import it, so test_release_versions.py checks all four agree.
+readonly OPENADKIT_VERSION_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$'
 
 INSTALL_TEMP=
 INSTALL_STAGE=
@@ -106,8 +107,10 @@ compare_release_versions() {
 import re
 import sys
 
+IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
 VERSION_RE = re.compile(
-    r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?$"
+    r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    rf"(?:-({IDENTIFIER}(?:\.{IDENTIFIER})*))?$"
 )
 
 
@@ -420,58 +423,22 @@ require_no_running_deployments() {
   local running
   command -v docker >/dev/null 2>&1 || return 0
   require_command python3
-  # Same live states as cli/compose.py. Fail closed if the list cannot be read:
+  # One implementation, cli/compose.py. Fail closed if the list cannot be read:
   # uninstall removes the only launcher that can stop these projects.
   running=$(
-    python3 - <<'PY'
-import json
-import os
-import subprocess
+    python3 - "$SCRIPT_DIR/cli" <<'PY'
 import sys
 
-env = os.environ.copy()
-for name in (
-    "COMPOSE_ENV_FILES",
-    "COMPOSE_FILE",
-    "COMPOSE_PROFILES",
-    "COMPOSE_PROJECT_NAME",
-):
-    env.pop(name, None)
-result = subprocess.run(
-    ["docker", "compose", "ls", "--format", "json"],
-    capture_output=True,
-    text=True,
-    check=False,
-    env=env,
-)
-if result.returncode != 0:
-    detail = result.stderr.strip()
-    suffix = f": {detail}" if detail else ""
-    print(f"could not list Compose projects{suffix}", file=sys.stderr)
-    raise SystemExit(1)
+sys.path.insert(0, sys.argv[1])
+import compose
+from manifest import OpenADKitError
+
 try:
-    projects = json.loads(result.stdout) if result.stdout.strip() else []
-except json.JSONDecodeError:
-    print("could not parse Compose project list", file=sys.stderr)
+    live = compose.live_projects()
+except OpenADKitError as error:
+    print(error, file=sys.stderr)
     raise SystemExit(1)
-if not isinstance(projects, list):
-    print("could not parse Compose project list", file=sys.stderr)
-    raise SystemExit(1)
-live = {"running", "restarting", "paused", "removing"}
-found = []
-for project in projects:
-    if not isinstance(project, dict):
-        continue
-    name = project.get("Name")
-    status = project.get("Status") or ""
-    if not isinstance(name, str) or not isinstance(status, str):
-        continue
-    if not name.startswith("openadkit-"):
-        continue
-    state = status.lower().split("(", 1)[0].strip()
-    if state in live:
-        found.append(name[len("openadkit-") :])
-print("\n".join(found))
+print("\n".join(sorted(name[len(compose.PROJECT_PREFIX) :] for name in live)))
 PY
   ) || fail 'could not confirm deployments are stopped; stop them before uninstall'
   if [[ -n $running ]]; then

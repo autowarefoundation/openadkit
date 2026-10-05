@@ -3,13 +3,23 @@
 Runs inside a deployment's api container (see run_cell.sh). Exit 0 on arrival.
 Ported from the 2026-09-27 spike; Humble passed 10/10 there.
 """
-import sys, time
+import sys
+import time
+
 import rclpy
+from autoware_adapi_v1_msgs.msg import (
+    LocalizationInitializationState,
+    OperationModeState,
+    RouteState,
+)
+from autoware_adapi_v1_msgs.srv import (
+    ChangeOperationMode,
+    InitializeLocalization,
+    SetRoutePoints,
+)
+from geometry_msgs.msg import Pose, PoseWithCovarianceStamped
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
-from autoware_adapi_v1_msgs.srv import InitializeLocalization, SetRoutePoints, ChangeOperationMode
-from autoware_adapi_v1_msgs.msg import RouteState, LocalizationInitializationState, OperationModeState
-from geometry_msgs.msg import PoseWithCovarianceStamped, Pose
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 START = dict(x=3648.464, y=73505.020, z=18.924, qz=0.750460, qw=0.660916)
 GOAL = dict(x=3638.004, y=73587.122, z=19.612, qz=0.750462, qw=0.660913)
@@ -59,7 +69,7 @@ class Golden(Node):
 
     def run(self):
         for cli in (self.init_cli, self.route_cli, self.auto_cli):
-            if not self.spin_until(lambda: cli.service_is_ready(), TIMEOUT_READY, cli.srv_name):
+            if not self.spin_until(cli.service_is_ready, TIMEOUT_READY, cli.srv_name):
                 return 2
         self.mark("services ready")
 

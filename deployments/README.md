@@ -13,7 +13,7 @@ CLI and release bundle:
 - [Planning Simulation](./planning-simulation) — Planning stack with a sample map
 - [Scenario Simulation](./scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
-- [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation --gpu`)
+- [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation`)
 
 Split-host (`--node` over Zenoh) is experimental. See the
 [split-host guide](https://autowarefoundation.github.io/openadkit/deployments/split-host/).

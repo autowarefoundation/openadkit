@@ -493,8 +493,9 @@ class Deployment:
 
         gpu_requirement = self.requirements["gpu"]
         if require_gpu:
-            if gpu_requirement == "required" and not gpu:
-                raise OpenADKitError(f"{self.name} requires --gpu")
+            # A deployment that only runs on a GPU needs no --gpu flag.
+            if gpu_requirement == "required":
+                gpu = True
             if gpu_requirement == "none" and gpu:
                 raise OpenADKitError(f"{self.name} does not provide a GPU mode")
             if gpu and gpu_requirement == "optional" and not self.compose["gpuFiles"]:

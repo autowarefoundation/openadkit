@@ -772,11 +772,8 @@ def test_repository_catalog_matches_the_deployments():
     ):
         assert re.search(rf"{name}\s+source\s+{gpu}\s+", result.stdout)
     assert "zenoh" not in result.stdout
-    carla = entry("validate", "carla-simulation", cwd=ROOT)
-    assert carla.returncode != 0
     if ARCH == "amd64":
-        assert "requires --gpu" in carla.stderr
-        jazzy = entry("validate", "carla-simulation", "--gpu", "--ros-distro", "jazzy", cwd=ROOT)
+        jazzy = entry("validate", "carla-simulation", "--ros-distro", "jazzy", cwd=ROOT)
         assert "does not support ROS distro jazzy" in jazzy.stderr
 
 
@@ -1252,13 +1249,17 @@ def served_resource(http, text, **extra):
 
 def test_fetch_verifies_and_publishes_zip_data(tmp_path, http):
     manifest = minimal_manifest(data=[zip_resource(http, {"dataset/required.txt": "ok"})])
-    # fetch downloads everything, even for a deployment that requires --gpu.
+    # fetch downloads everything, even for a deployment that requires a GPU.
     manifest["requirements"]["gpu"] = "required"
     root, _ = runtime_tree(tmp_path, manifest=manifest)
     result = run_cli(root, "fetch", "example")
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "home/data/example/required.txt").read_text() == "ok"
-    assert "requires --gpu" in run_cli(root, "validate", "example").stderr
+    # GPU mode turns on by itself where a GPU is required.
+    fake_docker(tmp_path)
+    validated = run_cli(root, "validate", "example", "--json")
+    assert validated.returncode == 0, validated.stderr
+    assert json.loads(validated.stdout)["gpu"] is True
 
 
 def test_fetch_checksum_failure_preserves_existing_data(tmp_path, http):

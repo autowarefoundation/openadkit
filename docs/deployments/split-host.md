@@ -110,13 +110,13 @@ Both hosts need an NVIDIA GPU. Start Autoware first:
 
 ```bash
 # Autoware host
-openadkit run carla-simulation --node autoware --gpu
+openadkit run carla-simulation --node autoware
 ```
 
 Then the CARLA host:
 
 ```bash
-openadkit run carla-simulation --node carla --gpu
+openadkit run carla-simulation --node carla
 ```
 
 CARLA RPC (`127.0.0.1:2000`) and map loading stay local to the CARLA host.

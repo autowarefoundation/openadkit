@@ -28,7 +28,7 @@ The deployment layer for the <a href="https://github.com/autowarefoundation/auto
 :material-cube-outline:{ .oak-card-icon }
 
 <p class="oak-card-title" role="heading" aria-level="3">Run a deployment</p>
-<p>Planning, scenario, logging, CARLA, or a distributed Zenoh bridge.</p>
+<p>Planning, scenario, logging, CARLA, or split-host simulation over Zenoh.</p>
 <a href="deployments/" class="md-button">Deployments</a>
 </div>
 

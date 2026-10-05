@@ -43,12 +43,30 @@ def manifest_validation_matrix():
             (ROOT / kit["deployments"][name]["path"] / "deployment.json").read_text()
         )
         gpu = manifest["requirements"]["gpu"]
+        nodes = [""] + sorted((manifest.get("nodes") or {}).keys())
         for distro in manifest["requirements"]["rosDistros"]:
-            if gpu in ("none", "optional"):
-                rows.append({"deployment": name, "gpu": False, "rosDistro": distro})
-            if gpu in ("required", "optional"):
-                rows.append({"deployment": name, "gpu": True, "rosDistro": distro})
-    rows.sort(key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"]))
+            for node in nodes:
+                if gpu in ("none", "optional"):
+                    rows.append(
+                        {
+                            "deployment": name,
+                            "gpu": False,
+                            "rosDistro": distro,
+                            "node": node,
+                        }
+                    )
+                if gpu in ("required", "optional"):
+                    rows.append(
+                        {
+                            "deployment": name,
+                            "gpu": True,
+                            "rosDistro": distro,
+                            "node": node,
+                        }
+                    )
+    rows.sort(
+        key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"], row["node"])
+    )
     return rows
 
 
@@ -582,7 +600,7 @@ def packager_env(tmp_path):
         "#!/usr/bin/env bash\n"
         f'printf "%s|%s\\n" "${{ROS_DISTRO:-}}" "$*" >> {json.dumps(str(calls))}\n'
         'if [[ "$*" == *"config --services"* ]]; then\n'
-        "  printf '%s\\n' map map-check planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario_simulator carla carla-interface carla-map-loader\n"
+        "  printf '%s\\n' map map-check planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario_simulator carla carla-interface carla-map-loader zenoh-bridge\n"
         "fi\n"
         "exit 0\n",
     )

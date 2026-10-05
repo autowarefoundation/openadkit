@@ -73,7 +73,8 @@ plugins:
         deployments/samples/scenario-simulation/index.md: deployments/scenario-simulation/index.md
         deployments/samples/logging-simulation/index.md: deployments/logging-simulation/index.md
         deployments/samples/carla-simulation/index.md: deployments/carla-simulation/index.md
-        deployments/demos/zenoh-bridge/index.md: deployments/zenoh-bridge/index.md
+        deployments/demos/zenoh-bridge/index.md: deployments/split-host.md
+        deployments/zenoh-bridge/index.md: deployments/split-host.md
         deployments/samples/index.md: deployments/index.md
         deployments/demos/index.md: deployments/index.md
         contributing/index.md: development/contributing.md

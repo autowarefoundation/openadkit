@@ -118,10 +118,15 @@ def compose_process_environment(
 
 
 def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
-    command = ["docker", "compose", "--project-name", deployment.project]
+    command = [
+        "docker",
+        "compose",
+        "--project-name",
+        deployment.project_name(selection.node),
+    ]
     for env_file in deployment.env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
-    for compose_file in deployment.compose_files(selection.gpu):
+    for compose_file in deployment.compose_files(selection.gpu, selection.node):
         command.extend(("--file", str(compose_file)))
     for profile in deployment.compose["profiles"]:
         command.extend(("--profile", profile))
@@ -167,9 +172,9 @@ def _compose_ls_environment() -> dict[str, str]:
     return environment
 
 
-def running_names(deployment_names: Iterable[str]) -> list[str]:
+def live_projects() -> set[str]:
+    """Names of the Open AD Kit Compose projects that are live on this host."""
     require_docker()
-    wanted = list(deployment_names)
     result = capture_process(
         ["docker", "compose", "ls", "--format", "json"],
         env=_compose_ls_environment(),
@@ -186,7 +191,7 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
         raise OpenADKitError("could not parse Compose project list") from error
     if not isinstance(projects, list):
         raise OpenADKitError("could not parse Compose project list")
-    found: set[str] = set()
+    live: set[str] = set()
     for project in projects:
         if not isinstance(project, dict):
             continue
@@ -194,13 +199,64 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
         status = project.get("Status") or ""
         if not isinstance(name, str) or not isinstance(status, str):
             continue
-        if not name.startswith(PROJECT_PREFIX):
-            continue
-        key = name[len(PROJECT_PREFIX) :]
         state = status.lower().split("(", 1)[0].strip()
-        if key in wanted and state in LIVE_PROJECT_STATES:
-            found.add(key)
+        if name.startswith(PROJECT_PREFIX) and state in LIVE_PROJECT_STATES:
+            live.add(name)
+    return live
+
+
+def owner(project: str, deployment_names: Iterable[str]) -> str | None:
+    """Deployment that owns a project: openadkit-<name> or openadkit-<name>-<node>.
+
+    The longest matching name wins, so planning-simulation is never read as
+    node "simulation" of a deployment called planning.
+    """
+    key = project[len(PROJECT_PREFIX) :]
+    matches = [
+        name
+        for name in deployment_names
+        if key == name or key.startswith(f"{name}-")
+    ]
+    return max(matches, key=len) if matches else None
+
+
+def running_names(deployment_names: Iterable[str]) -> list[str]:
+    wanted = list(deployment_names)
+    found = {owner(project, wanted) for project in live_projects()}
     return [name for name in wanted if name in found]
+
+
+def live_nodes(deployment: Deployment) -> list[str | None]:
+    """Live views of one deployment: None is the single-host project."""
+    live = live_projects()
+    views: list[str | None] = []
+    if deployment.project_name() in live:
+        views.append(None)
+    views.extend(
+        node for node in sorted(deployment.nodes) if deployment.project_name(node) in live
+    )
+    return views
+
+
+def view_label(node: str | None) -> str:
+    return "single-host" if node is None else f"node {node}"
+
+
+def live_state_conflict(deployment: Deployment, selection: Selection) -> str | None:
+    """Nodes of one deployment may share a host; single-host and nodes may not."""
+    live = live_nodes(deployment)
+    if selection.node is None:
+        clashing = [node for node in live if node is not None]
+    else:
+        clashing = [None] if None in live else []
+    if not clashing:
+        return None
+    running = ", ".join(view_label(node) for node in clashing)
+    return (
+        f"{deployment.name} is already running as {running}; "
+        f"stop it with openadkit stop {deployment.name} "
+        f"before starting {view_label(selection.node)}"
+    )
 
 
 def require_stopped(name: str) -> None:
@@ -224,7 +280,7 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
     # The Compose project is the deployment: every configured service is meant
     # to run. Only the oneshot services are cross-checked, so a typo in a
     # resetServices entry still fails fast.
-    unknown = sorted(set(deployment.compose["resetServices"]) - configured)
+    unknown = sorted(set(deployment.reset_services(selection.node)) - configured)
     if unknown:
         raise OpenADKitError(
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
@@ -296,7 +352,7 @@ def failed_services(
     failed = set()
     for line in result.stdout.splitlines():
         service, restarts, state, exit_code = line.split()
-        if service in deployment.compose["resetServices"]:
+        if service in deployment.reset_services(selection.node):
             continue
         if restarts != "0" or state == "restarting" or exit_code != "0":
             failed.add(service)
@@ -331,7 +387,7 @@ def start(deployment: Deployment, selection: Selection, pull_policy: str) -> Non
     if pull_policy != "never":
         compose_run(deployment, selection, ["pull", "--policy", pull_policy])
 
-    for service in deployment.compose["resetServices"]:
+    for service in deployment.reset_services(selection.node):
         compose_run(
             deployment,
             selection,

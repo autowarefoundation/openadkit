@@ -29,9 +29,7 @@ openadkit fetch <deployment> --force
 
 `validate --data` reports each resource as `ok`, `missing`, or `incomplete`;
 add `--gpu` to it for CARLA and for Logging Simulation's CenterPoint models.
-`fetch` always includes GPU data. The Zenoh bridge uses Scenario Simulation's
-map; refresh it with
-`./openadkit fetch scenario-simulation --force` from the repository root.
+`fetch` always includes GPU data.
 
 ## GPU
 
@@ -54,10 +52,9 @@ not fall back to CPU.
 Wait 10 to 30 seconds after `run`, then reload the page. If it stays blank,
 check `openadkit logs <deployment> --follow`.
 
-### Port 6080 or 6081 already in use
+### Port 6080 already in use
 
-Port 6080 serves the visualizer of the CLI deployments and 6081 the Zenoh
-bridge. Stop the service that holds the port. The CLI deployments use host
+Port 6080 serves the visualizer. Stop the service that holds the port. The CLI deployments use host
 networking, so adding a `ports:` mapping to `docker-compose.yaml` has no effect.
 
 ### ROS 2 nodes on another machine cannot see the stack

@@ -27,14 +27,18 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    . /opt/autoware/setup.sh && \
-    colcon build \
-      --base-paths \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' \
         /tmp/autoware/src/universe/autoware_universe/visualization \
         /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description \
         /tmp/autoware/src/sensor_component/external/sensor_component_description/velodyne_description \
+      > /opt/openadkit/colcon-base-paths && \
+    colcon_base_paths=$(tr '\n' ' ' < /opt/openadkit/colcon-base-paths) && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths ${colcon_base_paths} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
@@ -47,6 +51,18 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       --ignore-src --rosdistro "${ROS_DISTRO}" \
       --dependency-types=exec && \
     rm -rf /tmp/autoware
+
+# Align the packages the compiled tree links against with the current apt feed
+# and rebuild when any of them moved; the first compile above stays cached when
+# nothing did. Re-runs every build via ROS_ALIGN_STAMP (components/link-lock).
+ARG ROS_ALIGN_STAMP=0
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/link-lock,target=/tmp/link-lock \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "ros align ${ROS_ALIGN_STAMP}" && \
+    bash /tmp/link-lock/align.sh
 
 # =============================================================================
 # Runtime stage: visualizer
@@ -119,6 +135,15 @@ RUN install -d -o aw -g aw \
 COPY --chown=aw:aw components/visualizer/etc/xstartup /home/aw/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
 RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
+
+# Install the exact package versions the matching devel stage compiled
+# against and verify them (components/link-lock).
+RUN --mount=from=visualizer-devel,source=/opt/openadkit/link-lock.txt,target=/tmp/link-lock.txt \
+    --mount=type=bind,source=components/link-lock,target=/tmp/link-lock \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    bash /tmp/link-lock/lock.sh install --lock /tmp/link-lock.txt && \
+    bash /tmp/link-lock/lock.sh verify --lock /tmp/link-lock.txt
 
 # In remote mode, report unhealthy if noVNC (6080) or VNC (5999) stops accepting
 # connections. Local mode has no endpoints; PID 1 exits if its command fails.

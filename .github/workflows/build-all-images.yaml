@@ -240,6 +240,7 @@ jobs:
             *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
+            *.args.ROS_ALIGN_STAMP=${{ needs.prepare.outputs.build_tag }}
 
       - name: Prune BuildKit cache mount lineage
         if: env.SAVE_CCACHE == 'true'
@@ -352,6 +353,7 @@ jobs:
             *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
             *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
             *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
+            *.args.ROS_ALIGN_STAMP=${{ needs.prepare.outputs.build_tag }}
 
       - name: Prune BuildKit cache mount lineage
         if: env.SAVE_CCACHE == 'true'

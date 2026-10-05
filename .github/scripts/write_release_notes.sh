@@ -2,6 +2,8 @@
 # Write release metadata and notes from the immutable release plan.
 set -euo pipefail
 
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
@@ -138,6 +140,20 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
     printf '%s\n' "- \`${release_ref}\` -> \`${digest}\`"
   done < <(jq -r '.images[] | [.releaseRef, .digest] | @tsv' "${plan_file}")
 
+  echo ""
+  echo "## Verification"
+  echo ""
+  if [ -n "${EVIDENCE_CURRENT_SUMMARY:-}" ] && [ -f "${EVIDENCE_CURRENT_SUMMARY}" ]; then
+    report_args=(--current "${EVIDENCE_CURRENT_SUMMARY}" --output "${temporary}/upgrade-report.md")
+    if [ -n "${EVIDENCE_PREVIOUS_SUMMARY:-}" ] && [ -f "${EVIDENCE_PREVIOUS_SUMMARY}" ]; then
+      report_args+=(--previous "${EVIDENCE_PREVIOUS_SUMMARY}")
+    fi
+    python3 "${script_dir}/evidence/upgrade_report.py" "${report_args[@]}"
+    cat "${temporary}/upgrade-report.md"
+  else
+    echo "No evidence summary is attached to this build."
+  fi
+  echo ""
   if [ "${PUBLISH_LATEST_ALIASES}" = true ]; then
     echo ""
     echo "## Stable Aliases"

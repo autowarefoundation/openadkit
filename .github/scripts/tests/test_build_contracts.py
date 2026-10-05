@@ -132,6 +132,8 @@ def test_shared_build_inputs_select_all_targets():
         ".github/scripts/resolve_upstream_images.sh",
         ".github/actions/inject-ccache/action.yaml",
         ".trivyignore",
+        "components/link-lock/lock.sh",
+        "components/link-lock/align.sh",
     ):
         plan = matrices.build_single_image_plan(INVENTORY, [changed])
         assert set(plan["targets_json"]) == expected
@@ -169,7 +171,7 @@ def test_distro_validation_applies_to_global_and_target_constraints():
 def test_irrelevant_and_readme_changes_produce_empty_plan():
     plan = matrices.build_single_image_plan(
         INVENTORY,
-        ["docs/index.md", "components/README.md", "components/api/README.md"],
+        ["docs/index.md", "components/README.md", "components/api/README.md", "components/link-lock/README.md"],
     )
     assert plan["targets_json"] == []
 

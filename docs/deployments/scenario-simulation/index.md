@@ -2,60 +2,49 @@
 
 Run predefined traffic scenarios with
 [TIER IV Scenario Simulator](https://github.com/tier4/scenario_simulator_v2).
-The deployment executes scenarios automatically and writes their results to the
-host.
+The deployment runs a scenario automatically and writes the results to the host.
+No GPU is required.
 
-!!! warning "Use the Kashiwanoha map"
-    `sample-map-planning` is incompatible and causes invalid-map and MRM errors.
-
-## Setup
-
---8<-- "includes/cli-command-context.md"
-
-```bash
-openadkit setup --verify
-```
-
---8<-- "includes/docker-group-activation.md"
-
-The entry point downloads the Kashiwanoha map automatically.
-
-## Configuration
-
-Put overrides in `deployments/scenario-simulation/config.local.env`:
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `SCENARIO` | Scenario path inside the container | Bundled example |
-| `SCENARIO_HOST_DIR` | Host scenario directory | `deployments/scenario-simulation/scenarios` |
-| `OUTPUT_HOST_PATH` | Host results directory | `deployments/scenario-simulation/output` |
-| `SCENARIO_READY_TIMEOUT` | Autoware readiness timeout in seconds | `300` |
-| `MAP_PATH` | Host map directory | `~/autoware_map/kashiwanoha_map` |
-
-`config.env` stores those host paths as `./scenarios` and `./output`. Compose
-resolves them from `deployments/scenario-simulation/`, not the repository root.
-
-For a custom scenario, place its YAML in
-`deployments/scenario-simulation/scenarios` (or another `SCENARIO_HOST_DIR`)
-and set, for example, `SCENARIO=/scenarios/my-scenario.yaml`. A custom map must
-provide matching `MAP_PATH`, `LANELET2_MAP_FILE`, and `POINTCLOUD_MAP_FILE`
-values.
+Complete the [Quickstart](../../getting-started/index.md) setup first.
 
 ## Run
+
+--8<-- "includes/cli-command-context.md"
 
 ```bash
 openadkit run scenario-simulation
 openadkit logs scenario-simulation --follow
 ```
 
-Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
+--8<-- "includes/ros-distro.md"
 
-Initialization takes about 90 seconds. The runner waits up to
-`SCENARIO_READY_TIMEOUT`, executes the scenario, and writes results to
-`deployments/scenario-simulation/output` unless `OUTPUT_HOST_PATH` is
-overridden.
+`run` downloads the Kashiwanoha map. Autoware takes about 90 seconds to
+initialize; the runner then executes the scenario and writes the results to
+`deployments/scenario-simulation/output`.
 
 --8<-- "includes/visualizer-remote-access.md"
+
+## Configure
+
+Put overrides in `deployments/scenario-simulation/config.local.env`:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `SCENARIO` | Scenario path inside the container | Bundled example |
+| `SCENARIO_HOST_DIR` | Host scenario directory, mounted at `/scenarios` | `./scenarios` |
+| `OUTPUT_HOST_PATH` | Host results directory | `./output` |
+| `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware before running | `300` |
+| `MAP_PATH` | Host map directory | `~/autoware_map/kashiwanoha_map` |
+
+Relative paths resolve from `deployments/scenario-simulation/`.
+
+To run your own scenario, put its YAML in the scenarios directory and set, for
+example, `SCENARIO=/scenarios/my-scenario.yaml`. Scenarios must match the map: a
+custom map needs matching `MAP_PATH`, `LANELET2_MAP_FILE`, and
+`POINTCLOUD_MAP_FILE` values, and the planning sample map does not work here.
+
+Autoware parameter overrides for this deployment live in
+`config/mrm_handler.param.yaml` and `config/default_adapi.param.yaml`.
 
 ## Stop and Recover
 
@@ -63,7 +52,5 @@ overridden.
 openadkit stop scenario-simulation
 ```
 
-Parameter overrides live in `config/mrm_handler.param.yaml` and
-`config/default_adapi.param.yaml`. To replace missing map data, run
-`openadkit fetch scenario-simulation --force`. For common issues, see
-[Troubleshooting](../../getting-started/troubleshooting.md).
+To replace missing map data, run `openadkit fetch scenario-simulation --force`.
+For other issues, see [Troubleshooting](../../getting-started/troubleshooting.md).

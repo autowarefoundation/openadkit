@@ -9,81 +9,57 @@
 
 </div>
 
-Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for deploying [Autoware](https://github.com/autowarefoundation/autoware) as containerized, cloud/edge-ready software-defined vehicle components.
+> The deployment layer for the [Autoware](https://github.com/autowarefoundation/autoware) ecosystem: packaging its software into reproducible deployments, from simulation to in-vehicle systems.
 
-This repository provides the component images, deployment configurations, a
-versioned runtime bundle, and CI metadata needed to run and ship Autoware-based
-stacks more predictably.
+Open AD Kit packages Autoware into focused component images and ready-to-run containerized deployments, and integrates [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) with the deployed stack. It includes a CLI, deployment assets, and build and release automation for running autonomous driving and ADAS systems consistently across development and vehicle-edge hosts.
 
-## Quickstart
+Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle.
 
-Install the latest release on Ubuntu 22.04 or 24.04:
+## Quick Start
 
-```bash
-curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \
-  | bash -s -- install
-# Add the launcher to this shell if the installer reported ~/.local/bin is missing.
-export PATH="$HOME/.local/bin:$PATH"
-openadkit setup --verify
-# Start a new login session if setup changed Docker group membership.
-openadkit run planning-simulation
-```
-
-Or work from a source checkout:
+Run the CPU-based planning simulation on Ubuntu 22.04 or 24.04. No GPU is required.
 
 ```bash
 git clone https://github.com/autowarefoundation/openadkit.git
 cd openadkit
 ./openadkit setup --verify
-# Start a new login session if setup changed Docker group membership.
+# Run this if setup adds you to the Docker group, or start a new login session:
+newgrp docker
 ./openadkit run planning-simulation
 ```
 
-Open the noVNC visualizer at `https://localhost:6080/vnc.html` (password: `openadkit`; accept the self-signed certificate warning).
+When the stack is ready, open [the noVNC visualizer](https://localhost:6080/vnc.html), accept the self-signed certificate, and sign in with the password `openadkit`.
 
-The same entry point ships in the version-matched release bundle and in source
-checkouts. It prepares deployment data, pulls missing images, starts the stack,
-and verifies readiness. For install options, manual checksum verification,
-runtime controls, and other deployments, see the
-[documentation site](https://autowarefoundation.github.io/openadkit/).
+The CLI downloads required data, pulls missing images, starts the services, and verifies readiness. See the [guided quick start](https://autowarefoundation.github.io/openadkit/getting-started/) for installation options, runtime controls, and troubleshooting.
 
 ## Deployments
 
-The manifest-driven CLI and release bundle support these curated deployments:
+| Deployment | Purpose | GPU |
+|---|---|---|
+| [`planning-simulation`](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/) | Plan and follow a route with the built-in simulator | No |
+| [`scenario-simulation`](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/) | Run predefined traffic scenarios | No |
+| [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data through sensing and perception | Optional |
+| [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Run Autoware in closed loop with CARLA | Required |
 
-- **[planning-simulation](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/)** - Run planning with a simulator-backed vehicle interface
-- **[logging-simulation](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/)** - Replay sample data through the logging/perception stack
-- **[scenario-simulation](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/)** - Run scenario-based simulation workflows
-- **[carla-simulation](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/)** - Connect Autoware to CARLA simulation (Humble, amd64, GPU)
-
-The source checkout also contains a standalone Zenoh deployment:
-
-- **[zenoh-bridge](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/)** - Bridge isolated edge and visualization ROS domains in one Compose project
-
-## Images and Releases
-
-Images are published to GitHub Container Registry.
-
-- **[Container Images & Versioning](https://autowarefoundation.github.io/openadkit/getting-started/container-images/)** - Tag taxonomy, versioning, and pinning guidance
-- **[Release Process](https://autowarefoundation.github.io/openadkit/development/build-from-source/#release-process)** - How maintainers promote existing builds at release time
+Use `./openadkit list` to inspect the deployment catalog. CARLA requires Humble, amd64, and an NVIDIA GPU. The [Zenoh bridge](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/) is available as a standalone source-checkout workflow.
 
 ## Documentation
 
-For the full docs, platform support, and development guides:
+The [documentation site](https://autowarefoundation.github.io/openadkit/) covers:
 
-- **[Getting Started](https://autowarefoundation.github.io/openadkit/getting-started/)**
-- **[Documentation](https://autowarefoundation.github.io/openadkit/)**
-- **[Supported Platforms](https://autowarefoundation.github.io/openadkit/platforms/)** - Hardware and platform support status
-- **[Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)** - Build component images locally with `docker buildx bake`
+- [Architecture and components](https://autowarefoundation.github.io/openadkit/overview/)
+- [Deployments and custom stacks](https://autowarefoundation.github.io/openadkit/deployments/)
+- [Supported platforms](https://autowarefoundation.github.io/openadkit/platforms/)
+- [Container images and versioning](https://autowarefoundation.github.io/openadkit/getting-started/container-images/)
+- [Building from source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, DCO sign-off requirement, and deployment validation steps.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and validation steps.
 
-Join the community:
+The [Open AD Kit Working Group](https://github.com/autowarefoundation/autoware-projects/wiki/Open-AD-Kit-Working-Group) is open to everyone and meets every Thursday at 13:00 UTC. [Add the meeting to Google Calendar](https://www.google.com/calendar/event?eid=YnY4dmJxZTVsM2h2cWE1cTJ2NmhtOWdwMzZfMjAyNjA5MjRUMTMwMDAwWiBhdXRvd2FyZS5vcmdfNmxvbDBobzVmdDAyMTdoOGM2MHBpMWZtMzBAZw) for joining details, and browse the [meeting archive](https://github.com/orgs/autowarefoundation/discussions?discussions_q=label%3Ameeting%3Aopenadkit-wg) for agendas and notes.
 
-- Autoware Discord: [discord.gg/Q94UsPvReQ](https://discord.gg/Q94UsPvReQ)
-- Autoware Foundation LinkedIn: [linkedin.com/company/the-autoware-foundation](https://www.linkedin.com/company/the-autoware-foundation/)
+For questions and design discussions, join the [Autoware Discord](https://discord.gg/Q94UsPvReQ).
 
 ## License
 

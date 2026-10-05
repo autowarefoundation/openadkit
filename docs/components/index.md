@@ -1,121 +1,141 @@
 # Components
 
-Open AD Kit is a component-based project designed to run on a variety of platforms with containerized services. Each **Autoware function** remains independently deployable, while the published images group closely related functions together to keep the runtime layout simpler.
+Open AD Kit packages Autoware Universe into focused container images. Each image
+groups closely related Autoware functions, and deployments run them as separate
+containers that talk over ROS 2. External clients use the
+[Autoware AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/);
+the images use Autoware's component interfaces between them.
 
-## Architecture Overview
+All images build on a shared `universe-common` layer; see
+[Build from Source](../development/build-from-source.md#build-system) for the
+build graph. The [image reference](#image-reference) lists tags and platforms.
 
-Autoware uses a **Core / Universe** architecture. **Core** contains rigorously reviewed base functionality required for safe autonomous driving. **Universe** contains community extensions and research features that build on the Core foundation. Open AD Kit packages Universe components into focused container images that can be composed into complete AD systems.
+## Component Images
 
-## Build Pipeline
+### Sensing & Perception {: #sensing-perception }
 
---8<-- "includes/build-pipeline.md"
+Sensor preprocessing and environment understanding in one image.
 
-`universe-common` is an Open AD Kit-owned thin intermediate built on top of the
-upstream `autoware:core-devel`/`base` images. The bake groups and build commands
-are documented in [Build from Source](../development/build-from-source.md).
+- **Sensing** — LiDAR distortion correction, filtering, and point cloud
+  preprocessing; camera and radar preprocessing; GNSS/INS preprocessing; shared
+  point cloud container. Launch: `tier4_sensing_component.launch.xml`
+- **Perception** — camera, LiDAR, and radar object detection and fusion;
+  multi-object tracking and trajectory prediction; traffic light recognition;
+  occupancy grid mapping. Launch: `tier4_perception_component.launch.xml`
+- **CUDA variant** — `sensing-perception-cuda` accelerates point cloud
+  processing and neural-network inference on NVIDIA GPUs. It is amd64-only and
+  requires the NVIDIA Container Toolkit. Used by
+  [Logging Simulation](../deployments/logging-simulation/index.md) (`--gpu`) and
+  [CARLA Simulation](../deployments/carla-simulation/index.md).
 
-## Interface Layers
+### Localization & Mapping {: #localization-mapping }
 
-Autoware defines three formal interface categories that govern how components communicate:
+Serves HD maps and estimates the vehicle pose within them.
 
-<div class="oak-component-grid">
+- **Localization** — GNSS/RTK positioning and IMU dead reckoning; visual
+  odometry and LiDAR map matching; automatic pose initialization; EKF state
+  estimation. Launch: `tier4_localization_component.launch.xml`
+- **Mapping** — Lanelet2 vector map and point cloud map serving; occupancy grid
+  and point cloud map construction; map coordinate transforms. Launch:
+  `tier4_map_component.launch.xml`
 
-<div class="oak-component-item">
-<strong>AD API</strong>
-<span>External interface for fleet management and HMI. Exposed as ROS 2 services and topics for vehicle state queries and commands; external gateways (e.g. HTTP/MQTT) can be layered on top.</span>
-</div>
+Planning and Scenario Simulation run only the `map` service; the simulator
+supplies map-to-odometry transforms. Logging and CARLA Simulation also run
+localization.
 
-<div class="oak-component-item">
-<strong>Component Interface</strong>
-<span>Internal inter-module communication via ROS 2 topics and services. Standardized message types ensure compatibility across components.</span>
-</div>
+### Planning & Control {: #planning-control }
 
-<div class="oak-component-item">
-<strong>Local Interface</strong>
-<span>Intra-component communication within a single image. Implementation details that do not cross component boundaries.</span>
-</div>
+Trajectory generation and vehicle control. Deployments run them as separate
+containers from the same image.
 
-</div>
+- **Planning** — route planning on Lanelet2 road networks; behavior planning for
+  lanes, intersections, and obstacles; kinematically feasible motion planning;
+  goal and parking maneuvers; emergency fallback trajectories. Launch:
+  `tier4_planning_component.launch.xml`
+- **Control** — lateral steering and longitudinal velocity control; PID and
+  Model Predictive Control modes; vehicle-specific command conversion;
+  emergency stop and heartbeat monitoring. Launch:
+  `tier4_control_component.launch.xml`
 
-```mermaid
-flowchart LR
-    subgraph AD_API["AD API (External)"]
-        A1[ROS 2 Services / Topics]
-    end
+### Vehicle and System {: #vehicle-and-system }
 
-    subgraph Component_Interface["Component Interface"]
-        C1[ROS 2 Topics]
-        C2[ROS 2 Services]
-    end
+Vehicle actuation and system diagnostics, run as separate containers from one
+image.
 
-    subgraph Local_Interface["Local Interface"]
-        L1[Intra-component Communication]
-    end
+- **Vehicle** — actuation and state reporting; steering, throttle, brake, gear,
+  and turn-signal conversion; vehicle dimensions, limits, and kinematic
+  parameters. Launch: `tier4_vehicle_launch/vehicle.launch.xml`
+- **System** — health monitoring and heartbeat management; diagnostic
+  aggregation; Minimum Risk Maneuver handling; CPU, memory, and process
+  monitoring. Launch: `tier4_system_component.launch.xml`
 
-    AD_API --> Component_Interface
-    Component_Interface --> Local_Interface
-```
+### API {: #api }
 
-## Autoware Components
+Packages the [Autoware AD API](https://autowarefoundation.github.io/autoware-documentation/main/design/autoware-architecture-v1/interfaces/ad-api/)
+used by fleet managers, HMIs, and scenario runners. It provides ROS 2 services
+and topics for:
 
-Each Autoware function is packaged into a focused container image. Select a component from the sidebar or explore the pages below.
+- vehicle position, velocity, engage status, and operation mode
+- autonomous, manual, stop, local, and remote mode transitions
+- route and goal setting
+- emergency stop and engage/disengage commands
+- scenario simulation auto-engage and route integration
 
-<div class="oak-component-grid">
+Launch: `tier4_autoware_api_component.launch.xml`. It is the standard external
+entry point for the modular simulation deployments.
 
-<div class="oak-component-item">
-<strong><a href="sensing-perception/">Sensing &amp; Perception</a></strong>
-<span>Sensor preprocessing plus object detection, tracking, and multi-sensor fusion.</span>
-</div>
+### Simulator {: #simulator }
 
-<div class="oak-component-item">
-<strong><a href="localization-mapping/">Localization &amp; Mapping</a></strong>
-<span>HD map serving plus GNSS, IMU, visual odometry, and LiDAR map matching.</span>
-</div>
+Closed-loop vehicle and environment simulation without real sensors or vehicle
+hardware:
 
-<div class="oak-component-item">
-<strong><a href="planning-control/">Planning &amp; Control</a></strong>
-<span>Route, behavior, motion, and goal planning with PID/MPC trajectory tracking.</span>
-</div>
+- configurable kinematic and dynamic vehicle models
+- dummy perception, vehicle, door, and traffic-infrastructure interfaces
+- Scenario Simulator v2 adapter and localization simulation mode
+- simulated point cloud preprocessing, object tracking, shape estimation, and
+  map-based prediction
+- occupancy and elevation map handling; vehicle command conversion
 
-<div class="oak-component-item">
-<strong><a href="vehicle-system/">Vehicle and System</a></strong>
-<span>Vehicle interface and system-level orchestration services.</span>
-</div>
+Launch: `tier4_simulator_component.launch.xml`. `carla-interface` builds on this
+image for CARLA-specific sensor and control translation.
 
-<div class="oak-component-item">
-<strong><a href="api/">API</a></strong>
-<span>AD API for external fleet management and HMI integration.</span>
-</div>
+### Visualizer {: #visualizer }
 
-<div class="oak-component-item">
-<strong><a href="simulator/">Simulator</a></strong>
-<span>Closed-loop simulation for validation and local development.</span>
-</div>
+Browser-accessible RViz2 through noVNC: RViz2 with Autoware plugins, Openbox,
+TigerVNC, and a TLS-enabled noVNC server. The VNC backend stays loopback-only,
+and each container creates its own self-signed certificate at startup.
 
-<div class="oak-component-item">
-<strong><a href="visualizer/">Visualizer</a></strong>
-<span>Browser-accessible RViz2 via noVNC for remote monitoring.</span>
-</div>
+| Variable | Default | Values | Description |
+|----------|---------|--------|-------------|
+| `RVIZ_CONFIG` | <code>/opt/<wbr>autoware/<wbr>autoware_launch/<wbr>share/<wbr>autoware_launch/<wbr>rviz/<wbr>autoware.rviz</code> | Path | RViz2 configuration inside the container |
+| `REMOTE_DISPLAY` | `true` | `true`, `false` | Use browser-based RViz2; `false` launches a local display |
+| `REMOTE_PASSWORD` | — | String | Required when `REMOTE_DISPLAY=true` |
+| `WEBSOCKIFY_BIND` | `127.0.0.1` | IP address | noVNC bind address; bridge networking uses `0.0.0.0` with a host loopback port mapping |
+| `USE_SIM_TIME` | `false` | `true`, `false` | Use the ROS simulation clock |
+| `RVIZ_GPU` | `auto` | `auto`, `on`, `off` | Automatic, forced, or disabled VirtualGL acceleration |
 
-<div class="oak-component-item">
-<strong><a href="carla-interface/">CARLA Interface</a></strong>
-<span>Bridge for closed-loop simulation with the CARLA simulator.</span>
-</div>
+For access and remote use, see the
+[Quickstart](../getting-started/index.md#open-the-visualizer).
 
-</div>
+### CARLA Interface {: #carla-interface }
+
+Packages `autoware_carla_interface`, translating Autoware control commands to
+CARLA and CARLA sensor data to ROS 2 messages:
+
+- CARLA world initialization and synchronous simulation
+- ego vehicle spawning and sensor-kit configuration
+- camera, LiDAR, IMU, and GNSS message translation
+- vehicle command calibration and traffic light state publication
+- lightweight sensor mappings for constrained hosts
+
+Launch: `autoware_carla_interface.launch.xml`. The image is amd64-only (Humble
+and Jazzy); the [CARLA Simulation](../deployments/carla-simulation/index.md)
+deployment is Humble-only and needs an NVIDIA GPU.
 
 ## Image Reference
 
-The published component images and their platforms. This table is generated from
-the image catalog (`.github/image-inventory.json`), so it always matches what CI
-builds. See [Container Images & Versioning](../getting-started/container-images.md) for the tag
-naming scheme.
+Generated from the image catalog (`.github/image-inventory.json`), so it always
+matches what CI builds. Tag names are explained in
+[Container Images & Versioning](../getting-started/container-images.md).
 
 {{ component_table() }}
-
-## Related
-
-- [Deployments](../deployments/index.md) — How to compose components into running systems
-- [Build from Source](../development/build-from-source.md) — Bake groups, CI pipeline, and upstream pin
-- [Roadmap](../roadmap.md) — Release ladder and focus areas
-- [Supported Platforms](../platforms/index.md) — Where to deploy

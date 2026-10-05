@@ -1,107 +1,73 @@
 # Custom Deployment
 
-Use the published component images to compose a deployment for your own task.
-Start from the [Planning Simulation Compose file](https://github.com/autowarefoundation/openadkit/blob/main/deployments/planning-simulation/docker-compose.yaml)
-and the shared [deployment base](https://github.com/autowarefoundation/openadkit/blob/main/deployments/base/docker-compose.yaml)
-rather than assembling a complete stack from scratch. The
-[component catalog](../components/index.md#image-reference) lists image targets
-and supported platforms.
+Build your own stack by copying an existing deployment in a source checkout.
 
-## Base + Overlay Pattern
+## How Deployments Are Built
 
-Create `deployments/<your-deployment>/` with a Compose file, complete
-`config.env`, and a `deployment.json` manifest. Then add it to the root
-`openadkit.json` inventory. Base-backed deployments `include`
-`deployments/base/docker-compose.yaml` and declare the shared assets:
+Each service is defined once in
+[`deployments/shared/services/`](https://github.com/autowarefoundation/openadkit/tree/main/deployments/shared/services),
+one file per service. A deployment directory contains:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yaml` | Selects services with `include`, sets `depends_on`, and adds deployment-specific settings or services. It is the source of truth for the service set. |
+| `config.env` | Values the selected services need, such as map paths and simulator settings. |
+| `config.gpu.env` | GPU settings loaded with `--gpu`. Required when `deployment.json` lists `gpuFiles`. |
+| `deployment.json` | Supported architectures, ROS distros, GPU requirement, data downloads, and one-shot services to reset on each run. |
+
+Container ROS and DDS settings shared by all deployments live in
+`deployments/shared/runtime.env`.
+
+## Start from Planning Simulation
+
+From the repository root:
+
+```bash
+cp -r deployments/planning-simulation deployments/my-simulation
+```
+
+In the copied `deployment.json`, set `name` to `my-simulation` and update
+`description`. Then register it in the `deployments` object of the root
+`openadkit.json`:
 
 ```json
-{
-  "schemaVersion": 1,
-  "name": "your-deployment",
-  "description": "Describe the deployment",
-  "shared": ["base"],
-  "compose": {
-    "files": ["docker-compose.yaml"],
-    "gpuFiles": [],
-    "profiles": [],
-    "services": ["map", "planning", "visualizer"],
-    "resetServices": [],
-    "waitTimeout": 300
-  },
-  "requirements": {
-    "architectures": ["amd64", "arm64"],
-    "rosDistros": ["humble", "jazzy"],
-    "gpu": "none"
-  },
-  "data": []
+"my-simulation": {
+  "path": "deployments/my-simulation"
 }
 ```
 
-Without an inventory entry, `openadkit run your-deployment` fails with
-`unknown deployment`. Direct Compose remains available. The base's
-`runtime.env` is loaded inside containers and should contain only ROS/DDS
-runtime values. See [Deployments](index.md) for the operator model.
+## Customize the Stack
 
-## Core Patterns
+Add or remove services in `docker-compose.yaml`. A block under `services:`
+customizes an included service; it does not create a second container:
 
 ```yaml
-services:
-  planning:
-    image: {{ registry }}:planning-control
-    network_mode: host
-    ipc: host
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=1
-    command: >
-      ros2 launch autoware_launch tier4_planning_component.launch.xml
-      component_wise_launch:=true
-      use_sim_time:=true
-      vehicle_model:=sample_vehicle
+include:
+  # Other selected services...
+  - ../shared/services/visualizer.yaml
 
+services:
   visualizer:
-    image: {{ registry }}:visualizer
-    network_mode: host
-    ipc: host
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=1
-      - REMOTE_PASSWORD=openadkit
-      - USE_SIM_TIME=true
+    depends_on:
+      - map
 ```
 
-Keep these invariants:
+Add only the settings that differ. Deployment-only services can be defined
+directly in the same file. When removing a service, also check `depends_on`,
+`pid`, and `resetServices`: most shared services use `pid: service:map` and need
+the `map` service.
 
-- All services use the same `RMW_IMPLEMENTATION` and `ROS_DOMAIN_ID`.
-- Launch files are not always `tier4_<component>_component.launch.xml`. Match
-  the command used in the base or deployment compose, for example:
-  - map / planning / system / control / simulator: `tier4_*_component.launch.xml`
-    under `autoware_launch`
-  - vehicle: `tier4_vehicle_launch vehicle.launch.xml`
-  - API: `tier4_autoware_api_component.launch.xml`
-  - CARLA bridge: `autoware_carla_interface.launch.xml`
-- Do not override the visualizer command; its entrypoint starts noVNC and RViz2.
-- Add map, vehicle, system, simulator, and API services as required by the task.
-- Use `sensing-perception-cuda` only on amd64 hosts with NVIDIA Container
-  Toolkit (Logging Simulation GPU overlay and CARLA default).
-- Prefer loopback-bound noVNC and a strong `REMOTE_PASSWORD` (source:
-  `config.local.env`). Do not expose the
-  visualizer on untrusted networks without TLS and a non-default password.
+Keep communicating services on the same ROS domain and middleware. For the
+order in which env files are loaded, see
+[Configuration](../getting-started/cli.md#configuration).
 
-With host networking, open the visualizer at
-`https://localhost:6080/vnc.html` and accept the self-signed certificate.
-
-## Operate
-
---8<-- "includes/cli-command-context.md"
+## Validate and Run
 
 ```bash
-openadkit validate your-deployment
-openadkit run your-deployment
-openadkit status your-deployment
-openadkit logs your-deployment --follow
-openadkit stop your-deployment
+./openadkit validate my-simulation
+./openadkit run my-simulation
+./openadkit stop my-simulation
 ```
 
-See [Logging Simulation](logging-simulation/index.md) for a GPU overlay and
-[Zenoh Bridge](zenoh-bridge/index.md) for distributed ROS 2 domains.
+Validate every distro and GPU mode you declare. Logging Simulation is an example
+of a GPU overlay; CARLA Simulation is an example of deployment-only services.

@@ -5,21 +5,74 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import string
 import subprocess
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, NoReturn
 
 import compose
 import data
 from manifest import (
     OpenADKitError,
+    RuntimeContext,
     deployment_integrity,
     get_deployment,
+    load_json,
     load_kit,
+    require_string,
+    resolve_extends,
     root_path,
 )
+
+
+def find_kit(start: Path) -> Path | None:
+    """The integrator kit around the working directory, if any.
+
+    Like git, the nearest openadkit.json wins; it is a kit only when its kind
+    is "kit". OPENADKIT_KIT names the kit directly.
+    """
+    explicit = os.environ.get("OPENADKIT_KIT")
+    if explicit:
+        return Path(explicit).resolve()
+    for directory in (start, *start.parents):
+        manifest = directory / "openadkit.json"
+        if manifest.is_file():
+            try:
+                kind = json.loads(manifest.read_text(encoding="utf-8")).get("kind")
+            except (OSError, ValueError, AttributeError):
+                return None
+            return directory if kind == "kit" else None
+    return None
+
+
+def read_extends(kit_root: Path) -> str:
+    return require_string(load_json(kit_root / "openadkit.json").get("extends"), "extends")
+
+
+def load_context() -> tuple[Path, RuntimeContext]:
+    """The kit to act on, run by the CLI of the Open AD Kit it pins."""
+    cli_root = root_path()
+    kit_root = find_kit(Path.cwd())
+    if kit_root is None:
+        return cli_root, load_kit(cli_root)
+    # Hand over before reading anything else: only the pinned release's CLI
+    # is guaranteed to understand that release's manifests.
+    base_root = resolve_extends(kit_root, read_extends(kit_root))
+    if base_root != cli_root:
+        if os.environ.get("OPENADKIT_DELEGATED"):
+            raise OpenADKitError(f"{base_root}/openadkit did not run this kit as its own CLI")
+        launcher = base_root / "openadkit"
+        if not launcher.is_file():
+            raise OpenADKitError(f"{base_root} has no openadkit launcher")
+        environment = os.environ | {
+            "OPENADKIT_KIT": str(kit_root),
+            "OPENADKIT_DELEGATED": "1",
+        }
+        os.execve(launcher, [str(launcher), *sys.argv[1:]], environment)
+    return kit_root, load_kit(kit_root)
 
 
 class OpenADKitParser(argparse.ArgumentParser):
@@ -35,8 +88,7 @@ class OpenADKitParser(argparse.ArgumentParser):
         if self.help_inventory != "catalog":
             return
         try:
-            root = root_path()
-            kit = load_kit(root)
+            root, kit = load_context()
         except OpenADKitError:
             return
         print(file=file)
@@ -305,12 +357,16 @@ def show_version(root, kit, *, json_output: bool = False) -> int:
                     "bundle": kit.kind,
                     "version": version,
                     "commit": commit,
+                    "extends": kit.extends,
                     "bom": kit.bom(),
                 }
             )
         )
         return 0
-    if kit.kind == "release":
+    if kit.extends is not None:
+        print(f"kit: {root}")
+        print(f"extends: Open AD Kit {kit.extends} ({kit.base_root})")
+    elif kit.kind == "release":
         print(f"Open AD Kit {kit.version or 'unknown'}")
         print("bundle: release")
         if kit.autoware:
@@ -398,8 +454,7 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     if args.show_version:
-        root = root_path()
-        kit = load_kit(root)
+        root, kit = load_context()
         return show_version(root, kit)
     if not args.command:
         parser.print_help()
@@ -414,8 +469,7 @@ def main() -> int:
         print(f"error: run: {usage}", file=sys.stderr)
         return 2
 
-    root = root_path()
-    kit = load_kit(root)
+    root, kit = load_context()
 
     if args.command == "list":
         return list_deployments(root, kit, json_output=args.json_output)

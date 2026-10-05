@@ -306,3 +306,24 @@ def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):
     monkeypatch.setattr(sys, "stdin", io.StringIO("components/api/Dockerfile\n"))
     assert matrices.main(["resolver", "single-image", "humble", ""]) == 0
     assert 'targets_json=["api"]' in capsys.readouterr().out
+
+
+@pytest.mark.skipif(not COMPOSE_AVAILABLE, reason="docker compose is required")
+def test_example_kit_includes_the_base_and_adds_its_layer():
+    kit = ROOT / "examples/custom-kit"
+    env = dict(os.environ)
+    for name in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED", "COMPOSE_FILE"):
+        env.pop(name, None)
+    env["REMOTE_PASSWORD"] = "ci-validate"
+    result = subprocess.run(
+        [str(ROOT / "openadkit"), "validate", "custom-planning", "--json"],
+        cwd=kit, env=env, text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["manifestValid"] is True
+    # The kit's values come after the base's.
+    env_files = re.findall(r"--env-file (\S+)", result.stderr)
+    assert env_files[:2] == [
+        str(ROOT / "deployments/planning-simulation/config.env"),
+        str(kit / "deployments/custom-planning/config.env"),
+    ]

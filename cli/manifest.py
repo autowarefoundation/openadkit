@@ -35,6 +35,16 @@ ALLOWED_KIT_KEYS = {
     "autoware",
 }
 ALLOWED_ARTIFACT_KEYS = {"workload", "ref", "distros"}
+# An integrator kit: its own deployments on top of one pinned Open AD Kit.
+ALLOWED_INTEGRATOR_KIT_KEYS = {"schemaVersion", "kind", "extends", "deployments", "artifacts"}
+ALLOWED_INTEGRATOR_DEPLOYMENT_KEYS = {
+    "schemaVersion", "name", "description", "base", "compose", "data",
+}
+ALLOWED_INTEGRATOR_COMPOSE_KEYS = {"files", "resetServices", "waitTimeout"}
+# The include variable for the pinned kit, named per kit so a later layer
+# (a Tier-1 kit extended by an OEM kit) can add its own.
+BASE_KIT_ENV = "KIT_openadkit"
+RELEASE_TAG_RE = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$")
 ALLOWED_DEPLOYMENT_REF_KEYS = {"path", "checksum"}
 ALLOWED_DEPLOYMENT_KEYS = {
     "schemaVersion",
@@ -278,6 +288,17 @@ class RuntimeContext:
     artifacts: dict[str, dict[str, Any]]
     # Release only: the Autoware version, commit and lock file it was built from.
     autoware: dict[str, str] | None = None
+    # Integrator kit only: the pinned Open AD Kit it extends.
+    extends: str | None = None
+    base: RuntimeContext | None = None
+    base_root: Path | None = None
+
+    @property
+    def pinned(self) -> bool:
+        """Release images cannot be overridden from env files; source images can."""
+        if self.base is not None:
+            return self.base.pinned
+        return self.kind == "release"
 
     def bom(self) -> dict[str, Any]:
         """What this kit runs: Autoware, component images and artifacts."""
@@ -288,8 +309,14 @@ class RuntimeContext:
         }
 
     def artifact_environment(self, ros_distro: str) -> dict[str, str]:
-        """Artifact references for one distro; Compose requires them by name."""
-        environment: dict[str, str] = {}
+        """Artifact references for one distro; Compose requires them by name.
+
+        In an integrator kit its own artifacts come last, so one named like a
+        component image replaces that component.
+        """
+        environment = (
+            self.base.artifact_environment(ros_distro) if self.base is not None else {}
+        )
         for name, artifact in self.artifacts.items():
             reference = artifact.get("ref") or artifact.get("distros", {}).get(ros_distro)
             if reference:
@@ -299,6 +326,8 @@ class RuntimeContext:
     def component_environment(
         self, ros_distro: str, architecture: str, gpu: bool
     ) -> dict[str, str]:
+        if self.base is not None:
+            return self.base.component_environment(ros_distro, architecture, gpu)
         applicable = {
             name: target
             for name, target in self.component_images.items()
@@ -341,8 +370,16 @@ class Selection:
 
 
 class Deployment:
-    def __init__(self, root: Path, directory: Path, manifest: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        root: Path,
+        directory: Path,
+        manifest: dict[str, Any],
+        base: Deployment | None = None,
+    ) -> None:
         self.root = root
+        # An integrator deployment builds on this pinned deployment.
+        self.base = base
         self.directory = directory
         self.manifest_path = directory / "deployment.json"
         self.manifest = manifest
@@ -369,10 +406,25 @@ class Deployment:
     def output_directory(self) -> Path:
         return state_root() / self.name / "output"
 
+    @property
+    def has_gpu_files(self) -> bool:
+        return bool(self.compose["gpuFiles"]) or (
+            self.base is not None and self.base.has_gpu_files
+        )
+
     def env_files(self, gpu: bool = False) -> list[Path]:
-        result = [
-            ensure_safe_existing(self.directory, "config.env", "environment file")
-        ]
+        """Base env files, then this deployment's, then the host's site file."""
+        result = self.base._own_env_files(gpu) if self.base is not None else []
+        result.extend(self._own_env_files(gpu))
+        site = self.site_config
+        if site.exists():
+            if not site.is_file():
+                raise OpenADKitError(f"site configuration is not a regular file: {site}")
+            result.append(site)
+        return result
+
+    def _own_env_files(self, gpu: bool) -> list[Path]:
+        result: list[Path] = []
 
         def add_optional(name: str) -> None:
             candidate = self.directory / name
@@ -380,6 +432,14 @@ class Deployment:
                 result.append(
                     ensure_safe_existing(self.directory, name, "environment file")
                 )
+
+        # An integrator deployment may leave every base value as it is.
+        if self.base is None:
+            result.append(
+                ensure_safe_existing(self.directory, "config.env", "environment file")
+            )
+        else:
+            add_optional("config.env")
 
         if gpu:
             if self.compose["gpuFiles"]:
@@ -390,11 +450,6 @@ class Deployment:
                 )
             else:
                 add_optional("config.gpu.env")
-        site = self.site_config
-        if site.exists():
-            if not site.is_file():
-                raise OpenADKitError(f"site configuration is not a regular file: {site}")
-            result.append(site)
         return result
 
     def configuration_environment(self, gpu: bool = False) -> dict[str, str]:
@@ -414,10 +469,17 @@ class Deployment:
             names = list(self.compose["files"])
             if gpu:
                 names.extend(self.compose["gpuFiles"])
-            return [
+            files = [
                 ensure_safe_existing(self.directory, name, "Compose file")
                 for name in names
             ]
+            if gpu and self.base is not None:
+                # The base's GPU overlay patches the services the kit includes.
+                files.extend(
+                    ensure_safe_existing(self.base.directory, name, "Compose file")
+                    for name in self.base.compose["gpuFiles"]
+                )
+            return files
         names = list(self.nodes[node]["files"])
         if gpu:
             names.extend(self.compose["gpuFiles"])
@@ -440,11 +502,15 @@ class Deployment:
 
     def _base_injections(self, distro: str) -> dict[str, str]:
         # config.env defaults OUTPUT_HOST_PATH to this directory.
-        return {
+        injections = {
             "ROS_DISTRO": distro,
             "OPENADKIT_OUTPUT_DIR": str(self.output_directory),
             **host_user_environment(),
         }
+        if self.base is not None:
+            # The kit's Compose file includes the base by this path.
+            injections[BASE_KIT_ENV] = str(self.base.root)
+        return injections
 
     def _node_injections(self, node: str | None, injections: dict[str, str]) -> dict[str, str]:
         if node is None:
@@ -515,7 +581,7 @@ class Deployment:
                 gpu = True
             if gpu_requirement == "none" and gpu:
                 raise OpenADKitError(f"{self.name} does not provide a GPU mode")
-            if gpu and gpu_requirement == "optional" and not self.compose["gpuFiles"]:
+            if gpu and gpu_requirement == "optional" and not self.has_gpu_files:
                 raise OpenADKitError(
                     f"{self.name} declares optional GPU but has no GPU Compose file"
                 )
@@ -538,7 +604,7 @@ class Deployment:
             distro, architecture, gpu
         )
         component_environment.update(current_context.artifact_environment(distro))
-        if current_context.kind == "repository":
+        if not current_context.pinned:
             injections.update(
                 {
                     name: environment.get(name) or reference
@@ -572,6 +638,89 @@ class Deployment:
             injections=injections,
             environment=environment,
         )
+
+
+def _validate_data(data: Any, nodes: dict[str, Any]) -> list[dict[str, Any]]:
+    if not isinstance(data, list):
+        raise OpenADKitError("data must be an array")
+    names: set[str] = set()
+    destinations: set[str] = set()
+    for index, resource in enumerate(data):
+        where = f"data[{index}]"
+        if not isinstance(resource, dict):
+            raise OpenADKitError(f"{where} must be an object")
+        reject_unknown(resource, ALLOWED_DATA_KEYS, where)
+        resource_name = require_string(resource.get("name"), f"{where}.name")
+        if resource_name in names:
+            raise OpenADKitError(f"duplicate data resource: {resource_name}")
+        names.add(resource_name)
+        if resource.get("kind") not in ("zip", "files"):
+            raise OpenADKitError(f"{where}.kind must be zip or files")
+        require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
+        if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
+            raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
+        if resource["destinationEnv"] in destinations:
+            raise OpenADKitError(
+                f"duplicate data destination environment: {resource['destinationEnv']}"
+            )
+        destinations.add(resource["destinationEnv"])
+        if "gpu" in resource and not isinstance(resource["gpu"], bool):
+            raise OpenADKitError(f"{where}.gpu must be a boolean")
+        if "nodes" in resource:
+            resource["nodes"] = require_string_list(
+                resource["nodes"], f"{where}.nodes", nonempty=True
+            )
+            unknown_nodes = sorted(set(resource["nodes"]) - set(nodes))
+            if unknown_nodes:
+                raise OpenADKitError(
+                    f"{where}.nodes contains undeclared node(s): "
+                    + ", ".join(unknown_nodes)
+                )
+        resource["requiredFiles"] = require_string_list(
+            resource.get("requiredFiles", []), f"{where}.requiredFiles"
+        )
+        for required in resource["requiredFiles"]:
+            safe_relative(required, f"{where}.requiredFiles")
+        generated = resource.get("generatedFiles", {})
+        if not isinstance(generated, dict) or any(
+            not isinstance(value, str) for value in generated.values()
+        ):
+            raise OpenADKitError(f"{where}.generatedFiles must map paths to strings")
+        for relative in generated:
+            safe_relative(relative, f"{where}.generatedFiles")
+        resource["generatedFiles"] = generated
+        if resource["kind"] == "zip":
+            require_string(resource.get("url"), f"{where}.url")
+            checksum = require_string(resource.get("sha256"), f"{where}.sha256")
+            if not SHA256_RE.fullmatch(checksum):
+                raise OpenADKitError(f"{where}.sha256 is invalid")
+            safe_relative(
+                require_string(resource.get("expectedRoot"), f"{where}.expectedRoot"),
+                f"{where}.expectedRoot",
+            )
+            if resource.get("files") not in (None, []):
+                raise OpenADKitError(f"{where}.files is invalid for zip data")
+            resource["files"] = []
+        else:
+            files = resource.get("files")
+            if not isinstance(files, list) or not files:
+                raise OpenADKitError(f"{where}.files must be a nonempty array")
+            seen_paths: set[str] = set()
+            for file_index, item in enumerate(files):
+                file_where = f"{where}.files[{file_index}]"
+                if not isinstance(item, dict):
+                    raise OpenADKitError(f"{file_where} must be an object")
+                reject_unknown(item, ALLOWED_DATA_FILE_KEYS, file_where)
+                relative = require_string(item.get("path"), f"{file_where}.path")
+                safe_relative(relative, f"{file_where}.path")
+                if relative in seen_paths:
+                    raise OpenADKitError(f"duplicate data file path: {relative}")
+                seen_paths.add(relative)
+                require_string(item.get("url"), f"{file_where}.url")
+                checksum = require_string(item.get("sha256"), f"{file_where}.sha256")
+                if not SHA256_RE.fullmatch(checksum):
+                    raise OpenADKitError(f"{file_where}.sha256 is invalid")
+    return data
 
 
 def validate_manifest(root: Path, directory: Path) -> Deployment:
@@ -719,86 +868,7 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         require_string(evidence["exempt"], "evidence.exempt")
     manifest["evidence"] = evidence
 
-    data = manifest.get("data", [])
-    if not isinstance(data, list):
-        raise OpenADKitError("data must be an array")
-    names: set[str] = set()
-    destinations: set[str] = set()
-    for index, resource in enumerate(data):
-        where = f"data[{index}]"
-        if not isinstance(resource, dict):
-            raise OpenADKitError(f"{where} must be an object")
-        reject_unknown(resource, ALLOWED_DATA_KEYS, where)
-        resource_name = require_string(resource.get("name"), f"{where}.name")
-        if resource_name in names:
-            raise OpenADKitError(f"duplicate data resource: {resource_name}")
-        names.add(resource_name)
-        if resource.get("kind") not in ("zip", "files"):
-            raise OpenADKitError(f"{where}.kind must be zip or files")
-        require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
-        if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
-            raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
-        if resource["destinationEnv"] in destinations:
-            raise OpenADKitError(
-                f"duplicate data destination environment: {resource['destinationEnv']}"
-            )
-        destinations.add(resource["destinationEnv"])
-        if "gpu" in resource and not isinstance(resource["gpu"], bool):
-            raise OpenADKitError(f"{where}.gpu must be a boolean")
-        if "nodes" in resource:
-            resource["nodes"] = require_string_list(
-                resource["nodes"], f"{where}.nodes", nonempty=True
-            )
-            unknown_nodes = sorted(set(resource["nodes"]) - set(nodes))
-            if unknown_nodes:
-                raise OpenADKitError(
-                    f"{where}.nodes contains undeclared node(s): "
-                    + ", ".join(unknown_nodes)
-                )
-        resource["requiredFiles"] = require_string_list(
-            resource.get("requiredFiles", []), f"{where}.requiredFiles"
-        )
-        for required in resource["requiredFiles"]:
-            safe_relative(required, f"{where}.requiredFiles")
-        generated = resource.get("generatedFiles", {})
-        if not isinstance(generated, dict) or any(
-            not isinstance(value, str) for value in generated.values()
-        ):
-            raise OpenADKitError(f"{where}.generatedFiles must map paths to strings")
-        for relative in generated:
-            safe_relative(relative, f"{where}.generatedFiles")
-        resource["generatedFiles"] = generated
-        if resource["kind"] == "zip":
-            require_string(resource.get("url"), f"{where}.url")
-            checksum = require_string(resource.get("sha256"), f"{where}.sha256")
-            if not SHA256_RE.fullmatch(checksum):
-                raise OpenADKitError(f"{where}.sha256 is invalid")
-            safe_relative(
-                require_string(resource.get("expectedRoot"), f"{where}.expectedRoot"),
-                f"{where}.expectedRoot",
-            )
-            if resource.get("files") not in (None, []):
-                raise OpenADKitError(f"{where}.files is invalid for zip data")
-            resource["files"] = []
-        else:
-            files = resource.get("files")
-            if not isinstance(files, list) or not files:
-                raise OpenADKitError(f"{where}.files must be a nonempty array")
-            seen_paths: set[str] = set()
-            for file_index, item in enumerate(files):
-                file_where = f"{where}.files[{file_index}]"
-                if not isinstance(item, dict):
-                    raise OpenADKitError(f"{file_where} must be an object")
-                reject_unknown(item, ALLOWED_DATA_FILE_KEYS, file_where)
-                relative = require_string(item.get("path"), f"{file_where}.path")
-                safe_relative(relative, f"{file_where}.path")
-                if relative in seen_paths:
-                    raise OpenADKitError(f"duplicate data file path: {relative}")
-                seen_paths.add(relative)
-                require_string(item.get("url"), f"{file_where}.url")
-                checksum = require_string(item.get("sha256"), f"{file_where}.sha256")
-                if not SHA256_RE.fullmatch(checksum):
-                    raise OpenADKitError(f"{file_where}.sha256 is invalid")
+    data = _validate_data(manifest.get("data", []), nodes)
     manifest["data"] = data
 
     deployment = Deployment(root, directory, manifest)
@@ -812,6 +882,76 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         deployment.compose_files(False, node_name)
         if compose["gpuFiles"]:
             deployment.compose_files(True, node_name)
+    deployment.env_files()
+    return deployment
+
+
+def validate_kit_deployment(
+    root: Path, directory: Path, base_kit: RuntimeContext, base_root: Path
+) -> Deployment:
+    """An integrator deployment: its own Compose file and values on top of a
+    base deployment from the pinned kit, whose requirements it keeps as is."""
+    if directory.is_symlink() or not directory.is_dir():
+        raise OpenADKitError(f"unsafe deployment directory: {directory}")
+    manifest = load_json(
+        ensure_safe_existing(directory, "deployment.json", "deployment manifest")
+    )
+    reject_unknown(manifest, ALLOWED_INTEGRATOR_DEPLOYMENT_KEYS, "manifest")
+    if manifest.get("schemaVersion") != SCHEMA_VERSION:
+        raise OpenADKitError(
+            f"unsupported deployment schemaVersion {manifest.get('schemaVersion')!r} "
+            f"(expected {SCHEMA_VERSION})"
+        )
+    name = require_string(manifest.get("name"), "name")
+    if not NAME_RE.fullmatch(name) or name != directory.name:
+        raise OpenADKitError(
+            f"manifest name must match deployment directory: {directory.name}"
+        )
+    require_string(manifest.get("description"), "description")
+    base_name = require_string(manifest.get("base"), "base")
+    if base_name not in base_kit.deployments:
+        raise OpenADKitError(
+            f"base deployment {base_name} is not in the pinned kit; "
+            f"available: {available_deployments(base_kit)}"
+        )
+    base = get_deployment(base_root, base_kit, base_name)
+
+    compose = manifest.get("compose")
+    if not isinstance(compose, dict):
+        raise OpenADKitError("compose must be an object")
+    reject_unknown(compose, ALLOWED_INTEGRATOR_COMPOSE_KEYS, "compose")
+    files = require_string_list(compose.get("files"), "compose.files", nonempty=True)
+    extra_resets = require_string_list(compose.get("resetServices", []), "compose.resetServices")
+    wait_timeout = compose.get("waitTimeout", base.compose["waitTimeout"])
+    if not isinstance(wait_timeout, int) or isinstance(wait_timeout, bool) or wait_timeout <= 0:
+        raise OpenADKitError("compose.waitTimeout must be a positive integer")
+
+    own_data = _validate_data(manifest.get("data", []), {})
+    destinations = {item["destinationEnv"] for item in base.data}
+    clashing = sorted(destinations & {item["destinationEnv"] for item in own_data})
+    if clashing:
+        raise OpenADKitError(
+            "data reuses a destination of the base deployment: " + ", ".join(clashing)
+        )
+
+    merged = {
+        "name": name,
+        "description": manifest["description"],
+        "compose": {
+            "files": files,
+            "gpuFiles": [],
+            "profiles": list(base.compose["profiles"]),
+            "resetServices": list(dict.fromkeys(base.compose["resetServices"] + extra_resets)),
+            "waitTimeout": wait_timeout,
+        },
+        "nodes": {},
+        "requirements": base.requirements,
+        "data": base.data + own_data,
+        "shared": [],
+        "evidence": dict(base.manifest["evidence"]),
+    }
+    deployment = Deployment(root, directory, merged, base=base)
+    deployment.compose_files(False)
     deployment.env_files()
     return deployment
 
@@ -923,14 +1063,70 @@ def _require_checksum_map(value: Any, where: str) -> dict[str, str]:
     return value
 
 
+def install_root() -> Path:
+    """Where `openadkit install` puts versioned releases."""
+    explicit = os.environ.get("OPENADKIT_INSTALL_DIR")
+    if explicit:
+        return Path(explicit).expanduser()
+    return Path(expand_home("$HOME")) / ".local/share/openadkit"
+
+
+def resolve_extends(kit_root: Path, extends: str) -> Path:
+    """The Open AD Kit a kit pins: an installed release tag or, while
+    developing, a path to a source checkout."""
+    if RELEASE_TAG_RE.fullmatch(extends):
+        candidate = install_root() / f"openadkit-{extends}"
+        if not (candidate / "openadkit.json").is_file():
+            raise OpenADKitError(
+                f"this kit extends Open AD Kit {extends}, which is not installed; "
+                f"run: openadkit install --version {extends}"
+            )
+        candidate = candidate.resolve()
+    else:
+        candidate = (kit_root / Path(extends).expanduser()).resolve()
+        if not (candidate / "openadkit.json").is_file():
+            raise OpenADKitError(f"extends does not point to an Open AD Kit: {extends}")
+    if load_json(candidate / "openadkit.json").get("kind") == "kit":
+        raise OpenADKitError(
+            f"{candidate} is itself a kit; only one level of extends is supported"
+        )
+    return candidate
+
+
+def _load_integrator_kit(root: Path, value: dict[str, Any]) -> RuntimeContext:
+    reject_unknown(value, ALLOWED_INTEGRATOR_KIT_KEYS, "kit")
+    extends = require_string(value.get("extends"), "extends")
+    base_root = resolve_extends(root, extends)
+    base = load_kit(base_root)
+    # A kit artifact may reuse a component image name to replace that component.
+    artifacts = _parse_artifacts(value.get("artifacts", {}), {})
+    return RuntimeContext(
+        kind="kit",
+        default_ros_distro=base.default_ros_distro,
+        version=None,
+        image_prefix_component=base.image_prefix_component,
+        component_images=base.component_images,
+        images=base.images,
+        deployments=_parse_deployment_refs(value.get("deployments"), "kit"),
+        shared={},
+        artifacts=artifacts,
+        autoware=base.autoware,
+        extends=extends,
+        base=base,
+        base_root=base_root,
+    )
+
+
 def load_kit(root: Path) -> RuntimeContext:
     value = load_json(ensure_safe_existing(root, "openadkit.json", "bundle manifest"))
-    reject_unknown(value, ALLOWED_KIT_KEYS, "bundle")
     if value.get("schemaVersion") != SCHEMA_VERSION:
         raise OpenADKitError(
             f"unsupported openadkit.json schemaVersion {value.get('schemaVersion')!r} "
             f"(expected {SCHEMA_VERSION})"
         )
+    if value.get("kind") == "kit":
+        return _load_integrator_kit(root, value)
+    reject_unknown(value, ALLOWED_KIT_KEYS, "bundle")
     if value.get("kind") not in ("repository", "release"):
         raise OpenADKitError("invalid Open AD Kit bundle manifest")
     default_ros_distro = require_string(
@@ -1002,7 +1198,11 @@ def get_deployment(root: Path, kit: RuntimeContext, name: str) -> Deployment:
             f"unknown deployment: {name}\navailable: {available}"
         ) from error
     directory = root.joinpath(*safe_relative(reference.path, "deployment path").parts)
-    deployment = validate_manifest(root, directory)
+    if kit.base is not None:
+        assert kit.base_root is not None
+        deployment = validate_kit_deployment(root, directory, kit.base, kit.base_root)
+    else:
+        deployment = validate_manifest(root, directory)
     if deployment.name != name:
         raise OpenADKitError(
             f"deployment {name} path does not match manifest name {deployment.name}"

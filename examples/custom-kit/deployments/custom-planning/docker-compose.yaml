@@ -1,0 +1,12 @@
+# Include the pinned Planning Simulation and add services (extension point 4).
+# The CLI sets KIT_openadkit to the Open AD Kit this kit extends.
+include:
+  - ${KIT_openadkit}/deployments/planning-simulation/docker-compose.yaml
+
+services:
+  heartbeat:
+    # A kit artifact (extension point 5), pinned in this kit's openadkit.json.
+    image: ${HEARTBEAT_IMAGE:?pinned in openadkit.json artifacts}
+    network_mode: none
+    command: ["sleep", "infinity"]
+    restart: unless-stopped

@@ -2005,3 +2005,175 @@ def test_version_reports_the_bill_of_materials(tmp_path):
     root, _ = runtime_tree(tmp_path / "source")
     bom = json.loads(run_cli(root, "version", "--json").stdout)["bom"]
     assert bom["autoware"] is None and bom["images"] is None
+
+
+# --- Integrator kits -------------------------------------------------------------
+
+
+def integrator_kit(tmp_path, root, *, extends=None, deployment=None, artifacts=None,
+                   config_env="VALUE=kit\n"):
+    """A kit repo next to the base tree, with one deployment on the base's example."""
+    kit = tmp_path / "acme-kit"
+    document = {
+        "schemaVersion": 2,
+        "kind": "kit",
+        "extends": extends if extends is not None else str(root),
+        "deployments": {"custom": {"path": "deployments/custom"}},
+    }
+    if artifacts is not None:
+        document["artifacts"] = artifacts
+    directory = kit / "deployments/custom"
+    directory.mkdir(parents=True)
+    (kit / "openadkit.json").write_text(json.dumps(document))
+    (directory / "deployment.json").write_text(json.dumps(deployment or {
+        "schemaVersion": 2,
+        "name": "custom",
+        "description": "Acme on the example deployment",
+        "base": "example",
+        "compose": {"files": ["docker-compose.yaml"]},
+    }))
+    if config_env is not None:
+        (directory / "config.env").write_text(config_env)
+    (directory / "docker-compose.yaml").write_text(
+        "include:\n  - ${KIT_openadkit}/deployments/example/docker-compose.yaml\n"
+        "services:\n  acme:\n    image: busybox:1.36.1\n"
+    )
+    return kit
+
+
+def run_in(directory, root, *args, **env):
+    """Run the base tree's CLI from inside a kit directory."""
+    command_env = os.environ | {"HOME": str(root.parent / "home")}
+    for name in USER_ROOT_ENV + ("OPENADKIT_KIT", "OPENADKIT_DELEGATED"):
+        command_env.pop(name, None)
+    bin_dir = root.parent / "bin"
+    if bin_dir.is_dir():
+        command_env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+    command_env.update(env)
+    return subprocess.run(
+        [str(root / "openadkit"), *args],
+        cwd=directory, env=command_env, text=True, capture_output=True,
+    )
+
+
+def recording_docker(tmp_path):
+    """A docker that records its arguments and the kit include variable."""
+    seen = tmp_path / "seen-kit"
+    executable(
+        tmp_path / "bin/docker",
+        "#!/usr/bin/env bash\n"
+        f'printf "%s|%s|%s\\n" "${{KIT_openadkit-unset}}" "${{API_IMAGE-unset}}" "$*" >> {json.dumps(str(seen))}\n'
+        'if [[ "$*" == *"config --services"* ]]; then printf "app\\nacme\\n"; fi\n',
+    )
+    return seen
+
+
+def test_a_kit_runs_its_deployment_on_top_of_the_base(tmp_path):
+    root, _ = runtime_tree(tmp_path, config_env="VALUE=base\n")
+    kit = integrator_kit(tmp_path, root)
+    site_config(root, "VALUE=site\n", name="custom")
+    seen = recording_docker(tmp_path)
+
+    listed = run_in(kit, root, "list")
+    assert listed.returncode == 0, listed.stderr
+    assert re.search(r"^custom\s+source\s+none\s+Acme on the example", listed.stdout, re.M)
+
+    nested = kit / "deployments/custom"
+    result = run_in(nested, root, "validate", "custom")
+    assert result.returncode == 0, result.stderr
+    first = seen.read_text().splitlines()[0]
+    include_root, _, arguments = first.split("|", 2)
+    assert include_root == str(root)
+    assert "--project-name openadkit-custom " in arguments
+    env_files = [Path(item.split()[0]) for item in arguments.split("--env-file ")[1:]]
+    assert env_files == [
+        root / "deployments/example/config.env",
+        kit / "deployments/custom/config.env",
+        root.parent / "home/.config/openadkit/custom.env",
+    ]
+    assert f"--file {kit}/deployments/custom/docker-compose.yaml" in arguments
+
+
+def test_a_kit_inherits_the_base_requirements_and_data(tmp_path):
+    root, _ = runtime_tree(
+        tmp_path, manifest=minimal_manifest(data=[files_resource()]),
+        config_env="MAP_PATH=$HOME/data/example\n",
+    )
+    kit = integrator_kit(tmp_path, root)
+    recording_docker(tmp_path)
+    assert "does not provide a GPU mode" in run_in(kit, root, "validate", "custom", "--gpu").stderr
+    report = run_in(kit, root, "validate", "custom", "--data")
+    assert "data: dataset missing" in report.stdout
+
+    clash = integrator_kit(tmp_path / "clash", root, deployment={
+        "schemaVersion": 2, "name": "custom", "description": "d", "base": "example",
+        "compose": {"files": ["docker-compose.yaml"]},
+        "data": [files_resource("mine")],
+    })
+    result = run_in(clash, root, "list")
+    assert "data reuses a destination of the base deployment: MAP_PATH" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"base": "missing"}, "base deployment missing is not in the pinned kit; available: example"),
+        ({"requirements": {}}, "unknown manifest field(s): requirements"),
+        ({"compose": {"files": ["docker-compose.yaml"], "gpuFiles": []}},
+         "unknown compose field(s): gpuFiles"),
+    ],
+)
+def test_kit_deployment_schema_errors(tmp_path, change, message):
+    root, _ = runtime_tree(tmp_path)
+    deployment = {
+        "schemaVersion": 2, "name": "custom", "description": "d", "base": "example",
+        "compose": {"files": ["docker-compose.yaml"]},
+    }
+    deployment.update(change)
+    kit = integrator_kit(tmp_path, root, deployment=deployment)
+    assert message in run_in(kit, root, "list").stdout
+
+
+def test_a_kit_artifact_replaces_a_component_image(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    vehicle = f"registry.example/acme-api@sha256:{'f' * 64}"
+    kit = integrator_kit(tmp_path, root, artifacts={"API_IMAGE": {"workload": "api", "ref": vehicle}})
+    seen = recording_docker(tmp_path)
+    result = run_in(kit, root, "validate", "custom")
+    assert result.returncode == 0, result.stderr
+    assert seen.read_text().splitlines()[0].split("|")[1] == vehicle
+
+
+def test_a_kit_pinned_to_a_missing_release_says_how_to_install_it(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    kit = integrator_kit(tmp_path, root, extends="v9.9.9")
+    result = run_in(kit, root, "list")
+    assert result.returncode != 0
+    assert "extends Open AD Kit v9.9.9, which is not installed" in result.stderr
+    assert "openadkit install --version v9.9.9" in result.stderr
+
+
+def test_a_kit_runs_with_the_cli_of_the_release_it_pins(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    kit = integrator_kit(tmp_path, root, extends="v1.2.3")
+    pinned = tmp_path / "home/.local/share/openadkit/openadkit-v1.2.3"
+    pinned.mkdir(parents=True)
+    (pinned / "openadkit.json").write_text(json.dumps({"schemaVersion": 2, "kind": "release"}))
+    record = tmp_path / "delegated"
+    executable(
+        pinned / "openadkit",
+        "#!/usr/bin/env bash\n"
+        f'printf "%s|%s|%s\\n" "$OPENADKIT_KIT" "$OPENADKIT_DELEGATED" "$*" > {json.dumps(str(record))}\n',
+    )
+    result = run_in(kit, root, "run", "custom", "--pull", "never")
+    assert result.returncode == 0, result.stderr
+    assert record.read_text().strip() == f"{kit}|1|run custom --pull never"
+
+
+def test_kits_extend_one_level_only(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    inner = integrator_kit(tmp_path, root)
+    outer = integrator_kit(tmp_path / "outer", root, extends=str(inner))
+    result = run_in(outer, root, "list")
+    assert result.returncode != 0
+    assert "is itself a kit; only one level of extends is supported" in result.stderr

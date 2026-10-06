@@ -4,9 +4,8 @@ name: evidence
 # Result attestation. The subjects are the built image digests plus the
 # deployment and shared asset checksums of the staged release kit.
 #
-# Shadow mode for now: a failing cell makes this workflow red, but it does not
-# block releases yet. The release gate consumes these records once blocking
-# mode lands (PR 3).
+# The release gate requires a complete PASSED attestation. CI quarantine remains
+# visible as WARNED and never bypasses the release gate.
 
 permissions:
   contents: read

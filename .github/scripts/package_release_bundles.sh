@@ -12,6 +12,7 @@ export PYTHONDONTWRITEBYTECODE=1
 
 source_dir=${SOURCE_DIR:-src}
 build_metadata=${BUILD_METADATA_FILE:-release-input/build/build-metadata.json}
+evidence_report=${EVIDENCE_REPORT_FILE:-release-input/evidence-report.json}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 planner=${RELEASE_PLAN_SCRIPT:-${script_dir}/release_plan.py}
 root_name="openadkit-${VERSION}"
@@ -24,7 +25,8 @@ mkdir -p dist "${bundle_root}/deployments"
 
 python3 "${planner}" \
   --source-root "${source_dir}" \
-  --build-metadata "${build_metadata}" \
+    --build-metadata "${build_metadata}" \
+    --evidence-report "${evidence_report}" \
   --version "${VERSION}" \
   --release-sha "${RELEASE_SHA}" \
   --packager-sha "${PACKAGER_SHA}" \

@@ -123,6 +123,13 @@ def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, 
     return cells
 
 
+def evidence_cell_name(cell: dict[str, Any]) -> str:
+    """The hosted runtime cell identity, shared by aggregation and release policy."""
+    node = cell.get("node") or ""
+    suffix = f"-{node}" if node else ""
+    return f"{cell['deployment']}-{cell['distro']}{suffix}-linux-amd64"
+
+
 def evidence_exemptions(
     runtime: ModuleType,
     source_root: Path,

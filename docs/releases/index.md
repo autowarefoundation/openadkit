@@ -12,20 +12,25 @@ metadata. Each stable release publishes:
 - a versionless `openadkit` installer
 - the versioned `openadkit-vX.Y.Z.tar.gz` bundle
 - the pinned Autoware meta-release, ROS 2 distro(s), and image tags and digests
+- a BOM, signed runtime evidence summary, explicit CI exemptions and distro decision
+- build provenance for the installer, bundle, plan and metadata
 
 Installed releases move to the latest stable version with `openadkit upgrade`.
 Tag naming is documented in
 [Container Images & Versioning](../getting-started/container-images.md).
+See [Evidence Policy](evidence.md) for the blocking gate and upgrade report, and
+[Verify a Release](verification.md) before executing downloaded artifacts.
 
 ## Roadmap
 
-Open AD Kit matures in four phases between May 2026 and May 2027, with a CES 2027
-demo milestone.
+The [toolchain RFC](../development/rfc-0001-toolchain-model.md) records the
+selected design and its delivery boundaries. Roadmap entries are not claims of
+published releases, external team approval or vehicle certification.
 
 | Phase or milestone | Status | Focus |
 |-------|--------|-------|
-| **Trustworthy Foundation** | <span class="oak-badge oak-badge--verified">Complete</span> | Pinned images, scans, unified bundles, compose validation, CARLA 0.9.16 |
-| **Compatibility & Validation** | <span class="oak-badge oak-badge--testing">In progress</span> | Lockfiles, manifests, platform matrix, Scenario V2 CI gate, health readiness, Zenoh split |
-| **CES 2027 demo** | <span class="oak-badge oak-badge--neutral">Milestone</span> | Flagship demo: Autoware Safety Island + CARLA |
-| **Trust Signals & Platform Profiles** | <span class="oak-badge oak-badge--neutral">Planned</span> | SBOM, provenance, cosign signing, vulnerability policy, AutoSD/Podman profiles, BlueChi |
-| **Full OTA Support** | <span class="oak-badge oak-badge--neutral">Planned</span> | Staged apply, health promotion, verified rollback, end-to-end closed loop |
+| **v2.0 foundation** | <span class="oak-badge oak-badge--testing">Release validation pending</span> | Reference/integrator kits, pinned inputs, user-data boundaries, Compose nodes, L0-L2 evidence and blocking releases |
+| **v2.0.x confidence** | <span class="oak-badge oak-badge--neutral">Planned</span> | Evidence-backed upstream updates, richer upgrade/scenario metrics and image SBOMs |
+| **CES 2027 demo** | <span class="oak-badge oak-badge--neutral">Milestone</span> | Hardware integration and partner evidence; not a general vehicle-support claim |
+| **v2.1 delivery** | <span class="oak-badge oak-badge--neutral">Planned</span> | OCI package, vehicle-path flattening, Quadlet/BlueChi backend and pinned upstream applications |
+| **Later evidence views** | <span class="oak-badge oak-badge--neutral">Planned</span> | Generated compatibility views and partner-backed HIL/field coverage; fleet orchestration remains external |

@@ -125,3 +125,7 @@ def test_expected_cell_names_match_workflow_composition():
 
 def test_expected_cell_names_empty_matrix():
     assert test_result.expected_cell_names([]) == []
+
+
+def test_expected_cells_accepts_the_workflow_include_matrix():
+    assert test_result.expected_cell_names({"include": [{"deployment": "planning-simulation", "distro": "humble"}]}) == ["planning-simulation-humble-linux-amd64"]

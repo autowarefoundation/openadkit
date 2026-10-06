@@ -34,7 +34,8 @@ def main():
     previous = load(Path(args.previous)) if args.previous else None
     cells = sorted(current.get("cells", []), key=lambda cell: cell["name"])
 
-    lines = [f"Evidence result: **{current.get('result', 'UNKNOWN')}**", ""]
+    passed = sum(cell.get("result") == "PASSED" for cell in cells)
+    lines = [f"Evidence result: **{current.get('result', 'UNKNOWN')}**", "", f"Passing cells: **{passed}/{len(cells)}**", ""]
     lines.append("| Cell | Result | Ready (s) | Arrival (s) | Peak MiB |")
     lines.append("|---|---|---|---|---|")
     for cell in cells:
@@ -50,10 +51,14 @@ def main():
 
     if previous:
         previous_cells = {cell["name"]: cell for cell in previous.get("cells", [])}
+        baseline = previous.get("baseline", {})
+        label = baseline.get("version", f"main run {baseline.get('runId', 'unknown')}") if baseline else "historical evidence"
         lines.extend(
             [
                 "",
                 f"### Upgrade comparison vs build `{previous.get('build_tag', 'unknown')}`",
+                "",
+                f"Baseline: {label}. Historical metrics are informational, not a release gate.",
                 "",
                 "| Cell | Metric | Previous | Current | Delta |",
                 "|---|---|---|---|---|",

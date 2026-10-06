@@ -54,6 +54,8 @@ jobs:
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
             .github/scripts/validate_release.sh
+            .github/scripts/evidence/
+            .github/scripts/validation_matrix.py
             openadkit.json
 
       - name: Set up Docker Buildx
@@ -104,6 +106,8 @@ jobs:
             .github/scripts/install-compose.sh
             .github/scripts/package_release_bundles.sh
             .github/scripts/release_plan.py
+            .github/scripts/validation_matrix.py
+            .github/scripts/evidence/
 
       - name: Verify packager revision
         id: packager
@@ -130,6 +134,7 @@ jobs:
             /openadkit.json
             /cli/
             /deployments/
+            /examples/
 
       - name: Download validated release metadata
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -264,6 +269,8 @@ jobs:
     permissions:
       actions: read
       contents: write
+      attestations: write
+      id-token: write
     outputs:
       created: ${{ steps.prepare-release.outputs.created }}
       release_body_sha256: ${{ steps.prepare-release.outputs.release_body_sha256 }}
@@ -278,6 +285,7 @@ jobs:
             .github/scripts/release_tag.sh
             .github/scripts/write_release_notes.sh
             .github/scripts/evidence/upgrade_report.py
+            .github/scripts/evidence/fetch_baseline.py
 
       - name: Download validated release metadata
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -298,35 +306,16 @@ jobs:
           test "$(sha256sum release-plan.json | cut -d ' ' -f1)" \
             = "${EXPECTED_PLAN_SHA256}"
 
-      - name: Fetch evidence summaries
+      - name: Fetch previous release evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BUILD_TAG: ${{ inputs.build_tag }}
         run: |
           set -euo pipefail
-          mkdir -p evidence
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("evidence-attestation-")) | [.id, .name, .created_at] | @tsv' \
-            > evidence/artifacts.tsv
-          current_id=$(awk -F'\t' -v name="evidence-attestation-${BUILD_TAG}" '$2 == name {print $1; exit}' evidence/artifacts.tsv)
-          previous_id=$(sort -t$'\t' -k3,3r evidence/artifacts.tsv | awk -F'\t' -v name="evidence-attestation-${BUILD_TAG}" '$2 != name {print $1; exit}')
-          fetch_summary() {
-            local id="$1" dir="$2" summary
-            mkdir -p "${dir}"
-            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" >"${dir}/artifact.zip"
-            unzip -q -o "${dir}/artifact.zip" -d "${dir}/unpacked"
-            summary=$(find "${dir}/unpacked" -name evidence-summary.json -print -quit)
-            [ -n "${summary}" ] && printf '%s\n' "${summary}"
-          }
-          if [ -n "${current_id}" ]; then
-            summary=$(fetch_summary "${current_id}" evidence/current)
-            [ -n "${summary}" ] && echo "EVIDENCE_CURRENT_SUMMARY=${summary}" >>"$GITHUB_ENV"
-          else
-            echo "No evidence artifact found for ${BUILD_TAG}" >&2
-          fi
-          if [ -n "${previous_id}" ]; then
-            summary=$(fetch_summary "${previous_id}" evidence/previous)
-            [ -n "${summary}" ] && echo "EVIDENCE_PREVIOUS_SUMMARY=${summary}" >>"$GITHUB_ENV"
+          python3 .github/scripts/evidence/fetch_baseline.py \
+            --plan release-plan.json --repository "${GITHUB_REPOSITORY}" \
+            --output evidence/previous.json
+          if [ -f evidence/previous.json ]; then
+            echo "EVIDENCE_PREVIOUS_SUMMARY=evidence/previous.json" >> "$GITHUB_ENV"
           fi
         shell: bash
 
@@ -335,6 +324,15 @@ jobs:
           RELEASE_PLAN_FILE: release-plan.json
         run: bash .github/scripts/write_release_notes.sh
         shell: bash
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: |
+            dist/openadkit
+            dist/openadkit-${{ inputs.version }}.tar.gz
+            release-plan.json
+            release-metadata.json
 
       - name: Verify existing release or create draft
         id: prepare-release

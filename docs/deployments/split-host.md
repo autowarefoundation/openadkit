@@ -23,9 +23,10 @@ workload allowlist crosses Zenoh: simulation time, vehicle status and
 commands, transforms, ADAPI calls, and the enabled sensors. Map blobs, camera
 images, and the visualization/teleop traffic are not routed.
 
-!!! warning "Experimental"
-    Split-host nodes ship in the release as experimental and become supported
-    once their evidence passes the release gate. So far:
+!!! warning "Evidence scope"
+    Split-host nodes ship in the release. Scenario Simulation's required
+    split cell tests two isolated nodes on one hosted runner; CARLA is explicitly
+    exempt from hosted runtime CI. Existing observations include:
 
     - Both node views are rendered and validated in CI (`docker compose config`).
     - On one host, the two scenario-simulation nodes pass the sample scenario
@@ -35,7 +36,8 @@ images, and the visualization/teleop traffic are not routed.
       `ArrivedGoal` over the bridge.
 
     Bridge restart resilience and recorded CARLA throughput and latency
-    evidence are still open.
+    evidence are still open. One-runner evidence is not a general two-host,
+    WAN or vehicle compatibility claim; see the [release policy](../releases/evidence.md).
 
 ## Prerequisites
 

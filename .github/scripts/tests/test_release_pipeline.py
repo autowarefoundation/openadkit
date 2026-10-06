@@ -3,12 +3,16 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / ".github/scripts"))
+from evidence_fixtures import passing_report  # noqa: E402
+
 MANAGER = ROOT / ".github/scripts/manage_github_release.sh"
 PACKAGER = ROOT / ".github/scripts/package_release_bundles.sh"
 PLANNER = ROOT / ".github/scripts/release_plan.py"
@@ -655,11 +659,13 @@ def packager_env(tmp_path):
         "VERSION": VERSION,
         "RELEASE_SHA": RELEASE_SHA,
         "PACKAGER_SHA": "c" * 40,
-        "DEFAULT_ROS_DISTRO": "jazzy",
+        "DEFAULT_ROS_DISTRO": "humble",
         "PUBLISH_LATEST_ALIASES": "true",
         "STABLE_RELEASE": "true",
         "GITHUB_REPOSITORY": "example/repo",
     }
+    metadata = json.loads((build / "build-metadata.json").read_text())
+    (tmp_path / "release-input/evidence-report.json").write_text(json.dumps(passing_report(metadata)))
     return env, calls
 
 
@@ -752,6 +758,9 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
         {"name": asset.name, "sha256": first_asset}
     ]
     assert release_metadata["release_plan_sha256"] == first_plan
+    assert release_metadata["evidence"]["result"] == "PASSED"
+    assert len(release_metadata["evidence"]["cells"]) == 8
+    assert release_metadata["default_ros_distro_decision"]["selected"] == "humble"
     notes = (tmp_path / "release-notes.md").read_text()
     assert "## Open AD Kit Bundle" in notes
     assert notes.count(asset.name) == 1
@@ -769,6 +778,7 @@ def test_release_bundle_is_unified_verified_and_reproducible(tmp_path):
     exempt = {item["deployment"] for item in release_metadata["evidence_exempt"]}
     assert exempt == {"carla-simulation", "logging-simulation"}
     assert "Not verified in CI" in notes
+    assert "Passing cells: **8/8**" in notes
     assert "- `carla-simulation`: Needs an NVIDIA GPU" in notes
 
 
@@ -779,6 +789,7 @@ def test_release_installer_and_bundle_entrypoint_come_from_the_packager(tmp_path
     shutil.copy2(ROOT / "openadkit.json", promoted / "openadkit.json")
     shutil.copytree(ROOT / "cli", promoted / "cli")
     shutil.copytree(ROOT / "deployments", promoted / "deployments")
+    shutil.copytree(ROOT / "examples", promoted / "examples")
     stale = promoted / "openadkit"
     stale.write_text("#!/usr/bin/env bash\necho stale promoted build\n")
     stale.chmod(0o755)

@@ -129,6 +129,9 @@ Releases promote an existing CI build; nothing is rebuilt.
   Autoware release tag. Builds from a full SHA can only become pre-releases. The
   build summary shows its `build_tag`.
 - **A passing scan** of `scan-images` exists for that `build_tag`.
+- **Complete signed `PASSED` evidence** exists for that same build. Required
+  cells, source checksums and image digests must match; quarantine does not waive
+  the gate. See [Evidence Policy](../releases/evidence.md).
 
 ### Workflow
 
@@ -143,12 +146,13 @@ flowchart LR
 1. **validate**: runs the release gates in
    [`validate_release.sh`](https://github.com/autowarefoundation/openadkit/blob/main/.github/scripts/validate_release.sh)
    (version format, build provenance and age, scan results, metadata and file
-   integrity, image coverage, registry digests, Git tag). Nothing is tagged if a
+   integrity, image coverage, signed L0-L2 evidence, registry digests, Git tag). Nothing is tagged if a
    gate fails.
 2. **package-bundles**: writes the immutable release plan and the runtime bundle
    for both distros.
 3. **release-tag**: creates or verifies the Git tag.
-4. **prepare-github-release**: creates a draft release with notes and assets.
+4. **prepare-github-release**: writes notes/metadata from the validated plan,
+   attests bundle/installer/plan/metadata, then creates the draft with its assets.
 5. **release-images**: creates the release tags and, for stable releases, the
    moving aliases (see [Tag Reference](../getting-started/container-images.md#tag-reference)).
 6. **release-github**: publishes the draft.

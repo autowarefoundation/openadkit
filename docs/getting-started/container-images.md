@@ -55,10 +55,15 @@ notes.
 | Distro | Status |
 |--------|--------|
 | **Humble** | Default |
-| **Jazzy** | Published in parallel where the amd64 and arm64 builds pass |
+| **Jazzy** | Published where required builds, scans and runtime evidence pass |
 
 A release bundle carries pinned images for both distros; choose one with
 `--ros-distro`. A distro is supported only while it is supported upstream.
+Non-exempt runtime cells for each declared distro must also pass the
+[release evidence gate](../releases/evidence.md). The initial default is Humble;
+changing it requires a reviewed manifest change and passing evidence, not an
+automatic release-time fallback. Image builds alone do not prove runtime behavior
+on every architecture.
 
 ## What "Supported" Means
 
@@ -67,6 +72,11 @@ A release bundle carries pinned images for both distros; choose one with
 - **Platforms**: support is tiered (committed, experimental, best-effort,
   unsupported). See [Supported Platforms](../platforms/index.md).
 - **No certification claims**: Open AD Kit makes no safety-certification,
-  functional-safety, or production-readiness claims.
+   functional-safety, or production-readiness claims.
+
+Community help and version coverage are described in
+[SUPPORT.md](https://github.com/autowarefoundation/openadkit/blob/main/SUPPORT.md);
+report security vulnerabilities through the
+[private reporting policy](https://github.com/autowarefoundation/openadkit/blob/main/SECURITY.md).
 
 Maintainers: see the [Release Process](../development/build-from-source.md#release-process).

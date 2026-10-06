@@ -33,7 +33,7 @@ python3 "${source_root}/.github/scripts/release_plan.py" \
     --version "v0.0.0-evidence.${build_tag}" \
     --release-sha "${sha}" \
     --packager-sha "${sha}" \
-    --default-ros-distro humble \
+    --default-ros-distro "$(jq -er '.defaultRosDistro' "${source_root}/openadkit.json")" \
     --stable-release false \
     --publish-latest-aliases false
 

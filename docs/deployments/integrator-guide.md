@@ -135,6 +135,11 @@ host-specific `build`, `install` and `log` products.
 Base deployments with a reasoned CI evidence exemption retain that exemption
 in the kit. An exemption is not evidence of runtime compatibility.
 
+The [release gate](../releases/evidence.md) requires `PASSED`; static validation
+alone is not runtime evidence. See [Evidence Workflow](../development/evidence-workflow.md)
+for `workflow_call` and its current build-owning-repository/example-kit scope.
+Arbitrary external kit input is not yet supported by that interface.
+
 ## Upgrade Without Losing Your Work
 
 Install the new base next to the old version, update `extends`, rebuild your

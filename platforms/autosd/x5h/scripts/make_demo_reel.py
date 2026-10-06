@@ -20,7 +20,8 @@ bench LAN, so its log timestamps are wrong by days. The board clock is steady
 inside a run, so one constant offset is enough, and the run supplies it: the
 `kill` route ends VisionPilot, so its last rendered frame IS the fault. The
 offset is fault_at minus the monotonic stamp of the last per-frame Latency
-line. Alignment is therefore good to one VisionPilot frame, 25 to 40 ms at the
+line. A `slow` run anchors on the first frame over the 80 ms deadline instead,
+because VisionPilot renders on until the launch manager stops it. Alignment is therefore good to one VisionPilot frame, 25 to 40 ms at the
 measured 23.6 ms wall time, plus the rpmsg and DDS latency the fault itself
 takes to reach the firmware. The reel never claims better than that.
 
@@ -97,6 +98,23 @@ DEFAULT_CHAPTERS = [
     )),
     ("the car is stopped", 11.0, 22.0, 1.0, ()),
 ]
+# The cut for a slow run under the S-CORE launch manager. The fault chapter runs
+# to 1.5 s because the CR52 command comes 1.1-1.2 s after the fault, not 0.5 s.
+SLOW_CHAPTERS = [
+    DEFAULT_CHAPTERS[0],
+    ("the fault: VisionPilot runs too slow", -3.0, 1.5, 0.25, (
+        ("VisionPilot reports every frame to the S-CORE health monitor.", 30),
+        ("From here each frame takes 200 ms longer, over its 80 ms deadline.", 30),
+        ("", 20),
+        ("The health monitor fails the first late frame, and the launch", 26),
+        ("manager stops VisionPilot. Quarter speed, so it can be watched.", 26),
+    )),
+    ("the Safety Island brakes the car", 1.5, 11.5, 0.5, (
+        ("The heartbeat ends with VisionPilot, and the CR52 takes over.", 30),
+        ("It commands a steady stop. The launch manager's fallback also latches the fault.", 30),
+    )),
+    ("the car is stopped", 11.5, 22.0, 1.0, ()),
+]
 # Clipping a chapter shortens the reel. Clipping these two would remove the
 # event the reel exists to show, so they are refused instead.
 REQUIRED_CHAPTERS = 2
@@ -167,24 +185,44 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\[0m")
 
 # journalctl -o short-monotonic: "[  1234.567890] host unit[pid]: message".
 MONO = re.compile(r"^\[\s*(\d+\.\d+)\]")
+# VisionPilot prints frame_ms= at the end of each frame, after the slow fault's
+# injected sleep, so a slow frame shows here and not in its Latency line.
+FRAME_MS = re.compile(r"frame_ms=(\d+(?:\.\d+)?)")
+# SCORE_VP_FRAME_MAX_MS in the launch manager configuration: the first frame
+# over it is the one the health monitor fails. A healthy drive stays far under
+# it (SG2: p999 41.5 ms), and the slow fault adds 200 ms to every frame.
+LATE_FRAME_MS = 80.0
 
 
-def hud_frame_times(journal, fault_at):
+def hud_frame_times(journal, fault_at, mode="kill"):
     """Bench time of every rendered HUD frame, from the VisionPilot journal.
 
     A per-frame line is a Latency line that carries wall=; VisionPilot also
     prints Latency in other contexts, and counting those shifts every frame.
-    The last such line is the fault, so the whole list is offset onto the bench
-    clock by one constant.
+    One frame is the fault, so the whole list is offset onto the bench clock by
+    one constant. In a kill run it is the last frame. In a slow run it is the
+    first frame over the deadline: SIGUSR1 lands while that frame or the one
+    before it runs, and VisionPilot renders on until the launch manager stops it.
     """
     stamps = []
+    late = None
     for ln in journal.splitlines():
         mono = MONO.match(ln)
-        if mono and "Latency" in ln and "wall=" in ln:
+        if not mono:
+            continue
+        if "Latency" in ln and "wall=" in ln:
             stamps.append(float(mono.group(1)))
+        elif late is None and stamps:
+            ms = FRAME_MS.search(ln)
+            if ms and float(ms.group(1)) > LATE_FRAME_MS:
+                late = stamps[-1]
     if not stamps:
         raise ReelError("no_hud_frames")
-    offset = fault_at - stamps[-1]
+    if mode != "slow":
+        late = stamps[-1]
+    elif late is None:
+        raise ReelError("no_late_frame")
+    offset = fault_at - late
     return [s + offset for s in stamps]
 
 
@@ -299,7 +337,7 @@ def load_run(run_dir):
     # perfectly well formed.
     if "uppressed" in journal:
         raise ReelError("journal_suppressed")
-    run.hud_times = hud_frame_times(journal, fault_at)
+    run.hud_times = hud_frame_times(journal, fault_at, run.mode)
     hud_dir = run_dir / streams["hud"]["dir"]
     run.hud = sorted(hud_dir.glob("frame_*.png"))
     if not run.hud:
@@ -616,8 +654,9 @@ def main(argv=None):
     a = p.parse_args(argv)
     try:
         run = load_run(a.run_dir)
+        cut = SLOW_CHAPTERS if run.mode == "slow" else DEFAULT_CHAPTERS
         chapters = ([parse_chapter(s) for s in a.chapter] if a.chapter
-                    else [Chapter(*c) for c in DEFAULT_CHAPTERS])
+                    else [Chapter(*c) for c in cut])
         chapters, notes = clip_chapters(chapters, run)
         frames = chapter_frames(run, chapters, a.fps)
         check_console_covers(run.console,

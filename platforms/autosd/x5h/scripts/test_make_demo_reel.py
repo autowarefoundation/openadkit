@@ -111,6 +111,34 @@ def test_hud_times_put_the_last_rendered_frame_at_the_fault():
     assert len(t) == 4
 
 
+def slow_journal(late_at):
+    """Four frames; frame_ms crosses the deadline from frame late_at on."""
+    out = []
+    for i in range(4):
+        out.append(f"[  {100.0 + i * 0.1:12.6f}] x podman[1]: [VP] Latency  pre=1.8 ms  wall=23.6 ms  42 fps")
+        ms = 225.0 if i >= late_at else 24.0
+        out.append(f"[  {100.0 + i * 0.1 + 0.05:12.6f}] x podman[1]: [VP] frame_ms={ms:.1f}")
+    return "\n".join(out)
+
+
+def test_hud_times_put_the_first_late_frame_at_the_fault_in_a_slow_run():
+    t = m.hud_frame_times(slow_journal(late_at=2), fault_at=5000.0, mode="slow")
+    assert t[2] == pytest.approx(5000.0)
+    # The frames VisionPilot renders after the fault keep their place.
+    assert t[3] == pytest.approx(5000.1)
+
+
+def test_hud_times_keep_the_last_frame_anchor_in_a_kill_run():
+    t = m.hud_frame_times(slow_journal(late_at=2), fault_at=5000.0, mode="kill")
+    assert t[-1] == pytest.approx(5000.0)
+
+
+def test_hud_times_refuse_a_slow_run_with_no_late_frame():
+    with pytest.raises(m.ReelError) as e:
+        m.hud_frame_times(slow_journal(late_at=4), fault_at=1.0, mode="slow")
+    assert e.value.reason == "no_late_frame"
+
+
 def test_hud_times_ignore_lines_that_are_not_per_frame_latency():
     journal = (
         "[    100.000000] x podman[1]: [VP] starting, Latency budget 30 ms\n"

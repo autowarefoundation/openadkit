@@ -38,7 +38,6 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/autoware_universe/map \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor \
-        /tmp/autoware/src/universe/autoware_universe/system/autoware_default_adapi_helpers/autoware_automatic_pose_initializer \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log

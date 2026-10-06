@@ -20,7 +20,7 @@ bench LAN, so its log timestamps are wrong by days. The board clock is steady
 inside a run, so one constant offset is enough, and the run supplies it: the
 `kill` route ends VisionPilot, so its last rendered frame IS the fault. The
 offset is fault_at minus the monotonic stamp of the last per-frame Latency
-line. A `slow` run anchors on the first frame over the 80 ms deadline instead,
+line. A `slow` run anchors on the first frame over its deadline instead,
 because VisionPilot renders on until the launch manager stops it. Alignment is therefore good to one VisionPilot frame, 25 to 40 ms at the
 measured 23.6 ms wall time, plus the rpmsg and DDS latency the fault itself
 takes to reach the firmware. The reel never claims better than that.
@@ -104,7 +104,7 @@ SLOW_CHAPTERS = [
     DEFAULT_CHAPTERS[0],
     ("the fault: VisionPilot runs too slow", -3.0, 1.5, 0.25, (
         ("VisionPilot reports every frame to the S-CORE health monitor.", 30),
-        ("From here each frame takes 200 ms longer, over its 80 ms deadline.", 30),
+        ("From here each frame takes 200 ms longer, past its deadline.", 30),
         ("", 20),
         ("The health monitor fails the first late frame, and the launch", 26),
         ("manager stops VisionPilot. Quarter speed, so it can be watched.", 26),
@@ -188,10 +188,11 @@ MONO = re.compile(r"^\[\s*(\d+\.\d+)\]")
 # VisionPilot prints frame_ms= at the end of each frame, after the slow fault's
 # injected sleep, so a slow frame shows here and not in its Latency line.
 FRAME_MS = re.compile(r"frame_ms=(\d+(?:\.\d+)?)")
-# SCORE_VP_FRAME_MAX_MS in the launch manager configuration: the first frame
-# over it is the one the health monitor fails. A healthy drive stays far under
-# it (SG2: p999 41.5 ms), and the slow fault adds 200 ms to every frame.
-LATE_FRAME_MS = 80.0
+# SCORE_VP_FRAME_MAX_MS in score/config/recording, the launch manager
+# configuration of a recording run: the first frame over it is the one the
+# health monitor fails. A recording frame takes 72-85 ms (board 2,
+# 2026-10-06), and the slow fault adds 200 ms to every frame.
+LATE_FRAME_MS = 150.0
 
 
 def hud_frame_times(journal, fault_at, mode="kill"):

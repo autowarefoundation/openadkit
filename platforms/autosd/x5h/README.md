@@ -1186,12 +1186,25 @@ podman build --platform linux/arm64 -f components/demo/visionpilot-x5h.container
 
 For the recording session only, stage `components/demo/vision_pilot.capture.conf` over
 `/etc/containers/systemd/vision_pilot.conf`. `x5h-score-vp` always runs
-`localhost/x5h-visionpilot:latest`, so move that name to the recording image, and write
-down the demo image ID first:
+`localhost/x5h-visionpilot:latest`, so move that name to the recording image. Give the
+demo image a second name first, or it is left with none and a prune deletes it:
 
 ```
-podman image inspect --format '{{.Id}}' localhost/x5h-visionpilot:latest   # the demo image
+podman tag localhost/x5h-visionpilot:latest localhost/x5h-visionpilot:demo
 podman tag localhost/x5h-visionpilot:recording localhost/x5h-visionpilot:latest
+```
+
+Then point the launch manager at `etc/recording`. That configuration is the demo one with a
+150 ms frame deadline. The HUD and the recorder take VisionPilot to 72-85 ms a frame on
+board 2, so the demo's 80 ms fails a recording run at its second frame. A slow-fault frame
+takes about 280 ms and still fails 150 ms. The drop-in is under `/run`, so a reboot also
+removes it:
+
+```
+mkdir -p /run/systemd/system/score-lm.service.d
+printf '[Service]\nExecStart=\nExecStart=/usr/local/score/bin/launch_manager -c /usr/local/score/etc/recording/launch_manager_config.bin\n' \
+  > /run/systemd/system/score-lm.service.d/recording.conf
+systemctl daemon-reload
 ```
 
 Read the free space with `stat -f /opt/npu`, never with `df`. On this filesystem `df`
@@ -1217,10 +1230,11 @@ the journal, and a reset starts a new one.
 clips each chapter to the material that exists. It prints one `DEMO_REEL_CLIP` line per
 chapter it shortened or dropped, and it refuses outright when the fault is not covered.
 
-Afterwards, put the shipped `vision_pilot.conf` back and move the name back to the demo
-image with `podman tag <demo image ID> localhost/x5h-visionpilot:latest`. Do not use
+Afterwards, put the shipped `vision_pilot.conf` back, delete the drop-in and run
+`systemctl daemon-reload`, and move the name back with
+`podman tag localhost/x5h-visionpilot:demo localhost/x5h-visionpilot:latest`. Do not use
 `podman untag`: with no name given, it removes every name of the image. The next gate run
-then measures the image the gates were passed on.
+then measures the image and the deadline the gates were passed on.
 
 **Before the file leaves the bench, watch it.** The console pane shows real firmware output.
 No Renesas path, SDK directory or firmware blob name stays legible on screen.

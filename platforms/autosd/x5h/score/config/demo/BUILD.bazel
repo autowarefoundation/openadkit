@@ -5,3 +5,5 @@ launch_manager_config(
     config = "launch_manager_config.json",
     flatbuffer_out_dir = "etc",
 )
+
+exports_files(["launch_manager_config.json"])

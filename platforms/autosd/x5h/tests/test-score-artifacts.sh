@@ -13,7 +13,8 @@ tar -xf "$SCORE_TAR" -C "$tmp" || fail untar
 s="$tmp/score"
 for f in bin/launch_manager bin/datarouter bin/vp_standin lib/libscore_vp.so \
          etc/demo/launch_manager_config.bin etc/gate/launch_manager_config.bin \
-         etc/sil/launch_manager_config.bin etc/gate/logging.json; do
+         etc/sil/launch_manager_config.bin etc/recording/launch_manager_config.bin \
+         etc/gate/logging.json; do
     [ -s "$s/$f" ] || fail "missing_$f"
 done
 for f in bin/launch_manager bin/datarouter lib/libscore_vp.so; do

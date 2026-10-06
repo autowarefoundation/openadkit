@@ -36,7 +36,9 @@ openadkit stop planning-simulation
 - Put host settings in `~/.config/openadkit/<name>.env`; see
   [Configuration](../getting-started/cli.md#configuration).
 
-Split-host nodes are experimental: they ship in the release and become
-supported once their evidence passes the release gate.
+Scenario split-node evidence covers two isolated nodes on one hosted runner.
+CARLA is explicitly exempt from hosted runtime CI. Neither is a claim of
+arbitrary two-machine or vehicle compatibility; see the
+[evidence policy](../releases/evidence.md).
 
 To build your own stack, see [Custom Deployment](custom-deployment.md).

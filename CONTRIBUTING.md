@@ -7,6 +7,8 @@ Thank you for your interest in contributing to Open AD Kit. This project is part
 - [Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and plan tasks
 - [Discord](https://discord.gg/Q94UsPvReQ) — questions, ideas, and design discussion
 - [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md) — community help and version coverage
+- [Security policy](SECURITY.md) — private vulnerability reporting
 
 ## License
 
@@ -90,6 +92,13 @@ For split-host (`--node`) topology testing, follow the [documentation](https://a
 ### Releasing
 
 Use the `release.yaml` workflow (GitHub Actions) to promote a build to a release. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
+
+Both release candidates and stable releases require complete signed `PASSED`
+runtime evidence for the promoted build. CI quarantine does not bypass the gate;
+reviewed manifest exemptions remain explicitly unverified. Read the
+[evidence policy](https://autowarefoundation.github.io/openadkit/releases/evidence/),
+[verification guide](https://autowarefoundation.github.io/openadkit/releases/verification/)
+and [toolchain RFC](https://autowarefoundation.github.io/openadkit/development/rfc-0001-toolchain-model/).
 
 ## DCO Requirement
 

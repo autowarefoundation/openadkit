@@ -21,7 +21,11 @@ jq -e '
   (($plan.releaseContext.deployments | keys | sort) == ($plan.bundle.deployments | sort)) and
   (($plan.releaseContext.shared | keys | sort) == ($plan.bundle.shared | sort)) and
   ($plan.releaseContext.images | type == "object" and length > 0) and
-  all($plan.releaseContext.images[]; type == "object" and (keys | sort) == $targets)
+  all($plan.releaseContext.images[]; type == "object" and (keys | sort) == $targets) and
+  $plan.evidence.result == "PASSED" and
+  $plan.evidence.build_tag == $plan.release.buildTag and
+  $plan.evidence.source_sha == $plan.release.releaseSha and
+  $plan.evidence.defaultRosDistroDecision.selected == $plan.release.defaultRosDistro
 ' "${plan_file}" >/dev/null
 
 VERSION=$(jq -r '.release.version' "${plan_file}")
@@ -69,6 +73,7 @@ jq \
   --argjson publish_latest_aliases "${PUBLISH_LATEST_ALIASES}" \
   --slurpfile scan release-input/scan/scan-metadata.json \
   --argjson evidence_exempt "$(jq -c '.evidence.exempt' "${plan_file}")" \
+  --argjson evidence "$(jq -c '.evidence' "${plan_file}")" \
   --argjson bom "$(jq -c '.releaseContext | {autoware, images, artifacts}' "${plan_file}")" \
   '. + {
     openadkit_version: $version,
@@ -80,6 +85,8 @@ jq \
     latest_aliases_updated: $publish_latest_aliases,
     scan: $scan[0],
     evidence_exempt: $evidence_exempt,
+    evidence: $evidence,
+    default_ros_distro_decision: $evidence.defaultRosDistroDecision,
     bom: $bom
   }' \
   release-input/build/build-metadata.json >release-metadata.json
@@ -147,16 +154,18 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
   echo ""
   echo "## Verification"
   echo ""
-  if [ -n "${EVIDENCE_CURRENT_SUMMARY:-}" ] && [ -f "${EVIDENCE_CURRENT_SUMMARY}" ]; then
-    report_args=(--current "${EVIDENCE_CURRENT_SUMMARY}" --output "${temporary}/upgrade-report.md")
-    if [ -n "${EVIDENCE_PREVIOUS_SUMMARY:-}" ] && [ -f "${EVIDENCE_PREVIOUS_SUMMARY}" ]; then
-      report_args+=(--previous "${EVIDENCE_PREVIOUS_SUMMARY}")
-    fi
-    python3 "${script_dir}/evidence/upgrade_report.py" "${report_args[@]}"
-    cat "${temporary}/upgrade-report.md"
-  else
-    echo "No evidence summary is attached to this build."
+  jq '.evidence' "${plan_file}" >"${temporary}/current.json"
+  report_args=(--current "${temporary}/current.json" --output "${temporary}/upgrade-report.md")
+  if [ -n "${EVIDENCE_PREVIOUS_SUMMARY:-}" ] && [ -f "${EVIDENCE_PREVIOUS_SUMMARY}" ]; then
+    report_args+=(--previous "${EVIDENCE_PREVIOUS_SUMMARY}")
   fi
+  python3 "${script_dir}/evidence/upgrade_report.py" "${report_args[@]}"
+  cat "${temporary}/upgrade-report.md"
+  echo ""
+  echo "Default ROS distro: \`${DEFAULT_ROS_DISTRO}\`, explicitly selected in the release source manifest and covered by passing evidence."
+  echo ""
+  echo "The gate verified one complete signed Test Result from \`$(jq -r '.evidence.signerWorkflow' "${plan_file}")\`."
+  echo "See [release verification](https://autowarefoundation.github.io/openadkit/releases/verification/) for signature and result checks."
   if [ "$(jq '.evidence.exempt | length' "${plan_file}")" -gt 0 ]; then
     echo ""
     echo "Not verified in CI (the CLI warns when you run these):"

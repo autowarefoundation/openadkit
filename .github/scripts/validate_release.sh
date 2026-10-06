@@ -55,7 +55,7 @@ validate_inputs() {
 validate_manifest_consistency() {
   local manifest manifest_distro manifest_registry
 
-  manifest="${script_dir}/../../openadkit.json"
+  manifest="${RELEASE_SOURCE_ROOT:-${script_dir}/../..}/openadkit.json"
   [ -f "${manifest}" ] || fail "Product manifest not found at ${manifest}"
   manifest_distro=$(jq -r '.defaultRosDistro // empty' "${manifest}")
   [ -n "${manifest_distro}" ] \
@@ -119,6 +119,17 @@ download_build_metadata() {
     --repo "${GITHUB_REPOSITORY}" \
     --name "build-metadata-${BUILD_TAG}" \
     --dir release-input/build
+}
+
+checkout_release_source() {
+  # Keep dispatch-time policy/scripts separate from the exact promoted source.
+  # Sparse checkout must not cause missing CLI/example checksums to be ignored.
+  RELEASE_SOURCE_ROOT="${PWD}/release-source"
+  export RELEASE_SOURCE_ROOT
+  [ ! -e "${RELEASE_SOURCE_ROOT}" ] || fail "Release source directory already exists"
+  git fetch --quiet --depth 1 origin "${release_sha}"
+  mkdir -p "${RELEASE_SOURCE_ROOT}"
+  git archive "${release_sha}" | tar -x -C "${RELEASE_SOURCE_ROOT}"
 }
 
 select_scan_metadata() {
@@ -466,77 +477,32 @@ validate_registry_conflicts() {
 }
 
 verify_evidence() (
-  # Shadow mode: verify the evidence attestation for this build and report the
-  # outcome without blocking the release yet. Blocking mode lands once the
-  # gate has run in shadow for a while (PR 3).
-  set +e
-  local image_ref subjects_file verify_json attested local_subjects result cells problems=0
-
-  if [ ! -f release-input/build/build-metadata.json ]; then
-    echo "evidence gate (shadow): build metadata is missing; nothing to verify" >&2
-    exit 0
-  fi
-
-  image_ref=$(jq -r '.images[0] | "oci://" + .repo + "@" + .digest' release-input/build/build-metadata.json)
-  subjects_file=release-input/evidence-subjects.txt
-  verify_json=release-input/evidence-verify.json
-  attested=release-input/evidence-subjects-attested.txt
-  local_subjects=release-input/evidence-subjects-local.txt
-
-  # Recompute the expected subject set from the release tree.
-  if [ "$(git rev-parse HEAD 2>/dev/null)" != "${release_sha}" ]; then
-    git fetch --quiet --depth 1 origin "${release_sha}" 2>/dev/null
-    git checkout --quiet "${release_sha}" -- deployments 2>/dev/null
-  fi
-  if ! python3 "${script_dir}/evidence/subjects.py" \
-    --build-metadata release-input/build/build-metadata.json \
-    --source-root "${script_dir}/../.." \
-    --output "${subjects_file}" >/dev/null; then
-    echo "evidence gate (shadow): could not compute the expected subjects" >&2
-    exit 0
-  fi
-
+  set -euo pipefail
+  local image_ref verify_json=release-input/evidence-verify.json
+  # Never leave an old successful report usable after failed verification.
+  rm -f release-input/evidence-report.json
+  : "${RELEASE_SOURCE_ROOT:?RELEASE_SOURCE_ROOT is required}"
+  [ -f release-input/build/build-metadata.json ] || fail "evidence gate: build metadata is missing"
+  [ "$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)" = "${release_sha}" ] \
+    || fail "evidence gate: build SHA differs from the release source"
+  image_ref=$(jq -er '.images[0] | "oci://" + .repo + "@" + .digest' release-input/build/build-metadata.json)
   if ! gh attestation verify "${image_ref}" \
     --repo "${GITHUB_REPOSITORY}" \
     --predicate-type "https://in-toto.io/attestation/test-result/v0.1" \
     --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/evidence.yaml" \
     --source-ref "refs/heads/main" \
+    --deny-self-hosted-runners \
     --format json >"${verify_json}" 2>release-input/evidence-verify.err; then
-    echo "evidence gate (shadow): no valid evidence attestation found for ${image_ref}" >&2
     sed 's/^/  /' release-input/evidence-verify.err >&2
-    exit 0
+    fail "evidence gate: no valid evidence attestation found for ${image_ref}"
   fi
-
-  result=$(jq -r '
-    [.[].verificationResult.statement.predicate.result] |
-    if index("FAILED") then "FAILED"
-    elif index("WARNED") then "WARNED"
-    elif index("PASSED") then "PASSED"
-    else "UNKNOWN" end
-  ' "${verify_json}")
-  cells=$(jq -r '[.[].verificationResult.statement.predicate.configuration | length] | max // 0' "${verify_json}")
-
-  jq -r '.[].verificationResult.statement.subject[] | .digest.sha256 + " " + .name' "${verify_json}" | sort -u >"${attested}"
-  awk '{print $1" "$2}' "${subjects_file}" | sort -u >"${local_subjects}"
-
-  if [ "${result}" = "FAILED" ]; then
-    problems=$((problems + 1))
-    echo "evidence gate (shadow): the attested test result is FAILED" >&2
-  elif [ "${result}" = "WARNED" ]; then
-    echo "evidence gate (shadow): the attested test result is WARNED (quarantined cells; see .github/evidence-quarantine.json)"
-  fi
-  if ! cmp -s "${local_subjects}" "${attested}"; then
-    problems=$((problems + 1))
-    echo "evidence gate (shadow): attested subjects differ from the release plan" >&2
-    diff -u "${local_subjects}" "${attested}" | head -40 >&2
-  fi
-
-  if [ "${problems}" -eq 0 ]; then
-    echo "evidence gate (shadow): ${result} (${cells} cells, $(wc -l <"${local_subjects}" | tr -d ' ') subjects)"
-  else
-    echo "evidence gate (shadow): ${problems} finding(s); the gate blocks once blocking mode lands" >&2
-  fi
-  exit 0
+  python3 "${script_dir}/evidence/release_gate.py" \
+    --verified "${verify_json}" \
+    --build-metadata release-input/build/build-metadata.json \
+    --source-root "${RELEASE_SOURCE_ROOT}" \
+    --default-ros-distro "${DEFAULT_ROS_DISTRO:-humble}" \
+    --repository "${GITHUB_REPOSITORY}" \
+    --output release-input/evidence-report.json
 )
 
 write_outputs() {
@@ -549,9 +515,10 @@ write_outputs() {
 
 main() {
   validate_inputs
-  validate_manifest_consistency
   resolve_latest_alias_policy
   validate_build_run
+  checkout_release_source
+  validate_manifest_consistency
   download_build_metadata
   select_scan_metadata
   validate_build_metadata_schema

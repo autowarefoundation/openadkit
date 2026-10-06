@@ -18,6 +18,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from subjects import build_subjects, write_subjects  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from validation_matrix import evidence_cell_name  # noqa: E402
+
 
 def load(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -96,12 +99,9 @@ def classify_cells(cells, quarantine, today: date):
 
 def expected_cell_names(matrix):
     """Cell names as the evidence workflow composes them (deployment-distro[-node]-linux-amd64)."""
-    names = []
-    for entry in matrix:
-        node = entry.get("node") or ""
-        suffix = f"-{node}" if node else ""
-        names.append(f"{entry['deployment']}-{entry['distro']}{suffix}-linux-amd64")
-    return names
+    if isinstance(matrix, dict):
+        matrix = matrix["include"]
+    return [evidence_cell_name(entry) for entry in matrix]
 
 
 def main():
@@ -147,11 +147,14 @@ def main():
 
     configuration = []
     for cell in cells:
-        levels = {name: bool(data.get("ok")) for name, data in cell.get("levels", {}).items()}
+        levels = {name: data.get("ok") is True for name, data in cell.get("levels", {}).items()}
         configuration.append(
             {
                 "name": cell["name"],
                 "annotations": {
+                    "buildTag": cell.get("build_tag"),
+                    "sourceSha": cell.get("source_sha"),
+                    "kit": cell.get("kit") or None,
                     "deployment": cell.get("deployment"),
                     "rosDistro": cell.get("distro"),
                     "node": cell.get("node") or None,

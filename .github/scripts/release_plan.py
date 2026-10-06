@@ -11,6 +11,7 @@ from types import ModuleType
 from typing import Any, NoReturn
 
 import validation_matrix
+from evidence.release_gate import validate_report
 
 _IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
 # Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
@@ -244,6 +245,10 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "shared": product["shared"],
         "version": args.version,
     }
+    evidence = {"exempt": product["evidenceExempt"]}
+    if args.evidence_report is not None:
+        evidence = load_json(args.evidence_report)
+        validate_report(evidence, metadata, source_root, args.default_ros_distro)
     return {
         "bundle": {
             "asset": asset_name,
@@ -282,7 +287,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         },
         "releaseContext": release_context,
         # Deployments that ship without CI evidence, with the reason.
-        "evidence": {"exempt": product["evidenceExempt"]},
+        "evidence": evidence,
         "schemaVersion": 1,
     }
 
@@ -307,6 +312,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--build-metadata", type=Path)
+    parser.add_argument("--evidence-report", type=Path)
     parser.add_argument("--version")
     parser.add_argument("--release-sha")
     parser.add_argument("--packager-sha")

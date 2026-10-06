@@ -1,2 +1,4 @@
 nav:
   - index.md
+  - Evidence Policy: evidence.md
+  - Verify a Release: verification.md

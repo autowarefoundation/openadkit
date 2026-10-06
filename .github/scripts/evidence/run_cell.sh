@@ -292,6 +292,7 @@ jq -n \
     --arg result "${result}" \
     --arg build_tag "${BUILD_TAG:-unknown}" \
     --arg source_sha "${SOURCE_SHA:-unknown}" \
+    --arg kit "${KIT_PATH:-}" \
     --argjson l0 "${l0_ok}" \
     --argjson l1 "${l1_ok}" \
     --argjson l2 "${l2_ok}" \
@@ -309,6 +310,7 @@ jq -n \
         result: $result,
         build_tag: $build_tag,
         source_sha: $source_sha,
+        kit: $kit,
         overlayConformant: $overlay_conformant,
         levels: {
             L0: {ok: $l0},

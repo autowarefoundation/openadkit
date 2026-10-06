@@ -1127,8 +1127,6 @@ the board, the CR52 console, and the speed and command trace. The reel explains 
 **It is not a gate** and it carries no gate number. It is recorded in its own run. The
 instruments it adds must never land on gate D5's 23.6 ms or gate D6's 700 ms budget.
 
-Design: `claude-memory/autowarefoundation/openadkit/specs/2026-09-18-ces2027-demo-reel-design.md`.
-
 **The board image has to be rebuilt first.** The demo image is built from
 `feat/x5h-carla-npu`, which carries no frame-recorder sink. On that image `record_dir` is
 read by nothing, and a recording run records silently nothing.

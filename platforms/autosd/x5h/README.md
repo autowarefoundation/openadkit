@@ -1096,7 +1096,9 @@ The booth commands inject the faults:
 | `fault lm` | `systemctl kill -s KILL score-lm.service`. The LM dies. |
 | `reset` | `systemctl stop score-lm.service && systemctl kill -s USR2 x5h-si-link.service && systemctl start score-lm.service`. Stops the LM, clears the fault, and starts the LM again. The stop comes first, so a `si_fault` that the LM starts during the stop cannot latch the Safety Island after the clear. |
 
-Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. The script opens its ssh connection before the wait and fires over that connection, so the fault lands within a few milliseconds of `--at`. A cold ssh handshake and the podman CLI start made each fault land 0.44-0.75 s late on board 2. `score-soak-gate.sh` is gate SG2 and `vp-npu-gate.sh` is gate D5. D5 reads the journal.
+Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. The script opens its ssh connection before the wait and fires over that connection, so the fault lands about 0.2 s after `--at` on board 2. A cold ssh handshake and the podman CLI start made each fault land 0.44-0.75 s late.
+
+`si_stop_gate.py` measures from `--at` to the first CR52-authored command. The bounds are 700 ms for `fault kill`, 1300 ms for `fault slow` and 800 ms for `fault lm`. In `fault slow` the Safety Island, not `si_fault`, stops the vehicle: the LM stops VisionPilot about 0.65 s after `--at`, and the Safety Island trips about 0.5 s after the last heartbeat. `si_fault` comes later because the LM waits up to 1.5 s for VisionPilot to exit. Board 2 measured 1130-1220 ms (2026-10-02). `score-soak-gate.sh` is gate SG2 and `vp-npu-gate.sh` is gate D5. D5 reads the journal.
 
 After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp` and `x5h-image-republish` as running, even with `--sync`, because conmon died with them. The next `reset` removes these stale records with `--replace`. To check that no container is left, look at the processes (for example `pgrep -x VisionPilot`) or the cgroup. Do not use `podman ps`.
 

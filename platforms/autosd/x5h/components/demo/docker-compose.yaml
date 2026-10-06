@@ -114,7 +114,8 @@ services:
   # the `kill` fault route (the firmware trips the stop 0.5 s after the last
   # heartbeat, plus one 0.15 s cycle), the spec's 200 for the `channel` route
   # (no staleness wait there). Default here is the `kill` figure; override to
-  # 200 for a channel-route run.
+  # 200 for a channel-route run. Under the S-CORE launch manager: 1300 for
+  # `fault slow` and 800 for `fault lm` (README, "S-CORE launch manager").
   si-gate:
     image: ${VISIONPILOT_SI_IMAGE:-visionpilot:si}
     container_name: ces-si-gate

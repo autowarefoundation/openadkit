@@ -1164,46 +1164,63 @@ restart does not recover it. Run `reset` after CARLA is up: it is the last comma
 
 ### Recording the demo reel
 
-The reel is one recording of the `kill` route, composed into a four-pane video of about
-three minutes. The four panes are the CARLA chase camera, VisionPilot's own HUD rendered on
-the board, the CR52 console, and the speed and command trace. The reel explains the demo.
-**It is not a gate** and it carries no gate number. It is recorded in its own run. The
-instruments it adds must never land on gate D5's 23.6 ms or gate D6's 700 ms budget.
+The reel is one recording of one fault route, composed into a four-pane video of about
+three minutes. The main take is the `slow` route and the second take is `kill`. The four
+panes are the CARLA chase camera, VisionPilot's own HUD rendered on the board, the CR52
+console, and the speed and command trace. The reel explains the demo. **It is not a gate**
+and it carries no gate number. It is recorded in its own run. The instruments it adds must
+never land on gate D5's 23.6 ms or on a gate D6 budget.
 
 **The board image has to be rebuilt first.** The demo image is built from
-`feat/x5h-carla-npu`, which carries no frame-recorder sink. On that image `record_dir` is
+`feat/x5h-score-hook`, which carries no frame-recorder sink. On that image `record_dir` is
 read by nothing, and a recording run records silently nothing.
-`feat/x5h-carla-npu-recorder` is that ref with `feat/frame-recorder-sink` merged into it.
+`feat/x5h-score-hook-recorder` is that ref with the frame-recorder sink merged into it.
 Build it **on board 2**. The build context carries the vendor ORT library, which is NDA
 material and must never reach CI, CI logs or CI artifacts.
 
 ```
-components/demo/prepare-vp-context.sh <ort-overlay> /tmp/vp-ctx
+components/demo/prepare-vp-context.sh <ort-overlay> /var/tmp/vp-ctx
 podman build --platform linux/arm64 -f components/demo/visionpilot-x5h.containerfile \
-  --build-arg VP_REF=feat/x5h-carla-npu-recorder -t localhost/x5h-visionpilot:recording /tmp/vp-ctx
+  --build-arg VP_REF=feat/x5h-score-hook-recorder -t localhost/x5h-visionpilot:recording /var/tmp/vp-ctx
 ```
 
 For the recording session only, stage `components/demo/vision_pilot.capture.conf` over
-`/etc/containers/systemd/vision_pilot.conf`. Point `x5h-vp.container` at the `:recording`
-tag, and empty `/opt/npu/video/hud`. Read the free space with `stat -f /opt/npu`, never
-with `df`. On this filesystem `df` reports 0 available while hundreds of megabytes are free
-to root. Budget about 1.5 GB.
-
-On the bench, with the `tio` capture of the CR52 console already running:
+`/etc/containers/systemd/vision_pilot.conf`. `x5h-score-vp` always runs
+`localhost/x5h-visionpilot:latest`, so move that name to the recording image, and write
+down the demo image ID first:
 
 ```
-DRIVE_S=70 Simulation/CARLA/ROS2/si/record-demo.sh <carla-pkg>   # DEMO_REC_DONE streams=5 dir=<run>
-scripts/x5h-pull-demo-frames.sh <run>                            # DEMO_FRAMES_PULLED n=<frames>
-scripts/make_demo_reel.py <run> --dry-run                        # DEMO_REEL_PLAN frames=... seconds=...
-scripts/make_demo_reel.py <run> --out reel.mp4                   # DEMO_REEL_WRITTEN
+podman image inspect --format '{{.Id}}' localhost/x5h-visionpilot:latest   # the demo image
+podman tag localhost/x5h-visionpilot:recording localhost/x5h-visionpilot:latest
 ```
+
+Read the free space with `stat -f /opt/npu`, never with `df`. On this filesystem `df`
+reports 0 available while hundreds of megabytes are free to root. Budget about 1.5 GB.
+
+On the bench, with the `tio` capture of the CR52 console already running, use
+`youtalk/vision_pilot` branch `feat/ces2027-demo-reel-score`. `record-demo.sh` stops the
+launch manager and empties `/opt/npu/video/hud`. `run-d6.sh` then runs the booth reset once
+CARLA sends frames, because the launch manager falls back if VisionPilot sees no frame for
+60 s.
+
+```
+DRIVE_S=70 Simulation/CARLA/ROS2/si/record-demo.sh <carla-pkg> --route slow   # DEMO_REC_DONE streams=5 dir=<run>
+scripts/x5h-pull-demo-frames.sh <run>                                        # DEMO_FRAMES_PULLED n=<frames>
+scripts/make_demo_reel.py <run> --dry-run                                    # DEMO_REEL_PLAN frames=... seconds=...
+scripts/make_demo_reel.py <run> --out reel.mp4                               # DEMO_REEL_WRITTEN
+```
+
+Pull the frames before the next `reset`. The pull script reads the last VisionPilot run in
+the journal, and a reset starts a new one.
 
 `DRIVE_S=70` is what the built-in cut asks for. A shorter run is not wasted. The composer
 clips each chapter to the material that exists. It prints one `DEMO_REEL_CLIP` line per
 chapter it shortened or dropped, and it refuses outright when the fault is not covered.
 
-Put the shipped `vision_pilot.conf` back afterwards, so the next gate run measures the
-image the gates were passed on.
+Afterwards, put the shipped `vision_pilot.conf` back and move the name back to the demo
+image with `podman tag <demo image ID> localhost/x5h-visionpilot:latest`. Do not use
+`podman untag`: with no name given, it removes every name of the image. The next gate run
+then measures the image the gates were passed on.
 
 **Before the file leaves the bench, watch it.** The console pane shows real firmware output.
 No Renesas path, SDK directory or firmware blob name stays legible on screen.

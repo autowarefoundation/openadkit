@@ -5,7 +5,7 @@
 #      (default /opt/npu/video/hud, the record_dir in vision_pilot.capture.conf)
 # Markers: DEMO_FRAMES_PULLED n=<frames> dir=<dir> | DEMO_FRAMES_FAIL reason=<slug>
 #
-# The bench recorders write the other four streams; this brings back the two
+# The bench recorders write the other five streams; this brings back the two
 # the board owns, VisionPilot's HUD frames and the journal that places them in
 # time. make_demo_reel.py maps HUD frame N to the N-th per-frame Latency line,
 # so the two have to describe the same run and the same frames. Every way that

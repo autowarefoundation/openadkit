@@ -459,6 +459,12 @@ def test_hud_caption_dims_the_held_last_frame_of_a_kill_run(tmp_path):
     assert dim and "last frame" in text
 
 
+def test_hud_caption_dims_a_kill_run_just_after_the_fault(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    text, dim = m.hud_caption(r, t_rel=9e-15)
+    assert dim and "last frame" in text
+
+
 def test_hud_caption_keeps_a_slow_run_live_until_its_last_frame(tmp_path):
     r = m.load_run(make_run(tmp_path))
     r.mode = "slow"

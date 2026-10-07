@@ -552,6 +552,8 @@ def hud_caption(run, t_rel):
     if run.fault_at + t_rel > run.hud_times[-1]:
         return "VisionPilot HUD: the last frame it rendered, held", True
     if t_rel > 0:
+        if run.mode != "slow":
+            return "VisionPilot HUD: the last frame it rendered, held", True
         return "VisionPilot HUD, each frame now 200 ms late", False
     return "VisionPilot HUD, rendered on the X5H board", False
 
@@ -623,7 +625,9 @@ def dlt_strip(run, bench_time, box):
         if 1 <= msg.level <= 3:
             d.rectangle([0, y, 5, y + 19], fill=(230, 70, 70))
         level = LEVELS.get(msg.level, "-")
-        line = f"T{run.rel(t):+7.2f}  {msg.app:<4} {level:<5} {msg.text}"
+        stamp = f"T{run.rel(t):+.2f}"
+        text = msg.text.replace("\n", " ")
+        line = f"{stamp:<8}  {msg.app:<4} {level:<5} {text}"
         d.text((12, y), line[:160], font=f, fill=APP_COLOURS.get(msg.app, (190, 190, 200)))
         y += 23
     return _label(pane, "DLT on the bench host: the S-CORE launch manager (LM) and VisionPilot (VP)")

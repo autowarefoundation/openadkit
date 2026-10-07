@@ -43,6 +43,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from dlt_file import DltError, read_dlt
+
 WIDTH, HEIGHT = 1920, 1080
 BANNER_H = 60
 PANE_W, PANE_H = WIDTH // 2, (HEIGHT - BANNER_H) // 2
@@ -57,6 +59,14 @@ PLOT_WINDOW_S = 15.0
 # difference (a stream starting a frame early, the window edge) and nothing
 # more. Five frames is half a second of input at 10 Hz.
 COUNT_TOLERANCE = 5
+# Every stream load_run reads. record-demo.sh names all six in the manifest.
+REQUIRED_STREAMS = {"chase", "camera", "hud", "console", "trace", "dlt"}
+# The arrival lag a DLT message may show against its own board stamp, once both
+# are on the bench clock. The datarouter reads its clients and flushes every
+# 100 ms, so a real lag is 0 to about 250 ms. The margins cover one VisionPilot
+# frame of anchor error. A wrong offset, or a board up longer than 4.97 days
+# (the 0.1 ms stamp is 32 bits), is off by far more.
+DLT_LAG_S = (-0.5, 1.0)
 
 # The cut. Times are seconds from the fault, speed is playback rate: 0.25 means
 # one second of the run takes four seconds of screen time. Tune this table once
@@ -149,6 +159,8 @@ class Run:
     hud_times: list = field(default_factory=list)  # bench time per hud frame
     console: list = field(default_factory=list)    # [(bench_time, text)]
     trace: dict = field(default_factory=dict)
+    frame_ms: list = field(default_factory=list)   # [(bench_time, ms)], one per frame
+    dlt: list = field(default_factory=list)        # [(bench_time, DltMsg)], sorted
 
     def rel(self, bench_time):
         return bench_time - self.fault_at
@@ -195,35 +207,51 @@ FRAME_MS = re.compile(r"frame_ms=(\d+(?:\.\d+)?)")
 LATE_FRAME_MS = 150.0
 
 
-def hud_frame_times(journal, fault_at, mode="kill"):
-    """Bench time of every rendered HUD frame, from the VisionPilot journal.
+def journal_frames(journal):
+    """([board stamp per rendered frame], [(board stamp, frame_ms)]) from the journal.
 
-    A per-frame line is a Latency line that carries wall=; VisionPilot also
+    A per-frame line is a Latency line that carries wall=. VisionPilot also
     prints Latency in other contexts, and counting those shifts every frame.
-    One frame is the fault, so the whole list is offset onto the bench clock by
-    one constant. In a kill run it is the last frame. In a slow run it is the
-    first frame over the deadline: SIGUSR1 lands while that frame or the one
-    before it runs, and VisionPilot renders on until the launch manager stops it.
     """
-    stamps = []
-    late = None
+    stamps, frame_ms = [], []
     for ln in journal.splitlines():
         mono = MONO.match(ln)
         if not mono:
             continue
         if "Latency" in ln and "wall=" in ln:
             stamps.append(float(mono.group(1)))
-        elif late is None and stamps:
+        else:
             ms = FRAME_MS.search(ln)
-            if ms and float(ms.group(1)) > LATE_FRAME_MS:
-                late = stamps[-1]
+            if ms:
+                frame_ms.append((float(mono.group(1)), float(ms.group(1))))
+    return stamps, frame_ms
+
+
+def board_offset(journal, fault_at, mode="kill"):
+    """Seconds to add to a board monotonic time to put it on the bench clock.
+
+    One frame is the fault, so one constant places every board stamp: the HUD
+    frames, the frame times and the DLT messages. In a kill run that frame is
+    the last one. In a slow run it is the first frame over the deadline:
+    SIGUSR1 lands while that frame or the one before it runs, and VisionPilot
+    renders on until the launch manager stops it.
+    """
+    stamps, frame_ms = journal_frames(journal)
     if not stamps:
         raise ReelError("no_hud_frames")
     if mode != "slow":
-        late = stamps[-1]
-    elif late is None:
-        raise ReelError("no_late_frame")
-    offset = fault_at - late
+        return fault_at - stamps[-1]
+    for mono, ms in frame_ms:
+        before = [s for s in stamps if s <= mono]
+        if ms > LATE_FRAME_MS and before:
+            return fault_at - before[-1]
+    raise ReelError("no_late_frame")
+
+
+def hud_frame_times(journal, fault_at, mode="kill"):
+    """Bench time of every rendered HUD frame, from the VisionPilot journal."""
+    stamps, _ = journal_frames(journal)
+    offset = board_offset(journal, fault_at, mode)
     return [s + offset for s in stamps]
 
 
@@ -258,6 +286,28 @@ def check_console_covers(lines, first, last):
     if not lines or lines[0][0] > first or lines[-1][0] < last:
         raise ReelError("console_short",
                         f"have {lines[0][0]:.3f}..{lines[-1][0]:.3f} want {first:.3f}..{last:.3f}")
+
+
+def place_dlt(msgs, offset):
+    """[(bench_time, DltMsg)] by each message's own board stamp, sorted.
+
+    The stamp is the board's CLOCK_MONOTONIC at the log call, the clock of the
+    journal's short-monotonic stamps, so the offset that places the HUD frames
+    places these too. The arrival time is late by up to the datarouter's 100 ms
+    flush, and serves only as the cross-check in check_dlt_clock.
+    """
+    placed = sorted(((m.tmsp + offset, m) for m in msgs if m.tmsp is not None),
+                    key=lambda p: p[0])
+    if not placed:
+        raise ReelError("dlt_unstamped")
+    return placed
+
+
+def check_dlt_clock(placed, lag=DLT_LAG_S):
+    lags = sorted(m.recv - t for t, m in placed)
+    mid = lags[len(lags) // 2]
+    if not lag[0] <= mid <= lag[1]:
+        raise ReelError("dlt_clock", f"median arrival lag {mid:.3f} s")
 
 
 def read_trace(text):
@@ -309,7 +359,7 @@ def load_run(run_dir):
     if "fault_at" not in man:
         raise ReelError("no_fault_at")
     streams = man.get("streams")
-    if not isinstance(streams, dict) or set(streams) < {"chase", "camera", "hud", "console", "trace"}:
+    if not isinstance(streams, dict) or not REQUIRED_STREAMS <= set(streams):
         raise ReelError("bad_manifest")
 
     def need(rel):
@@ -339,6 +389,8 @@ def load_run(run_dir):
     if "uppressed" in journal:
         raise ReelError("journal_suppressed")
     run.hud_times = hud_frame_times(journal, fault_at, run.mode)
+    offset = board_offset(journal, fault_at, run.mode)
+    run.frame_ms = [(mono + offset, ms) for mono, ms in journal_frames(journal)[1]]
     hud_dir = run_dir / streams["hud"]["dir"]
     run.hud = sorted(hud_dir.glob("frame_*.png"))
     if not run.hud:
@@ -356,6 +408,12 @@ def load_run(run_dir):
 
     run.console = read_console(need(streams["console"]["file"]).read_text())
     run.trace = read_trace(need(streams["trace"]["file"]).read_text())
+    try:
+        msgs = read_dlt(need(streams["dlt"]["file"]).read_bytes())
+    except DltError as exc:
+        raise ReelError("bad_dlt", str(exc)) from exc
+    run.dlt = place_dlt(msgs, offset)
+    check_dlt_clock(run.dlt)
     check_alignment(run.hud_times, [t for t, _ in run.camera], fault_at)
     return run
 

@@ -15,6 +15,7 @@ import pytest
 from PIL import Image
 
 import make_demo_reel as m
+from test_dlt_file import arg_str, dlt_record
 
 
 def write(path, text):
@@ -62,6 +63,15 @@ def make_run(tmp_path, *, fault_at=1000.0, hud_frames=20, cam_rows=20, console_f
           "odom,1.000,45.000,20.000,9.000\n"
           "ack_accel,0.100,,,-3.000\n"
           "cr52_cmd,0.050,,,\n")
+    # Two DLT records on the board clock of the journal above. In a kill run the
+    # last Latency line is the fault, so tmsp 500.9 lands 1.0 s before it. Each
+    # arrives 0.1 s after its stamp, inside the datarouter's 100 ms flush.
+    offset = fault_at - (500.0 + (hud_frames - 1) * 0.1)
+    (run / "dlt.dlt").write_bytes(
+        dlt_record("VP", "VP", 4, [arg_str("health monitor started")],
+                   tmsp=500.9, recv=500.9 + offset + 0.1)
+        + dlt_record("LM", "LM", 4, [arg_str("Completed the request for PG"), arg_str("MainPG")],
+                     tmsp=501.4, recv=501.4 + offset + 0.1))
     write(run / "manifest.json", json.dumps({
         "run_id": "20260918-134501",
         "mode": "kill",
@@ -72,6 +82,7 @@ def make_run(tmp_path, *, fault_at=1000.0, hud_frames=20, cam_rows=20, console_f
             "hud": {"dir": "hud", "journal": "hud/vp-journal.txt"},
             "console": {"file": "cr52-console.txt"},
             "trace": {"file": "trace.csv"},
+            "dlt": {"file": "dlt.dlt"},
         },
     }))
     return run
@@ -160,6 +171,20 @@ def test_hud_times_refuse_a_journal_with_no_monotonic_stamp():
     with pytest.raises(m.ReelError) as e:
         m.hud_frame_times("Sep 18 13:45:01 board podman[1]: [VP] Latency  wall=23.6 ms\n", 1.0)
     assert e.value.reason == "no_hud_frames"
+
+
+def test_journal_frames_pairs_each_frame_time_with_its_stamp():
+    stamps, rows = m.journal_frames(slow_journal(late_at=2))
+    assert len(stamps) == 4
+    assert rows[1] == (pytest.approx(100.15), 24.0)
+    assert rows[2][1] == 225.0
+
+
+def test_board_offset_is_the_constant_the_hud_times_apply():
+    j = slow_journal(late_at=2)
+    off = m.board_offset(j, fault_at=5000.0, mode="slow")
+    assert off == pytest.approx(5000.0 - 100.2)
+    assert m.hud_frame_times(j, 5000.0, "slow")[0] == pytest.approx(100.0 + off)
 
 
 # --- the cross-check --------------------------------------------------------
@@ -296,6 +321,57 @@ def test_load_run_refuses_a_missing_stream(tmp_path):
     with pytest.raises(m.ReelError) as e:
         m.load_run(run)
     assert e.value.reason == "missing_stream"
+
+
+def test_load_run_places_dlt_by_the_board_stamp(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    assert [round(r.rel(t), 3) for t, _ in r.dlt] == [-1.0, -0.5]
+    assert r.dlt[0][1].text == "health monitor started"
+
+
+def test_load_run_refuses_dlt_on_another_clock(tmp_path):
+    # Arrival 6 s after the stamp: a wrong offset, or a board up longer than
+    # 4.97 days, where the 32-bit stamp wraps.
+    run = make_run(tmp_path)
+    (run / "dlt.dlt").write_bytes(
+        dlt_record("VP", "VP", 4, [arg_str("x")], tmsp=500.9, recv=1005.0))
+    with pytest.raises(m.ReelError) as e:
+        m.load_run(run)
+    assert e.value.reason == "dlt_clock"
+
+
+def test_load_run_refuses_a_manifest_without_the_dlt_stream(tmp_path):
+    run = make_run(tmp_path)
+    data = json.loads((run / "manifest.json").read_text())
+    del data["streams"]["dlt"]
+    (run / "manifest.json").write_text(json.dumps(data))
+    with pytest.raises(m.ReelError) as e:
+        m.load_run(run)
+    assert e.value.reason == "bad_manifest"
+
+
+def test_load_run_refuses_an_empty_dlt_file(tmp_path):
+    run = make_run(tmp_path)
+    (run / "dlt.dlt").write_bytes(b"")
+    with pytest.raises(m.ReelError) as e:
+        m.load_run(run)
+    assert e.value.reason == "missing_stream"
+
+
+def test_load_run_places_frame_times_on_the_bench_clock(tmp_path):
+    run = make_run(tmp_path)
+    out = []
+    for ln in (run / "hud" / "vp-journal.txt").read_text().splitlines():
+        out.append(ln)
+        mono = float(ln[1:].split("]")[0])
+        out.append(f"[  {mono + 0.05:12.6f}] board podman[1]: [VP] frame_ms=80.0")
+    (run / "hud" / "vp-journal.txt").write_text("\n".join(out) + "\n")
+    r = m.load_run(run)
+    assert len(r.frame_ms) == 20
+    # A kill run: the last Latency line is the fault, and its frame_ms line
+    # comes 50 ms later.
+    assert r.frame_ms[-1][0] == pytest.approx(1000.05)
+    assert r.frame_ms[-1][1] == 80.0
 
 
 def test_load_run_refuses_an_empty_hud_directory(tmp_path):

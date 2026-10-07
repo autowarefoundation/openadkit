@@ -433,6 +433,46 @@ def test_render_frame_after_the_fault_still_composes(tmp_path):
     assert img.size == (m.WIDTH, m.HEIGHT)
 
 
+def test_render_frame_before_any_dlt_message_composes(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    assert m.dlt_window(r.dlt, r.fault_at - 1.9) == []
+    img = m.render_frame(r, t_rel=-1.9, chapter=m.Chapter("drive", -2.0, 0.0, 1.0))
+    assert img.size == (m.WIDTH, m.HEIGHT)
+
+
+def test_dlt_window_returns_the_messages_already_logged(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at - 0.7)] == ["VP"]
+    assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at)] == ["VP", "LM"]
+    assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at, n=1)] == ["LM"]
+
+
+def test_output_hz_counts_the_frames_of_the_last_second(tmp_path):
+    r = m.load_run(make_run(tmp_path))       # 20 frames, 0.1 s apart, the last at the fault
+    assert m.output_hz(r, r.fault_at + 0.05) == 10
+    assert m.output_hz(r, r.fault_at + 1.5) == 0
+
+
+def test_hud_caption_dims_the_held_last_frame_of_a_kill_run(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    text, dim = m.hud_caption(r, t_rel=0.5)
+    assert dim and "last frame" in text
+
+
+def test_hud_caption_keeps_a_slow_run_live_until_its_last_frame(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    r.mode = "slow"
+    r.hud_times = r.hud_times[:-5] + [r.fault_at + 0.3 * k for k in range(1, 6)]
+    text, dim = m.hud_caption(r, t_rel=0.5)
+    assert not dim and "200 ms late" in text
+    assert m.hud_caption(r, t_rel=2.0)[1]
+
+
+def test_the_slow_cut_says_why_only_the_health_monitor_sees_it():
+    text = " ".join(t for t, _ in m.SLOW_CHAPTERS[1][4])
+    assert "0.5 s limit" in text and "3.6 Hz" in text
+
+
 def test_cards_are_the_declared_size(tmp_path):
     r = m.load_run(make_run(tmp_path))
     assert m.title_card(r).size == (m.WIDTH, m.HEIGHT)

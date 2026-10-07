@@ -77,13 +77,26 @@ for s in selfboot-smoke.sh npu-contract-smoke.sh cr52-rproc-up.sh x5h-role demo-
         grep -Eq "(^|[[:space:]|(])${role}[|)]" "$here/../scripts/$s" || fail "no_${role}_arm_$s"
     done
 done
-for u in x5h-si-link.service x5h-demo.service; do
+for u in x5h-si-link.service x5h-demo.service score-lm.service score-datarouter.service; do
     [ "$(grep -c '^ConditionKernelCommandLine=x5h\.role=demo$' "$cfg/$u")" = 1 ] || fail "no_demo_gate_$u"
 done
-for u in x5h-vp x5h-demo-bridge x5h-demo-restamp x5h-demo-hb; do
+for u in x5h-demo-bridge x5h-demo-restamp x5h-demo-hb; do
     f="$here/../components/demo/$u.container"
     [ -f "$f" ] || fail "missing_$u"
     [ "$(grep -c '^ConditionKernelCommandLine=x5h\.role=demo$' "$f")" = 1 ] || fail "no_demo_gate_$u"
     grep -q '^ConditionKernelCommandLine=|' "$f" && fail "piped_gate_on_demo_only_unit_$u"
 done
+# The S-CORE launch manager is the only orchestrator of the driving function.
+# A Quadlet for either container would start a second copy beside it.
+for u in x5h-vp x5h-image-republish; do
+    [ -e "$here/../components/demo/$u.container" ] && fail "quadlet_still_present_$u"
+done
+# An automatic restart would drive the vehicle again with no operator, and the
+# containers rely on the control-group kill when the launch manager stops.
+[ "$(grep -c '^Restart=no$' "$cfg/score-lm.service")" = 1 ] || fail score_lm_restart
+grep -q '^KillMode=' "$cfg/score-lm.service" && fail score_lm_killmode
+# A ready file left by the last run ends Startup before VisionPilot reports.
+ready=$(sed -n 's/.*"file_path": "\([^"]*\)".*/\1/p' "$here/../score/config/demo/launch_manager_config.json")
+[ -n "$ready" ] || fail no_ready_path
+grep -qx "ExecStartPre=/usr/bin/rm -f $ready" "$cfg/score-lm.service" || fail score_lm_stale_ready
 echo "TEST_PASS $name"

@@ -411,9 +411,9 @@ exception called out below the table.
 
 | Subcommand | `--yes`? | Does |
 |---|---|---|
-| `check-inputs` | no | every input present; `Image-autosd` embeds the MP-PHY blob; `rpmsg-eth` is a static aarch64 binary |
+| `check-inputs` | no | every input present; `Image-autosd` embeds the MP-PHY blob; `rpmsg-eth` and `rpmsg-ping` are static aarch64 binaries |
 | `backup-keys` | no | saves `authorized_keys.d/root` and the ssh host keys off the **live** board |
-| `prepare-root` | no | copies `x5h-rootfs.ext4` to the work area and injects hostname, `/etc/x5h/board.conf`, the saved keys, `rpmsg-eth` and the CR52 ELF |
+| `prepare-root` | no | copies `x5h-rootfs.ext4` to the work area and injects hostname, `/etc/x5h/board.conf`, the saved keys, `rpmsg-eth`, `rpmsg-ping` and the CR52 ELF |
 | `write-root` | **yes** | `dd`s the prepared image onto `x5h-root` and verifies it by md5 read-back |
 | `partition-lun2` | **yes** | writes the LUN 2 GPT and the three filesystems; destroys what is there |
 | `write-boot` | **yes** | replaces the contents of `x5h-boot` with the kernel, all three dtbs (the derived one is built here by `make-demo-dtb.sh`, so the staging host needs `dtc`), `x5h-env.txt` and `x5h-role.txt=dev` |
@@ -636,8 +636,8 @@ mkdir -p <mnt>/var/usrlocal/bin <mnt>/var/lib/containers
 
 This is also why `automotive-image-builder` refuses `/usr/local` outright
 and everything the image ships lives under `/usr/sbin` instead, and why
-`stage-board.sh prepare-root` writes the `rpmsg-eth` binary to
-`<mnt>/var/usrlocal/bin/rpmsg-eth` rather than through the symlink.
+`stage-board.sh prepare-root` writes the `rpmsg-eth` and `rpmsg-ping` binaries to
+`<mnt>/var/usrlocal/bin/` rather than through the symlink.
 
 ## Verifying a self-boot
 

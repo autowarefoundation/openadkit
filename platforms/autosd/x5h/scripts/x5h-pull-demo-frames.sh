@@ -5,7 +5,7 @@
 #      (default /opt/npu/video/hud, the record_dir in vision_pilot.capture.conf)
 # Markers: DEMO_FRAMES_PULLED n=<frames> dir=<dir> | DEMO_FRAMES_FAIL reason=<slug>
 #
-# The bench recorders write the other four streams; this brings back the two
+# The bench recorders write the other five streams; this brings back the two
 # the board owns, VisionPilot's HUD frames and the journal that places them in
 # time. make_demo_reel.py maps HUD frame N to the N-th per-frame Latency line,
 # so the two have to describe the same run and the same frames. Every way that
@@ -13,10 +13,11 @@
 # still holds the originals -- not later in the composer, when re-recording
 # means another board session.
 #
-# No time filter is used anywhere. The board has no RTC and no NTP on the
-# bench LAN, so its wall clock is wrong by days and `journalctl --since` would
-# select the wrong lines with great confidence. The journal is sliced at the
-# last unit start instead, which is a position in the file rather than a time.
+# No time filter takes its bound from the board's clock. The board has no
+# RTC, so its wall clock can be wrong by days and a `journalctl --since <date>`
+# would select the wrong lines with great confidence. The run is selected by
+# its journal stream instead, and the one --since below takes its bound from
+# that stream's own first entry, stamped by the same clock.
 #
 # rsync, not tar over ssh. Board-checked on board 2, 2026-09-18: the AutoSD
 # board image ships rsync, cpio, gzip and xz, and ships NO tar, no scp, no
@@ -27,7 +28,9 @@ BOARD="${X5H_BOARD:-root@192.168.0.20}"
 SSH="${SSH:-ssh}"
 RSYNC="${RSYNC:-rsync}"
 VIDEO_DIR="${X5H_VIDEO_DIR:-/opt/npu/video/hud}"
-UNIT=x5h-vp
+TAG=x5h-vp
+# SD_MESSAGE_JOURNAL_DROPPED: journald's "Suppressed N messages" line.
+DROPPED_ID=a596d6fe7bfa4994828e72309e95d61e
 
 fail() { echo "DEMO_FRAMES_FAIL reason=$1${2:+ $2}"; exit 1; }
 
@@ -37,22 +40,28 @@ RUN="${1:-}"
 hud="$RUN/hud"
 mkdir -p "$hud" || fail mkdir_failed "$hud"
 
-journal=$("$SSH" "$BOARD" "journalctl -u $UNIT -o short-monotonic --no-pager") \
+# The launch manager starts VisionPilot through systemd-cat, so each run is
+# one journal stream with its own _PID, and the last stream is the last run.
+# VisionPilot no longer restarts on failure, so one run is one stream, and the
+# FrameRecorder index starts at zero with it.
+pid=$("$SSH" "$BOARD" "journalctl -t $TAG -n 1 -o verbose --no-pager" | sed -n 's/^ *_PID=//p') \
+    || fail journal_unreadable
+[ -n "$pid" ] || fail no_unit_start
+journal=$("$SSH" "$BOARD" "journalctl -t $TAG _PID=$pid -o short-monotonic --no-pager") \
     || fail journal_unreadable
 [ -n "$journal" ] || fail journal_empty
 
-# Slice at the LAST unit start. VisionPilot restarts on failure, and the
-# FrameRecorder index restarts at zero with it, so a journal spanning two runs
-# describes more frames than the directory holds and every frame after the
-# first restart would be placed at the wrong instant.
-sliced=$(awk '/Started .*'"$UNIT"'/ { n = NR } END { print n + 0 }' <<<"$journal")
-[ "$sliced" -gt 0 ] || fail no_unit_start
-journal=$(awk -v from="$sliced" 'NR >= from' <<<"$journal")
-
 # journald's own rate limit drops messages and says so in one line. At up to
 # 40 Latency lines a second this is a real risk, and a journal with a hole in
-# it looks perfectly well formed.
-suppressed=$(grep -c "uppressed" <<<"$journal")
+# it looks perfectly well formed. journald logs that line under its own
+# identifier, never inside this stream, so ask for it by message id from the
+# stream's first entry on.
+t0=$("$SSH" "$BOARD" "journalctl -t $TAG _PID=$pid -o short-unix --no-pager -q" | sed -n '1s/[. ].*//p') \
+    || fail journal_unreadable
+[ -n "$t0" ] || fail journal_empty
+drops=$("$SSH" "$BOARD" "journalctl MESSAGE_ID=$DROPPED_ID --since @$t0 -o cat --no-pager -q") \
+    || fail journal_unreadable
+suppressed=$(grep -c . <<<"$drops" || true)
 [ "$suppressed" -eq 0 ] || fail journal_suppressed "$suppressed lines"
 
 printf '%s\n' "$journal" > "$hud/vp-journal.txt" || fail journal_unwritable

@@ -15,6 +15,8 @@ import pytest
 from PIL import Image
 
 import make_demo_reel as m
+from dlt_file import DltMsg
+from test_dlt_file import arg_str, dlt_record
 
 
 def write(path, text):
@@ -62,6 +64,15 @@ def make_run(tmp_path, *, fault_at=1000.0, hud_frames=20, cam_rows=20, console_f
           "odom,1.000,45.000,20.000,9.000\n"
           "ack_accel,0.100,,,-3.000\n"
           "cr52_cmd,0.050,,,\n")
+    # Two DLT records on the board clock of the journal above. In a kill run the
+    # last Latency line is the fault, so tmsp 500.9 lands 1.0 s before it. Each
+    # arrives 0.1 s after its stamp, inside the datarouter's 100 ms flush.
+    offset = fault_at - (500.0 + (hud_frames - 1) * 0.1)
+    (run / "dlt.dlt").write_bytes(
+        dlt_record("VP", "VP", 4, [arg_str("health monitor started")],
+                   tmsp=500.9, recv=500.9 + offset + 0.1)
+        + dlt_record("LM", "LM", 4, [arg_str("Completed the request for PG"), arg_str("MainPG")],
+                     tmsp=501.4, recv=501.4 + offset + 0.1))
     write(run / "manifest.json", json.dumps({
         "run_id": "20260918-134501",
         "mode": "kill",
@@ -72,6 +83,7 @@ def make_run(tmp_path, *, fault_at=1000.0, hud_frames=20, cam_rows=20, console_f
             "hud": {"dir": "hud", "journal": "hud/vp-journal.txt"},
             "console": {"file": "cr52-console.txt"},
             "trace": {"file": "trace.csv"},
+            "dlt": {"file": "dlt.dlt"},
         },
     }))
     return run
@@ -111,6 +123,34 @@ def test_hud_times_put_the_last_rendered_frame_at_the_fault():
     assert len(t) == 4
 
 
+def slow_journal(late_at):
+    """Four frames; frame_ms crosses the deadline from frame late_at on."""
+    out = []
+    for i in range(4):
+        out.append(f"[  {100.0 + i * 0.1:12.6f}] x podman[1]: [VP] Latency  pre=1.8 ms  wall=23.6 ms  42 fps")
+        ms = 225.0 if i >= late_at else 24.0
+        out.append(f"[  {100.0 + i * 0.1 + 0.05:12.6f}] x podman[1]: [VP] frame_ms={ms:.1f}")
+    return "\n".join(out)
+
+
+def test_hud_times_put_the_first_late_frame_at_the_fault_in_a_slow_run():
+    t = m.hud_frame_times(slow_journal(late_at=2), fault_at=5000.0, mode="slow")
+    assert t[2] == pytest.approx(5000.0)
+    # The frames VisionPilot renders after the fault keep their place.
+    assert t[3] == pytest.approx(5000.1)
+
+
+def test_hud_times_keep_the_last_frame_anchor_in_a_kill_run():
+    t = m.hud_frame_times(slow_journal(late_at=2), fault_at=5000.0, mode="kill")
+    assert t[-1] == pytest.approx(5000.0)
+
+
+def test_hud_times_refuse_a_slow_run_with_no_late_frame():
+    with pytest.raises(m.ReelError) as e:
+        m.hud_frame_times(slow_journal(late_at=4), fault_at=1.0, mode="slow")
+    assert e.value.reason == "no_late_frame"
+
+
 def test_hud_times_ignore_lines_that_are_not_per_frame_latency():
     journal = (
         "[    100.000000] x podman[1]: [VP] starting, Latency budget 30 ms\n"
@@ -132,6 +172,20 @@ def test_hud_times_refuse_a_journal_with_no_monotonic_stamp():
     with pytest.raises(m.ReelError) as e:
         m.hud_frame_times("Sep 18 13:45:01 board podman[1]: [VP] Latency  wall=23.6 ms\n", 1.0)
     assert e.value.reason == "no_hud_frames"
+
+
+def test_journal_frames_pairs_each_frame_time_with_its_stamp():
+    stamps, rows = m.journal_frames(slow_journal(late_at=2))
+    assert len(stamps) == 4
+    assert rows[1] == (pytest.approx(100.15), 24.0)
+    assert rows[2][1] == 225.0
+
+
+def test_board_offset_is_the_constant_the_hud_times_apply():
+    j = slow_journal(late_at=2)
+    off = m.board_offset(j, fault_at=5000.0, mode="slow")
+    assert off == pytest.approx(5000.0 - 100.2)
+    assert m.hud_frame_times(j, 5000.0, "slow")[0] == pytest.approx(100.0 + off)
 
 
 # --- the cross-check --------------------------------------------------------
@@ -270,6 +324,57 @@ def test_load_run_refuses_a_missing_stream(tmp_path):
     assert e.value.reason == "missing_stream"
 
 
+def test_load_run_places_dlt_by_the_board_stamp(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    assert [round(r.rel(t), 3) for t, _ in r.dlt] == [-1.0, -0.5]
+    assert r.dlt[0][1].text == "health monitor started"
+
+
+def test_load_run_refuses_dlt_on_another_clock(tmp_path):
+    # Arrival 6 s after the stamp: a wrong offset, or a board up longer than
+    # 4.97 days, where the 32-bit stamp wraps.
+    run = make_run(tmp_path)
+    (run / "dlt.dlt").write_bytes(
+        dlt_record("VP", "VP", 4, [arg_str("x")], tmsp=500.9, recv=1005.0))
+    with pytest.raises(m.ReelError) as e:
+        m.load_run(run)
+    assert e.value.reason == "dlt_clock"
+
+
+def test_load_run_refuses_a_manifest_without_the_dlt_stream(tmp_path):
+    run = make_run(tmp_path)
+    data = json.loads((run / "manifest.json").read_text())
+    del data["streams"]["dlt"]
+    (run / "manifest.json").write_text(json.dumps(data))
+    with pytest.raises(m.ReelError) as e:
+        m.load_run(run)
+    assert e.value.reason == "bad_manifest"
+
+
+def test_load_run_refuses_an_empty_dlt_file(tmp_path):
+    run = make_run(tmp_path)
+    (run / "dlt.dlt").write_bytes(b"")
+    with pytest.raises(m.ReelError) as e:
+        m.load_run(run)
+    assert e.value.reason == "missing_stream"
+
+
+def test_load_run_places_frame_times_on_the_bench_clock(tmp_path):
+    run = make_run(tmp_path)
+    out = []
+    for ln in (run / "hud" / "vp-journal.txt").read_text().splitlines():
+        out.append(ln)
+        mono = float(ln[1:].split("]")[0])
+        out.append(f"[  {mono + 0.05:12.6f}] board podman[1]: [VP] frame_ms=80.0")
+    (run / "hud" / "vp-journal.txt").write_text("\n".join(out) + "\n")
+    r = m.load_run(run)
+    assert len(r.frame_ms) == 20
+    # A kill run: the last Latency line is the fault, and its frame_ms line
+    # comes 50 ms later.
+    assert r.frame_ms[-1][0] == pytest.approx(1000.05)
+    assert r.frame_ms[-1][1] == 80.0
+
+
 def test_load_run_refuses_an_empty_hud_directory(tmp_path):
     run = make_run(tmp_path)
     for p in (run / "hud").glob("*.png"):
@@ -327,6 +432,66 @@ def test_render_frame_after_the_fault_still_composes(tmp_path):
     r = m.load_run(make_run(tmp_path))
     img = m.render_frame(r, t_rel=1.0, chapter=m.Chapter("stop", 0.0, 2.0, 1.0))
     assert img.size == (m.WIDTH, m.HEIGHT)
+
+
+def test_render_frame_before_any_dlt_message_composes(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    assert m.dlt_window(r.dlt, r.fault_at - 1.9) == []
+    img = m.render_frame(r, t_rel=-1.9, chapter=m.Chapter("drive", -2.0, 0.0, 1.0))
+    assert img.size == (m.WIDTH, m.HEIGHT)
+
+
+def test_dlt_window_returns_the_messages_already_logged(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at - 0.7)] == ["VP"]
+    assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at)] == ["VP", "LM"]
+    assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at, n=1)] == ["LM"]
+
+
+def test_dlt_window_hides_the_mw_log_statistics(tmp_path):
+    # mw::log logs its own buffer statistics, context STAT, at every process
+    # start and stop: 4 of the 18 messages of the 2026-10-07 SG5 recording.
+    r = m.load_run(make_run(tmp_path))
+    stat = DltMsg(recv=0.0, tmsp=0.0, ecu="X5H", app="LM", ctx="STAT", level=4,
+                  text="mw::log statistics: number_of_slots= 8")
+    placed = sorted(r.dlt + [(r.fault_at - 0.6, stat)], key=lambda p: p[0])
+    assert [msg.ctx for _, msg in m.dlt_window(placed, r.fault_at)] == ["VP", "LM"]
+    assert [msg.ctx for _, msg in m.dlt_window(placed, r.fault_at, n=1)] == ["LM"]
+
+
+def test_output_hz_counts_the_frames_of_the_last_second(tmp_path):
+    r = m.load_run(make_run(tmp_path))       # 20 frames, 0.1 s apart, the last at the fault
+    assert m.output_hz(r, r.fault_at + 0.05) == 10
+    assert m.output_hz(r, r.fault_at + 1.5) == 0
+
+
+def test_hud_caption_dims_the_held_last_frame_of_a_kill_run(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    text, dim = m.hud_caption(r, t_rel=0.5)
+    assert dim and "last frame" in text
+
+
+def test_hud_caption_dims_a_kill_run_just_after_the_fault(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    text, dim = m.hud_caption(r, t_rel=9e-15)
+    assert dim and "last frame" in text
+
+
+def test_hud_caption_keeps_a_slow_run_live_until_its_last_frame(tmp_path):
+    r = m.load_run(make_run(tmp_path))
+    r.mode = "slow"
+    r.hud_times = r.hud_times[:-5] + [r.fault_at + 0.3 * k for k in range(1, 6)]
+    text, dim = m.hud_caption(r, t_rel=0.5)
+    assert not dim and "200 ms late" in text
+    assert m.hud_caption(r, t_rel=2.0)[1]
+
+
+def test_the_slow_cut_says_why_only_the_health_monitor_sees_it():
+    text = " ".join(t for t, _ in m.SLOW_CHAPTERS[1][4])
+    assert "0.5 s limit" in text and "output rate drops" in text
+    # The rate readout in the frame time pane shows the real numbers. A recording
+    # run renders about 6 Hz, the demo about 10 Hz, so the card names neither.
+    assert "Hz" not in text
 
 
 def test_cards_are_the_declared_size(tmp_path):

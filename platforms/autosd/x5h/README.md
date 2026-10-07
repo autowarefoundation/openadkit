@@ -414,6 +414,8 @@ reused — GATE6 and GATE7 are new, not GATE5's successor under a new name.
 | `GATE7_SELINUX_BOOLS_ABSENT` | `selinux-bools.service`'s `LoadState` reads `not-found` — the unit is missing from this image entirely. Disambiguates from `GATE7_SELINUX_BOOLS_OK`: `systemctl is-failed` alone exits nonzero both for "healthy" and for "does not exist", so without this check a dropped unit could otherwise print `_OK`. | no |
 | `GATE_RPMSG_ETH_UNIT_PASS` | GATE8: the `rpmsg-eth` TAP bridge daemon's own unit test (`rpmsg-eth/test-rpmsg-eth.sh`) passed inside its dedicated Fedora test container — real tap0 on the guest kernel under test, a mock endpoint (socat pty), `--network=none`. Requires both a zero `podman run` exit status and a literal `TEST_PASS` in its output (see `gate-guest.sh`'s GATE8 comment for why exit-status-alone is not sufficient). | yes |
 | `GATE_RPMSG_ETH_UNIT_FAIL` | The `rpmsg-eth` unit test failed — either the container/build step itself failed, or `test-rpmsg-eth.sh` ran and reported a `TEST_FAIL`. Not part of the pass path. | no |
+| `GATE9_SCORE_LM_OK` | The S-CORE launch manager reaches run target `Startup` with the gate configuration (one self-terminating Native component). The guest has no `x5h.role`, so `gate-guest.sh` runs `score/bin/launch_manager` directly. | yes |
+| `GATE9_SCORE_LM_FAIL` | The launch manager never logged `Completed the request for PG to State Startup`; the last 20 log lines follow. | no |
 | `GATE_DONE` | `gate-guest.sh` reached the end of its run. | yes |
 
 `qemu-gate.exp` exits 0 only if every "Required: yes" marker above is present
@@ -634,11 +636,14 @@ kernel/build-bsp-kernel.sh /tmp/x5h-kernel
 #    GATE2 finding. The third, rpmsg-eth-docker.tar, carries the daemon
 #    source and its pty-mock unit test for GATE8 to run in-guest.
 scripts/make-test-images.sh /tmp/x5h-testimages
+
+# 4. The S-CORE tar for GATE9 (x86_64 host; builds the aarch64 launch manager).
+score/build-score.sh /tmp/x5h-score aarch64
 ```
 
 Three things to know before running these, because CI runs no single host
-through all of them — the kernel builds in an x64 `build-kernel` job and
-everything else on native arm64 (`ubicloud-standard-16-arm`):
+through all of them — the kernel and the S-CORE tar build in x64 jobs
+(`build-kernel`, `build-score`) and everything else in a native arm64 job:
 
 - **Step 2 requires an x86_64 host, and brings its own compiler.** ARM ships
   no aarch64-hosted 13.2.Rel1 toolchain, so `build-bsp-kernel.sh`
@@ -769,7 +774,7 @@ rmdir "$mnt"
 #    redundant overwrite for a tar built from this branch, since the aib
 #    manifest already carries the file; it is kept so a replay against an
 #    older tar still gets it.
-./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR"
+./scripts/inject-test-images.sh /tmp/x5h-replay.ext4 "$TESTIMAGES" "$KERNELDIR" /tmp/x5h-score/score-x5h-aarch64.tar
 
 # 3. Start the host listener GATE6_SNAT_OK probes. The guest reaches it as
 #    http://10.0.2.2:8099/, which slirp maps onto the host's
@@ -1050,11 +1055,11 @@ repo.
 
 The `demo` boot role runs two things in one boot: VisionPilot on the NPU, and the Safety
 Island on the CR52. Together they drive a CARLA-fed booth demo. See [selfboot.md](selfboot.md),
-"Roles", for the role itself. `x5h-demo.service` (`scripts/x5h-demo-up.sh`) starts four
-Quadlet container units plus one plain systemd unit at boot. When the Quadlet generator did
+"Roles", for the role itself. `x5h-demo.service` (`scripts/x5h-demo-up.sh`) starts six
+units at boot, in the order of the table below. When the Quadlet generator did
 not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recovery elsewhere.
 
-### The five units
+### The units
 
 | Unit | Role |
 | --- | --- |
@@ -1062,15 +1067,70 @@ not run, it regenerates the units itself. `x5h-mrm-demo.sh` uses the same recove
 | `x5h-demo-bridge.service` | The `domain_bridge` container. It joins DDS domain 1 (VisionPilot, host network) to domain 2 (the CR52, over `tap0`). [component-stack.md](component-stack.md) covers the bridge mechanics it shares with the MRM demo. |
 | `x5h-demo-restamp.service` | `control_restamp.py`. Republishes the CR52's `control_cmd_raw` as `control_cmd`, stamped with domain 1's clock instead of the CR52's own uptime. |
 | `x5h-demo-hb.service` | Turns every VisionPilot throttle command into `/safety_island/vp_heartbeat` for the CR52 to watch. |
-| `x5h-vp.service` | VisionPilot itself, on the NPU. Reads the CARLA camera feed over ROS 2. |
+| `score-datarouter.service` | The S-CORE datarouter. It sends the launch manager logs as DLT to rog-amd (192.168.0.1, UDP 3490). |
+| `score-lm.service` | The S-CORE launch manager. It starts and supervises the camera and VisionPilot containers. See "S-CORE launch manager" below. |
+
+### S-CORE launch manager
+
+`score-lm.service` runs the Eclipse S-CORE launch manager (LM). The LM starts and supervises the Open AD Kit containers. CI builds its binaries into `score-x5h-aarch64.tar` with `score/build-score.sh`. `stage-board.sh` unpacks the tar to `/usr/local/score` and refuses to continue without it.
+
+The LM configuration is `score/config/demo/launch_manager_config.json`. Run target `Startup` starts two components, `camera` and `visionpilot`. Only `visionpilot` is supervised. It reports ready with the file `/run/score/vp.ready`, and each frame has a deadline of `SCORE_VP_FRAME_MAX_MS=80`. If VisionPilot fails, the LM switches to `fallback_run_target`, which is `camera` and `si_fault`. `si_fault` runs `systemctl kill -s USR1 x5h-si-link.service` and ends. The camera stays in the fallback because the LM stops every component that the new target does not hold before it starts `si_fault`, and the camera took 0.68-2.17 s to exit on board 2. The Safety Island then stops the vehicle.
+
+Two exec scripts start the containers:
+
+| Script | Container | Journal tag |
+| --- | --- | --- |
+| `/usr/sbin/x5h-score-vp` | `x5h-vp`, with `--pid=host` because the `mw::log` PID check needs host PIDs | `x5h-vp` |
+| `/usr/sbin/x5h-score-camera` | `x5h-image-republish` | `x5h-camera` |
+
+Each script runs `systemd-cat -t <tag> podman run --log-driver=passthrough`. For this reason `podman logs` shows nothing. Use `journalctl -t x5h-vp` instead.
+
+`score-lm.service` has `Restart=no`. The Safety Island clears its staleness stop when it sees a fresh heartbeat. An automatic LM restart would drive the vehicle again with no operator present. Only the booth `reset` starts the LM again. `chrony` on the board syncs to rog-amd and steps the clock only in the first three updates after boot. See [companion-host.md](companion-host.md), "S-CORE demo: time and DLT on rog-amd".
+
+The booth commands inject the faults:
+
+| Command | Effect |
+| --- | --- |
+| `fault kill` | `pkill -KILL -x VisionPilot`. VisionPilot dies. |
+| `fault slow` | `pkill -USR1 -x VisionPilot`. VisionPilot runs slow and misses the frame deadline. |
+| `fault lm` | `systemctl kill -s KILL score-lm.service`. The LM dies. |
+| `reset` | `systemctl stop score-lm.service && systemctl kill -s USR2 x5h-si-link.service && systemctl start score-lm.service`. Stops the LM, clears the fault, and starts the LM again. The stop comes first, so a `si_fault` that the LM starts during the stop cannot latch the Safety Island after the clear. |
+
+Add `--at <epoch-s>` to a `fault` command to fire it at a fixed time. The script opens its ssh connection before the wait and fires over that connection, so the fault lands 35-51 ms after `--at` on board 2 (2026-10-06). A cold ssh handshake and the podman CLI start made each fault land 0.44-0.75 s late.
+
+`si_stop_gate.py` measures from `--at` to the first CR52-authored command. The bounds are 700 ms for `fault kill`, 1300 ms for `fault slow` and 800 ms for `fault lm`. In `fault slow` the Safety Island, not `si_fault`, stops the vehicle: the LM stops VisionPilot about 0.65 s after `--at`, and the Safety Island trips about 0.5 s after the last heartbeat. `si_fault` comes later because the LM waits up to 1.5 s for VisionPilot to exit. Board 2 measured 1130-1220 ms (2026-10-02). `score-soak-gate.sh` is gate SG2 and `vp-npu-gate.sh` is gate D5. D5 reads the journal.
+
+Gate SG5 checks that the launch manager and VisionPilot reach the bench over DLT. Run a
+`slow` fault with the DLT recorder listening, from vision_pilot's
+`Simulation/CARLA/ROS2/si`, with `jpeg_bridge.py` running and dlt-viewer closed:
+
+```
+python3 record_dlt.py /tmp/sg5.dlt --seconds 1200 2> /tmp/sg5-dlt.log &
+X5H_BOARD=root@192.168.0.21 DRIVE_S=40 bash run-d6.sh <carla-pkg> slow < /dev/null | tee /tmp/sg5-d6.txt
+kill %1
+scripts/dlt_file.py /tmp/sg5.dlt > /tmp/sg5-dlt.txt    # from this directory, in openadkit
+grep -c 'frame deadline failed' /tmp/sg5-dlt.txt
+grep -c -E 'Completed the request for PG .* to State .*fallback' /tmp/sg5-dlt.txt
+grep -c 'Alive Supervision' /tmp/sg5-dlt.txt
+```
+
+Each count must be 1 or more: the health monitor's deadline failure, the launch manager's
+switch to the fallback, and the alive supervision going from OK to EXPIRED. Then open
+`/tmp/sg5.dlt` in dlt-viewer and find the same events. Board 2 passed on 2026-10-07 with
+counts 1, 1 and 2 and `SI_STOP_PASS first_cr52_cmd_ms=819`. `run-d6.sh` reads stdin, so
+give it `/dev/null` when it runs from a script piped into a shell.
+
+After `fault lm`, no container process survives. `podman ps` still lists `x5h-vp` and `x5h-image-republish` as running, even with `--sync`, because conmon died with them. The next `reset` removes these stale records with `--replace`. To check that no container is left, look at the processes (for example `pgrep -x VisionPilot`) or the cgroup. Do not use `podman ps`.
+
+`/run/score/vp.ready` stays after a VisionPilot kill until the next LM start. `score-lm.service` removes it in `ExecStartPre`. The LM tests the ready condition as soon as it starts VisionPilot, before `x5h-score-vp.sh` removes the file, so a leftover file ends `Startup` at once and alive supervision then fails. Because the file outlives a killed VisionPilot, `check` also needs a running VisionPilot process (`pgrep -x VisionPilot`) and a heartbeat with `fault=0`. After a fault, `check` reports a FAIL marker until `reset`. Run the steps in this order: fault, reset, check.
 
 ### The six markers
 
-- `X5H_DEMO_UP units=<n>`: `x5h-demo-up.sh` at boot. All five units started (or `X5H_DEMO_UP_FAIL reason=<unit|quadlet>`).
+- `X5H_DEMO_UP units=<n>`: `x5h-demo-up.sh` at boot. All six units started (or `X5H_DEMO_UP_FAIL reason=<unit|quadlet>`).
 - `RPMSG_LISTEN_PASS n=<n> gaps=<n>`: `rpmsg-ping -l` on the board. The CR52 heartbeat arrived on `rpmsg-si` with consecutive sequence numbers.
 - `VP_NPU_PASS frames=<n> wall_avg_ms=<ms> wall_max_ms=<ms>`: `vp-npu-gate.sh`, gate D5.
 - `SI_STOP_PASS`: `si_stop_gate.py` on the companion host (the `si-gate` compose service, gate D6). The CR52-authored stop was seen on domain 1 within the latency budget.
-- `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=5 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together (or `X5H_CES_DEMO_FAIL reason=<slug>`).
+- `X5H_CES_DEMO_READY sha=<sha> spawn=<idx> units=6 hb=<seq>`: `scripts/x5h-ces2027-demo.sh check`, on the companion host. Reads the package sha, the CARLA spawn index, and the heartbeat sequence together. It also needs `/run/score/vp.ready`, a running VisionPilot process, and `fault=0` in the heartbeat (the Safety Island is not latched). Otherwise it prints `X5H_CES_DEMO_FAIL reason=<slug>`.
 - `DEMO_ROLE_PASS role=demo carveout=0x5da00000 vdev=0x5dc00000 remoteproc=<state>`: `demo-role-smoke.sh`, gate D1a. The board booted the `demo` role with the NPU tree intact, the CR52 carveout relocated, and all four carveouts `cr52_1` lists present under the names remoteproc looks them up by.
 
 ### The four CR52 carveouts
@@ -1109,61 +1169,114 @@ booth script itself needs only `ssh` to the board:
 
 ```
 x5h-ces2027-demo.sh check                 # ready? prints the READY/FAIL marker above
-x5h-ces2027-demo.sh run                   # prints the compose + board commands to bring the stack up
-x5h-ces2027-demo.sh fault kill|channel    # the demo moment
-x5h-ces2027-demo.sh reset                 # VisionPilot back, fault cleared
+x5h-ces2027-demo.sh run                   # prints the compose, board and reset commands to bring the stack up
+x5h-ces2027-demo.sh fault kill|slow|lm [--at <epoch-s>]   # the demo moment
+x5h-ces2027-demo.sh reset                 # fault cleared, launch manager and VisionPilot back
 ```
 
 `run` does not shell out to `docker` itself. That choice avoids mounting the host's
 `/var/run/docker.sock` into the `demo` container just to start its own compose siblings.
-Bringing the stack up is `docker compose`'s job. This script only prints the two commands
+Bringing the stack up is `docker compose`'s job. This script only prints the three commands
 the operator (or the `demo` container) needs.
+
+A board that booted before CARLA falls back after `ready_timeout` (60 s), and the board
+restart does not recover it. Run `reset` after CARLA is up: it is the last command `run` prints.
 
 ### Recording the demo reel
 
-The reel is one recording of the `kill` route, composed into a four-pane video of about
-three minutes. The four panes are the CARLA chase camera, VisionPilot's own HUD rendered on
-the board, the CR52 console, and the speed and command trace. The reel explains the demo.
-**It is not a gate** and it carries no gate number. It is recorded in its own run. The
-instruments it adds must never land on gate D5's 23.6 ms or gate D6's 700 ms budget.
+The reel is one recording of one fault route, composed into a video of about three
+minutes. The main take is the `slow` route and the second take is `kill`. Four panes sit
+over a full-width DLT strip. The panes are the CARLA chase camera, VisionPilot's own HUD
+rendered on the board, the CR52 console, and a plot pane. The plot pane shows
+VisionPilot's frame time against its deadline over the speed and command trace. The strip
+shows the last DLT messages from the launch manager and VisionPilot. The reel explains the
+demo. **It is not a gate** and it carries no gate number. It is recorded in its own run.
+The instruments it adds must never land on gate D5's 23.6 ms or on a gate D6 budget.
 
 **The board image has to be rebuilt first.** The demo image is built from
-`feat/x5h-carla-npu`, which carries no frame-recorder sink. On that image `record_dir` is
+`feat/x5h-score-hook`, which carries no frame-recorder sink. On that image `record_dir` is
 read by nothing, and a recording run records silently nothing.
-`feat/x5h-carla-npu-recorder` is that ref with `feat/frame-recorder-sink` merged into it.
+`feat/x5h-score-hook-recorder` is that ref with the frame-recorder sink merged into it.
 Build it **on board 2**. The build context carries the vendor ORT library, which is NDA
 material and must never reach CI, CI logs or CI artifacts.
 
 ```
-components/demo/prepare-vp-context.sh <ort-overlay> /tmp/vp-ctx
+components/demo/prepare-vp-context.sh <ort-overlay> /var/tmp/vp-ctx
 podman build --platform linux/arm64 -f components/demo/visionpilot-x5h.containerfile \
-  --build-arg VP_REF=feat/x5h-carla-npu-recorder -t localhost/x5h-visionpilot:recording /tmp/vp-ctx
+  --build-arg VP_REF=feat/x5h-score-hook-recorder -t localhost/x5h-visionpilot:recording /var/tmp/vp-ctx
 ```
 
 For the recording session only, stage `components/demo/vision_pilot.capture.conf` over
-`/etc/containers/systemd/vision_pilot.conf`. Point `x5h-vp.container` at the `:recording`
-tag, and empty `/opt/npu/video/hud`. Read the free space with `stat -f /opt/npu`, never
-with `df`. On this filesystem `df` reports 0 available while hundreds of megabytes are free
-to root. Budget about 1.5 GB.
-
-On the bench, with the `tio` capture of the CR52 console already running:
+`/etc/containers/systemd/vision_pilot.conf`. `x5h-score-vp` always runs
+`localhost/x5h-visionpilot:latest`, so move that name to the recording image. Give the
+demo image a second name first, or it is left with none and a prune deletes it:
 
 ```
-DRIVE_S=70 Simulation/CARLA/ROS2/si/record-demo.sh <carla-pkg>   # DEMO_REC_DONE streams=5 dir=<run>
-scripts/x5h-pull-demo-frames.sh <run>                            # DEMO_FRAMES_PULLED n=<frames>
-scripts/make_demo_reel.py <run> --dry-run                        # DEMO_REEL_PLAN frames=... seconds=...
-scripts/make_demo_reel.py <run> --out reel.mp4                   # DEMO_REEL_WRITTEN
+podman tag localhost/x5h-visionpilot:latest localhost/x5h-visionpilot:demo
+podman tag localhost/x5h-visionpilot:recording localhost/x5h-visionpilot:latest
 ```
+
+Then point the launch manager at `etc/recording`. That configuration is the demo one with a
+150 ms frame deadline. The HUD and the recorder take VisionPilot to 72-85 ms a frame on
+board 2, so the demo's 80 ms fails a recording run at its second frame. A slow-fault frame
+takes about 280 ms and still fails 150 ms. The drop-in is under `/run`, so a reboot also
+removes it:
+
+```
+mkdir -p /run/systemd/system/score-lm.service.d
+printf '[Service]\nExecStart=\nExecStart=/usr/local/score/bin/launch_manager -c /usr/local/score/etc/recording/launch_manager_config.bin\n' \
+  > /run/systemd/system/score-lm.service.d/recording.conf
+systemctl daemon-reload
+```
+
+Read the free space with `stat -f /opt/npu`, never with `df`. On this filesystem `df`
+reports 0 available while hundreds of megabytes are free to root. Budget about 1.5 GB.
+
+On the bench, use `youtalk/vision_pilot` branch `feat/ces2027-demo-reel-score`. The `tio`
+capture of the CR52 console and `jpeg_bridge.py` must already run. `run-d6.sh` starts
+CARLA and the bridge but not `jpeg_bridge.py`, and without it the board gets no camera
+frames. `record-demo.sh` stops the launch manager and empties `/opt/npu/video/hud`.
+`run-d6.sh` then runs the booth reset once CARLA sends frames, because the launch manager
+falls back if VisionPilot sees no frame for 60 s. Set `X5H_BOARD=root@192.168.0.21` for
+board 2. Without it, `record-demo.sh` skips its board preparation, and `run-d6.sh`
+(through `si_fault.sh`) and `x5h-pull-demo-frames.sh` default to board 1. Pass `--capture
+<file>` when the `tio` capture is not `/tmp/<device>.log`. On rog-amd it is
+`~/x5h-logs/x5h2-cr52-<date>.log`.
+
+`record-demo.sh` also records the board's DLT from UDP 3490 into `dlt.dlt`. Close
+dlt-viewer first: it holds the port, and the recording then stops with `dlt_port_busy`.
+rog-amd's `x5h` input chain must accept UDP 3490 on the bench interface.
+`scripts/dlt_file.py <run>/dlt.dlt` prints the stream as text, and dlt-viewer opens the
+same file.
+
+```
+DRIVE_S=70 Simulation/CARLA/ROS2/si/record-demo.sh <carla-pkg> --route slow   # DEMO_REC_DONE streams=6 dir=<run>
+scripts/x5h-pull-demo-frames.sh <run>                                        # DEMO_FRAMES_PULLED n=<frames>
+scripts/make_demo_reel.py <run> --dry-run                                    # DEMO_REEL_PLAN frames=... seconds=...
+scripts/make_demo_reel.py <run> --out reel.mp4                               # DEMO_REEL_WRITTEN
+```
+
+Pull the frames before the next `reset`. The pull script reads the last VisionPilot run in
+the journal, and a reset starts a new one.
 
 `DRIVE_S=70` is what the built-in cut asks for. A shorter run is not wasted. The composer
 clips each chapter to the material that exists. It prints one `DEMO_REEL_CLIP` line per
 chapter it shortened or dropped, and it refuses outright when the fault is not covered.
 
-Put the shipped `vision_pilot.conf` back afterwards, so the next gate run measures the
-image the gates were passed on.
+The composer places DLT messages by their board stamp, the clock of the journal, with the
+same offset that places the HUD frames. It refuses a run whose messages arrived far from
+that stamp (`dlt_clock`). The strip leaves out mw::log's own statistics lines (context
+`STAT`), which every process start and stop logs.
 
-**Before the file leaves the bench, watch it.** The console pane shows real firmware output.
-No Renesas path, SDK directory or firmware blob name stays legible on screen.
+Afterwards, put the shipped `vision_pilot.conf` back, delete the drop-in and run
+`systemctl daemon-reload`, and move the name back with
+`podman tag localhost/x5h-visionpilot:demo localhost/x5h-visionpilot:latest`. Do not use
+`podman untag`: with no name given, it removes every name of the image. The next gate run
+then measures the image and the deadline the gates were passed on.
+
+**Before the file leaves the bench, watch it.** The console pane shows real firmware
+output, and the DLT strip shows the board's own log text. No Renesas path, SDK directory
+or firmware blob name stays legible on screen.
 
 ### Gates
 
@@ -1174,7 +1287,7 @@ No Renesas path, SDK directory or firmware blob name stays legible on screen.
 | D3 (channel) | The second RPMsg endpoint binds on Linux, and the CR52 heartbeat arrives at 1 Hz for 10 minutes (`rpmsg-ping -l`, marker `RPMSG_LISTEN_PASS`). Pass: 600 of 600 (`listen_loop` accepts `n_hb >= seconds - 2`, so 598 of 600 also passes). | None. |
 | D4 (lap) | VisionPilot drives the Town04 ring one full lap unaided, cross-track error under 1.0 m. Pass: one lap, no lane departure. | Runs on rog-amd with no board involved, so it can proceed in parallel with D1 to D3. |
 | D5 (NPU) | VisionPilot end to end under 30 ms on the NPU while the CR52 runs its idle loop (`vp-npu-gate.sh`, marker `VP_NPU_PASS`). Pass: 396 of 396 frames. | None. |
-| D6 (stop) | Fault injected at a fixed point. The CR52-authored `control_cmd` appears within the latency budget. The vehicle stops in lane (`si_stop_gate.py`, marker `SI_STOP_PASS`). Pass: twice in a row, stop distance recorded. | The spec's figure is 200 ms. That holds for the `channel` route, where the latch needs no staleness. The `kill` route's threshold is 700 ms instead. The firmware trips the stop 0.5 s after the last heartbeat, then adds one 0.15 s cycle. |
+| D6 (stop) | Fault injected at a fixed point. The CR52-authored `control_cmd` appears within the latency budget. The vehicle stops in lane (`si_stop_gate.py`, marker `SI_STOP_PASS`). Pass: twice in a row, stop distance recorded. | The spec's figure is 200 ms. That holds for the `channel` route, where the latch needs no staleness. The `kill` route's threshold is 700 ms instead. The firmware trips the stop 0.5 s after the last heartbeat, then adds one 0.15 s cycle. `si_stop_gate.py` checks the lane only since 2026-10-06 (vision_pilot `feat/ces2027-demo-reel-score`). Replayed against the CARLA map, the earlier passes left the lane, because their faults fired where the road starts to curve. From spawn 5, fire the fault 40-70 s after VisionPilot is ready, on the 770 m straight. Board 2, 2026-10-06, nine faults at 40 s: the six that found the car moving stopped in lane. In the other three, VisionPilot at 12 m/s had already left the road at the exit where that straight begins, before any fault. |
 | D7 (cold boot) | Power cycle board 1. The whole stack comes up with no operator action (`x5h-demo-up.sh`, marker `X5H_DEMO_UP`). Pass: twice. | None. |
 
 ## Troubleshooting

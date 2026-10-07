@@ -1,0 +1,19 @@
+load("@score_lifecycle//:defs.bzl", "launch_manager_config")
+
+# The demo configuration for a demo-reel recording session, with a frame
+# deadline that the recording itself fits under. The HUD and the frame-recorder
+# sink take VisionPilot from about 25 ms to 72-74 ms a frame, and 115 ms at the
+# second frame (board 2, 2026-10-06), so the demo's 80 ms fails a recording run
+# on its own. The slow fault's frames take about 275 ms and still fail 150 ms.
+genrule(
+    name = "launch_manager_config",
+    srcs = ["//config/demo:launch_manager_config.json"],
+    outs = ["launch_manager_config.json"],
+    cmd = "sed 's/\"SCORE_VP_FRAME_MAX_MS\": \"80\"/\"SCORE_VP_FRAME_MAX_MS\": \"150\"/' $< > $@ && grep -q '\"SCORE_VP_FRAME_MAX_MS\": \"150\"' $@",
+)
+
+launch_manager_config(
+    name = "lm_config",
+    config = ":launch_manager_config",
+    flatbuffer_out_dir = "etc",
+)

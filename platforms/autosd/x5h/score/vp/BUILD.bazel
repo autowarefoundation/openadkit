@@ -1,0 +1,33 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_import")
+
+cc_binary(
+    name = "libscore_vp.so",
+    srcs = ["score_vp.cpp", "score_vp.h"],
+    additional_linker_inputs = ["score_vp.map"],
+    linkopts = [
+        "-Wl,--version-script=$(location score_vp.map)",
+        "-Wl,--exclude-libs,ALL",
+        "-lpthread",
+        "-lrt",
+        "-ldl",
+    ],
+    linkshared = True,
+    deps = [
+        "@score_baselibs//score/log_rust/stdout_logger_cpp_init",
+        "@score_baselibs//score/mw/log",
+        "@score_lifecycle//score/health_monitor:health_monitoring_cc",
+        "@score_logging//score/mw/log/backend:remote",
+    ],
+)
+
+cc_import(
+    name = "score_vp_import",
+    hdrs = ["score_vp.h"],
+    shared_library = ":libscore_vp.so",
+)
+
+cc_binary(
+    name = "vp_standin",
+    srcs = ["standin.c"],
+    deps = [":score_vp_import"],
+)

@@ -1,0 +1,7 @@
+load("@score_lifecycle//:defs.bzl", "launch_manager_config")
+
+launch_manager_config(
+    name = "lm_config",
+    config = "launch_manager_config.json",
+    flatbuffer_out_dir = "etc",
+)

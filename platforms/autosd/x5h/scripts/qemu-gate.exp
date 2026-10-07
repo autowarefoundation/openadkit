@@ -150,7 +150,7 @@ if {$guest_alive} {
 # Judge the markers from the captured log.
 set fh [open $logf r]; set log [read $fh]; close $fh
 set fail 0
-foreach must {GATE1_LOGIN_OK GATE1_KVER=6.1.102-autosd GATE1_CCVER_OK GATE2_STORE_FS=ext4 GATE2_EXT4_OK GATE3_TMPFS_OK GATE3_STORE_FS=tmpfs GATE4_BTRFS_OK GATE4_STORE_FS=btrfs GATE6_NFT_PORT_OK GATE6_SNAT_OK GATE7_SELINUX_PERMISSIVE_OK GATE7_SELINUX_BOOLS_OK GATE_RPMSG_ETH_UNIT_PASS GATE_DONE} {
+foreach must {GATE1_LOGIN_OK GATE1_KVER=6.1.102-autosd GATE1_CCVER_OK GATE2_STORE_FS=ext4 GATE2_EXT4_OK GATE3_TMPFS_OK GATE3_STORE_FS=tmpfs GATE4_BTRFS_OK GATE4_STORE_FS=btrfs GATE6_NFT_PORT_OK GATE6_SNAT_OK GATE7_SELINUX_PERMISSIVE_OK GATE7_SELINUX_BOOLS_OK GATE_RPMSG_ETH_UNIT_PASS GATE9_SCORE_LM_OK GATE_DONE} {
     if {![string match "*$must*" $log]} { puts "MISSING: $must"; set fail 1 }
 }
 # Module staging failure poisons every verdict above; fail loudly on it even

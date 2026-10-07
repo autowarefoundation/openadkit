@@ -1,0 +1,26 @@
+common --registry=https://raw.githubusercontent.com/eclipse-score/bazel_registry/main/
+common --registry=https://bcr.bazel.build
+common --repo_env=ANDROID_HOME=
+common --experimental_repository_downloader_retries=10
+common --http_connector_attempts=10
+build --java_language_version=17
+build --tool_java_language_version=17
+build --java_runtime_version=remotejdk_17
+build --tool_java_runtime_version=remotejdk_17
+build --incompatible_strict_action_env
+build --host_platform=@score_bazel_platforms//:x86_64-linux-gcc_12.2.0-posix
+build --extra_toolchains=@score_gcc_x86_64_toolchain//:x86_64-linux-gcc_12.2.0
+build --extra_toolchains=@score_toolchains_rust//toolchains/ferrocene:ferrocene_x86_64_unknown_linux_gnu
+build --@score_baselibs//score/json:base_library=nlohmann
+build --@score_logging//score/datarouter/build_configuration_flags:enable_nonverbose_dlt=False
+build --@score_logging//score/datarouter/build_configuration_flags:enable_dynamic_configuration=False
+build --@score_logging//score/datarouter/build_configuration_flags:file_transfer=False
+build --@score_logging//score/datarouter/build_configuration_flags:use_local_vlan=True
+# Without this the datarouter emits DLT only through its persistency dictionary.
+build --@score_logging//score/datarouter/build_configuration_flags:dlt_output_enable=True
+build:x86_64-linux --platforms=@score_bazel_platforms//:x86_64-linux-gcc_12.2.0-posix
+build:aarch64-linux --platforms=@score_bazel_platforms//:aarch64-linux-gcc_12.2.0-posix
+build:aarch64-linux --extra_toolchains=@score_gcc_aarch64_toolchain//:aarch64-linux-gcc_12.2.0
+build:aarch64-linux --extra_toolchains=@score_toolchains_rust//toolchains/ferrocene:ferrocene_aarch64_unknown_linux_gnu
+# lifecycle's own arm64 config adds -mno-outline-atomics and -latomic. They add
+# a libatomic.so.1 run-time dependency, and every target builds without them.

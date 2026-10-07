@@ -1,0 +1,9 @@
+{
+  global:
+    score_vp_init;
+    score_vp_report_running;
+    score_vp_frame_begin;
+    score_vp_frame_end;
+  local:
+    *;
+};

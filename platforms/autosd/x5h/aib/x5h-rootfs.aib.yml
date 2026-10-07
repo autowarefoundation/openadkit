@@ -54,6 +54,8 @@ content:
     # stage-board.sh stages the NPU payload with rsync --delete so re-staging
     # is idempotent; the image has no tar.
     - rsync
+    # Time from rog-amd for the S-CORE demo logs (config/chrony-x5h.conf).
+    - chrony
   # add_files (org.osbuild.copy) does not create parent directories, and
   # nothing else in the pipeline creates /etc/containers/containers.conf.d
   # (init_rootfs_dirs_stage creates /etc itself, but not this subtree).
@@ -104,6 +106,9 @@ content:
       parents: true
       exist_ok: true
     - path: /etc/motd.d
+      parents: true
+      exist_ok: true
+    - path: /etc/score
       parents: true
       exist_ok: true
   # NOT in make_dirs, deliberately, and do not "fix" these back:
@@ -228,16 +233,40 @@ content:
       path: /usr/sbin/x5h-demo-up.sh
     - source_path: ../config/x5h-demo.service
       path: /etc/systemd/system/x5h-demo.service
+    # --- demo role: S-CORE launch manager runs the driving function --------
+    # The camera and VisionPilot containers start from these exec scripts
+    # under the launch manager; there is no Quadlet for either.
+    - source_path: ../config/score/datarouter-logging.json
+      path: /etc/score/datarouter-logging.json
+    - source_path: ../config/score/lm-logging.json
+      path: /etc/score/lm-logging.json
+    - source_path: ../config/score/log-channels.json
+      path: /etc/score/log-channels.json
+    - source_path: ../config/score/vp-logging.json
+      path: /etc/score/vp-logging.json
+    - source_path: ../config/score-datarouter.service
+      path: /etc/systemd/system/score-datarouter.service
+    - source_path: ../config/score-lm.service
+      path: /etc/systemd/system/score-lm.service
+    - source_path: ../scripts/x5h-score-camera.sh
+      path: /usr/sbin/x5h-score-camera
+    - source_path: ../scripts/x5h-score-vp.sh
+      path: /usr/sbin/x5h-score-vp
     # Gate D5's instrument (see README.md, "CES 2027 demo role"): its default
-    # log source is `podman logs x5h-vp`, so it only runs on the board and
-    # has to ship in the image rather than be hand-copied on.
+    # log source is the x5h-vp journal stream, so it only runs on the board and
+    # has to ship in the image rather than be hand-copied on. The soak gate
+    # (SG2) reads the same journal.
     - source_path: ../scripts/vp-npu-gate.sh
       path: /usr/sbin/vp-npu-gate.sh
-    # --- role-independent: container store, watchdog, manifest -------------
+    - source_path: ../scripts/score-soak-gate.sh
+      path: /usr/sbin/score-soak-gate.sh
+    # --- role-independent: container store, watchdog, clock, manifest -------------
     - source_path: ../config/var-lib-containers.mount
       path: /etc/systemd/system/var-lib-containers.mount
     - source_path: ../config/10-watchdog.conf
       path: /etc/systemd/system.conf.d/10-watchdog.conf
+    - source_path: ../config/chrony-x5h.conf
+      path: /etc/chrony.conf
     - source_path: ../scripts/x5h-manifest.sh
       path: /usr/sbin/x5h-manifest.sh
     # selfboot-smoke.sh is the branch's primary acceptance instrument:
@@ -371,10 +400,6 @@ content:
       path: /etc/containers/systemd/x5h-demo-hb.container
     - source_path: ../components/demo/x5h-demo-restamp.container
       path: /etc/containers/systemd/x5h-demo-restamp.container
-    - source_path: ../components/demo/x5h-vp.container
-      path: /etc/containers/systemd/x5h-vp.container
-    - source_path: ../components/demo/x5h-image-republish.container
-      path: /etc/containers/systemd/x5h-image-republish.container
     # /var/lib/awf/scenario-sim{,/map} -- the scenario working directory
     # awf-oak-autoware and awf-oak-simulator mount, and the directory the
     # map is staged into -- are created at boot by systemd-tmpfiles rather
@@ -500,6 +525,12 @@ content:
     - path: /usr/sbin/x5h-demo-up.sh
       mode: "0755"
     - path: /usr/sbin/vp-npu-gate.sh
+      mode: "0755"
+    - path: /usr/sbin/score-soak-gate.sh
+      mode: "0755"
+    - path: /usr/sbin/x5h-score-camera
+      mode: "0755"
+    - path: /usr/sbin/x5h-score-vp
       mode: "0755"
 
 auth:

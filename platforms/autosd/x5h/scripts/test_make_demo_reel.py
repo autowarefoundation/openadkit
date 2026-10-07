@@ -15,6 +15,7 @@ import pytest
 from PIL import Image
 
 import make_demo_reel as m
+from dlt_file import DltMsg
 from test_dlt_file import arg_str, dlt_record
 
 
@@ -445,6 +446,17 @@ def test_dlt_window_returns_the_messages_already_logged(tmp_path):
     assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at - 0.7)] == ["VP"]
     assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at)] == ["VP", "LM"]
     assert [msg.app for _, msg in m.dlt_window(r.dlt, r.fault_at, n=1)] == ["LM"]
+
+
+def test_dlt_window_hides_the_mw_log_statistics(tmp_path):
+    # mw::log logs its own buffer statistics, context STAT, at every process
+    # start and stop: 4 of the 18 messages of the 2026-10-07 SG5 recording.
+    r = m.load_run(make_run(tmp_path))
+    stat = DltMsg(recv=0.0, tmsp=0.0, ecu="X5H", app="LM", ctx="STAT", level=4,
+                  text="mw::log statistics: number_of_slots= 8")
+    placed = sorted(r.dlt + [(r.fault_at - 0.6, stat)], key=lambda p: p[0])
+    assert [msg.ctx for _, msg in m.dlt_window(placed, r.fault_at)] == ["VP", "LM"]
+    assert [msg.ctx for _, msg in m.dlt_window(placed, r.fault_at, n=1)] == ["LM"]
 
 
 def test_output_hz_counts_the_frames_of_the_last_second(tmp_path):

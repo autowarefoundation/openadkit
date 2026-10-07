@@ -298,10 +298,16 @@ def console_window(lines, bench_time, n=CONSOLE_LINES):
     return [ln for _, ln in lines[max(0, upto - n):upto]]
 
 
+# mw::log logs its own buffer statistics (context STAT) at every process start
+# and stop. They say nothing about the fault and would take strip rows from it.
+HIDDEN_DLT_CONTEXTS = {"STAT"}
+
+
 def dlt_window(placed, bench_time, n=DLT_LINES):
-    """The last n DLT messages already logged at bench_time."""
+    """The last n DLT messages already logged at bench_time, without mw::log's statistics."""
     upto = bisect.bisect_right([t for t, _ in placed], bench_time)
-    return placed[max(0, upto - n):upto]
+    shown = [p for p in placed[:upto] if p[1].ctx not in HIDDEN_DLT_CONTEXTS]
+    return shown[-n:]
 
 
 def output_hz(run, bench_time):

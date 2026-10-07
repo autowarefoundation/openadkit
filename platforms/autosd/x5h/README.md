@@ -1187,11 +1187,11 @@ restart does not recover it. Run `reset` after CARLA is up: it is the last comma
 The reel is one recording of one fault route, composed into a video of about three
 minutes. The main take is the `slow` route and the second take is `kill`. Four panes sit
 over a full-width DLT strip. The panes are the CARLA chase camera, VisionPilot's own HUD
-rendered on the board, the CR52 console, and a plot pane. The plot pane shows VisionPilot's
-frame time against its deadline over the speed and command trace. The strip shows the last
-DLT messages from the launch manager and VisionPilot. The reel explains the demo. **It is not a gate**
-and it carries no gate number. It is recorded in its own run. The instruments it adds must
-never land on gate D5's 23.6 ms or on a gate D6 budget.
+rendered on the board, the CR52 console, and a plot pane. The plot pane shows
+VisionPilot's frame time against its deadline over the speed and command trace. The strip
+shows the last DLT messages from the launch manager and VisionPilot. The reel explains the
+demo. **It is not a gate** and it carries no gate number. It is recorded in its own run.
+The instruments it adds must never land on gate D5's 23.6 ms or on a gate D6 budget.
 
 **The board image has to be rebuilt first.** The demo image is built from
 `feat/x5h-score-hook`, which carries no frame-recorder sink. On that image `record_dir` is
@@ -1238,9 +1238,10 @@ CARLA and the bridge but not `jpeg_bridge.py`, and without it the board gets no 
 frames. `record-demo.sh` stops the launch manager and empties `/opt/npu/video/hud`.
 `run-d6.sh` then runs the booth reset once CARLA sends frames, because the launch manager
 falls back if VisionPilot sees no frame for 60 s. Set `X5H_BOARD=root@192.168.0.21` for
-board 2: `record-demo.sh`, `run-d6.sh` and `x5h-pull-demo-frames.sh` default to board 1.
-Pass `--capture <file>` when the `tio` capture is not `/tmp/<device>.log`. On rog-amd it
-is `~/x5h-logs/x5h2-cr52-<date>.log`.
+board 2. Without it, `record-demo.sh` skips its board preparation, and `run-d6.sh`
+(through `si_fault.sh`) and `x5h-pull-demo-frames.sh` default to board 1. Pass `--capture
+<file>` when the `tio` capture is not `/tmp/<device>.log`. On rog-amd it is
+`~/x5h-logs/x5h2-cr52-<date>.log`.
 
 `record-demo.sh` also records the board's DLT from UDP 3490 into `dlt.dlt`. Close
 dlt-viewer first: it holds the port, and the recording then stops with `dlt_port_busy`.
@@ -1273,8 +1274,9 @@ Afterwards, put the shipped `vision_pilot.conf` back, delete the drop-in and run
 `podman untag`: with no name given, it removes every name of the image. The next gate run
 then measures the image and the deadline the gates were passed on.
 
-**Before the file leaves the bench, watch it.** The console pane shows real firmware output, and the DLT strip shows the board's own log text.
-No Renesas path, SDK directory or firmware blob name stays legible on screen.
+**Before the file leaves the bench, watch it.** The console pane shows real firmware
+output, and the DLT strip shows the board's own log text. No Renesas path, SDK directory
+or firmware blob name stays legible on screen.
 
 ### Gates
 

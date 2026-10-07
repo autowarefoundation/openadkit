@@ -13,7 +13,15 @@ single_version_override(module_name = "score_baselibs", version = "0.2.12")
 bazel_dep(name = "score_communication")
 single_version_override(module_name = "score_communication", version = "0.4.0")
 bazel_dep(name = "score_lifecycle")
-single_version_override(module_name = "score_lifecycle", version = "0.6.1")
+# lifecycle 0.6.1 links only the console mw::log backend into launch_manager
+# (0.7.0 and main too), so lm-logging.json's kRemote fell back to the console.
+# The patch links the remote backend, as libscore_vp.so does. Spec section 24.
+single_version_override(
+    module_name = "score_lifecycle",
+    version = "0.6.1",
+    patch_strip = 1,
+    patches = ["//:lifecycle-lm-remote-log.patch"],
+)
 bazel_dep(name = "score_logging")
 single_version_override(module_name = "score_logging", version = "0.2.4")
 bazel_dep(name = "score_crates")

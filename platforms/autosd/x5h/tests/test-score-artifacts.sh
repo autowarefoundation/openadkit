@@ -2,7 +2,8 @@
 # Checks an S-CORE tar from build-score.sh. Needs SCORE_TAR (an aarch64 tar)
 # because a fresh checkout has no build; run.sh skips it without one.
 # The checks are the facts the board depends on: aarch64 ELF, no libstdc++ or
-# libatomic at run time, exactly the four C symbols, and every configuration.
+# libatomic at run time, exactly the four C symbols, the LM's remote log
+# backend, and every configuration.
 set -u
 name=test-score-artifacts
 fail() { echo "TEST_FAIL $name reason=$1"; exit 1; }
@@ -25,4 +26,8 @@ done
 syms=$(nm -D --defined-only "$s/lib/libscore_vp.so" | awk '$2 == "T" { print $3 }' | sort | tr '\n' ' ')
 [ "$syms" = "score_vp_frame_begin score_vp_frame_end score_vp_init score_vp_report_running " ] \
     || fail "exports=$syms"
+# lm-logging.json asks for kRemote. Without the remote backend in the link the
+# LM falls back to the console, and its half of SG5 never reaches the bench.
+nm -C "$s/bin/launch_manager" | grep -F 'CreateRemoteRecorder' > /dev/null \
+    || fail lm_no_remote_backend
 echo "TEST_PASS $name"

@@ -488,7 +488,10 @@ def test_hud_caption_keeps_a_slow_run_live_until_its_last_frame(tmp_path):
 
 def test_the_slow_cut_says_why_only_the_health_monitor_sees_it():
     text = " ".join(t for t, _ in m.SLOW_CHAPTERS[1][4])
-    assert "0.5 s limit" in text and "3.6 Hz" in text
+    assert "0.5 s limit" in text and "output rate drops" in text
+    # The rate readout in the frame time pane shows the real numbers. A recording
+    # run renders about 6 Hz, the demo about 10 Hz, so the card names neither.
+    assert "Hz" not in text
 
 
 def test_cards_are_the_declared_size(tmp_path):

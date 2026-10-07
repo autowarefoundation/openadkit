@@ -128,7 +128,7 @@ SLOW_CHAPTERS = [
     DEFAULT_CHAPTERS[0],
     ("the fault: VisionPilot runs too slow", -3.0, 1.5, 0.25, (
         ("VisionPilot reports every frame to the S-CORE health monitor.", 30),
-        ("From here each frame takes 200 ms longer: 10 Hz drops to about 3.6 Hz.", 30),
+        ("From here each frame takes 200 ms longer, and the output rate drops with it.", 30),
         ("Its output still reaches the Safety Island inside the 0.5 s limit,", 30),
         ("so only the health monitor sees that it is late.", 30),
         ("", 20),

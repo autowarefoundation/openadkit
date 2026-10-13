@@ -3,9 +3,11 @@
      on rog-amd, VisionPilot, the heartbeat and restamp nodes on this board):
      pinned to tsn5 so autodetermine can never pick tap0. Domain 2 is the
      CR52 link and is copied verbatim from components/cyclonedds-x5h.xml
-     (its own note there: net.core.rmem_max is 212992B on this board, so
-     General/SocketReceiveBufferSize must never be added here either — see
-     that file's header comment for the full story). -->
+     (its own note there: a SocketReceiveBufferSize minimum the kernel
+     cannot grant is fatal, so General/SocketReceiveBufferSize must never be
+     added here either — see that file's header comment for the full story).
+     Domain 1 relies on CycloneDDS's default 1 MiB request instead, which
+     config/90-x5h-dds.conf lets the kernel grant. -->
 <CycloneDDS xmlns="https://cdds.io/config">
   <Domain Id="1">
     <General>

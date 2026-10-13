@@ -180,6 +180,8 @@ content:
       path: /etc/ssh/authorized_keys.d/root
     - source_path: ../config/50-x5h-tsn5-unmanaged.conf
       path: /etc/NetworkManager/conf.d/50-x5h-tsn5-unmanaged.conf
+    - source_path: ../config/90-x5h-dds.conf
+      path: /etc/sysctl.d/90-x5h-dds.conf
     # May collide with a resolv.conf symlink in the base image; if the copy
     # stage fails CI, drop this entry and stage the file post-dd instead.
     - source_path: ../config/x5h-resolv.conf

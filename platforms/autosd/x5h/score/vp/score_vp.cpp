@@ -105,7 +105,11 @@ extern "C" int score_vp_report_running(void)
 
 extern "C" int score_vp_frame_begin(void)
 {
-    if (!g_deadline)
+    // Time frames only once the health monitor runs. A failed deadline stays
+    // failed, and VisionPilot's first output frame carries a one-time NPU
+    // warm-up of 62-83 ms against the 80 ms budget. Timed, it sent a start to
+    // the fallback with 0 alive indications (board 2, 2026-10-13).
+    if (!g_deadline || !g_hm_started)
     {
         return 0;
     }

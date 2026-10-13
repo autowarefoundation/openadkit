@@ -1,5 +1,7 @@
 /* VisionPilot stand-in for the SIL harness: 10 Hz frames through
- * libscore_vp.so, 30 ms of work and 70 ms idle. SIGUSR1 adds 200 ms of work to
+ * libscore_vp.so, 30 ms of work and 70 ms idle. Frame 1, the first with output,
+ * takes 120 ms, over the 80 ms budget, like VisionPilot's NPU warm-up frame,
+ * and only then reports running. SIGUSR1 adds 200 ms of work to
  * every later frame (D-slow). SIGTERM ends it. Both need handlers: SIGUSR1's
  * default action ends the process, and SIGTERM must end the loop cleanly.
  * Env: SCORE_VP_FRAME_MAX_MS (required). */
@@ -24,11 +26,12 @@ int main(void)
     if (max == NULL || score_vp_init((uint32_t)atoi(max)) != 0) return 1;
     const struct timespec work = {0, 30L * 1000 * 1000};
     const struct timespec slow_work = {0, 230L * 1000 * 1000};
+    const struct timespec warm_up = {0, 120L * 1000 * 1000};
     const struct timespec idle = {0, 70L * 1000 * 1000};
     for (long frame = 0; !g_stop; ++frame)
     {
         score_vp_frame_begin();
-        nanosleep(g_slow ? &slow_work : &work, NULL);
+        nanosleep(frame == 1 ? &warm_up : g_slow ? &slow_work : &work, NULL);
         score_vp_frame_end();
         if (frame == 1)
         {

@@ -16,9 +16,16 @@ WantedBy=multi-user.target
 [Container]
 Network=host
 ContainerName=x5h-demo-restamp
-# Same image as the relay and Autoware, for the same reason: rclpy and the
-# autoware_control_msgs types this node needs are already in it.
-Image=${AUTOWARE_IMAGE}
+# The bridge image, not the Autoware one. This node needs rclpy and the
+# autoware_control_msgs types and nothing else, and the bridge image carries
+# both under /opt/autoware, which it must: forwarding those messages between
+# domains is what the bridge is for. Board-checked on board 2, 2026-09-18.
+#
+# It is a 5.17 GB image against the Autoware image's 5.02 GB, so this is not a
+# saving in the abstract. It is a saving on the board, which already holds the
+# bridge image for x5h-demo-bridge and x5h-demo-hb and has room for one of the
+# two, not both. Board 2 could not start this unit at all until this changed.
+Image=${BRIDGE_IMAGE}
 # See the Pull=never note in awf-oak-autoware.container.
 Pull=never
 EnvironmentFile=/etc/containers/systemd/awf-oak-x5h.env

@@ -213,3 +213,16 @@ jobs:
         run: python3 -m pytest -q
         working-directory: platforms/autosd/x5h/components/nodes
         shell: bash
+
+      # The demo reel composer lives under scripts/ with the other operator
+      # tooling rather than under components/nodes, so pytest has to be pointed
+      # at it separately. It needs Pillow, and only Pillow: the panes are drawn
+      # with it and the frames are piped to ffmpeg, which this step never runs.
+      - name: Install Pillow
+        run: python3 -m pip install --user pillow
+        shell: bash
+
+      - name: Run x5h demo reel tests
+        run: python3 -m pytest -q
+        working-directory: platforms/autosd/x5h/scripts
+        shell: bash

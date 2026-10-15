@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - main
+      - 'release/*'
     paths:
+      - '.github/autoware.ref'
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
       - '.github/actions/inject-ccache/**'
@@ -19,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       autoware_ref:
-        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to UPSTREAM_TAG, then main.'
+        description: 'Optional diagnostic Autoware ref override. Defaults to .github/autoware.ref.'
         required: false
         default: ''
       run_scan:
@@ -49,6 +51,8 @@ jobs:
       autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
       autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      autoware_development: ${{ steps.prepare.outputs.autoware_development }}
+      cache_scope: ${{ steps.prepare.outputs.cache_scope }}
       upstream_images: ${{ steps.upstream.outputs.upstream_images }}
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
@@ -64,7 +68,7 @@ jobs:
       - name: Resolve shared build inputs
         id: prepare
         env:
-          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || vars.UPSTREAM_TAG || 'main' }}
+          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref }}
           RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
@@ -85,6 +89,7 @@ jobs:
         id: upstream
         env:
           AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          AUTOWARE_DEVELOPMENT: ${{ steps.prepare.outputs.autoware_development }}
         run: |
           set -euo pipefail
           bash .github/scripts/resolve_upstream_images.sh
@@ -117,7 +122,8 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/export_autoware_lock.py \
             autoware-metadata/repositories/autoware.repos \
-            autoware-lock/autoware-lock.repos
+            autoware-lock/autoware-lock.repos \
+            "${{ steps.prepare.outputs.autoware_repos_overlay }}"
           autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
           echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "$GITHUB_OUTPUT"
         shell: bash
@@ -135,15 +141,15 @@ jobs:
   build-common:
     needs: prepare
     runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
-    timeout-minutes: 120
+    timeout-minutes: ${{ needs.prepare.outputs.autoware_development == 'true' && 240 || 120 }}
     permissions:
       actions: write
       contents: read
       packages: write
     env:
-      CACHE_KEY_PREFIX: buildkit-mounts-universe-common-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
+      CACHE_KEY_PREFIX: buildkit-mounts-universe-common-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-${{ needs.prepare.outputs.cache_scope }}-
       IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-      SAVE_CCACHE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
+      SAVE_CCACHE: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && (github.event_name == 'push' || github.event_name == 'schedule') }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -153,9 +159,11 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up build environment
+        id: build-env
         uses: ./.github/actions/setup-build-env
         with:
           autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          development: ${{ needs.prepare.outputs.autoware_development }}
           build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
@@ -219,7 +227,7 @@ jobs:
           LOCAL_IMAGE: ""
         with:
           files: |
-            ${{ env.BAKE_FILE }}
+            ${{ steps.build-env.outputs.bake-files }}
             ${{ steps.meta-universe-common-devel.outputs.bake-file }}
             ${{ steps.meta-universe-common.outputs.bake-file }}
           targets: |
@@ -228,7 +236,7 @@ jobs:
           push: true
           set: |
             *.platform=${{ matrix.platform }}
-            *.contexts.autoware-core-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['core-devel'].uri }}
+            ${{ needs.prepare.outputs.autoware_development != 'true' && format('*.contexts.autoware-core-devel={0}', fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['core-devel'].uri) || '' }}
             *.contexts.autoware-base=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro].base.uri }}
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
@@ -238,8 +246,8 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.cache_scope }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
 
       - name: Prune BuildKit cache mount lineage
         if: env.SAVE_CCACHE == 'true'
@@ -265,9 +273,9 @@ jobs:
       contents: read
       packages: write
     env:
-      CACHE_KEY_PREFIX: buildkit-mounts-${{ matrix.target }}-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
+      CACHE_KEY_PREFIX: buildkit-mounts-${{ matrix.target }}-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-${{ needs.prepare.outputs.cache_scope }}-
       IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-      SAVE_CCACHE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
+      SAVE_CCACHE: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && (github.event_name == 'push' || github.event_name == 'schedule') }}
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -277,9 +285,11 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up build environment
+        id: build-env
         uses: ./.github/actions/setup-build-env
         with:
           autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          development: ${{ needs.prepare.outputs.autoware_development }}
           build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
@@ -331,7 +341,7 @@ jobs:
           LOCAL_IMAGE: ""
         with:
           files: |
-            ${{ env.BAKE_FILE }}
+            ${{ steps.build-env.outputs.bake-files }}
             ${{ steps.meta.outputs.bake-file }}
           targets: ${{ matrix.target }}
           push: true
@@ -350,8 +360,8 @@ jobs:
             *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
             *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
             *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.cache_scope }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
 
       - name: Prune BuildKit cache mount lineage
         if: env.SAVE_CCACHE == 'true'
@@ -424,8 +434,8 @@ jobs:
             *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
             carla-interface.contexts.simulator=docker-image://${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.cache_scope }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.cache_scope }},mode=max
             *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
             *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
             *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}

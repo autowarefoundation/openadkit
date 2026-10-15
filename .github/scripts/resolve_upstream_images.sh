@@ -50,7 +50,13 @@ mkdir -p "$(dirname -- "${output}")"
 
 for distro in "${distros[@]}"; do
   for name in "${names[@]}"; do
-    ref="${repo}:${name}-${distro}-${AUTOWARE_BASE_VERSION}"
+    suffix="-${AUTOWARE_BASE_VERSION}"
+    if [ "${AUTOWARE_DEVELOPMENT:-false}" = true ]; then
+      # Core is built from the dependency lock, not pulled from a release.
+      [ "${name}" != core-devel ] || continue
+      suffix=""
+    fi
+    ref="${repo}:${name}-${distro}${suffix}"
     digest=$(registry_manifest_digest "${ref}")
     jq -n \
       --arg name "${name}" \

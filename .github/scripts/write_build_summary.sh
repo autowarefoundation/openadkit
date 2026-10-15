@@ -23,18 +23,20 @@ echo ""
 echo "## Release Eligibility"
 
 autoware_stable_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-if [ "${SOURCE_REF}" != "refs/heads/main" ]; then
-  echo "This build is not release-eligible. Releases must promote builds from the main branch."
-elif [ "${AUTOWARE_REF_TYPE}" = "tag" ] && printf '%s\n' "${AUTOWARE_INPUT_REF}" | grep -Eq "${autoware_stable_re}"; then
-  echo "This build can be promoted to a stable or pre-release OpenADKit version after a passed full scan."
+release_branch_re='^refs/heads/release/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+if printf '%s\n' "${SOURCE_REF}" | grep -Eq "${release_branch_re}" \
+  && [ "${AUTOWARE_REF_TYPE}" = "tag" ] \
+  && printf '%s\n' "${AUTOWARE_INPUT_REF}" | grep -Eq "${autoware_stable_re}"; then
+  echo "This build can be promoted within the ${SOURCE_REF#refs/heads/release/} OpenADKit release line after a passed full scan and source-pin validation."
   echo ""
   echo "To release this build, run **Actions -> release -> Run workflow** and set \`build_tag\` to \`${BUILD_TAG}\`."
-elif [ "${AUTOWARE_REF_TYPE}" = "sha" ] && printf '%s\n' "${AUTOWARE_INPUT_REF}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+elif [ "${SOURCE_REF}" = refs/heads/main ] \
+  && { [ "${AUTOWARE_REF_TYPE}" = tag ] || [ "${AUTOWARE_REF_TYPE}" = sha ]; }; then
   echo "This build can only be promoted to a pre-release OpenADKit version after a passed full scan."
   echo ""
   echo "To pre-release this build, run **Actions -> release -> Run workflow** and set \`build_tag\` to \`${BUILD_TAG}\`."
 else
-  echo "This build is not release-eligible. Stable releases require an Autoware SemVer tag, and pre-releases require a SemVer tag or full SHA."
+  echo "This is a development build, not a release candidate. Stable releases require a release/X.Y source branch pinned to an Autoware SemVer tag."
 fi
 
 if [ "${SCAN_REQUESTED}" != "true" ]; then

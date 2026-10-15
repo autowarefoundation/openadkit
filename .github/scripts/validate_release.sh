@@ -55,7 +55,7 @@ validate_inputs() {
 validate_manifest_consistency() {
   local manifest manifest_distro manifest_registry
 
-  manifest="${script_dir}/../../openadkit.json"
+  manifest="${RELEASE_MANIFEST:-${script_dir}/../../openadkit.json}"
   [ -f "${manifest}" ] || fail "Product manifest not found at ${manifest}"
   manifest_distro=$(jq -r '.defaultRosDistro // empty' "${manifest}")
   [ -n "${manifest_distro}" ] \
@@ -85,7 +85,7 @@ resolve_latest_alias_policy() {
 
 validate_build_run() {
   local run_json workflow_name workflow_path head_branch status conclusion created_at
-  local created_epoch now_epoch max_age_seconds
+  local created_epoch now_epoch max_age_seconds major minor
 
   run_id="${BUILD_TAG%%-*}"
   run_attempt="${BUILD_TAG##*-}"
@@ -101,7 +101,12 @@ validate_build_run() {
 
   [ "${workflow_name}" = "build-all-images" ] || fail "Expected build-all-images run, got '${workflow_name}'"
   [ "${workflow_path}" = ".github/workflows/build-all-images.yaml" ] || fail "Unexpected workflow path '${workflow_path}'"
-  [ "${head_branch}" = "main" ] || fail "Source build must come from main branch (got '${head_branch}')"
+  IFS=. read -r major minor _ <<< "${VERSION#v}"
+  if [ "${head_branch}" != "release/${major}.${minor}" ]; then
+    if [ "${head_branch}" != main ] || printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+      fail "Source build for ${VERSION} must come from release/${major}.${minor} (got '${head_branch}'); only pre-releases may use main"
+    fi
+  fi
   [ "${status}" = "completed" ] || fail "Source build must be completed (got '${status}')"
   [ "${conclusion}" = "success" ] || fail "Source build must succeed (got '${conclusion}')"
 
@@ -119,6 +124,15 @@ download_build_metadata() {
     --repo "${GITHUB_REPOSITORY}" \
     --name "build-metadata-${BUILD_TAG}" \
     --dir release-input/build
+}
+
+download_source_configuration() {
+  mkdir -p release-input/source
+  gh api "repos/${GITHUB_REPOSITORY}/contents/openadkit.json?ref=${release_sha}" \
+    --jq .content | base64 --decode > release-input/source/openadkit.json
+  gh api "repos/${GITHUB_REPOSITORY}/contents/.github/autoware.ref?ref=${release_sha}" \
+    --jq .content | base64 --decode > release-input/source/autoware.ref
+  RELEASE_MANIFEST=release-input/source/openadkit.json
 }
 
 select_scan_metadata() {
@@ -393,7 +407,7 @@ validate_scan_coverage() {
 }
 
 validate_release_rules() {
-  local metadata_sha autoware_input_ref autoware_ref_type autoware_base_version
+  local metadata_sha autoware_input_ref autoware_ref_type autoware_base_version pinned_ref
 
   metadata_sha=$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)
   [ "${metadata_sha}" = "${release_sha}" ] \
@@ -407,6 +421,11 @@ validate_release_rules() {
       || fail "Autoware release tags must use X.Y.Z format (got ${autoware_input_ref})"
     [ "${autoware_base_version}" = "${autoware_input_ref}" ] \
       || fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
+    if printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}"; then
+      pinned_ref=$(cat release-input/source/autoware.ref)
+      [ "${pinned_ref}" = "${autoware_input_ref}" ] \
+        || fail "Stable build Autoware ${autoware_input_ref} does not match the source branch pin ${pinned_ref}"
+    fi
   elif ! printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_stable_re}" \
     && [ "${autoware_ref_type}" = "sha" ] \
     && printf '%s\n' "${autoware_input_ref}" | grep -Eq '^[0-9a-fA-F]{40}$'; then
@@ -475,9 +494,10 @@ write_outputs() {
 
 main() {
   validate_inputs
-  validate_manifest_consistency
   resolve_latest_alias_policy
   validate_build_run
+  download_source_configuration
+  validate_manifest_consistency
   download_build_metadata
   select_scan_metadata
   validate_build_metadata_schema

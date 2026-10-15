@@ -70,6 +70,12 @@ Each Open AD Kit release pins a specific upstream **Autoware semver meta-release
 - Stable Open AD Kit releases pin an Autoware `X.Y.Z` meta-release tag.
 Each release records its pinned Autoware version in the release notes.
 
+Development is independent of that release pin: Open AD Kit `main` follows
+upstream development. A maintained `release/X.Y` branch pins its Autoware tag in
+`.github/autoware.ref` and produces Open AD Kit `vX.Y.Z` releases. Development
+builds never update latest stable aliases, and releasing promotes the already
+tested image digests rather than rebuilding them.
+
 A release pins, at minimum: the Open AD Kit version, the Autoware meta-release, the ROS 2 distro(s), and the published image tags and digests. Published release details are listed on the [Releases](../releases/index.md) page; how the tags are structured is in the [Tag Reference](#tag-reference) above.
 
 ## ROS 2 Distro Support

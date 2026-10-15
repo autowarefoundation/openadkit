@@ -64,18 +64,25 @@ cd openadkit
 # 3. Make the pipx-installed vcs command available in this shell
 export PATH="$HOME/.local/bin:$PATH"
 
-# 4. Import Autoware sources at the release used by upstream base images
-AUTOWARE_REF=1.8.0
-export UPSTREAM_TAG="$AUTOWARE_REF"
+# 4. Import the sources selected by this Open AD Kit branch
+AUTOWARE_REF=$(cat .github/autoware.ref)
 git clone --branch "$AUTOWARE_REF" --depth 1 \
   https://github.com/autowarefoundation/autoware.git
 mkdir -p autoware/src
 vcs import --shallow autoware/src < autoware/repositories/autoware.repos
+BAKE_FILES=(-f components/docker-bake.hcl)
+if [ "$AUTOWARE_REF" = main ]; then
+  vcs import --shallow --force autoware/src < autoware/repositories/autoware-nightly.repos
+  BAKE_FILES+=(-f components/development.hcl)
+  export UPSTREAM_TAG=""
+else
+  export UPSTREAM_TAG="$AUTOWARE_REF"
+fi
 mkdir -p autoware/src/middleware/external
 touch autoware/src/middleware/external/.keep
 
 # 5. Build the universe-common base intermediate (~2 hours)
-docker buildx bake -f components/docker-bake.hcl universe-common
+docker buildx bake "${BAKE_FILES[@]}" universe-common
 
 # 6. Build and tag the planning-simulation images (~2 hours)
 ARCH=$(uname -m)
@@ -83,7 +90,7 @@ case "$ARCH" in
   x86_64|amd64) ARCH=amd64 ;;
   aarch64|arm64) ARCH=arm64 ;;
 esac
-docker buildx bake -f components/docker-bake.hcl \
+docker buildx bake "${BAKE_FILES[@]}" \
   --set localization-mapping.tags=ghcr.io/autowarefoundation/openadkit:localization-mapping-${ARCH}-humble \
   --set planning-control.tags=ghcr.io/autowarefoundation/openadkit:planning-control-${ARCH}-humble \
   --set vehicle-system.tags=ghcr.io/autowarefoundation/openadkit:vehicle-system-${ARCH}-humble \
@@ -106,24 +113,32 @@ Bake only populates the BuildKit cache). Repository-mode `./openadkit` injects
 walkthrough on amd64 and arm64. Group `component` also builds
 `carla-interface` and `sensing-perception-cuda`, which are amd64-only.
 
+`main` follows upstream development: the regular manifest is overlaid with
+upstream's development manifest, and `components/development.hcl` builds core
+using upstream's own Dockerfile and the same imported source tree. There is no
+separate nightly image channel. Release branches use an exact Autoware tag and
+the official matching core image instead. CI resolves manifests into one SHA
+lock and external base images into digests before starting any build job; the
+local commands above are intended for interactive development.
+
 ### Build Targets (Reference)
 
 To build only specific targets or groups, pass the group or target name as an
 argument to Bake. Local builds resolve cross-stage references within a single
-Bake graph.
+Bake graph. These examples reuse `BAKE_FILES` from the setup above.
 
 ```bash
 # Build everything (universe-common + all components)
-docker buildx bake -f components/docker-bake.hcl
+docker buildx bake "${BAKE_FILES[@]}"
 
 # Build only the universe-common intermediate
-docker buildx bake -f components/docker-bake.hcl universe-common
+docker buildx bake "${BAKE_FILES[@]}" universe-common
 
 # Build the component group
-docker buildx bake -f components/docker-bake.hcl component
+docker buildx bake "${BAKE_FILES[@]}" component
 
 # Build a single component
-docker buildx bake -f components/docker-bake.hcl \
+docker buildx bake "${BAKE_FILES[@]}" \
   --set sensing-perception.tags=openadkit:sensing-perception \
   --load \
   sensing-perception
@@ -136,13 +151,12 @@ The Bake file exposes a few variables, overridable via environment variables:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ROS_DISTRO` | `humble` or `jazzy` | `humble` |
-| `UPSTREAM_TAG` | Pins the upstream Autoware release (e.g. `1.8.0`). Empty pulls the plain `<name>-<distro>` multi-arch tag — handy for local experiments, not for reproducible builds. | `""` |
+| `UPSTREAM_TAG` | Local upstream image suffix. Use the branch's exact Autoware release tag, or leave empty with the development Bake file. CI resolves external images to digests. | `""` |
 | `UPSTREAM_REPO` | Upstream Autoware image repository | `ghcr.io/autowarefoundation/autoware` |
 
 ```bash
 # Reuse the ref selected for the Autoware checkout above
-ROS_DISTRO=humble UPSTREAM_TAG="$AUTOWARE_REF" \
-  docker buildx bake -f components/docker-bake.hcl component
+ROS_DISTRO=humble docker buildx bake "${BAKE_FILES[@]}" component
 ```
 
 !!! note "Tags and contexts"
@@ -152,7 +166,15 @@ ROS_DISTRO=humble UPSTREAM_TAG="$AUTOWARE_REF" \
 
 CI builds every target automatically via [`.github/workflows/build-all-images.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/build-all-images.yaml), which invokes the same Bake file across a build matrix. The matrix (targets, platforms, ROS distros) is driven by [`.github/image-inventory.json`](https://github.com/autowarefoundation/openadkit/blob/main/.github/image-inventory.json) — the source of truth for what gets built and on which architectures.
 
-The workflow runs staged jobs — `prepare`, then `build-common` and `build-components`, then `build-carla-interface` (which depends on `simulator`) — so each layer is pushed before the layer that depends on it. Most targets build for `{humble, jazzy} × {amd64, arm64}`; `sensing-perception-cuda` and `carla-interface` are amd64-only (Humble and Jazzy). A final `create-manifests` job stitches the per-arch tags into multi-arch manifests.
+The workflow runs on `main` and `release/*` pushes, plus the existing scheduled
+`main` build and manual dispatch. `.github/autoware.ref` selects the sources;
+`vars.UPSTREAM_TAG` is not used. PR checks use the merged checkout's pin. The
+optional manual `autoware_ref` input remains available for diagnostics, but a
+stable release must match the pin in the promoted source commit. Cache writes
+are scoped by branch so development and release builds do not overwrite each
+other's cache lineage.
+
+The workflow runs staged jobs — `prepare`, then `build-common` and `build-components`, then `build-carla-interface` (which depends on `simulator`) — so each layer is pushed before the layer that depends on it. Development core is a dependency within the existing Bake graph, not a separate workflow. Most targets build for `{humble, jazzy} × {amd64, arm64}`; `sensing-perception-cuda` and `carla-interface` are amd64-only (Humble and Jazzy). A final `create-manifests` job stitches the per-arch tags into multi-arch manifests.
 
 If a scheduled build fails, a `notify-failure` job creates a GitHub issue with the run URL so maintainers are notified without polling the Actions tab. Failure notifications are only created for scheduled builds, not for push or manual triggers.
 
@@ -164,11 +186,21 @@ Open AD Kit releases are promoted from existing CI builds rather than rebuilt at
 
 Before running the release pipeline, verify:
 
-- **`vars.UPSTREAM_TAG`** is set in the repository or organization Variables on GitHub. This selects the default Autoware source release (e.g. `1.8.0`). Manual `autoware_ref` inputs override it; the workflow derives and pins the matching base-image release from the resolved source ref.
+- **A release branch** `release/X.Y` exists for the Open AD Kit version being
+  released. Create it from a commit verified against the intended Autoware
+  release, pin `.github/autoware.ref` to that exact tag (e.g. `1.9.0`), and
+  cherry-pick relevant fixes. Do not create a branch for every Autoware release;
+  maintain only the Open AD Kit release lines that need support.
 - **GHCR packages** are accessible: `ghcr.io/autowarefoundation/openadkit`, `ghcr.io/autowarefoundation/openadkit-common`, and the build cache repo `ghcr.io/autowarefoundation/openadkit-buildcache` must accept pushes from CI.
 - **`secrets.RELEASE_TOKEN`** is available when promoting a build commit older than subsequent workflow changes. Use a token with repository Contents and Workflows write access; otherwise the workflow uses `GITHUB_TOKEN`.
-- **A successful build** exists: `build-all-images` completed on `main` from an exact Autoware release tag or full SHA. Stable releases require a tag; SHA builds can only be promoted to pre-releases. Branch builds cannot be promoted. The build summary shows the resulting `build_tag`.
-- **A successful scan** exists: `scan-images` completed and **passed** for that `build_tag`.
+- **A successful build** exists: stable `vX.Y.Z` releases promote a
+  `build-all-images` run from `release/X.Y`, built from its pinned Autoware tag.
+  Pre-releases may also promote diagnostic tag/SHA builds from `main`.
+  Upstream development-branch builds are not promotable. The build summary
+  shows the resulting `build_tag`.
+- **A successful scan** exists: `scan-images` completed and **passed** for that
+  `build_tag`. Run manual scan and release controller workflows from `main`,
+  even when the source build belongs to a release branch.
 
 ### Workflow Steps
 
@@ -206,15 +238,15 @@ Before any image is tagged, the `validate` job (`.github/scripts/validate_releas
 |---|------|------------------|
 | 1 | **Version format** | `vX.Y.Z` for stable, `vX.Y.Z-prerelease` for pre-release |
 | 2 | **Build tag format** | Must match `RUN_ID-RUN_ATTEMPT` |
-| 3 | **Source branch** | Release must run from `main` |
-| 4 | **Manifest consistency** | `default_ros_distro` and the component image prefix must match `openadkit.json` |
+| 3 | **Source branch** | The controller runs from `main`; stable source builds must come from the matching `release/X.Y` branch |
+| 4 | **Manifest consistency** | `default_ros_distro` and the component image prefix must match the promoted source commit's `openadkit.json` |
 | 5 | **Alias policy** | If a newer stable release already exists, latest aliases won't be updated |
-| 6 | **Build provenance** | The build tag must reference a completed, successful `build-all-images` run on `main` |
+| 6 | **Build provenance** | The build tag must reference a completed, successful `build-all-images` run on an eligible source branch |
 | 7 | **Build age** | Build must be less than 90 days old |
 | 8 | **Scan results** | A passing `scan-images` run must exist for the build; scan metadata is validated against the build metadata |
 | 9 | **Metadata schema** | 15+ fields in `build-metadata.json` are validated (types, formats, SHA256 lengths) |
 | 10 | **File integrity** | SHA256 of `autoware-lock.repos`, `image-inventory.json`, and `upstream-images.json` must match the metadata |
-| 11 | **Autoware revision** | Stable releases require an exact Autoware release tag matching the base version; pre-releases also accept a full SHA |
+| 11 | **Autoware revision** | Stable releases require the source commit's pinned Autoware tag and matching base version; pre-releases also accept a full SHA |
 | 12 | **Inventory coverage** | Every image in `image-inventory.json` must be present in the build; no missing or extra images |
 | 13 | **Upstream coverage** | Every required Autoware base is recorded and consumed as an immutable manifest digest |
 | 14 | **Scan coverage** | Every image digest and platform must have a scan result |

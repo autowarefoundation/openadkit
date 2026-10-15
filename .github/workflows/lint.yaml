@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '.gitignore'
+      - '.github/autoware.ref'
       - 'openadkit'
       - 'cli/**'
       - '**/*.sh'

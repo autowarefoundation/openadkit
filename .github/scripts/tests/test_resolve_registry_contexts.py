@@ -76,6 +76,8 @@ def source_repository(tmp_path, changed_source=None):
     repo.mkdir()
     git(repo, "init", "--quiet")
     for source_path in (
+        ".github/autoware.ref",
+        "components/development.hcl",
         "components/docker-bake.hcl",
         "components/runtime-cleanup.sh",
         "components/universe-common/input",
@@ -321,6 +323,8 @@ def test_simulator_source_mismatch_reuses_matching_common_contexts(tmp_path):
 @pytest.mark.parametrize(
     "changed_source",
     [
+        ".github/autoware.ref",
+        "components/development.hcl",
         "components/docker-bake.hcl",
         "components/runtime-cleanup.sh",
         "components/universe-common/input",

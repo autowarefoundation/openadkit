@@ -85,6 +85,8 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
     images_by_target = {image["target"]: image for image in images}
     all_targets = set(images_by_target)
     shared_build_inputs = (
+        ".github/autoware.ref",
+        "components/development.hcl",
         "components/runtime-cleanup.sh",
         ".github/image-inventory.json",
         ".github/scripts/export_autoware_lock.py",

@@ -16,9 +16,9 @@ variable "ROS_DISTRO" {
 
 // Pin for upstream Autoware images. A concrete release tag (e.g. "1.2.3") is
 // the production default; CI derives it from the Autoware ref being built so
-// the base images always match the sources compiled on top of them. Empty
-// string yields the upstream "plain" <name>-<distro> multi-arch manifest —
-// handy for local experiments, but NOT what CI should run with.
+// release builds use matching base images. Development CI resolves the plain
+// source-independent base images to digests and uses development.hcl to build
+// core from the same source lock as the components.
 variable "UPSTREAM_TAG" {
   default = ""
 }

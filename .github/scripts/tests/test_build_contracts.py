@@ -47,6 +47,23 @@ def test_inventory_matches_bake_targets_and_metadata_stubs():
     assert metadata == inventory
 
 
+def test_development_and_release_use_the_same_workflows_with_a_versioned_pin():
+    for workflow in (ALL_IMAGES_WORKFLOW, SINGLE_IMAGE_WORKFLOW):
+        assert ".github/autoware.ref" in workflow
+        assert "vars.UPSTREAM_TAG" not in workflow
+        assert "steps.prepare.outputs.autoware_repos_overlay" in workflow
+        assert "development: ${{ needs.prepare.outputs.autoware_development }}" in workflow
+        assert "steps.build-env.outputs.bake-files" in workflow
+        assert "needs.prepare.outputs.cache_scope" in workflow
+    assert "Require one Autoware release revision" not in SINGLE_IMAGE_WORKFLOW
+    assert "'release/*'" in ALL_IMAGES_WORKFLOW
+    development = (ROOT / "components/development.hcl").read_text()
+    assert 'dockerfile = "docker/core.Dockerfile"' in development
+    assert 'context    = "autoware"' in development
+    assert 'autoware-core-devel = "target:autoware-development-core-devel"' in development
+    assert "FROM " not in development
+
+
 def test_matrix_preserves_platform_and_distro_constraints():
     index = manifest_index()
     assert index[("component", "planning-control", "humble")] == "amd64 arm64"
@@ -105,6 +122,8 @@ def test_component_changes_select_required_targets(changed, expected, flags):
 def test_shared_build_inputs_select_all_targets():
     expected = {image["target"] for image in INVENTORY["images"]}
     for changed in (
+        ".github/autoware.ref",
+        "components/development.hcl",
         ".github/scripts/registry_lookup.sh",
         ".github/scripts/resolve_registry_contexts.sh",
         ".github/scripts/resolve_upstream_images.sh",
@@ -160,10 +179,7 @@ def test_unknown_component_input_fails_closed():
 
 
 def test_long_pr_build_leaves_time_for_vulnerability_scan():
-    assert re.search(
-        r"(?m)^\s+timeout-minutes:\s+(1[5-9][0-9]|[2-9][0-9]{2,})$",
-        SINGLE_IMAGE_WORKFLOW,
-    )
+    assert "timeout-minutes: ${{ needs.prepare.outputs.autoware_development == 'true' && 300 || 180 }}" in SINGLE_IMAGE_WORKFLOW
 
 
 def test_single_image_skips_ccache_extraction():
@@ -174,7 +190,7 @@ def test_single_image_skips_ccache_extraction():
 
 def test_scheduled_main_builds_refresh_ccache_lineages():
     save_ccache = (
-        "github.ref == 'refs/heads/main' && "
+        "(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && "
         "(github.event_name == 'push' || github.event_name == 'schedule')"
     )
     assert save_ccache in ALL_IMAGES_WORKFLOW

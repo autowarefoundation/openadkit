@@ -48,6 +48,15 @@ inputs:
     description: Whether to create middleware/external/.keep (needed by universe-common)
     required: false
     default: "false"
+  development:
+    description: Build upstream core from the same dependency lock as components
+    required: false
+    default: "false"
+
+outputs:
+  bake-files:
+    description: Bake files for the selected source graph
+    value: ${{ steps.graph.outputs.files }}
 
 runs:
   using: composite
@@ -97,6 +106,22 @@ runs:
           mkdir -p autoware/src/middleware/external
           touch autoware/src/middleware/external/.keep
         fi
+      shell: bash
+
+    - name: Select build graph
+      id: graph
+      env:
+        DEVELOPMENT: ${{ inputs.development }}
+        SETUP_AUTOWARE: ${{ inputs.setup-autoware }}
+      run: |
+        {
+          echo 'files<<BAKE_FILES'
+          echo components/docker-bake.hcl
+          if [ "${DEVELOPMENT}" = true ] && [ "${SETUP_AUTOWARE}" = true ]; then
+            echo components/development.hcl
+          fi
+          echo BAKE_FILES
+        } >> "$GITHUB_OUTPUT"
       shell: bash
 
     - name: Set up Docker Buildx

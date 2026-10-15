@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import os
@@ -121,9 +122,12 @@ def write_plan(tmp_path, *, images=None):
     return result, output
 
 
-def run_release_rules(tmp_path, *, version, ref_type, input_ref, base_version="1.8.0"):
+def run_release_rules(tmp_path, *, version, ref_type, input_ref, base_version="1.8.0", pinned_ref=None):
     build = tmp_path / "release-input/build"
     build.mkdir(parents=True)
+    source = tmp_path / "release-input/source"
+    source.mkdir(parents=True)
+    (source / "autoware.ref").write_text((pinned_ref or input_ref) + "\n")
     (build / "build-metadata.json").write_text(
         json.dumps(
             {
@@ -194,7 +198,56 @@ def test_release_rules_reject_unsupported_autoware_refs(
     assert result.returncode != 0
 
 
-def run_manifest_consistency(tmp_path, *, distro=None, registry=None):
+def test_stable_release_rejects_a_diagnostic_override_of_the_branch_pin(tmp_path):
+    result = run_release_rules(
+        tmp_path, version="v2.0.0", ref_type="tag", input_ref="1.8.0", pinned_ref="1.9.0"
+    )
+    assert result.returncode != 0
+    assert "does not match the source branch pin" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("version", "branch", "accepted"),
+    [
+        ("v2.0.1", "release/2.0", True),
+        ("v2.0.0-rc.1", "release/2.0", True),
+        ("v2.0.0", "main", False),
+        ("v2.0.0", "release/2.1", False),
+        ("v2.0.0", "feature/work", False),
+        ("v2.0.0-rc.1", "main", True),
+    ],
+)
+def test_source_build_must_match_the_release_line(tmp_path, version, branch, accepted):
+    run = {
+        "name": "build-all-images",
+        "path": ".github/workflows/build-all-images.yaml",
+        "head_branch": branch,
+        "head_sha": RELEASE_SHA,
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2099-01-01T00:00:00Z",
+    }
+    executable(tmp_path / "gh", "#!/usr/bin/env bash\nprintf '%s\\n' \"$RUN_JSON\"\n")
+    env = os.environ | {
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "RUN_JSON": json.dumps(run),
+        "BUILD_TAG": BUILD_TAG,
+        "GH_TOKEN": "test",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
+        "IMAGE_PREFIX_COMPONENT": "ghcr.io/example/openadkit",
+        "VERSION": version,
+    }
+    result = subprocess.run(
+        ["bash", "-c", 'source "$1"; validate_build_run', "bash", str(VALIDATOR)],
+        env=env, text=True, capture_output=True,
+    )
+    assert (result.returncode == 0) is accepted, result.stderr
+
+
+def run_manifest_consistency(tmp_path, *, distro=None, registry=None, source_manifest=None):
     manifest = json.loads((ROOT / "openadkit.json").read_text())
     env = os.environ | {
         "BUILD_TAG": BUILD_TAG,
@@ -207,6 +260,8 @@ def run_manifest_consistency(tmp_path, *, distro=None, registry=None):
         "IMAGE_PREFIX_COMPONENT": registry or manifest["imagePrefixComponent"],
         "DEFAULT_ROS_DISTRO": distro or manifest["defaultRosDistro"],
     }
+    if source_manifest is not None:
+        env["RELEASE_MANIFEST"] = str(source_manifest)
     return subprocess.run(
         [
             "bash",
@@ -225,6 +280,59 @@ def run_manifest_consistency(tmp_path, *, distro=None, registry=None):
 def test_manifest_consistency_accepts_release_inputs_matching_manifest(tmp_path):
     result = run_manifest_consistency(tmp_path)
     assert result.returncode == 0, result.stderr
+
+
+def test_release_checks_the_promoted_source_manifest_not_current_main(tmp_path):
+    manifest = json.loads((ROOT / "openadkit.json").read_text())
+    manifest["defaultRosDistro"] = "jazzy"
+    source_manifest = tmp_path / "release-openadkit.json"
+    source_manifest.write_text(json.dumps(manifest))
+    result = run_manifest_consistency(tmp_path, distro="jazzy", source_manifest=source_manifest)
+    assert result.returncode == 0, result.stderr
+
+
+def test_release_downloads_configuration_at_the_verified_build_commit(tmp_path):
+    manifest = json.loads((ROOT / "openadkit.json").read_text())
+    manifest["defaultRosDistro"] = "jazzy"
+    executable(
+        tmp_path / "gh",
+        """#!/usr/bin/env bash
+set -euo pipefail
+[[ "$2" == *"?ref=${EXPECTED_SHA}" ]] || exit 1
+if [[ "$2" == *"/contents/openadkit.json?"* ]]; then
+  printf '%s\\n' "$SOURCE_MANIFEST_BASE64"
+elif [[ "$2" == *"/contents/.github/autoware.ref?"* ]]; then
+  printf '%s\\n' "$SOURCE_PIN_BASE64"
+else
+  exit 1
+fi
+""",
+    )
+    env = os.environ | {
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "EXPECTED_SHA": RELEASE_SHA,
+        "SOURCE_MANIFEST_BASE64": base64.b64encode(json.dumps(manifest).encode()).decode(),
+        "SOURCE_PIN_BASE64": base64.b64encode(b"1.9.0\n").decode(),
+        "BUILD_TAG": BUILD_TAG,
+        "GH_TOKEN": "test",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_REPOSITORY": "example/repo",
+        "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
+        "IMAGE_PREFIX_COMPONENT": manifest["imagePrefixComponent"],
+        "DEFAULT_ROS_DISTRO": "jazzy",
+        "VERSION": "v2.0.0",
+    }
+    result = subprocess.run(
+        [
+            "bash", "-c",
+            'source "$1"; release_sha="$2"; download_source_configuration; validate_manifest_consistency',
+            "bash", str(VALIDATOR), RELEASE_SHA,
+        ],
+        cwd=tmp_path, env=env, text=True, capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "release-input/source/autoware.ref").read_text() == "1.9.0\n"
 
 
 def test_manifest_consistency_rejects_distro_that_contradicts_manifest(tmp_path):

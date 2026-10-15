@@ -77,6 +77,7 @@ if jq -e 'index("carla-interface") != null' <<<"${TARGETS_JSON}" >/dev/null \
   # export_autoware_lock.py resolves the dependency SHAs that vcs import bakes
   # into the base, so a change to it must invalidate cached registry contexts.
   if simulator_context=$(resolve_registry_context "${simulator_ref}" \
+    .github/autoware.ref components/development.hcl \
     components/docker-bake.hcl components/runtime-cleanup.sh \
     components/universe-common components/simulator \
     .github/scripts/export_autoware_lock.py); then
@@ -101,10 +102,12 @@ if [ "${common_required}" = true ] && [ "${use_local_common}" != true ]; then
   devel_ref="${IMAGE_PREFIX_COMMON}:universe-common-devel-amd64-${distro}"
   runtime_ref="${IMAGE_PREFIX_COMMON}:universe-common-amd64-${distro}"
   if devel_context=$(resolve_registry_context "${devel_ref}" \
+    .github/autoware.ref components/development.hcl \
     components/docker-bake.hcl components/runtime-cleanup.sh \
     components/universe-common \
     .github/scripts/export_autoware_lock.py) \
     && runtime_context=$(resolve_registry_context "${runtime_ref}" \
+      .github/autoware.ref components/development.hcl \
       components/docker-bake.hcl components/runtime-cleanup.sh \
       components/universe-common \
       .github/scripts/export_autoware_lock.py); then

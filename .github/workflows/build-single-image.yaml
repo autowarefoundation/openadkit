@@ -18,6 +18,7 @@ permissions:
 on:
   pull_request:
     paths:
+      - ".github/autoware.ref"
       - "components/**"
       - ".github/image-inventory.json"
       - ".github/scripts/export_autoware_lock.py"
@@ -63,6 +64,8 @@ jobs:
       autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
       autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      autoware_development: ${{ steps.prepare.outputs.autoware_development }}
+      cache_scope: ${{ steps.prepare.outputs.cache_scope }}
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       upstream_core_devel: ${{ steps.upstream.outputs.core_devel }}
       upstream_base: ${{ steps.upstream.outputs.base }}
@@ -85,24 +88,7 @@ jobs:
 
       - name: Resolve shared build inputs
         id: prepare
-        env:
-          AUTOWARE_REF_INPUT: ${{ vars.UPSTREAM_TAG || 'main' }}
         run: bash .github/scripts/resolve_build_inputs.sh
-        shell: bash
-
-      - name: Require one Autoware release revision
-        env:
-          AUTOWARE_INPUT_REF: ${{ steps.prepare.outputs.autoware_input_ref }}
-          AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
-          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
-        run: |
-          set -euo pipefail
-          normalized_input_ref="${AUTOWARE_INPUT_REF#v}"
-          if [ "${AUTOWARE_REF_TYPE}" != tag ] || [ "${normalized_input_ref}" != "${AUTOWARE_BASE_VERSION}" ]; then
-            echo "build-single-image requires vars.UPSTREAM_TAG to name an exact Autoware release tag (e.g. 1.8.0)" >&2
-            echo "resolved ref: ${AUTOWARE_INPUT_REF} (${AUTOWARE_REF_TYPE}), base version: ${AUTOWARE_BASE_VERSION}" >&2
-            exit 1
-          fi
         shell: bash
 
       - name: Install YAML parser
@@ -115,7 +101,8 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/export_autoware_lock.py \
             autoware-metadata/repositories/autoware.repos \
-            autoware-lock/autoware-lock.repos
+            autoware-lock/autoware-lock.repos \
+            "${{ steps.prepare.outputs.autoware_repos_overlay }}"
           autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
           echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "${GITHUB_OUTPUT}"
         shell: bash
@@ -182,6 +169,7 @@ jobs:
         id: upstream
         env:
           AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          AUTOWARE_DEVELOPMENT: ${{ steps.prepare.outputs.autoware_development }}
           TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
           UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}
           USE_LOCAL_COMMON: ${{ steps.contexts.outputs.use_local_common }}
@@ -214,7 +202,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: ${{ needs.prepare.outputs.autoware_development == 'true' && 240 || 120 }}
     permissions:
       actions: write
       contents: read
@@ -233,9 +221,11 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up build environment
+        id: build-env
         uses: ./.github/actions/setup-build-env
         with:
           autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          development: ${{ needs.prepare.outputs.autoware_development }}
           build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
@@ -248,9 +238,9 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
-          key: buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-${{ github.sha }}
+          key: buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-${{ needs.prepare.outputs.cache_scope }}-${{ github.sha }}
           restore-keys: |
-            buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-
+            buildkit-mounts-universe-common-${{ inputs.ros-distro || 'humble' }}-amd64-${{ needs.prepare.outputs.cache_scope }}-
 
       - name: Inject universe-common BuildKit cache mounts
         uses: ./.github/actions/inject-ccache
@@ -265,7 +255,7 @@ jobs:
           UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
           LOCAL_IMAGE: ""
         with:
-          files: ${{ env.BAKE_FILE }}
+          files: ${{ steps.build-env.outputs.bake-files }}
           targets: universe-common
           push: false
           set: |
@@ -273,7 +263,7 @@ jobs:
             *.args.ROS_DISTRO=${{ inputs.ros-distro || 'humble' }}
             ${{ needs.prepare.outputs.upstream_core_devel != '' && format('*.contexts.autoware-core-devel={0}', needs.prepare.outputs.upstream_core_devel) || '' }}
             ${{ needs.prepare.outputs.upstream_base != '' && format('*.contexts.autoware-base={0}', needs.prepare.outputs.upstream_base) || '' }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-amd64-${{ inputs.ros-distro || 'humble' }}-main
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-amd64-${{ inputs.ros-distro || 'humble' }}-${{ needs.prepare.outputs.cache_scope }}
             universe-common-devel.cache-to=type=gha,scope=pr-common-devel-${{ github.run_id }},mode=min
             universe-common.cache-to=type=gha,scope=pr-common-runtime-${{ github.run_id }},mode=min
 
@@ -287,8 +277,8 @@ jobs:
       (needs.build-local-common.result == 'success' ||
       needs.build-local-common.result == 'skipped')
     runs-on: ubuntu-22.04
-    # planning-control can take nearly two hours before the bounded Trivy scan.
-    timeout-minutes: 180
+    # Forks may also build locked development core locally before the component.
+    timeout-minutes: ${{ needs.prepare.outputs.autoware_development == 'true' && 300 || 180 }}
     permissions:
       actions: read
       contents: read
@@ -303,9 +293,11 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up build environment
+        id: build-env
         uses: ./.github/actions/setup-build-env
         with:
           autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          development: ${{ needs.prepare.outputs.autoware_development }}
           build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
@@ -329,9 +321,9 @@ jobs:
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: cache-mounts
-          key: buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-${{ github.sha }}
+          key: buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-${{ needs.prepare.outputs.cache_scope }}-${{ github.sha }}
           restore-keys: |
-            buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-
+            buildkit-mounts-${{ matrix.target }}-${{ inputs.ros-distro || 'humble' }}-amd64-${{ needs.prepare.outputs.cache_scope }}-
 
       - name: Inject BuildKit cache mounts
         uses: ./.github/actions/inject-ccache
@@ -347,7 +339,7 @@ jobs:
           LOCAL_IMAGE: ""
         with:
           files: |
-            ${{ env.BAKE_FILE }}
+            ${{ steps.build-env.outputs.bake-files }}
             ${{ steps.meta.outputs.bake-file }}
           targets: ${{ matrix.target }}
           push: false
@@ -362,11 +354,11 @@ jobs:
             ${{ needs.prepare.outputs.devel_context != '' && format('*.contexts.universe-common-devel={0}', needs.prepare.outputs.devel_context) || '' }}
             ${{ needs.prepare.outputs.runtime_context != '' && format('*.contexts.universe-common={0}', needs.prepare.outputs.runtime_context) || '' }}
             ${{ matrix.target == 'carla-interface' && needs.prepare.outputs.use_local_simulator != 'true' && format('carla-interface.contexts.simulator={0}', needs.prepare.outputs.simulator_context) || '' }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-main
-            ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-amd64-${{ inputs.ros-distro || 'humble' }}-${{ needs.prepare.outputs.cache_scope }}
+            ${{ needs.prepare.outputs.use_local_common == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common-amd64-{1}-{2}', github.repository_owner, inputs.ros-distro || 'humble', needs.prepare.outputs.cache_scope) || '' }}
             ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-devel-{0}', github.run_id) || '' }}
             ${{ needs.build-local-common.result == 'success' && format('*.cache-from+=type=gha,scope=pr-common-runtime-{0}', github.run_id) || '' }}
-            ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-main', github.repository_owner, inputs.ros-distro || 'humble') || '' }}
+            ${{ needs.prepare.outputs.use_local_simulator == 'true' && format('*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator-amd64-{1}-{2}', github.repository_owner, inputs.ros-distro || 'humble', needs.prepare.outputs.cache_scope) || '' }}
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
         # Reporting-only: findings are surfaced in the step log, but the hard

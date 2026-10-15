@@ -8,8 +8,26 @@ set -euo pipefail
 : "${GITHUB_RUN_ATTEMPT:?GITHUB_RUN_ATTEMPT is required}"
 : "${GITHUB_EVENT_NAME:?GITHUB_EVENT_NAME is required}"
 
-autoware_input_ref="${AUTOWARE_REF_INPUT:-main}"
+autoware_pin_file="${AUTOWARE_PIN_FILE:-.github/autoware.ref}"
+autoware_pin=$(cat "${autoware_pin_file}")
+autoware_stable_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+if [[ "${autoware_pin}" != main && ! "${autoware_pin}" =~ ${autoware_stable_re} ]]; then
+  echo "${autoware_pin_file} must contain main or an exact Autoware X.Y.Z release tag" >&2
+  exit 1
+fi
+source_branch="${GITHUB_BASE_REF:-${GITHUB_REF_NAME:-}}"
+if [ "${source_branch}" = main ] && [ "${autoware_pin}" != main ]; then
+  echo "The main branch must track Autoware main in ${autoware_pin_file}" >&2
+  exit 1
+fi
+if [[ "${source_branch}" == release/* && ! "${autoware_pin}" =~ ${autoware_stable_re} ]]; then
+  echo "Release branches must pin an Autoware X.Y.Z release in ${autoware_pin_file}" >&2
+  exit 1
+fi
+autoware_input_ref="${AUTOWARE_REF_INPUT:-${autoware_pin}}"
 build_tag="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+# Git branch names may contain characters or lengths invalid in registry tags.
+cache_scope=$(printf '%s' "${source_branch:-main}" | sha256sum | cut -c1-12)
 
 scan_requested=false
 if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
@@ -60,11 +78,22 @@ git -C autoware-metadata fetch --filter=blob:none --tags --force origin "${fetch
 git -C autoware-metadata checkout --detach FETCH_HEAD
 
 autoware_ref=$(git -C autoware-metadata rev-parse HEAD)
+autoware_development=false
+autoware_repos_overlay=""
+if [ "${autoware_ref_type}" = branch ]; then
+  autoware_development=true
+  autoware_repos_overlay=autoware-metadata/repositories/autoware-nightly.repos
+  [ -f "${autoware_repos_overlay}" ] || {
+    echo "Development manifest not found: ${autoware_repos_overlay}" >&2
+    exit 1
+  }
+fi
 autoware_base_version=$(
   git -C autoware-metadata describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null \
     || git -C autoware-metadata describe --tags --match '[0-9]*.[0-9]*.[0-9]*' --abbrev=0 2>/dev/null \
     || true
 )
+autoware_base_version="${autoware_base_version#v}"
 if printf '%s\n' "${autoware_input_ref}" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
   autoware_base_version="${autoware_input_ref#v}"
 fi
@@ -78,6 +107,9 @@ fi
   echo "autoware_ref_type=${autoware_ref_type}"
   echo "autoware_ref=${autoware_ref}"
   echo "autoware_base_version=${autoware_base_version}"
+  echo "autoware_development=${autoware_development}"
+  echo "autoware_repos_overlay=${autoware_repos_overlay}"
+  echo "cache_scope=${cache_scope}"
   echo "build_tag=${build_tag}"
   echo "scan_requested=${scan_requested}"
 } >> "${GITHUB_OUTPUT}"

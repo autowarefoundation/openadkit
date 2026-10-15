@@ -11,7 +11,7 @@ on:
         description: 'OpenADKit release version (e.g. v1.0.0 or v1.0.0-rc.1)'
         required: true
       build_tag:
-        description: 'Build tag to promote (e.g. 123456789-1)'
+        description: 'Build tag to promote (e.g. 123456789-1). Stable builds must come from the matching release/X.Y branch.'
         required: true
       default_ros_distro:
         description: 'ROS distro for bare tag aliases; must match openadkit.json defaultRosDistro'

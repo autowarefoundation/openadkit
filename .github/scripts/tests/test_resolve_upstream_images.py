@@ -9,7 +9,7 @@ SCRIPT = ROOT / ".github/scripts/resolve_upstream_images.sh"
 DIGEST = f"sha256:{'a' * 64}"
 
 
-def resolver_env(tmp_path, distro=None, image_names=None):
+def resolver_env(tmp_path, distro=None, image_names=None, development=False):
     inventory = tmp_path / "inventory.json"
     inventory.write_text(json.dumps({"ros_distros": ["humble", "jazzy"]}))
     output = tmp_path / "upstream-images.json"
@@ -26,6 +26,7 @@ printf '{"manifest":{"digest":"%s"}}\n' "${DIGEST}"
     env = os.environ | {
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
         "AUTOWARE_BASE_VERSION": "1.8.0",
+        "AUTOWARE_DEVELOPMENT": str(development).lower(),
         "IMAGE_INVENTORY": str(inventory),
         "UPSTREAM_IMAGES_OUTPUT": str(output),
         "DOCKER_LOG": str(docker_log),
@@ -38,8 +39,8 @@ printf '{"manifest":{"digest":"%s"}}\n' "${DIGEST}"
     return env, output, docker_log
 
 
-def run_resolver(tmp_path, distro=None, image_names=None):
-    env, output, docker_log = resolver_env(tmp_path, distro, image_names)
+def run_resolver(tmp_path, distro=None, image_names=None, development=False):
+    env, output, docker_log = resolver_env(tmp_path, distro, image_names, development)
     result = subprocess.run(
         ["bash", str(SCRIPT)], env=env, text=True, capture_output=True
     )
@@ -73,6 +74,25 @@ def test_resolves_only_requested_image_names(tmp_path):
     assert result.returncode == 0
     assert {item["name"] for item in data} == {"core-devel", "base"}
     assert len(inspected) == 2
+
+
+def test_development_pins_plain_base_images_without_pulling_release_core(tmp_path):
+    result, data, inspected = run_resolver(tmp_path, "humble", development=True)
+    assert result.returncode == 0, result.stderr
+    assert {item["name"] for item in data} == {"base", "base-cuda-runtime", "base-cuda-devel"}
+    assert len(inspected) == 3
+    assert all(ref.endswith("-humble") for ref in inspected)
+    assert all("core-devel" not in ref for ref in inspected)
+    assert all(item["uri"] == f"docker-image://{item['ref']}@{DIGEST}" for item in data)
+
+
+def test_development_common_build_resolves_only_its_external_base(tmp_path):
+    result, data, inspected = run_resolver(
+        tmp_path, "humble", "core-devel base", development=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert [item["name"] for item in data] == ["base"]
+    assert len(inspected) == 1
 
 
 def test_empty_image_name_list_skips_registry_lookup(tmp_path):

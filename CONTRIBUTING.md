@@ -26,8 +26,23 @@ If you are a member of the Autoware Foundation contributing to active developmen
 
 ### Branch Strategy
 
-- `main` — stable, production-ready code
+- `main` — integration with upstream Autoware development
+- `release/X.Y` — supported Open AD Kit release line, pinned to an Autoware release
 - `feat/...`, `fix/...`, `refactor/...` — active development branches merged into `main` via PR
+
+`main` tracks upstream development, not the last Autoware release. The branch's
+`.github/autoware.ref` is the build source of truth: `main` on the development
+branch, or an exact Autoware tag such as `1.9.0` on a release branch. PR checks
+use the merged checkout's pin; no repository-wide `UPSTREAM_TAG` variable is
+needed. Development sources use upstream's regular manifest plus its development
+overrides, resolved together into one SHA lock. The upstream core Dockerfile
+builds core from that same lock; release builds use official release images.
+
+Create `release/X.Y` only when stabilizing or maintaining that Open AD Kit line,
+from a commit verified against the selected Autoware release. Set its pin and
+cherry-pick relevant fixes; do not merge upstream-only compatibility changes into
+an older release line. Keep one active release line unless broader maintenance
+is explicitly needed. Branch creation and backports remain manual.
 
 ### Local CI Commands
 
@@ -88,7 +103,13 @@ For zenoh-bridge split topology testing, follow the [documentation](https://auto
 
 ### Releasing
 
-Use the `release.yaml` workflow (GitHub Actions) to promote a build to a release. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
+Run the scan and release controller workflows from `main` to promote an existing
+build. Stable `vX.Y.Z` releases require a build from `release/X.Y` whose Autoware tag matches
+that source commit's `.github/autoware.ref`. Development branch builds cannot be
+promoted to stable releases. Existing tag/SHA diagnostic builds may still be
+used for pre-releases. The `default_ros_distro` input must match the promoted
+source commit's `openadkit.json`, not the current development manifest. Images
+are promoted by digest and never rebuilt during release.
 
 ## DCO Requirement
 

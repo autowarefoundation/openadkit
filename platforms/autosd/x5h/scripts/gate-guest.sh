@@ -350,4 +350,20 @@ else
 fi
 podman rmi -af >/dev/null 2>&1
 
+# --- GATE9: the S-CORE launch manager runs on this rootfs and kernel. The
+# guest boots with no x5h.role, so score-lm.service never starts here: run
+# the binary directly with the gate configuration, one self-terminating
+# Native component. Reaching run target Startup proves the aarch64 binary,
+# its flatbuffer configuration and the process launcher. The board stays
+# the judge of the demo configuration and of the containers.
+S="$T/score"
+MW_LOG_CONFIG_FILE="$S/etc/gate/logging.json" timeout -s TERM 10 \
+    "$S/bin/launch_manager" -c "$S/etc/gate/launch_manager_config.bin" >/tmp/g9.log 2>&1
+if grep -q 'Completed the request for PG to State Startup' /tmp/g9.log; then
+    echo GATE9_SCORE_LM_OK
+else
+    echo GATE9_SCORE_LM_FAIL
+    tail -20 /tmp/g9.log
+fi
+
 echo GATE_DONE

@@ -2,10 +2,10 @@
 # Copy test archives + gate-guest.sh into the ext4 export (aib add_files cannot
 # write under /var, and embedding containers would dodge the unpack path under
 # test), plus the rebuilt kernel's module tree and the nftables drop-in.
-# Usage: inject-test-images.sh <rootfs.ext4> <testimages-dir> <kernel-bundle-dir>
+# Usage: inject-test-images.sh <rootfs.ext4> <testimages-dir> <kernel-bundle-dir> <score-tar>
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOTFS="$1"; IMAGES="$2"; BUNDLE="$3"
+ROOTFS="$1"; IMAGES="$2"; BUNDLE="$3"; SCORE_TAR="$4"
 KVER="$(cat "$BUNDLE/kernelrelease.txt")"
 MNT="$(mktemp -d)"
 sudo mount -o loop "$ROOTFS" "$MNT"
@@ -36,6 +36,11 @@ sudo mkdir -p "$MNT/var/lib/autosd-test"
 sudo cp "$IMAGES/busybox-oci.tar" "$IMAGES/captest-docker.tar" "$IMAGES/rpmsg-eth-docker.tar" \
         "$HERE/gate-guest.sh" "$MNT/var/lib/autosd-test/"
 sudo chmod +x "$MNT/var/lib/autosd-test/gate-guest.sh"
+# GATE9 runs the S-CORE launch manager from here: the guest boots with no
+# x5h.role, so score-lm.service never starts in it.
+sudo tar -xf "$SCORE_TAR" -C "$MNT/var/lib/autosd-test"
+sudo test -x "$MNT/var/lib/autosd-test/score/bin/launch_manager" \
+    || { echo "FATAL: no launch_manager after extracting $SCORE_TAR"; exit 1; }
 
 # fstab was written for a disk image and carries a LABEL=ESP entry for
 # /boot/efi; the ext4 export is a bare filesystem with no ESP partition, so

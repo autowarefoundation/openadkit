@@ -1,0 +1,1 @@
+{"appId": "DR", "appDesc": "Data Router", "logLevel": "kInfo", "logMode": "kConsole", "ringBufferSize": 786432, "numberOfSlots": 4, "slotSizeBytes": 4096}

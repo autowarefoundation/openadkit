@@ -1,0 +1,22 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -190,6 +190,7 @@
+ use_repo(oci, "debian-test-runtime", "debian-test-runtime_linux_amd64")
+ 
+ bazel_dep(name = "score_baselibs", version = "0.2.12")
++bazel_dep(name = "score_logging", version = "0.2.4")
+ bazel_dep(name = "score_communication", version = "0.4.0")
+ 
+ # Needed to fix bazel mod errors
+diff --git a/score/launch_manager/src/daemon/BUILD b/score/launch_manager/src/daemon/BUILD
+--- a/score/launch_manager/src/daemon/BUILD
++++ b/score/launch_manager/src/daemon/BUILD
+@@ -32,5 +32,7 @@
+         "//score/launch_manager/src/daemon/src/supervision_control_client:supervision_control_notifier",
+         "//score/launch_manager/src/daemon/src/watchdog:watchdog_factory",
+         "@score_baselibs//score/language/futurecpp",
++        # x5h: the remote mw::log backend, so logMode kRemote reaches the datarouter.
++        "@score_logging//score/mw/log/backend:remote",
+     ],
+ )

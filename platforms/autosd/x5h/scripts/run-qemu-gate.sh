@@ -2,7 +2,7 @@
 # Boot the x5h rootfs export under the rebuilt AutoSD kernel (6.1.102-autosd).
 # Usage: run-qemu-gate.sh <Image> <rootfs.ext4> <blank-disk> [extra qemu args...]
 # TCG with -cpu cortex-a76 (never -cpu max: aborts under TCG). KVM only if the
-# host is aarch64 with a writable /dev/kvm — the Ubicloud arm64 runner has none.
+# host is aarch64 with a writable /dev/kvm.
 # The kernel now has SELinux compiled in; enforcing=0 on the cmdline boots it
 # permissive (GATE7 asserts this). selinux=0 remains the documented emergency
 # fallback for disabling SELinux entirely.

@@ -1,0 +1,13 @@
+{
+    "channels": {
+        "3491": {
+            "address": "127.0.0.1", "port": 3491,
+            "dstAddress": "127.0.0.1", "dstPort": 3490,
+            "ecu": "SIL", "channelThreshold": "kInfo"
+        }
+    },
+    "channelAssignments": {"LM": {"": ["3491"]}, "VP": {"": ["3491"]}},
+    "defaultChannel": "3491",
+    "defaultThresold": "kInfo",
+    "messageThresholds": {"": {"": "kInfo"}}
+}

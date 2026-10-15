@@ -1,0 +1,19 @@
+[Unit]
+Description=S-CORE datarouter: DLT from the launch manager and VisionPilot to the bench
+ConditionKernelCommandLine=x5h.role=demo
+ConditionPathExists=/usr/local/score/bin/datarouter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Logging is platform, not the driving function: it runs here, not under the
+# launch manager, whose run target falls back when any component dies.
+# score-lm.service only Wants= this unit, so a datarouter crash never stops
+# the launch manager.
+Restart=always
+RestartSec=2
+Environment=MW_LOG_CONFIG_FILE=/etc/score/datarouter-logging.json
+ExecStart=/usr/local/score/bin/datarouter --no_adaptive_runtime -c /etc/score/log-channels.json
+
+[Install]
+WantedBy=multi-user.target

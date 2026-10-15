@@ -2,12 +2,13 @@
 # provider, Release build. arm64 only.
 #   components/demo/prepare-vp-context.sh <overlay> /tmp/vp-ctx
 #   podman build --platform linux/arm64 -f components/demo/visionpilot-x5h.containerfile \
-#     --build-arg VP_REF=feat/x5h-carla-npu -t localhost/x5h-visionpilot:latest /tmp/vp-ctx
+#     --build-arg VP_REF=feat/x5h-score-hook -t localhost/x5h-visionpilot:latest /tmp/vp-ctx
 # The context carries only ort/ (vendor library + headers). The source is
 # cloned from youtalk/vision_pilot at VP_REF. The apt list mirrors
 # VisionPilot/docker/Dockerfile.cpu on that branch, minus the stock ORT tarball.
 FROM docker.io/library/ros:jazzy-ros-base AS builder
-ARG VP_REF=feat/x5h-carla-npu
+# feat/x5h-carla-npu plus the S-CORE hook, the SIGTERM exit and D-slow injection.
+ARG VP_REF=feat/x5h-score-hook
 ENV DEBIAN_FRONTEND=noninteractive
 # coinor-libipopt-dev, libcppad-dev, liblapack-dev, libblas-dev: the brief's
 # list omitted these, and modules/safety_guardian/planning/CMakeLists.txt:4

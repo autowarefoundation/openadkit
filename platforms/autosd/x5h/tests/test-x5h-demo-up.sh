@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# x5h-demo-up.sh with a fake systemctl: starts the five units in order,
-# regenerates the Quadlet output only when x5h-vp.service is unknown, names
+# x5h-demo-up.sh with a fake systemctl: starts the six units in order,
+# regenerates the Quadlet output only when x5h-demo-bridge.service is unknown, names
 # the failing unit, and treats a unit systemd SKIPPED (start rc=0, but
 # is-active reports inactive -- the shape of a failed Condition=) the same
 # as a hard failure.
@@ -28,9 +28,9 @@ printf '#!/bin/sh\necho "quadlet $*" >> "$LOG"\n' > "$tmp/quadlet"
 chmod +x "$tmp/systemctl" "$tmp/quadlet"
 run() { LOG="$tmp/log" SYSTEMCTL="$tmp/systemctl" QUADLET="$tmp/quadlet" bash "$s"; }
 : > "$tmp/log"; out=$(KNOWN=1 run) || fail "good_failed $out"
-exact "$out" 'X5H_DEMO_UP units=5' pass_marker
+exact "$out" 'X5H_DEMO_UP units=6' pass_marker
 order=$(grep '^start' "$tmp/log" | tr '\n' ' ')
-[ "$order" = "start x5h-si-link.service start x5h-demo-bridge.service start x5h-demo-restamp.service start x5h-demo-hb.service start x5h-vp.service " ] || fail "order=$order"
+[ "$order" = "start x5h-si-link.service start x5h-demo-bridge.service start x5h-demo-restamp.service start x5h-demo-hb.service start score-datarouter.service start score-lm.service " ] || fail "order=$order"
 grep -q '^quadlet' "$tmp/log" && fail regenerated_when_known
 : > "$tmp/log"; out=$(KNOWN=0 run) || fail "regen_failed $out"
 grep -q '^quadlet /run/systemd/system /run/systemd/system /run/systemd/system$' "$tmp/log" || fail no_regen

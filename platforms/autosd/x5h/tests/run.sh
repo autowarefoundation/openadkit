@@ -27,6 +27,12 @@ for t in "${tests[@]}"; do
         echo "TEST_SKIP test-make-demo-dtb reason=dtc_missing"
         continue
     fi
+    # test-score-artifacts checks a build-score.sh tar, and a fresh checkout
+    # has none. Skipped on the same argument as test-kernel-patches.
+    if [ "$t" = test-score-artifacts.sh ] && [ -z "${SCORE_TAR:-}" ]; then
+        echo "TEST_SKIP test-score-artifacts reason=SCORE_TAR_unset"
+        continue
+    fi
     if bash "$t"; then :; else rc=1; fi
 done
 [ $rc -eq 0 ] && echo "ALL_TESTS_PASS" || echo "ALL_TESTS_FAIL"

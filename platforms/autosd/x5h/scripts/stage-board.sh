@@ -9,7 +9,8 @@
 #   check-inputs     every input present; Image-autosd embeds the MP-PHY blob
 #   backup-keys      save authorized_keys + ssh host keys from the LIVE board
 #   prepare-root     copy x5h-rootfs.ext4 -> work/<board>-root.ext4, inject
-#                    hostname, /etc/x5h/board.conf, keys, rpmsg-eth, ELF
+#                    hostname, /etc/x5h/board.conf, keys, rpmsg-eth,
+#                    rpmsg-ping, ELF
 #   write-root --yes dd the prepared root to the board's x5h-root (board must
 #                    NOT be running from it: yocto role or rescue netboot)
 #   partition-lun2 --yes  GPT on the second LUN: yocto-boot/yocto-root/npu-work
@@ -122,7 +123,7 @@ need_yes() { [ "$yes" = --yes ] || { mark "PLAN ONLY: re-run with --yes to execu
 check_inputs() {
     local missing=0 f cfg ftype needle
     for f in Image-autosd extract-ikconfig r8a78000-ironhide-uio-autosd.dtb r8a78000-ironhide-npu.dtb \
-             x5h-rootfs.ext4 rpmsg-eth "$CR52_ELF" npu/ort-rootfs npu/cmemdrv.ko npu/renesas_ep_eval_latency.py; do
+             x5h-rootfs.ext4 rpmsg-eth rpmsg-ping score-x5h-aarch64.tar "$CR52_ELF" npu/ort-rootfs npu/cmemdrv.ko npu/renesas_ep_eval_latency.py; do
         [ -e "$inputs/$f" ] || { echo "MISSING $inputs/$f"; missing=1; }
     done
     [ $missing -eq 0 ] || die "STAGE_CHECK_FAIL reason=missing_inputs"
@@ -139,11 +140,14 @@ check_inputs() {
         *"$needle"*) ;;
         *) die "STAGE_CHECK_FAIL reason=kernel_without_firmware" ;;
     esac
-    ftype=$(file "$inputs/rpmsg-eth") || die "STAGE_CHECK_FAIL reason=file_probe_failed"
-    case "$ftype" in
-        *aarch64*"statically linked"*) ;;
-        *) die "STAGE_CHECK_FAIL reason=rpmsg_eth_not_static_aarch64" ;;
-    esac
+    # The board has no compiler and no shared libraries to match a host build.
+    for f in rpmsg-eth rpmsg-ping; do
+        ftype=$(file "$inputs/$f") || die "STAGE_CHECK_FAIL reason=file_probe_failed"
+        case "$ftype" in
+            *aarch64*"statically linked"*) ;;
+            *) die "STAGE_CHECK_FAIL reason=${f//-/_}_not_static_aarch64" ;;
+        esac
+    done
     mark "STAGE_CHECK_PASS board=$board"
 }
 
@@ -192,6 +196,17 @@ prepare_root() {
     (cd "$mnt" && sudo cpio -idmu < "$WORK/keys.cpio") || die "STAGE_ROOT_FAIL reason=key_restore_failed"
     sudo install -D -m 0755 "$inputs/rpmsg-eth" "$mnt/var/usrlocal/bin/rpmsg-eth" \
         || die "STAGE_ROOT_FAIL reason=rpmsg_eth_install_failed"   # /usr/local -> ../var/usrlocal on this rootfs
+    # x5h-si-link.service runs it. Without it the demo role has no rpmsg-si
+    # channel, so neither the heartbeat nor si_fault reaches the CR52.
+    sudo install -D -m 0755 "$inputs/rpmsg-ping" "$mnt/var/usrlocal/bin/rpmsg-ping" \
+        || die "STAGE_ROOT_FAIL reason=rpmsg_ping_install_failed"
+    # The S-CORE binaries come from CI (build-score.sh), not from aib, which
+    # takes only checkout sources and /etc or /usr destinations.
+    sudo mkdir -p "$mnt/var/usrlocal" || die "STAGE_ROOT_FAIL reason=usrlocal_mkdir_failed"
+    sudo tar -xf "$inputs/score-x5h-aarch64.tar" -C "$mnt/var/usrlocal" \
+        || die "STAGE_ROOT_FAIL reason=score_extract_failed"   # /usr/local -> ../var/usrlocal on this rootfs
+    sudo test -x "$mnt/var/usrlocal/score/bin/launch_manager" \
+        || die "STAGE_ROOT_FAIL reason=no_launch_manager"
     sudo install -D -m 0644 "$inputs/$CR52_ELF" "$mnt/lib/firmware/$CR52_ELF" \
         || die "STAGE_ROOT_FAIL reason=cr52_elf_install_failed"
     printf 'CR52_FIRMWARE=%s\n' "$CR52_ELF" | sudo tee "$mnt/etc/default/cr52-remoteproc" >/dev/null \

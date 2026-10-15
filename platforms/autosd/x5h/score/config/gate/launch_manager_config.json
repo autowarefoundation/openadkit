@@ -1,0 +1,25 @@
+{
+    "schema_version": 1,
+    "defaults": {
+        "deployment_config": {
+            "bin_dir": "/usr/bin",
+            "sandbox": {
+                "uid": 0, "gid": 0, "supplementary_group_ids": [],
+                "scheduling_policy": "SCHED_OTHER", "scheduling_priority": 0
+            }
+        }
+    },
+    "components": {
+        "probe": {
+            "component_properties": {
+                "binary_name": "true",
+                "application_profile": {"application_type": "Native", "is_self_terminating": true},
+                "ready_condition": {"process_state": "Terminated"}
+            }
+        }
+    },
+    "run_targets": {"Startup": {"depends_on": ["probe"]}},
+    "initial_run_target": "Startup",
+    "fallback_run_target": {"depends_on": []},
+    "alive_supervision": {"evaluation_cycle": 0.5}
+}

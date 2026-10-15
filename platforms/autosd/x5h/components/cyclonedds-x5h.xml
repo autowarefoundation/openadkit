@@ -18,8 +18,9 @@
        file.
 
        This file deliberately does NOT set General/SocketReceiveBufferSize.
-       net.core.rmem_max is 212992 bytes (208KB) on both the companion host
-       and the board, and CycloneDDS treats a SocketReceiveBufferSize
+       net.core.rmem_max is 212992 bytes (208KB) on the companion host (the
+       board raises it to 8 MiB in config/90-x5h-dds.conf, for the default
+       1 MiB request), and CycloneDDS treats a SocketReceiveBufferSize
        minimum it cannot obtain from the kernel as fatal: it aborts at
        participant creation ("failed to increase socket receive buffer size
        to at least N bytes, current is 425984 bytes" -> "error creating

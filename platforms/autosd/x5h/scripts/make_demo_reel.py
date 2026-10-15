@@ -8,21 +8,26 @@ The run directory is what Simulation/CARLA/ROS2/si/record-demo.sh on the bench
 leaves behind, with the board's HUD frames added by x5h-pull-demo-frames.sh.
 manifest.json describes it. Every path in the manifest is relative to the run
 directory, and every time in this script is in seconds relative to the fault,
-because that is the only instant all five streams share.
+because that is the only instant all six streams share.
 
-Four panes, 2x2 under one banner: the chase camera, VisionPilot's own HUD from
-the board, the CR52 console, and the speed and command trace. The banner reads
-the offset from the fault, so the claim that the four pictures show the same
-instant is on screen and checkable.
+Four panes, 2x2 under one banner, over a full-width DLT strip: the chase
+camera, VisionPilot's own HUD from the board, the CR52 console, and a plot pane
+with two rows, VisionPilot's frame time over its deadline and the speed and
+command trace. The strip shows the last DLT messages from the S-CORE launch
+manager and VisionPilot. The banner reads the offset from the fault, so the
+claim that every pane shows the same instant is on screen and checkable.
 
 **Why the fault and not a clock.** The X5H board has no RTC and no NTP on the
 bench LAN, so its log timestamps are wrong by days. The board clock is steady
 inside a run, so one constant offset is enough, and the run supplies it: the
 `kill` route ends VisionPilot, so its last rendered frame IS the fault. The
 offset is fault_at minus the monotonic stamp of the last per-frame Latency
-line. Alignment is therefore good to one VisionPilot frame, 25 to 40 ms at the
+line. A `slow` run anchors on the first frame over its deadline instead,
+because VisionPilot renders on until the launch manager stops it. Alignment is therefore good to one VisionPilot frame, 25 to 40 ms at the
 measured 23.6 ms wall time, plus the rpmsg and DDS latency the fault itself
-takes to reach the firmware. The reel never claims better than that.
+takes to reach the firmware.
+DLT messages carry the board's own monotonic stamp, the clock of the journal,
+so the same offset places them. The reel never claims better than that.
 
 Underscores in the file name, unlike its hyphenated neighbours in this
 directory: its tests import it, and `import make-demo-reel` is not a thing.
@@ -42,9 +47,19 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from dlt_file import LEVELS, DltError, read_dlt
+
 WIDTH, HEIGHT = 1920, 1080
 BANNER_H = 60
-PANE_W, PANE_H = WIDTH // 2, (HEIGHT - BANNER_H) // 2
+# The full-width DLT strip under the 2x2 panes, and how many lines it shows.
+STRIP_H = 180
+DLT_LINES = 6
+PANE_W, PANE_H = WIDTH // 2, (HEIGHT - BANNER_H - STRIP_H) // 2
+# The frame time row at the top of the bottom-right pane, and its y axis. A
+# slow-fault frame takes about 280 ms in a recording run.
+FT_H = 180
+FT_MAX_MS = 400.0
+APP_COLOURS = {"VP": (120, 200, 255), "LM": (255, 200, 90)}
 CONSOLE_LINES = 16
 # How far before the fault the HUD and camera frame counts are compared. Two
 # seconds is enough to catch a run that dropped input frames and short enough
@@ -56,6 +71,14 @@ PLOT_WINDOW_S = 15.0
 # difference (a stream starting a frame early, the window edge) and nothing
 # more. Five frames is half a second of input at 10 Hz.
 COUNT_TOLERANCE = 5
+# Every stream load_run reads. record-demo.sh names all six in the manifest.
+REQUIRED_STREAMS = {"chase", "camera", "hud", "console", "trace", "dlt"}
+# The arrival lag a DLT message may show against its own board stamp, once both
+# are on the bench clock. The datarouter reads its clients and flushes every
+# 100 ms, so a real lag is 0 to about 250 ms. The margins cover one VisionPilot
+# frame of anchor error. A wrong offset, or a board up longer than 4.97 days
+# (the 0.1 ms stamp is 32 bits), is off by far more.
+DLT_LAG_S = (-0.5, 1.0)
 
 # The cut. Times are seconds from the fault, speed is playback rate: 0.25 means
 # one second of the run takes four seconds of screen time. Tune this table once
@@ -79,23 +102,44 @@ DEFAULT_CHAPTERS = [
         ("Top left: CARLA on the bench host, chasing the car.", 30),
         ("Top right: what VisionPilot draws, rendered on the X5H board itself.", 30),
         ("Bottom left: the CR52 Safety Island's own console.", 30),
-        ("Bottom right: the car's speed, and the commands it is given.", 30),
+        ("Bottom right: VisionPilot's frame time, then the car's speed and commands.", 30),
+        ("Bottom strip: S-CORE and VisionPilot log messages, over DLT.", 30),
         ("", 20),
-        ("The board has no clock the bench can read, so all four panes", 26),
-        ("are aligned on the fault instant, to within one rendered frame.", 26),
+        ("The board has no clock the bench can read, so every pane", 26),
+        ("is aligned on the fault instant, to within one rendered frame.", 26),
     )),
     ("the fault: VisionPilot stops answering", -3.0, 1.0, 0.25, (
         ("VisionPilot sends the Safety Island a heartbeat over rpmsg.", 30),
         ("The process is killed here. The heartbeat stops with it.", 30),
+        ("The S-CORE launch manager sees the exit and switches to its fallback.", 30),
         ("", 20),
         ("Quarter speed from here, so the half second the CR52 waits", 26),
         ("before it decides is long enough to watch.", 26),
     )),
     ("the Safety Island brakes the car", 1.0, 11.0, 0.5, (
-        ("The CR52 latches the stale heartbeat and takes the actuation path.", 30),
-        ("It commands a steady stop. Nothing on the Linux side is involved.", 30),
+        ("Two routes reach the CR52: the launch manager's fallback over rpmsg,", 30),
+        ("and the heartbeat that stopped. The first to arrive starts a steady stop.", 30),
     )),
     ("the car is stopped", 11.0, 22.0, 1.0, ()),
+]
+# The cut for a slow run under the S-CORE launch manager. The fault chapter runs
+# to 1.5 s because the CR52 command comes 1.1-1.2 s after the fault, not 0.5 s.
+SLOW_CHAPTERS = [
+    DEFAULT_CHAPTERS[0],
+    ("the fault: VisionPilot runs too slow", -3.0, 1.5, 0.25, (
+        ("VisionPilot reports every frame to the S-CORE health monitor.", 30),
+        ("From here each frame takes 200 ms longer, and the output rate drops with it.", 30),
+        ("Its output still reaches the Safety Island inside the 0.5 s limit,", 30),
+        ("so only the health monitor sees that it is late.", 30),
+        ("", 20),
+        ("The health monitor fails the first late frame, and the launch", 26),
+        ("manager stops VisionPilot. Quarter speed, so it can be watched.", 26),
+    )),
+    ("the Safety Island brakes the car", 1.5, 11.5, 0.5, (
+        ("The heartbeat ends with VisionPilot, and the CR52 takes over.", 30),
+        ("It commands a steady stop. The launch manager's fallback also latches the fault.", 30),
+    )),
+    ("the car is stopped", 11.5, 22.0, 1.0, ()),
 ]
 # Clipping a chapter shortens the reel. Clipping these two would remove the
 # event the reel exists to show, so they are refused instead.
@@ -131,6 +175,8 @@ class Run:
     hud_times: list = field(default_factory=list)  # bench time per hud frame
     console: list = field(default_factory=list)    # [(bench_time, text)]
     trace: dict = field(default_factory=dict)
+    frame_ms: list = field(default_factory=list)   # [(bench_time, ms)], one per frame
+    dlt: list = field(default_factory=list)        # [(bench_time, DltMsg)], sorted
 
     def rel(self, bench_time):
         return bench_time - self.fault_at
@@ -167,24 +213,61 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\[0m")
 
 # journalctl -o short-monotonic: "[  1234.567890] host unit[pid]: message".
 MONO = re.compile(r"^\[\s*(\d+\.\d+)\]")
+# VisionPilot prints frame_ms= at the end of each frame, after the slow fault's
+# injected sleep, so a slow frame shows here and not in its Latency line.
+FRAME_MS = re.compile(r"frame_ms=(\d+(?:\.\d+)?)")
+# SCORE_VP_FRAME_MAX_MS in score/config/recording, the launch manager
+# configuration of a recording run: the first frame over it is the one the
+# health monitor fails. A recording frame takes 72-85 ms (board 2,
+# 2026-10-06), and the slow fault adds 200 ms to every frame.
+LATE_FRAME_MS = 150.0
 
 
-def hud_frame_times(journal, fault_at):
-    """Bench time of every rendered HUD frame, from the VisionPilot journal.
+def journal_frames(journal):
+    """([board stamp per rendered frame], [(board stamp, frame_ms)]) from the journal.
 
-    A per-frame line is a Latency line that carries wall=; VisionPilot also
+    A per-frame line is a Latency line that carries wall=. VisionPilot also
     prints Latency in other contexts, and counting those shifts every frame.
-    The last such line is the fault, so the whole list is offset onto the bench
-    clock by one constant.
     """
-    stamps = []
+    stamps, frame_ms = [], []
     for ln in journal.splitlines():
         mono = MONO.match(ln)
-        if mono and "Latency" in ln and "wall=" in ln:
+        if not mono:
+            continue
+        if "Latency" in ln and "wall=" in ln:
             stamps.append(float(mono.group(1)))
+        else:
+            ms = FRAME_MS.search(ln)
+            if ms:
+                frame_ms.append((float(mono.group(1)), float(ms.group(1))))
+    return stamps, frame_ms
+
+
+def board_offset(journal, fault_at, mode="kill"):
+    """Seconds to add to a board monotonic time to put it on the bench clock.
+
+    One frame is the fault, so one constant places every board stamp: the HUD
+    frames, the frame times and the DLT messages. In a kill run that frame is
+    the last one. In a slow run it is the first frame over the deadline:
+    SIGUSR1 lands while that frame or the one before it runs, and VisionPilot
+    renders on until the launch manager stops it.
+    """
+    stamps, frame_ms = journal_frames(journal)
     if not stamps:
         raise ReelError("no_hud_frames")
-    offset = fault_at - stamps[-1]
+    if mode != "slow":
+        return fault_at - stamps[-1]
+    for mono, ms in frame_ms:
+        before = [s for s in stamps if s <= mono]
+        if ms > LATE_FRAME_MS and before:
+            return fault_at - before[-1]
+    raise ReelError("no_late_frame")
+
+
+def hud_frame_times(journal, fault_at, mode="kill"):
+    """Bench time of every rendered HUD frame, from the VisionPilot journal."""
+    stamps, _ = journal_frames(journal)
+    offset = board_offset(journal, fault_at, mode)
     return [s + offset for s in stamps]
 
 
@@ -215,10 +298,49 @@ def console_window(lines, bench_time, n=CONSOLE_LINES):
     return [ln for _, ln in lines[max(0, upto - n):upto]]
 
 
+# mw::log logs its own buffer statistics (context STAT) at every process start
+# and stop. They say nothing about the fault and would take strip rows from it.
+HIDDEN_DLT_CONTEXTS = {"STAT"}
+
+
+def dlt_window(placed, bench_time, n=DLT_LINES):
+    """The last n DLT messages already logged at bench_time, without mw::log's statistics."""
+    upto = bisect.bisect_right([t for t, _ in placed], bench_time)
+    shown = [p for p in placed[:upto] if p[1].ctx not in HIDDEN_DLT_CONTEXTS]
+    return shown[-n:]
+
+
+def output_hz(run, bench_time):
+    """Frames VisionPilot rendered in the one second up to bench_time."""
+    return sum(1 for t in run.hud_times if bench_time - 1.0 < t <= bench_time)
+
+
 def check_console_covers(lines, first, last):
     if not lines or lines[0][0] > first or lines[-1][0] < last:
         raise ReelError("console_short",
                         f"have {lines[0][0]:.3f}..{lines[-1][0]:.3f} want {first:.3f}..{last:.3f}")
+
+
+def place_dlt(msgs, offset):
+    """[(bench_time, DltMsg)] by each message's own board stamp, sorted.
+
+    The stamp is the board's CLOCK_MONOTONIC at the log call, the clock of the
+    journal's short-monotonic stamps, so the offset that places the HUD frames
+    places these too. The arrival time is late by up to the datarouter's 100 ms
+    flush, and serves only as the cross-check in check_dlt_clock.
+    """
+    placed = sorted(((m.tmsp + offset, m) for m in msgs if m.tmsp is not None),
+                    key=lambda p: p[0])
+    if not placed:
+        raise ReelError("dlt_unstamped")
+    return placed
+
+
+def check_dlt_clock(placed, lag=DLT_LAG_S):
+    lags = sorted(m.recv - t for t, m in placed)
+    mid = lags[len(lags) // 2]
+    if not lag[0] <= mid <= lag[1]:
+        raise ReelError("dlt_clock", f"median arrival lag {mid:.3f} s")
 
 
 def read_trace(text):
@@ -270,7 +392,7 @@ def load_run(run_dir):
     if "fault_at" not in man:
         raise ReelError("no_fault_at")
     streams = man.get("streams")
-    if not isinstance(streams, dict) or set(streams) < {"chase", "camera", "hud", "console", "trace"}:
+    if not isinstance(streams, dict) or not REQUIRED_STREAMS <= set(streams):
         raise ReelError("bad_manifest")
 
     def need(rel):
@@ -299,7 +421,9 @@ def load_run(run_dir):
     # perfectly well formed.
     if "uppressed" in journal:
         raise ReelError("journal_suppressed")
-    run.hud_times = hud_frame_times(journal, fault_at)
+    run.hud_times = hud_frame_times(journal, fault_at, run.mode)
+    offset = board_offset(journal, fault_at, run.mode)
+    run.frame_ms = [(mono + offset, ms) for mono, ms in journal_frames(journal)[1]]
     hud_dir = run_dir / streams["hud"]["dir"]
     run.hud = sorted(hud_dir.glob("frame_*.png"))
     if not run.hud:
@@ -317,6 +441,12 @@ def load_run(run_dir):
 
     run.console = read_console(need(streams["console"]["file"]).read_text())
     run.trace = read_trace(need(streams["trace"]["file"]).read_text())
+    try:
+        msgs = read_dlt(need(streams["dlt"]["file"]).read_bytes())
+    except DltError as exc:
+        raise ReelError("bad_dlt", str(exc)) from exc
+    run.dlt = place_dlt(msgs, offset)
+    check_dlt_clock(run.dlt)
     check_alignment(run.hud_times, [t for t, _ in run.camera], fault_at)
     return run
 
@@ -417,22 +547,104 @@ def console_pane(run, bench_time, box):
     return _label(pane, "CR52 Safety Island console")
 
 
+def hud_caption(run, t_rel):
+    """(label, dim) for the HUD pane at t_rel.
+
+    After VisionPilot's last rendered frame the pane holds that frame. A bright,
+    normal-looking HUD next to a braking car reads as a live picture, so the
+    frame is dimmed and says what it is. A slow run renders on past the fault
+    until the launch manager stops it, and those frames are live.
+    """
+    if run.fault_at + t_rel > run.hud_times[-1]:
+        return "VisionPilot HUD: the last frame it rendered, held", True
+    if t_rel > 0:
+        if run.mode != "slow":
+            return "VisionPilot HUD: the last frame it rendered, held", True
+        return "VisionPilot HUD, each frame now 200 ms late", False
+    return "VisionPilot HUD, rendered on the X5H board", False
+
+
+def plot_window(run, t_rel):
+    """(t_min, t_max) of both bottom-right plots, in seconds from the fault.
+
+    The axis covers the trace and never moves. Deriving it from the samples
+    drawn so far rescales the plot on every output frame, which makes a still
+    car look like it is still slowing down. It is a window around the fault,
+    not the whole trace: the run drives for over a minute and stops in nine
+    seconds, so an axis over all of it compresses the braking into the last
+    tenth of the width.
+    """
+    every = [t for rows in run.trace.values() for t, _ in rows]
+    t_min = max(min(every), -PLOT_WINDOW_S)
+    t_max = min(max(every), PLOT_WINDOW_S)
+    return t_min, max(t_max, t_rel)
+
+
+def frame_time_pane(run, t_rel, box):
+    """VisionPilot's time per frame against the deadline, and its output rate.
+
+    The slow route's story in one row: the frame time steps over the deadline
+    at the fault, and the rate falls with it. The time axis is the speed
+    plot's, so the two rows read as one timeline.
+    """
+    pane = Image.new("RGB", box, (18, 18, 22))
+    d = ImageDraw.Draw(pane)
+    left, right, top, bottom = 60, box[0] - 20, 50, box[1] - 12
+    t_min, t_max = plot_window(run, t_rel)
+
+    def xy(t, ms):
+        x = left + (right - left) * (t - t_min) / max(t_max - t_min, 1e-6)
+        y = bottom - (bottom - top) * min(ms, FT_MAX_MS) / FT_MAX_MS
+        return x, y
+
+    small = _font(15)
+    d.rectangle([left, top, right, bottom], outline=(70, 70, 80))
+    d.text((6, top - 4), f"{FT_MAX_MS:.0f}", font=small, fill=(160, 160, 170))
+    d.text((6, bottom - 16), "0", font=small, fill=(160, 160, 170))
+    _, yd = xy(t_min, LATE_FRAME_MS)
+    for x in range(left, right, 16):
+        d.line([x, yd, min(x + 8, right), yd], fill=(255, 220, 90), width=1)
+    d.text((left + 6, yd - 18),
+           f"deadline {LATE_FRAME_MS:.0f} ms (recording run; the demo runs 80 ms)",
+           font=small, fill=(255, 220, 90))
+    pts = [xy(run.rel(t), ms) for t, ms in run.frame_ms if t_min <= run.rel(t) <= t_rel]
+    if len(pts) > 1:
+        d.line(pts, fill=(140, 230, 140), width=2)
+    x0, _ = xy(0.0, 0)
+    d.line([x0, top, x0, bottom], fill=(220, 80, 80), width=2)
+    d.text((right - 170, top + 4), f"output {output_hz(run, run.fault_at + t_rel):2d} Hz",
+           font=_font(20, mono=True), fill=(235, 235, 235))
+    return _label(pane, "VisionPilot frame time, ms, and its output rate")
+
+
+def dlt_strip(run, bench_time, box):
+    """The last DLT_LINES messages logged by bench_time, VP and LM in their colours.
+
+    A warning or worse gets a red bar at the left edge instead of a third text
+    colour, so the line still says which process wrote it.
+    """
+    pane = Image.new("RGB", box, (12, 12, 16))
+    d = ImageDraw.Draw(pane)
+    f = _font(18, mono=True)
+    y = 34
+    for t, msg in dlt_window(run.dlt, bench_time):
+        if 1 <= msg.level <= 3:
+            d.rectangle([0, y, 5, y + 19], fill=(230, 70, 70))
+        level = LEVELS.get(msg.level, "-")
+        stamp = f"T{run.rel(t):+.2f}"
+        text = msg.text.replace("\n", " ")
+        line = f"{stamp:<8}  {msg.app:<4} {level:<5} {text}"
+        d.text((12, y), line[:160], font=f, fill=APP_COLOURS.get(msg.app, (190, 190, 200)))
+        y += 23
+    return _label(pane, "DLT on the bench host: the S-CORE launch manager (LM) and VisionPilot (VP)")
+
+
 def trace_pane(run, t_rel, box):
     pane = Image.new("RGB", box, (18, 18, 22))
     d = ImageDraw.Draw(pane)
     left, right, top, bottom = 60, box[0] - 20, 50, box[1] - 34
     odom = run.trace["odom"]
-    # The axis covers the whole trace and never moves. Deriving it from the
-    # samples drawn so far rescales the plot on every output frame, which makes
-    # a still car look like it is still slowing down.
-    # A window around the fault, not the whole trace. The run drives for over
-    # a minute and stops in nine seconds, so an axis covering all of it
-    # compresses the braking, which is the one thing this pane exists to show,
-    # into the last tenth of the width.
-    every = [t for rows in run.trace.values() for t, _ in rows]
-    t_min = max(min(every), -PLOT_WINDOW_S)
-    t_max = min(max(every), PLOT_WINDOW_S)
-    t_max = max(t_max, t_rel)
+    t_min, t_max = plot_window(run, t_rel)
     v_max = max(max(v for _, v in odom), 1.0) * 1.15
 
     def xy(t, v):
@@ -495,22 +707,22 @@ def render_frame(run, t_rel, chapter):
     box = (PANE_W, PANE_H)
     chase = _label(_fit(run.chase[pick([t for t, _ in run.chase], bench)][1], box),
                    "CARLA, chase camera")
-    # After the fault this pane is VisionPilot's LAST rendered frame, held. That
-    # is the truth of the kill route, but a bright, normal-looking HUD next to a
-    # braking car reads as a live picture. Dim it and say what it is.
+    caption, dim = hud_caption(run, t_rel)
     hud_img = _fit(run.hud[pick(run.hud_times, bench)], box)
-    if t_rel > 0:
+    if dim:
         hud_img = Image.eval(hud_img, lambda v: v * 4 // 10)
-        hud = _label(hud_img, "VisionPilot HUD: the last frame it rendered before the kill")
-    else:
-        hud = _label(hud_img, "VisionPilot HUD, rendered on the X5H board")
+    lower = BANNER_H + PANE_H
     img.paste(chase, (0, BANNER_H))
-    img.paste(hud, (PANE_W, BANNER_H))
-    img.paste(console_pane(run, bench, box), (0, BANNER_H + PANE_H))
-    img.paste(trace_pane(run, t_rel, box), (PANE_W, BANNER_H + PANE_H))
+    img.paste(_label(hud_img, caption), (PANE_W, BANNER_H))
+    img.paste(console_pane(run, bench, box), (0, lower))
+    img.paste(frame_time_pane(run, t_rel, (PANE_W, FT_H)), (PANE_W, lower))
+    img.paste(trace_pane(run, t_rel, (PANE_W, PANE_H - FT_H)), (PANE_W, lower + FT_H))
+    img.paste(dlt_strip(run, bench, (WIDTH, STRIP_H)), (0, HEIGHT - STRIP_H))
     d = ImageDraw.Draw(img)
-    d.line([PANE_W, BANNER_H, PANE_W, HEIGHT], fill=(60, 60, 68), width=2)
-    d.line([0, BANNER_H + PANE_H, WIDTH, BANNER_H + PANE_H], fill=(60, 60, 68), width=2)
+    d.line([PANE_W, BANNER_H, PANE_W, HEIGHT - STRIP_H], fill=(60, 60, 68), width=2)
+    d.line([0, lower, WIDTH, lower], fill=(60, 60, 68), width=2)
+    d.line([PANE_W, lower + FT_H, WIDTH, lower + FT_H], fill=(60, 60, 68), width=1)
+    d.line([0, HEIGHT - STRIP_H, WIDTH, HEIGHT - STRIP_H], fill=(60, 60, 68), width=2)
     return img
 
 
@@ -616,8 +828,9 @@ def main(argv=None):
     a = p.parse_args(argv)
     try:
         run = load_run(a.run_dir)
+        cut = SLOW_CHAPTERS if run.mode == "slow" else DEFAULT_CHAPTERS
         chapters = ([parse_chapter(s) for s in a.chapter] if a.chapter
-                    else [Chapter(*c) for c in DEFAULT_CHAPTERS])
+                    else [Chapter(*c) for c in cut])
         chapters, notes = clip_chapters(chapters, run)
         frames = chapter_frames(run, chapters, a.fps)
         check_console_covers(run.console,

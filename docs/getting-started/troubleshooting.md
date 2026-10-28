@@ -54,6 +54,15 @@ not fall back to CPU.
 Wait 10 to 30 seconds after `run`, then reload the page. If it stays blank,
 check `openadkit logs <deployment> --follow`.
 
+### noVNC says "failed to connect"
+
+Open the page over `http://`. Releases up to v2.0.0-rc.7 served noVNC over
+HTTPS with a certificate generated at each start: the browser loaded the page
+from its cache, never asked about the new certificate, and the WebSocket to it
+failed (the visualizer log shows `SSLV3_ALERT_CERTIFICATE_UNKNOWN`). The
+visualizer now serves plain HTTP unless you give it a certificate
+(`NOVNC_CERT`, `NOVNC_KEY`).
+
 ### Port 6080 already in use
 
 Port 6080 serves the visualizer. Stop the service that holds the port. The CLI deployments use host

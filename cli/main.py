@@ -454,12 +454,13 @@ def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> 
 
 
 def print_run_next_steps(
-    deployment, services: set[str], node: str | None, output: str | None
+    deployment, services: set[str], node: str | None, output: str | None, *, tls: bool = False
 ) -> None:
     target = deployment.name if node is None else f"{deployment.name} --node {node}"
     print(f"running: {target}")
     if "visualizer" in services:
-        print("visualizer: https://localhost:6080/vnc.html")
+        # Plain HTTP unless the site gives noVNC its own certificate.
+        print(f"visualizer: {'https' if tls else 'http'}://localhost:6080/vnc.html")
         print(
             "password: REMOTE_PASSWORD (default openadkit; override in "
             f"{deployment.site_config})"
@@ -648,7 +649,8 @@ def main() -> int:
         skipped = configured_services & ({"visualizer"} if args.no_visualizer else set())
         compose.start(deployment, selection, args.pull, configured_services, skipped)
         print_run_next_steps(
-            deployment, configured_services - skipped, selection.node, output_path(selection)
+            deployment, configured_services - skipped, selection.node, output_path(selection),
+            tls=bool(selection.environment.get("NOVNC_CERT")),
         )
         return 0
 

@@ -117,10 +117,10 @@ services, and waits until they are ready.
 Wait about 10 seconds for the containers to initialize, then open:
 
 ```text
-https://localhost:6080/vnc.html
+http://localhost:6080/vnc.html
 ```
 
-Use the default password **`openadkit`** and accept the self-signed certificate.
+Use the default password **`openadkit`**.
 
 For a remote host, keep noVNC loopback-only and forward it over SSH:
 
@@ -128,7 +128,7 @@ For a remote host, keep noVNC loopback-only and forward it over SSH:
 ssh -L 8080:localhost:6080 <user>@<host>
 ```
 
-Then open `https://localhost:8080/vnc.html` locally.
+Then open `http://localhost:8080/vnc.html` locally.
 
 ## 5. Drive {: #drive }
 

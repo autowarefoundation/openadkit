@@ -420,7 +420,16 @@ def test_run_can_leave_out_the_visualizer(tmp_path, headless):
     assert ("--scale=visualizer=0" in up) is headless
     # A left-out service is not pulled either.
     assert pull[pull.index("missing") + 1:] == (["app"] if headless else [])
-    assert ("visualizer: https://localhost:6080" in result.stdout) is not headless
+    assert ("visualizer: http://localhost:6080" in result.stdout) is not headless
+
+
+def test_run_prints_https_only_for_a_site_certificate(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, services=("app", "visualizer"))
+    site_config(root, "NOVNC_CERT=/certs/novnc.crt\nNOVNC_KEY=/certs/novnc.key\n")
+    result = run_cli(root, "run", "example")
+    assert result.returncode == 0, result.stderr
+    assert "visualizer: https://localhost:6080/vnc.html" in result.stdout
 
 
 @pytest.mark.parametrize(("projects", "args", "message"), [

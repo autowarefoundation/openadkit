@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cspell:ignore openbox, VNC, tigervnc, novnc, websockify, newkey, xstartup, pixelformat, AUTHTOKEN, authtoken, vncserver, autoconnect, vncpasswd
+# cspell:ignore openbox, VNC, tigervnc, novnc, websockify, xstartup, pixelformat, AUTHTOKEN, authtoken, vncserver, autoconnect, vncpasswd
 # shellcheck disable=SC1090,SC1091
 set -euo pipefail
 
@@ -117,18 +117,23 @@ EOF
     echo "Setting DISPLAY to :99"
     export DISPLAY=:99
     grep -qxF "export DISPLAY=:99" ~/.bashrc || echo "export DISPLAY=:99" >>~/.bashrc
-    # Generate a unique self-signed TLS certificate at runtime so each
-    # container instance has its own key pair (instead of a shared build-time
-    # certificate baked into the image).
-    echo "Generating TLS certificate for NoVNC..."
-    mkdir -p "$HOME/.vnc"
-    if ! openssl req -x509 -nodes -newkey rsa:2048 \
-      -keyout "$HOME/.vnc/novnc.key" \
-      -out "$HOME/.vnc/novnc.crt" \
-      -days 365 \
-      -subj "/O=Autoware-OpenADKit/CN=localhost" >/dev/null 2>&1; then
-        echo "Failed to generate TLS certificate for NoVNC"
-        exit 1
+    # noVNC is served over plain HTTP unless NOVNC_CERT and NOVNC_KEY name a
+    # certificate mounted into the container. Websockify binds to loopback,
+    # where TLS adds nothing (browsers treat http://localhost as secure), and
+    # remote access goes through an SSH tunnel or a TLS reverse proxy. A
+    # certificate generated at each start broke the page: browsers serve
+    # noVNC's files from their cache without asking about the new
+    # certificate, and the WebSocket to it then fails silently. A mounted
+    # certificate stays the same across starts, so its exception holds.
+    local tls=()
+    local scheme=http
+    if [ -n "${NOVNC_CERT:-}" ] || [ -n "${NOVNC_KEY:-}" ]; then
+        if [ ! -r "${NOVNC_CERT:-}" ] || [ ! -r "${NOVNC_KEY:-}" ]; then
+            echo "NOVNC_CERT and NOVNC_KEY must both name readable files in the container"
+            exit 1
+        fi
+        tls=(--cert="$NOVNC_CERT" --key="$NOVNC_KEY" --ssl-only)
+        scheme=https
     fi
 
     # Start NoVNC. Under network_mode: host (base deployments) bind to
@@ -139,8 +144,7 @@ EOF
     # 127.0.0.1. The VNC server is always loopback-only (see -localhost above).
     echo "Starting NoVNC..."
     local websck_bind="${WEBSOCKIFY_BIND:-127.0.0.1}"
-    websockify --web=/usr/share/novnc/ \
-      --cert="$HOME/.vnc/novnc.crt" --key="$HOME/.vnc/novnc.key" \
+    websockify --web=/usr/share/novnc/ "${tls[@]}" \
       "${websck_bind}:6080" localhost:5999 &
     WEBSOCKIFY_PID=$!
     sleep 1
@@ -153,7 +157,7 @@ EOF
 
     # Print info
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"
-    echo -e "\033[32mBrowser interface available at https://127.0.0.1:6080/vnc.html?resize=scale&autoconnect=true\033[0m"
+    echo -e "\033[32mBrowser interface available at ${scheme}://127.0.0.1:6080/vnc.html?resize=scale&autoconnect=true\033[0m"
     echo -e "\033[32mUse the REMOTE_PASSWORD configured in your env file.\033[0m"
     echo -e "\033[32mThe websockify server is bound to ${websck_bind}.\033[0m"
     echo -e "\033[32m-------------------------------------------------------------------------\033[0m"

@@ -32,6 +32,7 @@ services:
       - SCENARIO=${SCENARIO}
       - ARCHITECTURE_TYPE=${ARCHITECTURE_TYPE}
       - GLOBAL_FRAME_RATE=${GLOBAL_FRAME_RATE}
+      - GLOBAL_REAL_TIME_FACTOR=${GLOBAL_REAL_TIME_FACTOR:-1.0}
       - GLOBAL_TIMEOUT=${GLOBAL_TIMEOUT}
       - INITIALIZE_DURATION=${INITIALIZE_DURATION}
       - LAUNCH_AUTOWARE=${LAUNCH_AUTOWARE}
@@ -108,6 +109,7 @@ services:
         exec ros2 launch scenario_test_runner scenario_test_runner.launch.py \
           architecture_type:="$$ARCHITECTURE_TYPE" \
           global_frame_rate:="$$GLOBAL_FRAME_RATE" \
+          global_real_time_factor:="$$GLOBAL_REAL_TIME_FACTOR" \
           global_timeout:="$$GLOBAL_TIMEOUT" \
           initialize_duration:="$$INITIALIZE_DURATION" \
           launch_autoware:="$$LAUNCH_AUTOWARE" \

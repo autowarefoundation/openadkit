@@ -37,6 +37,8 @@ Put overrides in `~/.config/openadkit/scenario-simulation.env`:
 | `SCENARIO_HOST_DIR` | Host scenario directory, mounted at `/scenarios` | `./scenarios` |
 | `OUTPUT_HOST_PATH` | Host results directory | `~/.local/state/openadkit/scenario-simulation/output` |
 | `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware before running | `600` |
+| `GLOBAL_REAL_TIME_FACTOR` | Simulated seconds per wall-clock second; below `1` on a host that cannot run Autoware in real time | `1.0` |
+| `GLOBAL_TIMEOUT` | Wall-clock seconds each scenario may take; scale it with the factor | `180` |
 | `MAP_PATH` | Host map directory | `~/autoware_map/kashiwanoha_map` |
 
 A relative `SCENARIO_HOST_DIR` resolves from `deployments/scenario-simulation/`. `MAP_PATH` must be absolute; use `$HOME`

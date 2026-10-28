@@ -302,6 +302,10 @@ def test_version_pairs_the_release_with_its_autoware_also_in_a_kit(tmp_path):
     kit = integrator_kit(tmp_path, root)
     output = run_cli(root, "version", directory=kit).stdout
     assert f"autoware: 1.8.0 ({'a' * 40})" in output.splitlines()
+    # A line's backported fixes show with the Autoware they patch.
+    edit_kit(root, lambda doc: doc["autoware"].update(backports=[
+        {"repository": "universe/autoware_universe", "subject": "fix", "upstream": "https://example.com/pull/1"}]))
+    assert f"autoware: 1.8.0 ({'a' * 40}, 1 backported fix)" in run_cli(root, "version").stdout.splitlines()
 
 
 def test_completion_lists_every_command_and_option():

@@ -125,6 +125,17 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
   echo "| Upstream images SHA256 | \`${upstream_images_sha256}\` |"
   echo "| ROS snapshots | ${ros_snapshots} |"
   echo ""
+  # Fixes this release line carries on top of the Autoware tag.
+  backports=$(jq -r '.releaseContext.autoware.backports // [] | .[]
+    | "- \(.subject) (`\(.repository)`): \(.upstream)"' "${plan_file}")
+  if [ -n "${backports}" ]; then
+    echo "## Backported Autoware fixes"
+    echo ""
+    echo "On top of Autoware ${autoware_base_version}, from upstream:"
+    echo ""
+    echo "${backports}"
+    echo ""
+  fi
   echo "## Open AD Kit Bundle"
   echo "| Asset | SHA256 |"
   echo "|-------|--------|"

@@ -93,6 +93,8 @@ runs:
           exit 1
         fi
         vcs import --shallow autoware/src < autoware-lock/autoware-lock.repos
+        # A release line's backported Autoware fixes (.github/autoware-patches).
+        python3 .github/scripts/autoware_patches.py apply autoware/src
         if [ "${{ inputs.with-middleware }}" = "true" ]; then
           # Some Autoware refs do not provide middleware sources, but
           # components/universe-common/Dockerfile bind-mounts this path.

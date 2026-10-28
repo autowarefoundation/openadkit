@@ -96,6 +96,27 @@ latest published one and refuses another Autoware minor (v2.0.x is 1.9.x). Build
 weekly snapshot of upstream development and are never released. The build's
 `autoware-lock.repos`, resolved SHA and upstream image digests record the input.
 
+### Backporting an Autoware fix
+
+Autoware releases come months apart. A fix that blocks a release line and is
+upstream, merged on Autoware's `main` or in an open pull request, can ride on
+the line as a patch instead of waiting for the next Autoware release:
+
+1. In the upstream repository, `git format-patch -1 <commit>`, and add a line
+   `Upstream: <URL of the commit or pull request>` to its message.
+2. Open a pull request into `release/X.Y` that adds it as
+   `.github/autoware-patches/<repository>/<NNNN>-<subject>.patch`, where
+   `<repository>` is its path under `autoware/src` (a key of
+   `autoware-lock.repos`, such as `universe/autoware_universe`). The review is
+   the fix's own diff.
+3. Every build of the line applies the patches in order right after
+   `vcs import`; one that does not apply, or has no `Upstream:` line, fails the
+   build. The release lists them under **Backported Autoware fixes**, its
+   bundle carries them as `autoware.backports`, and `openadkit version` counts
+   them. The Autoware version and the release line stay those of the tag.
+4. When the line moves to an Autoware release that contains the fix, delete
+   the patch. `main`, which builds upstream development, needs none.
+
 `defaultRosDistro` in the promoted `openadkit.json` explicitly selects the ROS
 distro. The release input must agree, and its required runtime cells must pass.
 The gate does not automatically switch from Humble to Jazzy or remove a failing

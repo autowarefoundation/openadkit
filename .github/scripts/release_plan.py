@@ -12,6 +12,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, NoReturn
 
+import autoware_patches
 import validation_matrix
 from evidence.release_gate import validate_report
 from images import build_images, image_ref
@@ -226,11 +227,18 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
 
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
-    autoware = {
+    autoware: dict[str, Any] = {
         "version": require_string(metadata.get("autoware_base_version"), "autoware_base_version"),
         "ref": require_string(metadata.get("autoware_ref"), "autoware_ref"),
         "lockSha256": require_string(metadata.get("autoware_lock_sha256"), "autoware_lock_sha256"),
     }
+    # The fixes the build applied on top of the tag; the release commit is the
+    # build commit, so its patch directory is what the images carry.
+    backports = autoware_patches.list_patches(source_root)
+    if backports:
+        autoware["backports"] = [
+            {key: item[key] for key in ("repository", "subject", "upstream")} for item in backports
+        ]
     release_context = {
         "artifacts": kit.artifacts,
         "autoware": autoware,

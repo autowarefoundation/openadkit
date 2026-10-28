@@ -146,7 +146,11 @@ other side's service layer instead of the base's Compose file. For example, a
 kit that brings its own simulator to `carla-simulation` includes
 `${OPENADKIT_BASE_DEPLOYMENT}/services.autoware.yaml`: no service in it depends
 on a CARLA service. The base's `resetServices` that the kit's services leave
-out are skipped; the kit's own must exist.
+out are skipped; the kit's own must exist. `validate` then checks the kit
+against that layer only: a service of the same name the kit defines itself,
+such as its own `carla`, is the kit's, and a variable the kit both sets in its
+env file and reads in its Compose file is its own setting. A variable only set
+or only read, and unknown to the base, is still reported as a likely typo.
 
 ### 5. Image Replacement
 

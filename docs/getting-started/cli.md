@@ -5,6 +5,16 @@ configuration, upgrades, and cleanup.
 
 --8<-- "includes/cli-command-context.md"
 
+## Short Name and Tab Completion
+
+`openadkit install` also links `adkit`, a short name for the same launcher:
+`adkit run planning-simulation` is `openadkit run planning-simulation`. Tab
+completes commands, options and the deployment names of the kit or release in
+the current directory, for both names; bash-completion (installed on Ubuntu by
+default) loads it from `~/.local/share/bash-completion/completions` in a new
+shell. The installer leaves an `adkit` or a completion file that it did not
+install alone, and `openadkit uninstall` removes only its own links.
+
 ## Runtime Controls
 
 ```bash

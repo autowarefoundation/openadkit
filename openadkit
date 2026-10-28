@@ -39,11 +39,23 @@ Usage: openadkit install [--version vX.Y.Z] [--destination DIRECTORY] [--force]
 
 Downloads and verifies an Open AD Kit release bundle. The default destination is
 $OPENADKIT_INSTALL_DIR, else ~/.local/share/openadkit. A launcher is installed at
-~/.local/bin/openadkit.
+~/.local/bin/openadkit, with adkit as its short name and Tab completion for both.
 Reinstalling over an existing version requires --force.
 
 To move an installed release to the latest stable version, run: openadkit upgrade
 EOF
+}
+
+# Links the installer made point into a versioned release directory; any
+# other file at a link's path is the user's and is left alone.
+link_beside_launcher() {
+  local target=$1 path=$2
+  if [[ -e $path || -L $path ]] && [[ ! -L $path || $(readlink "$path") != */openadkit-v*/* ]]; then
+    log "kept ${path}: it was not installed by openadkit"
+    return 0
+  fi
+  ln -sfn "$target" "${path}.new"
+  mv -Tf "${path}.new" "$path"
 }
 
 start_install_temp() {
@@ -100,7 +112,7 @@ install_resolved_release() {
   local release_version=$1 archive_name=$2 expected_sha256=$3
   local destination=$4 force=$5 announce_next=$6
   local root_name final_root staged_bundle launcher_dir launcher_path link_path moved_aside
-  local next_command
+  local next_command completion_dir name
 
   root_name="openadkit-${release_version}"
   final_root="${destination}/${root_name}"
@@ -184,6 +196,16 @@ PY
   link_path="${launcher_path}.new"
   ln -sfn "$final_root/openadkit" "$link_path"
   mv -Tf "$link_path" "$launcher_path"
+  # adkit, the short name, and Tab completion for both, which bash-completion
+  # loads from this directory on first use.
+  link_beside_launcher "$final_root/openadkit" "${launcher_dir}/adkit"
+  if [[ -f "$final_root/cli/completion.bash" ]]; then
+    completion_dir="${XDG_DATA_HOME:-${HOME}/.local/share}/bash-completion/completions"
+    mkdir -p "$completion_dir"
+    for name in openadkit adkit; do
+      link_beside_launcher "$final_root/cli/completion.bash" "${completion_dir}/${name}"
+    done
+  fi
 
   cleanup_install
   INSTALL_TEMP=

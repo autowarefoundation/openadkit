@@ -249,6 +249,36 @@ def test_real_integrator_contract_checks_compiled_models(tmp_path, compose_conte
     assert all(warning.get("service") != "acme-probe" for warning in report["overlayWarnings"])
 
 
+@pytest.mark.parametrize("change", [None, "command", "typo"])
+def test_kit_on_one_service_layer_owns_its_services_and_settings(tmp_path, compose_context, change):
+    # An integrator kit: carla-simulation's Autoware side, with its own CARLA.
+    kit = tmp_path / "kit"
+    directory = kit / "deployments/world"
+    directory.mkdir(parents=True)
+    (kit / "openadkit.json").write_text(json.dumps({
+        "schemaVersion": 2, "kind": "kit", "extends": str(ROOT),
+        "deployments": {"world": {"path": "deployments/world"}}, "artifacts": {},
+    }))
+    (directory / "deployment.json").write_text(json.dumps({
+        "schemaVersion": 2, "name": "world", "description": "Own simulator",
+        "base": "carla-simulation", "compose": {"files": ["docker-compose.yaml"]},
+    }))
+    (directory / "config.env").write_text("TOWN=Town01\n" + ("VEHICLE_MODLE=typo\n" if change == "typo" else ""))
+    override = '  control:\n    command: ["true"]\n' if change == "command" else ""
+    (directory / "docker-compose.yaml").write_text(
+        "include:\n  - ${OPENADKIT_BASE_DEPLOYMENT}/services.autoware.yaml\n"
+        "services:\n" + override +
+        "  carla:\n    image: busybox:1.36.1\n    command: [\"sleep\", \"${TOWN}\"]\n"
+    )
+    result = subprocess.run([str(ROOT / "openadkit"), "validate", "world", "--gpu", "--json"],
+                            cwd=kit, env=dict(os.environ), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    rules = {warning["rule"] for warning in json.loads(result.stdout)["overlayWarnings"]}
+    # Its own carla service replaces nothing, and TOWN is set and read by the kit;
+    # changing an inherited service or setting a variable nothing reads still warns.
+    assert rules == {None: set(), "command": {"command"}, "typo": {"variable"}}[change]
+
+
 def test_centerpoint_models_mount_where_the_cli_installs_them(compose_context, tmp_path):
     import data
     (tmp_path / "config").mkdir()

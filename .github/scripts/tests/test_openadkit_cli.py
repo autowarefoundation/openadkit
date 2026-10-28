@@ -270,6 +270,20 @@ def test_install_adds_adkit_and_completion_and_uninstall_removes_only_its_links(
     assert (completions / "adkit").read_text() == "# the user's own\n"
 
 
+
+def test_uninstall_removes_links_of_a_destination_given_with_a_trailing_slash(tmp_path):
+    home = tmp_path / "home"
+    result = command(ENTRYPOINT, "install", "--destination", f"{home / 'kit'}/", home=home,
+                     bin_dir=release_bin(tmp_path))
+    assert result.returncode == 0, result.stderr
+    short = home / ".local/bin/adkit"
+    assert short.resolve() == installed(tmp_path)
+    fake_docker(tmp_path)
+    result = command(home / ".local/bin/openadkit", "uninstall", home=home, bin_dir=tmp_path / "bin")
+    assert result.returncode == 0, result.stderr
+    assert not short.is_symlink()
+    assert not (home / ".local/share/bash-completion/completions/openadkit").is_symlink()
+
 def complete(root, words, directory=None):
     """COMPREPLY for words (the last one being completed), as bash-completion asks."""
     script = (
@@ -587,8 +601,33 @@ def files_resource(tmp_path, *, env="MAP_PATH", name="dataset", **extra):
 def test_data_resource_names_must_be_safe_path_names(tmp_path, name):
     resource = files_resource(tmp_path) | {"name": name}
     with pytest.raises(cli_manifest.OpenADKitError, match="name"):
-        cli_manifest._validate_data([resource], {})
+        cli_manifest._validate_data([resource], {}, tmp_path)
 
+
+
+def test_data_file_shipped_with_the_deployment_installs_by_checksum(tmp_path):
+    shipped = {"name": "dataset", "kind": "files", "destinationEnv": "MAP_PATH", "requiredFiles": ["required.txt"],
+               "files": [{"path": "required.txt", "source": "data/map.txt",
+                          "sha256": hashlib.sha256(b"shipped").hexdigest()}]}
+    root, directory = runtime_tree(tmp_path, document=manifest(data=[shipped]))
+    fake_docker(tmp_path)
+    result = run_cli(root, "fetch", "example")
+    assert result.returncode != 0 and "missing data[0].files[0].source" in result.stderr
+    (directory / "data").mkdir()
+    (directory / "data/map.txt").write_text("changed")
+    result = run_cli(root, "fetch", "example")
+    assert result.returncode != 0 and "checksum mismatch" in result.stderr
+    (directory / "data/map.txt").write_text("shipped")
+    result = run_cli(root, "fetch", "example")
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "home/data/map/required.txt").read_text() == "shipped"
+
+
+def test_data_file_takes_exactly_one_of_url_and_source(tmp_path):
+    resource = files_resource(tmp_path)
+    resource["files"][0]["source"] = "data/map.txt"
+    with pytest.raises(cli_manifest.OpenADKitError, match="exactly one of url and source"):
+        cli_manifest._validate_data([resource], {}, tmp_path)
 
 def test_only_explicit_fetch_force_replaces_managed_data(tmp_path):
     root, _ = runtime_tree(tmp_path, document=manifest(data=[files_resource(tmp_path)]))

@@ -28,6 +28,13 @@ DQ_N="a\\nb"
 DQ_DOLLAR="a\\$b"
 QUOTED_COMMENT="v" # note
 UNQUOTED_TAB=value\t# tab before comment
+COLON: colon value
+COLON_TIGHT:tight
+URL=http://host:8080/x
+FROM_SHELL
+export FROM_SHELL_EXPORTED
+DOT.NAME=dot
+DASH-NAME=dash
 '''
 
 EXPECTED = {
@@ -35,8 +42,11 @@ EXPECTED = {
     "SINGLE": "C:\\path", "HASH_UNQUOTED": "value", "HASH_NO_SPACE": "value#still",
     "DQ_ESCAPE": "a\tb", "SQ_DQ": "a\\tb", "EMPTY": "", "SPACED": "spaced value",
     "DQ_QUOTE": 'a"b', "DQ_N": "a\nb", "DQ_DOLLAR": "a$b", "QUOTED_COMMENT": "v",
-    "UNQUOTED_TAB": "value\t# tab before comment",
+    "UNQUOTED_TAB": "value\t# tab before comment", "COLON": "colon value",
+    "COLON_TIGHT": "tight", "URL": "http://host:8080/x",
 }
+# Keys Compose reads but cannot interpolate, so they are checked on the reader only.
+NOT_INTERPOLATED = {"DOT.NAME": "dot", "DASH-NAME": "dash"}
 
 
 def compose_environment(tmp_path):
@@ -63,4 +73,7 @@ def test_dotenv_matches_compose(tmp_path):
     # `compose config` renders a literal dollar as "$$" (Compose's own escape);
     # a container receives one, which is what the reader returns.
     rendered = {name: value.replace("$$", "$") for name, value in compose.items()}
+    assert {name: parsed.pop(name) for name in NOT_INTERPOLATED} == NOT_INTERPOLATED
+    # A name alone takes the shell's value: the file sets nothing for it.
+    assert "FROM_SHELL" not in parsed and "FROM_SHELL_EXPORTED" not in parsed
     assert parsed == rendered == EXPECTED

@@ -10,6 +10,7 @@ on:
       - '.github/autoware.ref'
       - '.github/autoware-lock.repos'
       - '.github/autoware-base-images.json'
+      - '.github/autoware-patches/**'
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
       - '.github/actions/build-image/**'
@@ -20,7 +21,7 @@ on:
       - '!.github/scripts/tests/**'
       - '.github/workflows/build-all-images.yaml'
       - 'components/**'
-      - '!components/**/README.md'
+      - '!components/*/README.md'
 
   schedule:
     - cron: '0 0 * * 0'

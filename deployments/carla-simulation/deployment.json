@@ -42,7 +42,7 @@
       "files": [
         {
           "path": "lanelet2_map.osm",
-          "url": "https://raw.githubusercontent.com/oguzkaganozt/openadkit/8d0a915d00febbaa01b4672904bd66ad8668ba76/deployments/carla-simulation/data/lanelet2_map.osm",
+          "source": "data/lanelet2_map.osm",
           "sha256": "5fe0f15b9c40b12eea973bf2e67209b622a1003ecf5327c353b64b1c94c9bf6a"
         },
         {

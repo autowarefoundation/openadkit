@@ -532,6 +532,11 @@ def main() -> int:
         return 0
 
     if args.command == "build-overlay":
+        if os.geteuid() == 0 and os.environ.get("SUDO_USER"):
+            raise OpenADKitError(
+                "run build-overlay without sudo: the build would leave root-owned files"
+                " that your next build cannot replace"
+            )
         if args.deployment:
             deployment = get_deployment(root, kit, args.deployment)
             ros_distro = deployment.select(kit, args.ros_distro, False, require_gpu=False).ros_distro

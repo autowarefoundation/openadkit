@@ -110,13 +110,19 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
             if not changed_file:
                 continue
             # These shape every image's sources, context and dependency graph.
+            # Autoware patches change the sources every image compiles, as a new
+            # Autoware revision does.
             if changed_file in ("components/docker-bake.hcl", ".dockerignore", ".github/autoware.ref", ".github/autoware-lock.repos",
-                                ".github/autoware-base-images.json"):
+                                ".github/autoware-base-images.json", ".github/scripts/autoware_patches.py") or fnmatch.fnmatchcase(
+                changed_file, ".github/autoware-patches/*"
+            ):
                 targets.update(all_targets)
                 use_local_common = True
                 use_local_simulator = True
-            elif changed_file == "components/README.md" or fnmatch.fnmatchcase(
-                changed_file, "components/*/README.md"
+            # A component's own README documents it; a README deeper down may be
+            # copied into the image (fnmatch's "*" would also match "/").
+            elif changed_file == "components/README.md" or (
+                changed_file.endswith("/README.md") and changed_file.count("/") == 2
             ):
                 continue
             elif any(

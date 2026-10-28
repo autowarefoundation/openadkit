@@ -139,6 +139,13 @@ def download(url: str, destination: Path, checksum: str) -> None:
     raise OpenADKitError(f"failed to download {url}: {last_error}")
 
 
+def copy_verified(source: Path, destination: Path, checksum: str) -> None:
+    """Install a file the deployment ships, if it is the one its manifest pins."""
+    if sha256_file(source) != checksum:
+        raise OpenADKitError(f"checksum mismatch for {source}")
+    shutil.copyfile(source, destination)
+
+
 def ensure_no_symlink_components(path: Path) -> None:
     current = Path(path.anchor)
     for part in path.parts[1:]:
@@ -472,7 +479,10 @@ def install_resource(
                     item["path"], "data file path"
                 )
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                download(item["url"], destination, item["sha256"])
+                if "sourcePath" in item:
+                    copy_verified(item["sourcePath"], destination, item["sha256"])
+                else:
+                    download(item["url"], destination, item["sha256"])
         for relative, content in resource.get("generatedFiles", {}).items():
             generated = candidate / safe_relative(relative, "generated data file")
             generated.parent.mkdir(parents=True, exist_ok=True)

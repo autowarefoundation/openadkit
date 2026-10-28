@@ -26,6 +26,8 @@ on:
       - ".github/autoware.ref"
       - ".github/autoware-lock.repos"
       - ".github/autoware-base-images.json"
+      - ".github/autoware-patches/**"
+      - ".github/scripts/autoware_patches.py"
       - "components/**"
       - ".github/image-inventory.json"
       - ".github/scripts/export_autoware_lock.py"

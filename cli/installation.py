@@ -258,9 +258,11 @@ def uninstall(root: Path, arguments: Sequence[str]) -> int:
 
     log(f"removing {root}")
     # Only links into this release; a file of the user's at those paths stays.
+    # Compare where the links lead, not their text: the installer writes the
+    # destination as given, which may end in "/" or pass through a linked HOME.
     shortcuts = [
         path for path in shortcut_paths()
-        if path.is_symlink() and os.readlink(path).startswith(f"{root}{os.sep}")
+        if path.is_symlink() and path.resolve().is_relative_to(root.resolve())
     ]
     shutil.rmtree(root)
     launcher_path().unlink()

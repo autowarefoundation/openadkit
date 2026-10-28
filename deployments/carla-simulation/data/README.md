@@ -9,5 +9,5 @@ with one line added after the `<osm>` element:
 ```
 
 Autoware's route handler rejects a map without a format version, so a goal
-cannot be routed on the upstream file. `deployment.json` fetches this copy by
-commit and checks its sha256; this directory is not read at runtime.
+cannot be routed on the upstream file. `deployment.json` installs this copy
+(`"source"`) and checks its sha256.

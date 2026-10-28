@@ -14,6 +14,9 @@ from typing import Any
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Compose also reads env file keys with dots and dashes; only interpolation
+# names are limited to ENV_NAME_RE.
+ENV_FILE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_REFERENCE_RE = re.compile(r"^\S+@sha256:[0-9a-f]{64}$")
 GPU_COMPONENT_IMAGE = "SENSING_PERCEPTION_GPU_IMAGE"
@@ -96,7 +99,7 @@ ALLOWED_DATA_KEYS = {
     "gpu",
     "nodes",
 }
-ALLOWED_DATA_FILE_KEYS = {"path", "url", "sha256"}
+ALLOWED_DATA_FILE_KEYS = {"path", "url", "source", "sha256"}
 
 
 class OpenADKitError(Exception):
@@ -202,8 +205,10 @@ def _dotenv_unescape(value: str) -> str:
 def parse_dotenv(path: Path) -> dict[str, str]:
     """Read a Compose env file the way Compose does.
 
-    Quoted values may span lines and keep comments; a double-quoted value
-    unescapes \\n, \\r, \\t, \\", \\\\ and \\$; an unquoted one ends at " #".
+    A name is followed by "=" or ":". A name alone takes its value from the
+    shell, so the file does not set it. Quoted values may span lines and keep
+    comments; a double-quoted value unescapes \\n, \\r, \\t, \\", \\\\ and
+    \\$; an unquoted one ends at " #".
     """
     try:
         text = path.read_text(encoding="utf-8")
@@ -223,17 +228,18 @@ def parse_dotenv(path: Path) -> dict[str, str]:
         line += 1
         if not stripped or stripped.startswith("#"):
             continue
-        if "=" not in raw:
-            raise OpenADKitError(f"invalid dotenv assignment at {where}")
-        name, value_start = raw.split("=", 1)
-        name = name.strip()
+        separators = [position for position in (raw.find("="), raw.find(":")) if position != -1]
+        separator = min(separators, default=len(raw))
+        name, value_start = raw[:separator].strip(), raw[separator + 1 :]
         words = name.split(None, 1)
         if len(words) == 2 and words[0] == "export":
             name = words[1]
-        if not ENV_NAME_RE.fullmatch(name):
+        if not ENV_FILE_NAME_RE.fullmatch(name):
             raise OpenADKitError(f"invalid environment name at {where}: {name}")
+        if not separators:
+            continue
         # Position of the value in the whole text, for multi-line values.
-        offset = start_of_line + raw.index("=") + 1
+        offset = start_of_line + separator + 1
         while offset < length and text[offset] in " \t":
             offset += 1
         if offset < length and text[offset] in ("'", '"'):
@@ -693,7 +699,7 @@ class Deployment:
         )
 
 
-def _validate_data(data: Any, nodes: dict[str, Any]) -> list[dict[str, Any]]:
+def _validate_data(data: Any, nodes: dict[str, Any], directory: Path) -> list[dict[str, Any]]:
     if not isinstance(data, list):
         raise OpenADKitError("data must be an array")
     names: set[str] = set()
@@ -772,7 +778,16 @@ def _validate_data(data: Any, nodes: dict[str, Any]) -> list[dict[str, Any]]:
                 if relative in seen_paths:
                     raise OpenADKitError(f"duplicate data file path: {relative}")
                 seen_paths.add(relative)
-                require_string(item.get("url"), f"{file_where}.url")
+                # A file the deployment ships (source, relative to its directory)
+                # or one to download (url); the checksum is checked either way.
+                if ("url" in item) == ("source" in item):
+                    raise OpenADKitError(f"{file_where} needs exactly one of url and source")
+                if "url" in item:
+                    require_string(item["url"], f"{file_where}.url")
+                else:
+                    item["sourcePath"] = ensure_safe_existing(
+                        directory, item["source"], f"{file_where}.source"
+                    )
                 checksum = require_string(item.get("sha256"), f"{file_where}.sha256")
                 if not SHA256_RE.fullmatch(checksum):
                     raise OpenADKitError(f"{file_where}.sha256 is invalid")
@@ -929,7 +944,7 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         require_string(evidence["exempt"], "evidence.exempt")
     manifest["evidence"] = evidence
 
-    data = _validate_data(manifest.get("data", []), nodes)
+    data = _validate_data(manifest.get("data", []), nodes, directory)
     manifest["data"] = data
 
     deployment = Deployment(root, directory, manifest)
@@ -969,7 +984,7 @@ def validate_kit_deployment(
     extra_resets = require_string_list(compose.get("resetServices", []), "compose.resetServices")
     wait_timeout = _wait_timeout(compose.get("waitTimeout", base.compose["waitTimeout"]))
 
-    own_data = _validate_data(manifest.get("data", []), {})
+    own_data = _validate_data(manifest.get("data", []), {}, directory)
     destinations = {item["destinationEnv"] for item in base.data}
     clashing = sorted(destinations & {item["destinationEnv"] for item in own_data})
     if clashing:

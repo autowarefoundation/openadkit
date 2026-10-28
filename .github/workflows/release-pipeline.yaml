@@ -74,12 +74,20 @@ jobs:
       - name: Resolve build tag
         id: tag
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUILD_TAG: ${{ inputs.build_tag }}
           RUN_ID: ${{ steps.build.outputs.run_id }}
-          RUN_ATTEMPT: ${{ steps.build.outputs.run_attempt }}
         run: |
           set -euo pipefail
-          build_tag=${BUILD_TAG:-${RUN_ID}-${RUN_ATTEMPT}}
+          # The images carry the tag of the attempt that built them: re-running
+          # only the failed jobs keeps the first attempt's. Read it from the
+          # newest metadata artifact, as evidence does, not from the attempt.
+          build_tag=${BUILD_TAG}
+          if [ -z "${build_tag}" ]; then
+            build_tag=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.expired | not) | .name | select(startswith("build-metadata-")) | ltrimstr("build-metadata-")' \
+              | sort -V | tail -n 1)
+          fi
           [[ "${build_tag}" =~ ^[0-9]+-[0-9]+$ ]] || { echo "Invalid build tag '${build_tag}'" >&2; exit 1; }
           echo "build_tag=${build_tag}" >>"${GITHUB_OUTPUT}"
           echo "build_tag: ${build_tag}" >>"${GITHUB_STEP_SUMMARY}"

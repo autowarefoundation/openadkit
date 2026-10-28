@@ -50,6 +50,14 @@ def test_inventory_bake_and_runtime_catalog_agree():
     ("components/sensing-perception/scripts/build.sh", {"sensing-perception", "sensing-perception-cuda"}, {}),
     ("components/simulator/Dockerfile", {"carla-interface"}, {"use_local_simulator": True}),
     ("docs/index.md", set(), {}),
+    (".github/autoware-patches/universe/autoware_universe/0001-fix.patch",
+     {image["target"] for image in INVENTORY["images"]} - {"simulator"},
+     {"use_local_common": True, "use_local_simulator": True}),
+    (".github/scripts/autoware_patches.py", {image["target"] for image in INVENTORY["images"]} - {"simulator"},
+     {"use_local_common": True, "use_local_simulator": True}),
+    ("components/visualizer/README.md", set(), {}),
+    # Copied into the image, unlike the component's own README.
+    ("components/visualizer/novnc/README.md", {"visualizer"}, {}),
 ])
 def test_changed_inputs_select_required_builds(path, expected, flags):
     plan = matrices.build_single_image_plan(INVENTORY, [path])

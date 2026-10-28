@@ -5,6 +5,7 @@ import io
 import json
 import os
 import platform
+import re
 import shutil
 import stat
 import subprocess
@@ -29,7 +30,7 @@ OTHER_PIN = f"registry.example/custom@sha256:{'b' * 64}"
 ARCH = {"x86_64": "amd64", "aarch64": "arm64"}.get(platform.machine(), platform.machine())
 ISOLATED_ENV = (
     "XDG_CONFIG_HOME", "XDG_STATE_HOME", "OPENADKIT_CONFIG_DIR", "OPENADKIT_STATE_DIR",
-    "OPENADKIT_KIT", "OPENADKIT_DELEGATED", "OPENADKIT_INSTALL_DIR", "COMPOSE_FILE",
+    "OPENADKIT_KIT", "OPENADKIT_DELEGATED", "OPENADKIT_INSTALL_DIR", "COMPOSE_FILE", "XDG_DATA_HOME",
 )
 
 
@@ -194,6 +195,7 @@ def release_bin(tmp_path, version="v1.2.3", *, bad_checksum=False, member=None):
     files = {"openadkit": ENTRYPOINT.read_bytes(), "cli/main.py": b'print("ok")\n',
              "openadkit.json": json.dumps({"schemaVersion": 2, "kind": "release", "version": version}).encode()}
     files.update({f"cli/{name}.py": (ROOT / f"cli/{name}.py").read_bytes() for name in ("compose", "manifest", "installation")})
+    files["cli/completion.bash"] = (ROOT / "cli/completion.bash").read_bytes()
     if member:
         files[member] = "/etc/passwd" if member == "link" else b"escape"
     with tarfile.open(bundle, "w:gz", format=tarfile.USTAR_FORMAT) as archive:
@@ -244,6 +246,72 @@ def test_install_upgrade_and_uninstall_preserve_kept_versions(tmp_path):
     assert result.returncode == 0, result.stderr
     assert not launcher.exists() and not installed(tmp_path, "v1.3.0").exists()
     assert installed(tmp_path).is_file()
+
+
+def test_install_adds_adkit_and_completion_and_uninstall_removes_only_its_links(tmp_path):
+    home = tmp_path / "home"
+    completions = home / ".local/share/bash-completion/completions"
+    # A completion file of the user's own stays as it is.
+    completions.mkdir(parents=True)
+    (completions / "adkit").write_text("# the user's own\n")
+    assert install(tmp_path, release_bin(tmp_path)).returncode == 0
+    short = home / ".local/bin/adkit"
+    assert short.resolve() == installed(tmp_path)
+    assert (completions / "openadkit").resolve() == installed(tmp_path).parent / "cli/completion.bash"
+    assert (completions / "adkit").read_text() == "# the user's own\n"
+    # The short name runs the same release (the fixture's main.py prints ok).
+    result = command(short, "list", home=home, bin_dir=tmp_path / "bin")
+    assert result.returncode == 0 and result.stdout == "ok\n"
+    fake_docker(tmp_path)
+    result = command(home / ".local/bin/openadkit", "uninstall", home=home, bin_dir=tmp_path / "bin")
+    assert result.returncode == 0, result.stderr
+    assert not short.is_symlink() and not (completions / "openadkit").is_symlink()
+    assert (completions / "adkit").read_text() == "# the user's own\n"
+
+
+def complete(root, words, directory=None):
+    """COMPREPLY for words (the last one being completed), as bash-completion asks."""
+    script = (
+        f"source {ROOT / 'cli/completion.bash'}\n"
+        'COMP_WORDS=("$@"); COMP_CWORD=$(($# - 1)); _openadkit; printf "%s\\n" "${COMPREPLY[@]}"\n'
+    )
+    result = subprocess.run(["bash", "-c", script, "bash", *words], cwd=directory or root, text=True,
+                            capture_output=True, timeout=30,
+                            env=dict(os.environ, PATH=f"{root}:{os.environ['PATH']}"))
+    assert result.returncode == 0, result.stderr
+    return set(result.stdout.split())
+
+
+def test_completion_offers_commands_options_and_deployments(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    assert {"run", "build-overlay", "record"} <= complete(root, ["openadkit", ""])
+    assert complete(root, ["adkit", "build-"]) == {"build-overlay"}
+    assert complete(root, ["openadkit", "run", "--no-"]) == {"--no-visualizer"}
+    assert complete(root, ["openadkit", "run", "--ros-distro", ""]) == {"humble", "jazzy"}
+    assert complete(root, ["openadkit", "run", "ex"]) == {"example"}
+    assert complete(root, ["openadkit", "run", "--ros-distro", "jazzy", ""]) == {"example"}
+    # One deployment per command; list takes none.
+    assert complete(root, ["openadkit", "run", "example", ""]) == set()
+    assert complete(root, ["openadkit", "list", ""]) == set()
+
+
+def test_completion_lists_every_command_and_option():
+    import argparse
+
+    import main as cli_main
+    text = (ROOT / "cli/completion.bash").read_text()
+    commands = re.search(r'local commands="([^"]+)"', text).group(1).split()
+    listed = dict(re.findall(r"^\s+([a-z|\- ]+)\) options=\"([^\"]*)\"", text, re.MULTILINE))
+    options = {name.strip(): set(value.split()) for names, value in listed.items() for name in names.split("|")}
+    subparsers = next(action for action in cli_main.build_parser()._actions
+                      if isinstance(action, argparse._SubParsersAction))
+    assert set(commands) == set(subparsers.choices)
+    # install, upgrade, setup and uninstall are parsed by the launcher and their own scripts.
+    for name, parser in subparsers.choices.items():
+        if name in ("install", "upgrade", "setup", "uninstall"):
+            continue
+        flags = {flag for action in parser._actions for flag in action.option_strings if flag.startswith("--")}
+        assert flags - {"--help"} <= options[name], name
 
 
 def test_install_defaults_to_the_root_kits_resolve_extends_from(tmp_path):

@@ -44,7 +44,8 @@ replaced. Source checkouts update with git pull or git checkout instead.
 UNINSTALL_USAGE = """\
 Usage: openadkit uninstall [--all]
 
-Removes the active Open AD Kit release installation and its launcher.
+Removes the active Open AD Kit release installation, its launcher, the adkit
+short name and Tab completion.
 Downloaded data is not touched. Refuses while an openadkit-* Compose project
 is still running, because uninstall removes the launcher `openadkit stop` needs.
 
@@ -104,6 +105,14 @@ def compare_versions(current: str, latest: str) -> str:
 
 def launcher_path() -> Path:
     return Path(expand_home("$HOME")) / ".local/bin/openadkit"
+
+
+def shortcut_paths() -> list[Path]:
+    """The short name and the completion links the installer puts beside the launcher."""
+    home = Path(expand_home("$HOME"))
+    data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local/share")
+    completions = data / "bash-completion/completions"
+    return [home / ".local/bin/adkit", completions / "openadkit", completions / "adkit"]
 
 
 def active_release(root: Path, command: str) -> str:
@@ -248,8 +257,15 @@ def uninstall(root: Path, arguments: Sequence[str]) -> int:
     require_no_running_deployments()
 
     log(f"removing {root}")
+    # Only links into this release; a file of the user's at those paths stays.
+    shortcuts = [
+        path for path in shortcut_paths()
+        if path.is_symlink() and os.readlink(path).startswith(f"{root}{os.sep}")
+    ]
     shutil.rmtree(root)
     launcher_path().unlink()
+    for path in shortcuts:
+        path.unlink()
 
     if remove_kept:
         for candidate in sorted(destination.glob("openadkit-v*")):

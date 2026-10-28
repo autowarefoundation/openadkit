@@ -126,11 +126,12 @@ RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
 
 # Open AD Kit's look for noVNC: a stylesheet after noVNC's own, the Autoware
 # Foundation logo and symbol, favicons and the page title
-# (components/visualizer/novnc/README.md). noVNC's code is unchanged.
+# (components/visualizer/novnc/README.md). noVNC's code is unchanged. The
+# patterns match noVNC 1.0 (humble, Ubuntu 22.04) and 1.3 (jazzy, 24.04).
 COPY components/visualizer/novnc/ /usr/share/novnc/app/openadkit/
 RUN sed -i \
       -e 's|<title>noVNC</title>|<title>Open AD Kit \&middot; RViz</title>|' \
-      -e 's|\(<link rel="stylesheet" href="app/styles/base.css" />\)|\1\n    <link rel="stylesheet" href="app/openadkit/openadkit.css" />|' \
+      -e 's|\(<link rel="stylesheet" href="app/styles/base.css"[^>]*>\)|\1\n    <link rel="stylesheet" href="app/openadkit/openadkit.css">|' \
       -e 's|app/images/icons/novnc-\([0-9]*x[0-9]*\)\.png|app/openadkit/icons/openadkit-\1.png|g' \
       -e '/novnc-icon\.svg/d' \
       /usr/share/novnc/vnc.html && \

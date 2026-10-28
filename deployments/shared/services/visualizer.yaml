@@ -1,7 +1,9 @@
-# Visualizer — RViz behind noVNC.
+# Visualizer — RViz behind noVNC, over plain HTTP.
 # `ports:` is ignored under `network_mode: host`. Websockify binds to loopback by
-# default (`WEBSOCKIFY_BIND=127.0.0.1`). To expose noVNC remotely, set
-# WEBSOCKIFY_BIND=0.0.0.0 and front the port with an authenticated reverse proxy.
+# default (`WEBSOCKIFY_BIND=127.0.0.1`); reach it remotely through an SSH tunnel.
+# To expose noVNC itself, set WEBSOCKIFY_BIND=0.0.0.0 and front the port with an
+# authenticated reverse proxy, or serve HTTPS with your own certificate:
+# NOVNC_CERT and NOVNC_KEY name its files, mounted into this service.
 services:
   visualizer:
     image: ${VISUALIZER_IMAGE:-ghcr.io/autowarefoundation/openadkit:visualizer}
@@ -19,6 +21,8 @@ services:
       - REMOTE_PASSWORD=${REMOTE_PASSWORD}
       - WEBSOCKIFY_BIND=${WEBSOCKIFY_BIND:-127.0.0.1}
       - RVIZ_GPU=${RVIZ_GPU:-auto}
+      - NOVNC_CERT=${NOVNC_CERT:-}
+      - NOVNC_KEY=${NOVNC_KEY:-}
     volumes:
       - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       # Integrator layer, applied by the image's entrypoint hook (components/shared/entrypoint).

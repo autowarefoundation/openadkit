@@ -98,6 +98,7 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
         ".github/actions/build-image/*",
         ".github/actions/setup-build-env/*",
         ".github/workflows/build-single-image.yaml",
+        ".github/workflows/build-single-image-distro.yaml",
         ".trivyignore",
     )
     targets = set(target_input.split())
@@ -265,7 +266,7 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
             if prepared.get("use_local_common") == "true":
                 cache_from.extend(common_cache_from)
             if common_cached:
-                cache_from.extend(f"type=gha,scope=pr-common-{stage}-{run_id}" for stage in ("devel", "runtime"))
+                cache_from.extend(f"type=gha,scope=pr-common-{stage}-{distro}-{run_id}" for stage in ("devel", "runtime"))
             if prepared.get("use_local_simulator") == "true":
                 cache_from.append(f"type=registry,ref={cache_ref('simulator')}")
 
@@ -292,7 +293,7 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
         overrides["sensing-perception-cuda"]["args"]["SECURITY_REFRESH"] = build_tag
     if shared_common:
         for name, stage in (("universe-common-build", "devel"), ("universe-common", "runtime")):
-            overrides[name]["cache-to"] = [f"type=gha,scope=pr-common-{stage}-{run_id},mode=min"]
+            overrides[name]["cache-to"] = [f"type=gha,scope=pr-common-{stage}-{distro}-{run_id},mode=min"]
     targets = (["universe-common-build", "universe-common-devel", "universe-common"]
                if publish and target == "universe-common" else [target])
     return {"target": overrides}, targets

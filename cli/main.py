@@ -387,8 +387,11 @@ def show_version(root, kit, *, json_output: bool = False) -> int:
     if kit.extends is not None:
         print(f"kit: {root}")
         print(f"extends: Open AD Kit {kit.extends} ({kit.base_root})")
+        if kit.autoware:
+            print(f"autoware: {kit.autoware['version']} ({kit.autoware['ref']})")
     elif kit.kind == "release":
-        print(f"Open AD Kit {kit.version or 'unknown'}")
+        autoware = f" · Autoware {kit.autoware['version']}" if kit.autoware else ""
+        print(f"Open AD Kit {kit.version or 'unknown'}{autoware}")
         print("bundle: release")
         if kit.autoware:
             print(f"autoware: {kit.autoware['version']} ({kit.autoware['ref']})")

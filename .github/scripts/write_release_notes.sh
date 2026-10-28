@@ -107,6 +107,8 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
 {
   echo '<!-- openadkit-release-workflow:v1 -->'
   echo ""
+  echo "Open AD Kit ${VERSION} builds on Autoware ${autoware_base_version}. Every v$(printf '%s' "${VERSION#v}" | cut -d. -f1-2).x release builds on Autoware $(printf '%s' "${autoware_base_version}" | cut -d. -f1-2).x."
+  echo ""
   echo "## Provenance"
   echo "| Key | Value |"
   echo "|-----|-------|"

@@ -90,7 +90,9 @@ issue, keep the previous verified stable pin and explain the exception, date
 and follow-up in the release notes. v2.0 pins **Autoware 1.9.0**.
 
 Every release, stable or candidate, is built on its `release/X.Y` branch from
-the Autoware release tag in `.github/autoware.ref`. Builds of `main` use a
+the Autoware release tag in `.github/autoware.ref`. A release line keeps one
+Autoware minor release: the release gate compares each release with the line's
+latest published one and refuses another Autoware minor (v2.0.x is 1.9.x). Builds of `main` use a
 weekly snapshot of upstream development and are never released. The build's
 `autoware-lock.repos`, resolved SHA and upstream image digests record the input.
 

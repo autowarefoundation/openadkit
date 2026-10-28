@@ -124,6 +124,21 @@ COPY --chown=aw:aw components/visualizer/etc/xstartup /home/aw/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
 RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
 
+# Open AD Kit's look for noVNC: a stylesheet after noVNC's own, the Autoware
+# Foundation logo and symbol, favicons and the page title
+# (components/visualizer/novnc/README.md). noVNC's code is unchanged.
+COPY components/visualizer/novnc/ /usr/share/novnc/app/openadkit/
+RUN sed -i \
+      -e 's|<title>noVNC</title>|<title>Open AD Kit \&middot; RViz</title>|' \
+      -e 's|\(<link rel="stylesheet" href="app/styles/base.css" />\)|\1\n    <link rel="stylesheet" href="app/openadkit/openadkit.css" />|' \
+      -e 's|app/images/icons/novnc-\([0-9]*x[0-9]*\)\.png|app/openadkit/icons/openadkit-\1.png|g' \
+      -e '/novnc-icon\.svg/d' \
+      /usr/share/novnc/vnc.html && \
+    rm /usr/share/novnc/app/openadkit/README.md && \
+    grep -q 'app/openadkit/openadkit.css' /usr/share/novnc/vnc.html && \
+    grep -q '<title>Open AD Kit' /usr/share/novnc/vnc.html && \
+    ! grep -q 'icons/novnc-' /usr/share/novnc/vnc.html
+
 # Fail when a compiled binary cannot load its libraries in this image
 # (components/shared/check-linked-libs.sh).
 RUN --mount=type=bind,source=components/shared/check-linked-libs.sh,target=/tmp/check-linked-libs.sh \

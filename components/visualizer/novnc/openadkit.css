@@ -1,0 +1,78 @@
+/* Open AD Kit's look for noVNC, loaded after its base.css.
+ *
+ * The Autoware Foundation brand guideline's black theme: the logo and its
+ * symbol in white, unaltered, never on a colored background and with clear
+ * space around them; black and neutral greys, with the primary highlight
+ * color (#5E90E3) for the one action. noVNC is credited under its button. */
+
+body,
+#noVNC_container {
+  background-color: #000;
+}
+#noVNC_container {
+  border-radius: 0; /* noVNC's curved grey screen */
+}
+
+/* Connect screen: the logo, the product, then noVNC's credit. */
+#noVNC_connect_dlg .noVNC_logo {
+  --logo-width: min(386px, 60vw); /* the logo is 1287 x 597 */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: var(--logo-width);
+  height: calc(var(--logo-width) * 597 / 1287 + 48px);
+  margin: 0 auto 24px;
+  padding: 0;
+  font-size: 0;
+  text-shadow: none;
+  background: url("autoware-logo-white.png") center top / 100% auto no-repeat;
+}
+#noVNC_connect_dlg .noVNC_logo span {
+  display: none;
+}
+#noVNC_connect_dlg .noVNC_logo::after {
+  content: "Open AD Kit \00B7  RViz"; /* the first space ends the escape */
+  color: #fff;
+  font: 22px / 1 sans-serif;
+  letter-spacing: 0.08em;
+}
+#noVNC_connect_dlg::after {
+  content: "powered by noVNC";
+  display: block;
+  margin-top: 16px;
+  color: #808080;
+  font: 12px / 1 sans-serif;
+  text-align: center;
+}
+
+#noVNC_connect_button {
+  background-color: #5e90e3;
+}
+#noVNC_connect_button div,
+:root:not(.noVNC_touch) #noVNC_connect_button div:hover {
+  background: #5e90e3;
+  border-color: #fff;
+}
+
+/* Control bar: the symbol in place of noVNC's name, on neutral greys. */
+#noVNC_control_bar,
+.noVNC_panel .noVNC_heading {
+  background-color: #1a1a1a;
+}
+#noVNC_control_bar_handle {
+  background-color: #333;
+}
+#noVNC_control_bar_hint {
+  box-shadow: 0 0 10px black, inset 0 0 10px 10px rgba(94, 144, 227, 0.8);
+}
+#noVNC_control_bar .noVNC_logo {
+  width: 26px;
+  height: 30px;
+  margin: 10px auto;
+  font-size: 0;
+  text-shadow: none;
+  background: url("autoware-symbol-white.png") center / contain no-repeat;
+}
+#noVNC_control_bar .noVNC_logo span {
+  display: none;
+}

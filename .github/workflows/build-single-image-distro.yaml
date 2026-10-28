@@ -286,4 +286,3 @@ jobs:
           scanners: vuln,secret
           timeout: 15m
           trivyignores: .trivyignore
-

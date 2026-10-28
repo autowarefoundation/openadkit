@@ -151,10 +151,15 @@ kit that brings its own simulator to `carla-simulation` includes
 `${OPENADKIT_BASE_DEPLOYMENT}/services.autoware.yaml`: no service in it depends
 on a CARLA service. The base's `resetServices` that the kit's services leave
 out are skipped; the kit's own must exist. `validate` then checks the kit
-against that layer only: a service of the same name the kit defines itself,
-such as its own `carla`, is the kit's, and a variable the kit both sets in its
-env file and reads in its Compose file is its own setting. A variable only set
-or only read, and unknown to the base, is still reported as a likely typo.
+against that layer only, and a deployment that includes no base file inherits
+no base service: a service of the same name the kit defines itself, such as
+its own `carla`, is the kit's. The kit's Compose files are its entry files and
+the kit files they include (a world file several deployments share). A
+variable the kit both sets in its env file and reads in those files is its own
+setting, and one read with a default or a message (`${DISPLAY:?...}`,
+`${TOWN:-Town01}`) is meant to come from the host or the site file. A variable
+only set, or only read plainly, and unknown to the base, is still reported as
+a likely typo.
 
 ### 5. Image Replacement
 

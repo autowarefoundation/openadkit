@@ -111,7 +111,11 @@ Without a deployment it builds the kit's workspace, which all its deployments
 share. With one, it builds each workspace that deployment mounts, the kit's
 first. Each builds at the path the services mount it, and the CLI records the image and distro in
 `install/.openadkit-overlay.json`. After a base upgrade or a distro change,
-`validate` and `run` warn until you rebuild. Releases before this pin, and
+`validate` and `run` warn until you rebuild. A workspace builds
+incrementally only on its own last build in the same image and distro;
+otherwise (an upgrade, a build by hand, a rebuilt layer below) its `build/`
+and `install/` are removed first, since CMake caches record the paths they
+were configured with. Releases before this pin, and
 source checkouts, pin no devel image: set `DEVEL_IMAGE` to the matching
 `universe-common-devel` digest from the build metadata or release BOM. The
 CLI mounts the workspace and the hook sources `overlay_ws/install/local_setup.bash`

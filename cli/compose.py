@@ -766,12 +766,33 @@ def overlay_workspaces(deployment: Deployment) -> list[tuple[Path, str]]:
     ]
 
 
+def read_overlay_stamp(workspace: Path) -> dict[str, Any] | None:
+    try:
+        stamp = json.loads((workspace / "install" / OVERLAY_STAMP).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return stamp if isinstance(stamp, dict) else None
+
+
 def build_overlay(workspaces: list[tuple[Path, str]], image: str, ros_distro: str) -> None:
-    """Build each overlay layer in the devel image, on top of the ones before it."""
+    """Build each overlay layer in the devel image, on top of the ones before it.
+
+    A layer builds incrementally only on its own last build in this image and
+    distro. Anything else (another image or distro, a build by hand at another
+    path, a layer below that was rebuilt) starts from a clean build and
+    install: CMake caches record the image's paths and the path they were
+    configured at, and links record the layers below.
+    """
     require_docker()
     environment = _compose_ls_environment()
     below: list[tuple[Path, str]] = []
+    clean = False
     for host, target in workspaces:
+        clean = clean or read_overlay_stamp(host) != {"image": image, "rosDistro": ros_distro}
+        if clean:
+            for products in (host / "build", host / "install"):
+                if products.is_dir() and not products.is_symlink():
+                    shutil.rmtree(products)
         mounts = [arg for path, mount in below for arg in ("--volume", f"{path}:{mount}:ro")]
         # The image compiles through ccache in the aw home, which only uid
         # 1000 can write; keep HOME and the cache in the container's /tmp.
@@ -789,6 +810,7 @@ def build_overlay(workspaces: list[tuple[Path, str]], image: str, ros_distro: st
             ],
             env=environment,
         )
+        (host / "install").mkdir(exist_ok=True)
         (host / "install" / OVERLAY_STAMP).write_text(
             json.dumps({"image": image, "rosDistro": ros_distro}) + "\n",
             encoding="utf-8",
@@ -801,11 +823,8 @@ def check_overlay_builds(deployment: Deployment, selection: Selection, image: st
     """Warn about overlay installs that build-overlay made for another image."""
     warnings: list[str] = []
     for host, _ in overlay_workspaces(deployment):
-        try:
-            stamp = json.loads((host / "install" / OVERLAY_STAMP).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if not isinstance(stamp, dict):
+        stamp = read_overlay_stamp(host)
+        if stamp is None:
             continue
         if stamp.get("rosDistro") != selection.ros_distro or (image and stamp.get("image") != image):
             warnings.append(

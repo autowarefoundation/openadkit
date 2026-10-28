@@ -1044,6 +1044,23 @@ def test_build_overlay_builds_each_layer_in_the_pinned_devel_image(tmp_path):
     result = run_cli(root, "build-overlay", "custom", directory=kit, DEVEL_IMAGE="local/devel:test")
     assert result.returncode == 0 and "local/devel:test" in recorded(calls)[-1]["args"]
 
+    # A build for another image starts clean, and so does every layer above it;
+    # the same image builds incrementally.
+    for workspace in (kit / "overlay_ws", directory / "overlay_ws"):
+        (workspace / "build").mkdir(exist_ok=True)
+        (workspace / "build/CMakeCache.txt").write_text("old")
+    assert run_cli(root, "build-overlay", "custom", directory=kit).returncode == 0
+    assert not (kit / "overlay_ws/build/CMakeCache.txt").exists()
+    assert not (directory / "overlay_ws/build/CMakeCache.txt").exists()
+    for workspace in (kit / "overlay_ws", directory / "overlay_ws"):
+        (workspace / "install").mkdir(exist_ok=True)
+        (workspace / "install/.openadkit-overlay.json").write_text(
+            json.dumps({"image": devel[:-1] + "e", "rosDistro": "humble"}))
+        (workspace / "build").mkdir(exist_ok=True)
+        (workspace / "build/CMakeCache.txt").write_text("current")
+    assert run_cli(root, "build-overlay", "custom", directory=kit).returncode == 0
+    assert (kit / "overlay_ws/build/CMakeCache.txt").read_text() == "current"
+
     # Without a deployment a kit builds its own workspace, which all its deployments share.
     before = len(recorded(calls))
     result = run_cli(root, "build-overlay", directory=kit)

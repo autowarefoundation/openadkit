@@ -791,6 +791,13 @@ def _validate_data(data: Any, nodes: dict[str, Any], directory: Path) -> list[di
                 checksum = require_string(item.get("sha256"), f"{file_where}.sha256")
                 if not SHA256_RE.fullmatch(checksum):
                     raise OpenADKitError(f"{file_where}.sha256 is invalid")
+                # A shipped file is part of the deployment: check it with the
+                # manifest, so validate and release packaging catch a mismatch
+                # before any user fetches it.
+                if "sourcePath" in item and sha256_file(item["sourcePath"]) != checksum:
+                    raise OpenADKitError(
+                        f"{file_where}.source {item['source']} does not match its sha256"
+                    )
     return data
 
 

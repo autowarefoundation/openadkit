@@ -148,9 +148,10 @@ elif "config --quiet" in text:
     sys.exit({config})
 elif "up --detach" in text:
     project = args[args.index("--project-name") + 1]
+    files = ",".join(args[index + 1] for index, arg in enumerate(args) if arg == "--file")
     rows = json.loads(live.read_text())
     if not any(row["Name"] == project for row in rows):
-        rows.append({{"Name": project, "Status": "running(1)"}})
+        rows.append({{"Name": project, "Status": "running(1)", "ConfigFiles": files}})
     live.write_text(json.dumps(rows))
 ''')
     return calls
@@ -248,6 +249,20 @@ def test_install_upgrade_and_uninstall_preserve_kept_versions(tmp_path):
     assert not launcher.exists() and not installed(tmp_path, "v1.3.0").exists()
     assert installed(tmp_path).is_file()
 
+
+
+def test_uninstall_all_removes_kept_releases_but_not_lookalike_directories(tmp_path):
+    assert install(tmp_path, release_bin(tmp_path)).returncode == 0
+    launcher = tmp_path / "home/.local/bin/openadkit"
+    assert command(launcher, "upgrade", home=tmp_path / "home", bin_dir=release_bin(tmp_path, "v1.3.0")).returncode == 0
+    backup = tmp_path / "home/kit/openadkit-v1.2.3-backup"
+    backup.mkdir()
+    (backup / "notes.txt").write_text("the user's own")
+    fake_docker(tmp_path)
+    result = command(launcher, "uninstall", "--all", home=tmp_path / "home", bin_dir=tmp_path / "bin")
+    assert result.returncode == 0, result.stderr
+    assert not installed(tmp_path).exists() and not installed(tmp_path, "v1.3.0").exists()
+    assert (backup / "notes.txt").read_text() == "the user's own"
 
 def test_install_adds_adkit_and_completion_and_uninstall_removes_only_its_links(tmp_path):
     home = tmp_path / "home"
@@ -560,8 +575,25 @@ def test_exclusivity_only_allows_declared_nodes_of_the_selected_deployment(tmp_p
     root, _ = runtime_tree(tmp_path, document=manifest(nodes=True))
     kit = cli_manifest.load_kit(root)
     deployment = cli_manifest.get_deployment(root, kit, "example")
-    monkeypatch.setattr(cli_compose, "live_projects", lambda: {project})
+    monkeypatch.setattr(cli_compose, "live_project_files", lambda: {project: []})
     assert cli_compose.other_projects(deployment) == ([] if allowed else [project])
+
+
+@pytest.mark.parametrize("started_from", ["own", "elsewhere", "other-node"])
+def test_run_treats_a_same_named_project_from_another_directory_as_foreign(tmp_path, monkeypatch, started_from):
+    root, directory = runtime_tree(tmp_path, document=manifest(nodes=True))
+    kit = cli_manifest.load_kit(root)
+    deployment = cli_manifest.get_deployment(root, kit, "example")
+    # Another kit's "example", or a deployment named "example-primary", has the
+    # same project name as this one's single-host or primary view.
+    entry = {"own": directory / "docker-compose.yaml", "elsewhere": tmp_path / "other-kit/docker-compose.yaml",
+             "other-node": directory / "compose.secondary.yaml"}[started_from]
+    live = {"openadkit-example": [str(entry)], "openadkit-example-primary": [str(entry).replace(
+        "docker-compose.yaml", "compose.primary.yaml")]}
+    monkeypatch.setattr(cli_compose, "live_project_files", lambda: live)
+    # run must not replace another stack in place; stop still reaches it by name.
+    assert cli_compose.other_projects(deployment) == ([] if started_from == "own" else sorted(live))
+    assert cli_compose.live_nodes(deployment) == [None, "primary"]
 
 
 def test_several_live_nodes_require_an_explicit_stop_target(tmp_path):
@@ -615,8 +647,10 @@ def test_data_file_shipped_with_the_deployment_installs_by_checksum(tmp_path):
     assert result.returncode != 0 and "missing data[0].files[0].source" in result.stderr
     (directory / "data").mkdir()
     (directory / "data/map.txt").write_text("changed")
-    result = run_cli(root, "fetch", "example")
-    assert result.returncode != 0 and "checksum mismatch" in result.stderr
+    # Checked with the manifest, so validate fails as well as fetch.
+    for command in (("validate", "example"), ("fetch", "example")):
+        result = run_cli(root, *command)
+        assert result.returncode != 0 and "data/map.txt does not match its sha256" in result.stderr
     (directory / "data/map.txt").write_text("shipped")
     result = run_cli(root, "fetch", "example")
     assert result.returncode == 0, result.stderr
@@ -695,6 +729,9 @@ def test_data_marked_before_sources_were_recorded_is_checked_by_checksum(tmp_pat
     (target / cli_data.MARKER).write_text(json.dumps({"resource": "dataset"}))
     (target / "required.txt").write_text(content)
     assert cli_data.is_outdated(target, resource) is outdated
+    # A marker that is not JSON says nothing about what was installed.
+    (target / cli_data.MARKER).write_text("{truncated")
+    assert cli_data.is_outdated(target, resource) is True
     # Unmarked data is the operator's own: never reported as outdated.
     (target / cli_data.MARKER).unlink()
     assert cli_data.is_outdated(target, resource) is False

@@ -242,6 +242,11 @@ def _compose_ls_environment() -> dict[str, str]:
 
 def live_projects() -> set[str]:
     """Names of the Open AD Kit Compose projects that are live on this host."""
+    return set(live_project_files())
+
+
+def live_project_files() -> dict[str, list[str]]:
+    """Live Open AD Kit Compose projects, with the Compose files each started from."""
     require_docker()
     result = capture_process(
         ["docker", "compose", "ls", "--format", "json"],
@@ -259,7 +264,7 @@ def live_projects() -> set[str]:
         raise OpenADKitError("could not parse Compose project list") from error
     if not isinstance(projects, list):
         raise OpenADKitError("could not parse Compose project list")
-    live: set[str] = set()
+    live: dict[str, list[str]] = {}
     for project in projects:
         if not isinstance(project, dict):
             continue
@@ -269,7 +274,8 @@ def live_projects() -> set[str]:
             continue
         state = status.lower().split("(", 1)[0].strip()
         if name.startswith(PROJECT_PREFIX) and state in LIVE_PROJECT_STATES:
-            live.add(name)
+            files = project.get("ConfigFiles")
+            live[name] = [item for item in files.split(",") if item] if isinstance(files, str) else []
     return live
 
 
@@ -295,9 +301,26 @@ def running_names(deployment_names: Iterable[str]) -> list[str]:
 
 
 def other_projects(deployment: Deployment) -> list[str]:
-    """Include foreign kits; only this deployment's exact views may coexist."""
-    own = {deployment.project_name(), *(deployment.project_name(node) for node in deployment.nodes)}
-    return sorted(live_projects() - own)
+    """Include foreign kits; only this deployment's exact views may coexist.
+
+    A project is named after its deployment only, so another kit's deployment
+    of the same name, or a deployment named like this one plus a node, has the
+    same project name as one of these views. A view is this deployment's only
+    when it started from the view's own entry Compose file; otherwise `run`
+    would replace another stack in place. Compose that reports no files keeps
+    the name as the only evidence. stop, status and logs still go by name, so
+    a stack started from an older release stays reachable after an upgrade.
+    """
+    live = live_project_files()
+    own = set()
+    for node in (None, *deployment.nodes):
+        name = deployment.project_name(node)
+        if name not in live:
+            continue
+        entry = deployment.compose_files(False, node)[0].resolve()
+        if not live[name] or Path(live[name][0]).resolve() == entry:
+            own.add(name)
+    return sorted(set(live) - own)
 
 
 def live_nodes(deployment: Deployment) -> list[str | None]:

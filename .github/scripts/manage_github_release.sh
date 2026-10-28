@@ -15,6 +15,9 @@ VERSION=$(jq -r '.release.version' "${plan_file}")
 RELEASE_SHA=$(jq -r '.release.releaseSha' "${plan_file}")
 STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")
 PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
+# The title pairs the version with the Autoware it builds on; creation and
+# every verification use this one value.
+RELEASE_TITLE="Open AD Kit ${VERSION} · Autoware $(jq -r '.releaseContext.autoware.version' "${plan_file}")"
 
 project_release() {
   jq -c '{
@@ -55,11 +58,12 @@ verify_owned_draft() {
   jq -e \
     --arg marker "${RELEASE_WORKFLOW_MARKER}" \
     --arg version "${VERSION}" \
+    --arg title "${RELEASE_TITLE}" \
     --arg release_sha "${RELEASE_SHA}" '
       (.id | type == "number") and
       .isDraft == true and
       .tagName == $version and
-      .name == $version and
+      .name == $title and
       .targetCommitish == $release_sha and
       (.body | startswith($marker))
     ' <<<"${state}" >/dev/null
@@ -156,13 +160,14 @@ verify_published_release() {
   release_id=$(jq -r '.id' <<<"${state}")
   jq -e \
     --arg version "${VERSION}" \
+    --arg title "${RELEASE_TITLE}" \
     --arg release_sha "${RELEASE_SHA}" \
     --argjson prerelease "${prerelease}" \
     --rawfile expected_body release-notes.md '
       (.id | type == "number") and
       .tagName == $version and
       .targetCommitish == $release_sha and
-      .name == $version and
+      .name == $title and
       .isDraft == false and
       .isPrerelease == $prerelease and
       .body == $expected_body
@@ -192,10 +197,9 @@ create_draft() {
   local state
   local -a assets
   mapfile -t assets < <(jq -r '.githubAssets[].path' "${plan_file}")
-  # The title pairs the version with the Autoware it builds on.
   gh release create "${VERSION}" \
     --target "${RELEASE_SHA}" \
-    --title "Open AD Kit ${VERSION} · Autoware $(jq -r '.releaseContext.autoware.version' "${plan_file}")" \
+    --title "${RELEASE_TITLE}" \
     --notes-file release-notes.md \
     --draft \
     "${assets[@]}" >/dev/null

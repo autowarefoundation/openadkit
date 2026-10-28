@@ -241,6 +241,23 @@ def require_no_running_deployments() -> None:
         )
 
 
+def is_installed_release(directory: Path) -> bool:
+    """A directory the installer made: a release manifest naming this version.
+
+    A name like openadkit-v1.2.3-backup also matches KEPT_RELEASE_RE, so the
+    name alone must never decide what --all deletes.
+    """
+    metadata = directory / "openadkit.json"
+    if metadata.is_symlink() or not metadata.is_file():
+        return False
+    try:
+        kit = json.loads(metadata.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return (isinstance(kit, dict) and kit.get("kind") == "release"
+            and directory.name == f"openadkit-{kit.get('version')}")
+
+
 def uninstall(root: Path, arguments: Sequence[str]) -> int:
     remove_kept = False
     for argument in arguments:
@@ -271,7 +288,8 @@ def uninstall(root: Path, arguments: Sequence[str]) -> int:
 
     if remove_kept:
         for candidate in sorted(destination.glob("openadkit-v*")):
-            if candidate.is_dir() and not candidate.is_symlink() and KEPT_RELEASE_RE.fullmatch(candidate.name):
+            if (candidate.is_dir() and not candidate.is_symlink() and KEPT_RELEASE_RE.fullmatch(candidate.name)
+                    and is_installed_release(candidate)):
                 log(f"removing {candidate}")
                 shutil.rmtree(candidate)
         for pattern in (".openadkit-old.*", ".openadkit-stage.*"):

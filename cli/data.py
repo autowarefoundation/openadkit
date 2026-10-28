@@ -79,7 +79,9 @@ def is_outdated(target: Path, resource: dict[str, Any]) -> bool:
     try:
         marker = json.loads((target / MARKER).read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return False
+        # The CLI writes valid JSON: an unreadable marker says nothing about
+        # what was installed, so the data cannot count as current.
+        return True
     recorded = marker.get("source") if isinstance(marker, dict) else None
     if isinstance(recorded, str):
         return recorded != source_digest(resource)

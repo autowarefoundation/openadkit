@@ -68,18 +68,24 @@ resolve_registry_context() {
 }
 
 distro="${ROS_DISTRO:-humble}"
+# What a cached base was built from: its build files, plus the Autoware
+# checkout. export_autoware_lock.py resolves the dependency SHAs that vcs
+# import bakes into the base, and setup-build-env imports the sources and
+# applies the line's Autoware patches; a change to any of them must
+# invalidate cached registry contexts.
+base_inputs=(
+  .dockerignore components/docker-bake.hcl components/shared components/universe-common
+  .github/scripts/export_autoware_lock.py .github/actions/setup-build-env
+  .github/scripts/autoware_patches.py .github/autoware-patches
+)
 use_local_common="${USE_LOCAL_COMMON:-false}"
 use_local_simulator="${USE_LOCAL_SIMULATOR:-false}"
 
 if jq -e 'index("carla-interface") != null' <<<"${TARGETS_JSON}" >/dev/null \
   && [ "${use_local_simulator}" != true ]; then
   simulator_ref="${IMAGE_PREFIX_COMPONENT}:simulator-amd64-${distro}"
-  # export_autoware_lock.py resolves the dependency SHAs that vcs import bakes
-  # into the base, so a change to it must invalidate cached registry contexts.
   if simulator_context=$(resolve_registry_context "${simulator_ref}" \
-    .dockerignore components/docker-bake.hcl components/shared \
-    components/universe-common components/simulator \
-    .github/scripts/export_autoware_lock.py); then
+    "${base_inputs[@]}" components/simulator); then
     echo "simulator_context=${simulator_context}" >> "${GITHUB_OUTPUT}"
   else
     rc=$?
@@ -100,14 +106,8 @@ fi
 if [ "${common_required}" = true ] && [ "${use_local_common}" != true ]; then
   devel_ref="${IMAGE_PREFIX_COMMON}:universe-common-devel-amd64-${distro}"
   runtime_ref="${IMAGE_PREFIX_COMMON}:universe-common-amd64-${distro}"
-  if devel_context=$(resolve_registry_context "${devel_ref}" \
-    .dockerignore components/docker-bake.hcl components/shared \
-    components/universe-common \
-    .github/scripts/export_autoware_lock.py) \
-    && runtime_context=$(resolve_registry_context "${runtime_ref}" \
-      .dockerignore components/docker-bake.hcl components/shared \
-      components/universe-common \
-      .github/scripts/export_autoware_lock.py); then
+  if devel_context=$(resolve_registry_context "${devel_ref}" "${base_inputs[@]}") \
+    && runtime_context=$(resolve_registry_context "${runtime_ref}" "${base_inputs[@]}"); then
     echo "devel_context=${devel_context}" >> "${GITHUB_OUTPUT}"
     echo "runtime_context=${runtime_context}" >> "${GITHUB_OUTPUT}"
   else

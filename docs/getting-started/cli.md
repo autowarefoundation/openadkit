@@ -43,8 +43,9 @@ before localization starts.
 Ctrl+C. It runs as a copy of the running api container, so it joins the
 deployment's ROS domain and knows the overlay's message types, and the bag stays
 on the host when the deployment stops.
-One deployment runs at a time, including deployments from other kits. `run`
-refuses conflicting projects; stop them from their owning kit first. Declared
+One deployment runs at a time, including deployments from other kits, even one
+with the same name. `run` refuses conflicting projects; stop them from their
+owning kit first. Declared
 split nodes of the same deployment can still run together.
 After starting, `run` watches the services for 10 seconds and fails if one
 crashes.

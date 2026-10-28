@@ -107,9 +107,10 @@ translation.
 Browser-accessible RViz2 through noVNC: RViz2 with Autoware plugins, Openbox,
 TigerVNC, and a noVNC server over plain HTTP. The VNC backend stays
 loopback-only, and so does noVNC by default; reach it remotely through an SSH
-tunnel. To serve HTTPS, mount your own certificate and name its files in
-`NOVNC_CERT` and `NOVNC_KEY`; it stays the same across starts, so a browser
-exception for it holds.
+tunnel. To serve HTTPS, mount your own certificate into the visualizer from an
+[integrator kit](../deployments/integrator-guide.md) or a Compose override (the
+release mounts none) and name its files in `NOVNC_CERT` and `NOVNC_KEY`; it
+stays the same across starts, so a browser exception for it holds.
 
 | Variable | Default | Values | Description |
 |----------|---------|--------|-------------|

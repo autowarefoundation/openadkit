@@ -481,54 +481,83 @@ def baseline_injections(
     return injections
 
 
+# A list item naming a relative Compose file, as in a kit's include: list.
+LOCAL_INCLUDE_RE = re.compile(r"^\s*-\s*(?:path:\s*)?['\"]?([^\s'\"$][^\s'\"]*\.ya?ml)['\"]?\s*$", re.MULTILINE)
+BASE_REFERENCE_RE = re.compile(r"\$\{(OPENADKIT_BASE_DEPLOYMENT|KIT_openadkit)\}/([^\s'\"]+\.ya?ml)")
+COMPOSE_DOCUMENT_RE = re.compile(r"^(services|include):", re.MULTILINE)
+# ${NAME:-default}, ${NAME:?message} and their unset-only forms: a value the
+# file means to take from the host or the site file, not a typo.
+DELIBERATE_READ_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*):?[-?]")
+
+
+def is_compose_document(path: Path) -> bool:
+    return path.is_file() and COMPOSE_DOCUMENT_RE.search(path.read_text(encoding="utf-8")) is not None
+
+
+def kit_compose_files(deployment: Deployment, gpu: bool) -> list[Path]:
+    """The kit's own Compose files: its entry files and the kit files they include."""
+    root = deployment.root.resolve()
+    pending = [path.resolve() for path in deployment.compose_files(gpu)]
+    found: list[Path] = []
+    while pending:
+        path = pending.pop(0)
+        if path in found:
+            continue
+        found.append(path)
+        for relative in LOCAL_INCLUDE_RE.findall(path.read_text(encoding="utf-8")):
+            candidate = (path.parent / relative).resolve()
+            if candidate.is_relative_to(root) and is_compose_document(candidate):
+                pending.append(candidate)
+    return found
+
+
 def kit_variables(deployment: Deployment, gpu: bool) -> set[str]:
     """Variables the kit sets or reads that only one side of the kit knows.
 
     A variable the kit sets in its env files and reads in its own Compose
-    files is the kit's own setting, such as one of its services' options.
-    One that is only set or only read, and that the base does not declare,
-    is a likely typo. The host's site file is not part of the kit: what it
-    sets, such as the documented *_IMAGE overrides, belongs to this host.
+    files is the kit's own setting, such as one of its services' options, and
+    one read with a default or a required message (${NAME:-x}, ${NAME:?x})
+    is meant to come from the host or the site file. One only set, or only
+    read plainly, and that the base does not declare, is a likely typo. The
+    host's site file is not part of the kit: what it sets, such as the
+    documented *_IMAGE overrides, belongs to this host.
     """
     set_by_kit: set[str] = set()
     for path in deployment.env_layers[-1].files(gpu):
         set_by_kit.update(parse_dotenv(path))
     read_by_kit: set[str] = set()
-    for path in deployment.compose_files(gpu):
-        read_by_kit.update(INTERPOLATION_RE.findall(path.read_text(encoding="utf-8")))
-    return set_by_kit ^ read_by_kit
-
-
-BASE_REFERENCE_RE = re.compile(r"\$\{(OPENADKIT_BASE_DEPLOYMENT|KIT_openadkit)\}/([^\s'\"]+\.ya?ml)")
-COMPOSE_DOCUMENT_RE = re.compile(r"^(services|include):", re.MULTILINE)
+    deliberate: set[str] = set()
+    for path in kit_compose_files(deployment, gpu):
+        text = path.read_text(encoding="utf-8")
+        read_by_kit.update(INTERPOLATION_RE.findall(text))
+        deliberate.update(DELIBERATE_READ_RE.findall(text))
+    return (set_by_kit - read_by_kit) | (read_by_kit - deliberate - set_by_kit)
 
 
 def included_base_files(deployment: Deployment, gpu: bool) -> list[Path] | None:
-    """The base Compose files a kit's entry files include; None means all of them.
+    """The base Compose files the kit includes; None means all of them.
 
     A kit that includes the base's entry file inherits every base service.
     One that includes only a service layer (services.autoware.yaml) inherits
-    that layer's services; a service of the same name elsewhere in the kit is
-    its own, not a replacement of the base's.
+    that layer's services, and one that includes no base file inherits none;
+    a service of the same name elsewhere in the kit is its own, not a
+    replacement of the base's. A kit reaches the base only through
+    OPENADKIT_BASE_DEPLOYMENT or KIT_openadkit, since it cannot know where
+    the base is installed.
     """
     base = deployment.base
     assert base is not None
     roots = {"OPENADKIT_BASE_DEPLOYMENT": base.directory, "KIT_openadkit": base.root}
     entry = {path.resolve() for path in base.compose_files(gpu)}
     found: list[Path] = []
-    for path in deployment.compose_files(gpu):
+    for path in kit_compose_files(deployment, gpu):
         for variable, relative in BASE_REFERENCE_RE.findall(path.read_text(encoding="utf-8")):
             candidate = (roots[variable] / relative).resolve()
             if candidate in entry:
                 return None
-            if (
-                candidate not in found
-                and candidate.is_file()
-                and COMPOSE_DOCUMENT_RE.search(candidate.read_text(encoding="utf-8"))
-            ):
+            if candidate not in found and is_compose_document(candidate):
                 found.append(candidate)
-    # Nothing recognizable: compare with the whole base rather than skip it.
-    return found or None
+    return found
 
 
 def check_overlay(
@@ -541,9 +570,11 @@ def check_overlay(
     base_selection = base.select(kit.base, selection.ros_distro, selection.gpu)
     injections = baseline_injections(deployment, selection, kit, base_selection)
     baseline = Selection(selection.ros_distro, selection.gpu, None, injections, selection.environment)
-    original = compose_model(
-        base, baseline, environment_from=deployment,
-        files=included_base_files(deployment, selection.gpu),
+    layers = included_base_files(deployment, selection.gpu)
+    original = (
+        compose_model(base, baseline, environment_from=deployment, files=layers)
+        if layers != []
+        else {}
     )
     current = compose_model(deployment, selection)
     declared = set(selection.injections)

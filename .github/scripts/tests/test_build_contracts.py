@@ -279,6 +279,43 @@ def test_kit_on_one_service_layer_owns_its_services_and_settings(tmp_path, compo
     assert rules == {None: set(), "command": {"command"}, "typo": {"variable"}}[change]
 
 
+@pytest.mark.parametrize("change", [None, "plain-read", "set-only"])
+def test_kit_files_shared_by_deployments_and_host_reads_are_the_kits(tmp_path, compose_context, change):
+    # An integrator kit: a world file two deployments include, one of which
+    # takes nothing from the base and reads the desktop's DISPLAY.
+    kit = tmp_path / "kit"
+    (kit / "deployments/shared").mkdir(parents=True)
+    (kit / "openadkit.json").write_text(json.dumps({
+        "schemaVersion": 2, "kind": "kit", "extends": str(ROOT),
+        "deployments": {"manual": {"path": "deployments/manual"}}, "artifacts": {},
+    }))
+    world = '  carla:\n    image: busybox:1.36.1\n    command: ["sleep", "${TOWN}"]\n'
+    if change == "plain-read":
+        world += '    environment:\n      SPAWN: ${SPAWNN}\n'
+    (kit / "deployments/shared/world.yaml").write_text("services:\n" + world)
+    directory = kit / "deployments/manual"
+    directory.mkdir()
+    (directory / "deployment.json").write_text(json.dumps({
+        "schemaVersion": 2, "name": "manual", "description": "Drive by hand",
+        "base": "carla-simulation", "compose": {"files": ["docker-compose.yaml"]},
+    }))
+    (directory / "config.env").write_text("TOWN=Town01\n" + ("CARLA_CPU=3\n" if change == "set-only" else ""))
+    (directory / "docker-compose.yaml").write_text(
+        "include:\n  - ../shared/world.yaml\n"
+        "services:\n  manual:\n    image: busybox:1.36.1\n"
+        "    environment:\n      DISPLAY: ${DISPLAY:?run from a desktop session}\n"
+    )
+    environment = dict(os.environ, DISPLAY=":1")
+    result = subprocess.run([str(ROOT / "openadkit"), "validate", "manual", "--gpu", "--json"],
+                            cwd=kit, env=environment, text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    warnings = json.loads(result.stdout)["overlayWarnings"]
+    # Its carla is its own (it includes no base file), TOWN is set and read by
+    # the kit across its files, and DISPLAY is read from the host on purpose.
+    assert [warning.get("variable") for warning in warnings] == {
+        None: [], "plain-read": ["SPAWNN"], "set-only": ["CARLA_CPU"]}[change]
+
+
 def test_centerpoint_models_mount_where_the_cli_installs_them(compose_context, tmp_path):
     import data
     (tmp_path / "config").mkdir()

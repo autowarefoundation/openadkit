@@ -58,6 +58,13 @@ export OPENADKIT_CONFIG_DIR="${out}/config"
 unset OPENADKIT_KIT OPENADKIT_DELEGATED
 mkdir -p "${OPENADKIT_CONFIG_DIR}"
 scenario_output="${OPENADKIT_STATE_DIR}/${deployment}/output"
+# A 4-vCPU runner cannot run Autoware main in real time: the ego drives late
+# and the samples take three times as long as on 16 vCPUs, past the wall-clock
+# timeout. Half speed gives Autoware the CPU a larger host has per simulated
+# second, so the cell checks the scenarios rather than the runner's size.
+if [ "${l2_check}" = scenario ]; then
+    printf '%s\n' GLOBAL_REAL_TIME_FACTOR=0.5 GLOBAL_TIMEOUT=400 >"${OPENADKIT_CONFIG_DIR}/${deployment}.env"
+fi
 
 # Several nodes on one host: each gets its own project, logs and Zenoh endpoint.
 split=false
@@ -224,7 +231,8 @@ if [ "${l1_ok}" = true ]; then
             fi
             ;;
         scenario)
-            ss_rc=$(timeout 1200 docker wait autoware-scenario-simulator 2>/dev/null || echo timeout)
+            # Three samples of up to GLOBAL_TIMEOUT each, after the readiness wait.
+            ss_rc=$(timeout 1800 docker wait autoware-scenario-simulator 2>/dev/null || echo timeout)
             docker logs autoware-scenario-simulator >"${out}/scenario.log" 2>&1 || true
             python3 "${script_dir}/scenario_metrics.py" \
                 --output-dir "${scenario_output}" \

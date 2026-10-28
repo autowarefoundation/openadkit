@@ -45,16 +45,29 @@ Open AD Kit uses [Semantic Versioning](https://semver.org/)
 | Part | Increments when |
 |------|-----------------|
 | **MAJOR** | A backward-incompatible change to the image set, the documented deployment layout, or a supported platform is removed. |
-| **MINOR** | New backward-compatible capability: components, platforms, deployments, or tooling. |
+| **MINOR** | New backward-compatible capability: components, platforms, deployments, or tooling; or a move to the next Autoware minor release. |
 | **PATCH** | Backward-compatible fixes: bugs, CVE remediation, image refreshes, and documentation. |
 
-The Open AD Kit version is **independent of the Autoware version**. Each release
-pins one upstream Autoware release, the ROS 2 distros, and every image digest,
-and lists them in its
-[GitHub Release](https://github.com/autowarefoundation/openadkit/releases)
-notes. A `release/X.Y` branch produces the `vX.Y.Z` releases and pins their
-Autoware release in `.github/autoware.ref`; `main` builds a snapshot of
-upstream development that moves weekly.
+The Open AD Kit version is its own: it follows the CLI, kit and deployment
+contract, not Autoware's numbering. Each **release line builds on one Autoware
+minor release**, so the version still tells the Autoware:
+
+| Open AD Kit | Autoware |
+|-------------|----------|
+| v2.0.x | 1.9.x |
+
+A `release/X.Y` branch produces the `vX.Y.Z` releases and pins their Autoware
+release in `.github/autoware.ref`. An Autoware patch release may join its line;
+the next Autoware minor release starts a new line, and the release gate refuses
+a release that would leave its line's Autoware. Every release pairs the two in
+its [GitHub Release](https://github.com/autowarefoundation/openadkit/releases)
+title, `Open AD Kit v2.0.1 · Autoware 1.9.0`, and so do `openadkit install` and
+`openadkit version`. The release also pins the ROS 2 distros and every image
+digest, and its images carry `org.opencontainers.image.autoware-base-version`.
+A fix that is upstream but not yet in an Autoware release can be
+[backported](../releases/evidence.md#backporting-an-autoware-fix) on a line;
+the release notes list it, and the Autoware version stays the tag's.
+`main` builds a snapshot of upstream development that moves weekly.
 
 ## ROS 2 Distro Support
 

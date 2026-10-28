@@ -1090,9 +1090,14 @@ def _parse_autoware(value: Any, kind: str) -> dict[str, str] | None:
         raise OpenADKitError("repository bundles must not declare autoware")
     if not isinstance(value, dict):
         raise OpenADKitError("autoware must be an object")
-    reject_unknown(value, {"version", "ref", "lockSha256"}, "autoware")
+    reject_unknown(value, {"version", "ref", "lockSha256", "backports"}, "autoware")
     for field in ("version", "ref", "lockSha256"):
         require_string(value.get(field), f"autoware.{field}")
+    backports = value.get("backports", [])
+    if not isinstance(backports, list) or any(
+        not isinstance(item, dict) or not isinstance(item.get("upstream"), str) for item in backports
+    ):
+        raise OpenADKitError("autoware.backports must list fixes with their upstream URL")
     return value
 
 

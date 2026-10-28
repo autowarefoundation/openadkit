@@ -357,6 +357,12 @@ def show_running(root, kit, command: str, running: list[str], *, extra: str = ""
     return 2
 
 
+def autoware_line(autoware: dict[str, Any]) -> str:
+    backports = len(autoware.get("backports", []))
+    fixes = f", {backports} backported fix{'es' if backports > 1 else ''}" if backports else ""
+    return f"autoware: {autoware['version']} ({autoware['ref']}{fixes})"
+
+
 def show_version(root, kit, *, json_output: bool = False) -> int:
     if kit.kind == "release":
         version = kit.version
@@ -387,11 +393,14 @@ def show_version(root, kit, *, json_output: bool = False) -> int:
     if kit.extends is not None:
         print(f"kit: {root}")
         print(f"extends: Open AD Kit {kit.extends} ({kit.base_root})")
+        if kit.autoware:
+            print(autoware_line(kit.autoware))
     elif kit.kind == "release":
-        print(f"Open AD Kit {kit.version or 'unknown'}")
+        autoware = f" · Autoware {kit.autoware['version']}" if kit.autoware else ""
+        print(f"Open AD Kit {kit.version or 'unknown'}{autoware}")
         print("bundle: release")
         if kit.autoware:
-            print(f"autoware: {kit.autoware['version']} ({kit.autoware['ref']})")
+            print(autoware_line(kit.autoware))
     else:
         print("Open AD Kit development")
         print(f"commit: {commit or 'unknown'}")

@@ -192,9 +192,10 @@ create_draft() {
   local state
   local -a assets
   mapfile -t assets < <(jq -r '.githubAssets[].path' "${plan_file}")
+  # The title pairs the version with the Autoware it builds on.
   gh release create "${VERSION}" \
     --target "${RELEASE_SHA}" \
-    --title "${VERSION}" \
+    --title "Open AD Kit ${VERSION} · Autoware $(jq -r '.releaseContext.autoware.version' "${plan_file}")" \
     --notes-file release-notes.md \
     --draft \
     "${assets[@]}" >/dev/null

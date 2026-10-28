@@ -16,6 +16,7 @@ INSTALL_FINAL=
 RESOLVED_VERSION=
 RESOLVED_ARCHIVE=
 RESOLVED_SHA256=
+RESOLVED_AUTOWARE=
 
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 usage_fail() { printf 'error: %s\n' "$*" >&2; exit 2; }
@@ -94,18 +95,19 @@ try:
         raise ValueError("expected exactly one release bundle")
     bundle = bundles[0]
     name, digest = bundle["name"], bundle["sha256"]
+    autoware = metadata.get("autoware_base_version") or "unknown"
     if name != f"openadkit-{version}.tar.gz":
         raise ValueError("bundle name does not match the release version")
     if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
         raise ValueError("invalid bundle SHA-256")
-    print(version, name, digest, sep="\t")
+    print(version, name, digest, autoware, sep="\t")
 except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
     print(f"invalid release metadata: {error}", file=sys.stderr)
     raise SystemExit(1)
 PY
 )
   ((${#release_fields[@]} == 1)) || exit 1
-  IFS=$'\t' read -r RESOLVED_VERSION RESOLVED_ARCHIVE RESOLVED_SHA256 <<<"${release_fields[0]}"
+  IFS=$'\t' read -r RESOLVED_VERSION RESOLVED_ARCHIVE RESOLVED_SHA256 RESOLVED_AUTOWARE <<<"${release_fields[0]}"
 }
 
 install_resolved_release() {
@@ -211,7 +213,7 @@ PY
   INSTALL_TEMP=
   trap - EXIT INT TERM
 
-  log "installed ${release_version} to ${final_root}"
+  log "installed ${release_version} (Autoware ${RESOLVED_AUTOWARE:-unknown}) to ${final_root}"
   if [[ $announce_next != true ]]; then
     return 0
   fi

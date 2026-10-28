@@ -108,6 +108,7 @@ jobs:
             .github/scripts/install-compose.sh
             .github/scripts/package_release_bundles.sh
             .github/scripts/release_plan.py
+            .github/scripts/autoware_patches.py
             .github/scripts/images.py
             .github/scripts/validation_matrix.py
             .github/scripts/evidence/
@@ -138,6 +139,7 @@ jobs:
             /cli/
             /components/docker-bake.hcl
             /deployments/
+            /.github/autoware-patches/
 
       - name: Download validated release metadata
         uses: actions/download-artifact@v8

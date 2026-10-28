@@ -209,7 +209,7 @@ def release_bin(tmp_path, version="v1.2.3", *, bad_checksum=False, member=None):
                 info.size = len(payload)
                 archive.addfile(info, io.BytesIO(payload))
     (release / "release-metadata.json").write_text(json.dumps({
-        "openadkit_version": version, "bundles": [{"name": bundle.name,
+        "openadkit_version": version, "autoware_base_version": "1.9.0", "bundles": [{"name": bundle.name,
         "sha256": "0" * 64 if bad_checksum else hashlib.sha256(bundle.read_bytes()).hexdigest()}],
     }))
     bin_dir = release / "bin"
@@ -233,7 +233,8 @@ def installed(tmp_path, version="v1.2.3"):
 
 
 def test_install_upgrade_and_uninstall_preserve_kept_versions(tmp_path):
-    assert install(tmp_path, release_bin(tmp_path)).returncode == 0
+    result = install(tmp_path, release_bin(tmp_path))
+    assert result.returncode == 0 and "installed v1.2.3 (Autoware 1.9.0)" in result.stdout
     launcher = tmp_path / "home/.local/bin/openadkit"
     assert launcher.resolve() == installed(tmp_path)
     newer = release_bin(tmp_path, "v1.3.0")
@@ -293,6 +294,18 @@ def test_completion_offers_commands_options_and_deployments(tmp_path):
     # One deployment per command; list takes none.
     assert complete(root, ["openadkit", "run", "example", ""]) == set()
     assert complete(root, ["openadkit", "list", ""]) == set()
+
+
+def test_version_pairs_the_release_with_its_autoware_also_in_a_kit(tmp_path):
+    root, _ = runtime_tree(tmp_path, release=True)
+    assert run_cli(root, "version").stdout.splitlines()[0] == "Open AD Kit v1.2.3 · Autoware 1.8.0"
+    kit = integrator_kit(tmp_path, root)
+    output = run_cli(root, "version", directory=kit).stdout
+    assert f"autoware: 1.8.0 ({'a' * 40})" in output.splitlines()
+    # A line's backported fixes show with the Autoware they patch.
+    edit_kit(root, lambda doc: doc["autoware"].update(backports=[
+        {"repository": "universe/autoware_universe", "subject": "fix", "upstream": "https://example.com/pull/1"}]))
+    assert f"autoware: 1.8.0 ({'a' * 40}, 1 backported fix)" in run_cli(root, "version").stdout.splitlines()
 
 
 def test_completion_lists_every_command_and_option():

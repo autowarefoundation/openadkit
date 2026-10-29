@@ -144,7 +144,9 @@ def manager_env(tmp_path, problem):
     """One asset is sufficient to exercise ownership, race and content guards."""
     asset = tmp_path / "bundle.tar.gz"
     asset.write_bytes(b"validated bundle")
-    state = {"id": 42, "tag_name": VERSION, "target_commitish": RELEASE_SHA, "name": VERSION,
+    # GitHub returns the title the release was created with, not the tag.
+    state = {"id": 42, "tag_name": VERSION, "target_commitish": RELEASE_SHA,
+             "name": f"Open AD Kit {VERSION} · Autoware 1.9.0",
              "draft": True, "prerelease": False, "body": MARKER, "assets": [{"id": 101, "name": asset.name}]}
     (tmp_path / "release-notes.md").write_text(MARKER)
     (tmp_path / "release-assets.sha256").write_text(f"{hashlib.sha256(asset.read_bytes()).hexdigest()}  {asset.name}\n")

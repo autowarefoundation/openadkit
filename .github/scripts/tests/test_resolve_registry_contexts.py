@@ -175,6 +175,12 @@ SHARED_SOURCES = (
     "components/shared/runtime-cleanup.sh",
     "components/universe-common/input",
 )
+# The Autoware checkout a base was compiled from.
+CHECKOUT_SOURCES = (
+    ".github/actions/setup-build-env/action.yaml",
+    ".github/scripts/autoware_patches.py",
+    ".github/autoware-patches/universe/autoware_universe/0001-fix.patch",
+)
 
 
 @pytest.mark.parametrize(
@@ -193,6 +199,7 @@ SHARED_SOURCES = (
         (["carla-interface"], {"simulator_matches": False}, "registry", "local", 3),
         (["carla-interface"], {"changed_source": "components/simulator/input"}, "registry", "local", 3),
         *((["carla-interface"], {"changed_source": path}, "local", "local", 2) for path in SHARED_SOURCES),
+        *((["api"], {"changed_source": path}, "local", None, None) for path in CHECKOUT_SOURCES),
     ],
 )
 def test_resolver_reuses_registry_images_only_when_they_match(

@@ -73,9 +73,10 @@ New runner cells use `schemaVersion: 1`. The same payload is embedded under
 Test Result `configuration[].annotations.openadkitCell` and stored in the
 schema-v2 summary; CI, JUnit and release views are derived from it. Release
 reports store the original verified statement and its hash, not a second cell
-copy. Readers also accept legacy annotations, unversioned summaries and sealed
-schema-v1 release reports; signature and exact build/source/matrix checks still
-apply. New summary readers should use `metrics` rather than top-level timings.
+copy. Readers accept only these versioned payloads: a cell without
+`schemaVersion: 1` and `metrics`, or a report that does not match its verified
+statement, is rejected. Summary readers should use `metrics` rather than
+top-level timings.
 
 Inspect the workflow summary and failures before release. A CI quarantine
 warning never grants release permission: the

@@ -28,7 +28,7 @@ newgrp docker
 ./openadkit run planning-simulation
 ```
 
-When the stack is ready, open [the noVNC visualizer](https://localhost:6080/vnc.html), accept the self-signed certificate, and sign in with the password `openadkit`.
+When the stack is ready, open [the noVNC visualizer](http://localhost:6080/vnc.html) and sign in with the password `openadkit`.
 
 The CLI downloads required data, pulls missing images, starts the services, and verifies readiness. See the [guided quick start](https://autowarefoundation.github.io/openadkit/getting-started/) for installation options, runtime controls, and troubleshooting.
 

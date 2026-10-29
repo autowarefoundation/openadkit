@@ -13,6 +13,12 @@ include:
   - services.carla.yaml
 
 services:
+  # Like every Autoware launch, carla-interface joins map's PID namespace so its
+  # /launch_ros_<PID> node is unique (../shared/services/map.yaml). The
+  # --node carla view has no map and keeps its own namespace.
+  carla-interface:
+    pid: service:map
+
   vehicle:
     depends_on:
       - map

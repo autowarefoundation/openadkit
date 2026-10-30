@@ -34,7 +34,6 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
     runs-on: ubuntu-22.04
     timeout-minutes: 360
     permissions:
@@ -43,6 +42,13 @@ jobs:
     outputs:
       build_tag: ${{ steps.tag.outputs.build_tag }}
     steps:
+      # Fail rather than skip: a skipped chain would end green with nothing released.
+      - name: Require a release branch
+        if: ${{ !startsWith(github.ref, 'refs/heads/release/') }}
+        run: |
+          echo "::error::run release-pipeline on a release/X.Y branch, not ${GITHUB_REF}"
+          exit 1
+
       - name: Check out dispatch script
         uses: actions/checkout@v7
         with:

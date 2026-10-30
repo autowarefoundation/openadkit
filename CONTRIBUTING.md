@@ -51,11 +51,11 @@ by hand to move sooner.
 
 ### Local CI Commands
 
-Run the full lint suite before pushing. These commands mirror (and extend) what CI runs in `.github/workflows/lint.yaml`:
+Run these before pushing. They cover most of what `.github/workflows/lint.yaml` runs; CI also validates every deployment cell from `validation_matrix.py` and checks the Bake file.
 
 ```bash
-# Shell scripts
-git ls-files '*.sh' | xargs shellcheck --severity=error
+# Shell scripts (and the extensionless launcher)
+{ git ls-files '*.sh'; echo openadkit; } | xargs shellcheck --severity=error
 
 # GitHub Actions workflows (no glob — picks up .github/actions/ composites too)
 ./actionlint
@@ -76,6 +76,7 @@ npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.g
 pytest .github/scripts/
 bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
 bash .github/scripts/tests/test_report_manifests.sh
+bash .github/scripts/tests/test_setup_helpers.sh
 
 # Deployment validation for both supported ROS distros
 ./openadkit validate planning-simulation --ros-distro humble

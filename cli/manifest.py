@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import stat
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -49,7 +50,12 @@ ALLOWED_INTEGRATOR_COMPOSE_KEYS = {"files", "resetServices", "waitTimeout"}
 # The include variable for the pinned kit, named per kit so a later layer
 # (a Tier-1 kit extended by an OEM kit) can add its own.
 BASE_KIT_ENV = "KIT_openadkit"
-RELEASE_TAG_RE = re.compile(r"^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$")
+_IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+# Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
+VERSION_RE = re.compile(
+    r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    rf"(?:-({_IDENTIFIER}(?:\.{_IDENTIFIER})*))?$"
+)
 ALLOWED_DEPLOYMENT_REF_KEYS = {"path", "checksum"}
 ALLOWED_DEPLOYMENT_KEYS = {
     "schemaVersion",
@@ -139,6 +145,15 @@ def require_string(value: Any, where: str, *, nonempty: bool = True) -> str:
     return value
 
 
+def require_url(value: Any, where: str) -> str:
+    url = require_string(value, where)
+    parsed = urllib.parse.urlsplit(url)
+    # file: serves a local mirror; anything else would fail only at fetch.
+    if parsed.scheme not in ("http", "https", "file") or (parsed.scheme != "file" and not parsed.netloc):
+        raise OpenADKitError(f"{where} must be an http, https or file URL: {url}")
+    return url
+
+
 def require_string_list(
     value: Any,
     where: str,
@@ -212,7 +227,7 @@ def parse_dotenv(path: Path) -> dict[str, str]:
     """
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError as error:
+    except (OSError, UnicodeError) as error:
         raise OpenADKitError(f"could not read environment file {path}: {error}") from error
     values: dict[str, str] = {}
     index, line = 0, 1
@@ -752,14 +767,17 @@ def _validate_data(data: Any, nodes: dict[str, Any], directory: Path) -> list[di
             safe_relative(relative, f"{where}.generatedFiles")
         resource["generatedFiles"] = generated
         if resource["kind"] == "zip":
-            require_string(resource.get("url"), f"{where}.url")
+            require_url(resource.get("url"), f"{where}.url")
             checksum = require_string(resource.get("sha256"), f"{where}.sha256")
             if not SHA256_RE.fullmatch(checksum):
                 raise OpenADKitError(f"{where}.sha256 is invalid")
-            safe_relative(
+            # The archive's single top-level directory, which data.py extracts.
+            expected_root = safe_relative(
                 require_string(resource.get("expectedRoot"), f"{where}.expectedRoot"),
                 f"{where}.expectedRoot",
             )
+            if len(expected_root.parts) != 1:
+                raise OpenADKitError(f"{where}.expectedRoot must be one directory name")
             if resource.get("files") not in (None, []):
                 raise OpenADKitError(f"{where}.files is invalid for zip data")
             resource["files"] = []
@@ -783,7 +801,7 @@ def _validate_data(data: Any, nodes: dict[str, Any], directory: Path) -> list[di
                 if ("url" in item) == ("source" in item):
                     raise OpenADKitError(f"{file_where} needs exactly one of url and source")
                 if "url" in item:
-                    require_string(item["url"], f"{file_where}.url")
+                    require_url(item["url"], f"{file_where}.url")
                 else:
                     item["sourcePath"] = ensure_safe_existing(
                         directory, item["source"], f"{file_where}.source"
@@ -1145,7 +1163,7 @@ def install_root() -> Path:
 def resolve_extends(kit_root: Path, extends: str) -> Path:
     """The Open AD Kit a kit pins: an installed release tag or, while
     developing, a path to a source checkout."""
-    if RELEASE_TAG_RE.fullmatch(extends):
+    if VERSION_RE.fullmatch(extends):
         candidate = install_root() / f"openadkit-{extends}"
         if not (candidate / "openadkit.json").is_file():
             raise OpenADKitError(

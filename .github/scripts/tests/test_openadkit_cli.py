@@ -386,7 +386,7 @@ def test_failed_replacement_restores_previous_release(tmp_path, stop, message):
     root = installed(tmp_path).parent
     (root / "marker").write_text("previous")
     executable(bin_dir / "mv", "#!/usr/bin/env bash\n"
-               f'if [[ $# -eq 2 && "$2" == "{root}" && "$1" == *".openadkit-stage."* ]]; then {stop}; fi\n'
+               f'if [[ $# -eq 3 && "$1" == -T && "$3" == "{root}" && "$2" == *".openadkit-stage."* ]]; then {stop}; fi\n'
                f'exec {shutil.which("mv")} "$@"\n')
     result = install(tmp_path, bin_dir, "--force")
     assert result.returncode != 0 and message in result.stderr
@@ -662,6 +662,28 @@ def test_data_file_takes_exactly_one_of_url_and_source(tmp_path):
     resource["files"][0]["source"] = "data/map.txt"
     with pytest.raises(cli_manifest.OpenADKitError, match="exactly one of url and source"):
         cli_manifest._validate_data([resource], {}, tmp_path)
+
+
+@pytest.mark.parametrize("url", ["foo", "ftp://example.com/map.txt", "https:///map.txt"])
+def test_data_url_must_be_fetchable(tmp_path, url):
+    resource = files_resource(tmp_path)
+    resource["files"][0]["url"] = url
+    with pytest.raises(cli_manifest.OpenADKitError, match="must be an http, https or file URL"):
+        cli_manifest._validate_data([resource], {}, tmp_path)
+
+
+def test_zip_expected_root_is_one_directory(tmp_path):
+    resource = {"name": "dataset", "kind": "zip", "destinationEnv": "MAP_PATH", "expectedRoot": "dataset/inner",
+                "url": "https://example.com/data.zip", "sha256": "0" * 64, "requiredFiles": ["required.txt"]}
+    with pytest.raises(cli_manifest.OpenADKitError, match="expectedRoot must be one directory name"):
+        cli_manifest._validate_data([resource], {}, tmp_path)
+
+
+def test_env_file_that_is_not_utf8_is_a_cli_error(tmp_path):
+    path = tmp_path / "config.env"
+    path.write_bytes(b"NAME=\xff\n")
+    with pytest.raises(cli_manifest.OpenADKitError, match="could not read environment file"):
+        cli_manifest.parse_dotenv(path)
 
 def test_only_explicit_fetch_force_replaces_managed_data(tmp_path):
     root, _ = runtime_tree(tmp_path, document=manifest(data=[files_resource(tmp_path)]))

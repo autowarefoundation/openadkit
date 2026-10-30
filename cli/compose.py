@@ -687,7 +687,7 @@ def failed_services(
     ids: list[str],
     baseline: dict[str, int],
 ) -> list[str]:
-    """Long-running services that restarted since `up` or exited with an error."""
+    """Long-running services that restarted since `up` or exited."""
     result = capture_process(
         [
             "docker",
@@ -709,8 +709,9 @@ def failed_services(
                 failed.add(service)
             continue
         # `up` keeps unchanged containers, and with them earlier restarts.
+        # on-failure does not restart a clean exit, which leaves the service gone.
         restarted = int(restarts) > baseline.get(container, 0)
-        if restarted or state == "restarting" or exit_code != "0":
+        if restarted or state in ("restarting", "exited") or exit_code != "0":
             failed.add(service)
     return sorted(failed)
 
@@ -1041,6 +1042,7 @@ def record(
     ]
     print_command(command)
     process = subprocess.Popen(command, env=environment)
+    interrupted = False
     while True:
         try:
             returncode = process.wait()
@@ -1048,10 +1050,14 @@ def record(
         except KeyboardInterrupt:
             # Ctrl+C reached the recorder too; killing the client would leave
             # it recording, so wait while it closes the bag.
-            continue
+            interrupted = True
     # Ctrl+C ends ros2 bag record with a nonzero status; a bag is a result.
-    if returncode != 0 and not bag.is_dir():
-        raise OpenADKitError(f"recording failed with exit status {returncode}")
+    # Without it the recorder stopped on its own, and the bag may be partial.
+    if returncode != 0 and not (interrupted and bag.is_dir()):
+        raise OpenADKitError(
+            f"recording failed with exit status {returncode}"
+            + (f"; partial bag: {bag}" if bag.is_dir() else "")
+        )
     return bag
 
 

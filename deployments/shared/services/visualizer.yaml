@@ -23,7 +23,12 @@ services:
       - RVIZ_GPU=${RVIZ_GPU:-auto}
       - NOVNC_CERT=${NOVNC_CERT:-}
       - NOVNC_KEY=${NOVNC_KEY:-}
+      # REMOTE_DISPLAY=false opens RViz on the desktop's X server, reached
+      # over the host network; its cookie comes from the session's XAUTHORITY.
+      - DISPLAY=${DISPLAY:-}
+      - XAUTHORITY=/tmp/.Xauthority
     volumes:
+      - ${XAUTHORITY:-/dev/null}:/tmp/.Xauthority:ro
       - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       # Integrator layer, applied by the image's entrypoint hook (components/shared/entrypoint).
       - ${OPENADKIT_CONFIG_SHARED:?set by the openadkit CLI}:/openadkit/config/shared:ro

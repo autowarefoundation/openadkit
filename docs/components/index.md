@@ -115,7 +115,7 @@ stays the same across starts, so a browser exception for it holds.
 | Variable | Default | Values | Description |
 |----------|---------|--------|-------------|
 | `RVIZ_CONFIG` | <code>/tmp/<wbr>openadkit/<wbr>autoware_launch/<wbr>share/<wbr>autoware_launch/<wbr>rviz/<wbr>autoware.rviz</code> | Path | RViz2 configuration inside the container; the default is the copy with config overrides applied |
-| `REMOTE_DISPLAY` | `true` | `true`, `false` | Use browser-based RViz2; `false` launches a local display |
+| `REMOTE_DISPLAY` | `true` | `true`, `false` | Use browser-based RViz2; `false` opens RViz2 on the desktop, using the session's `DISPLAY` and `XAUTHORITY` |
 | `REMOTE_PASSWORD` | — | String | Required when `REMOTE_DISPLAY=true` |
 | `WEBSOCKIFY_BIND` | `127.0.0.1` | IP address | noVNC bind address; bridge networking uses `0.0.0.0` with a host loopback port mapping |
 | `USE_SIM_TIME` | `false` | `true`, `false` | Use the ROS simulation clock |

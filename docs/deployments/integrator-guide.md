@@ -188,13 +188,12 @@ mounts and commands/images of new services are not reported as replacements.
 Validation does not pull images or inspect their parameter files.
 
 The evidence runner combines the static result with every mounted service's
-hook report and records `overlayConformant` in the signed Test Result. Missing
+hook report and records `overlayConformant` in the evidence summary. Missing
 or invalid hook reports are nonconformant, not silently clean. The example
 acceptance cell additionally requires conformance, checks shared/kit/inherited
 parameters and fresh C++ publication, and runs Planning Simulation's golden
 path. Humble and Jazzy each build the workspace against their matching devel
-digest. The attestation binds the kit's source/config checksum, excluding
-host-specific `build`, `install` and `log` products.
+digest, without host-specific `build`, `install` and `log` products.
 
 Base deployments with a reasoned CI evidence exemption retain that exemption
 in the kit. An exemption is not evidence of runtime compatibility.

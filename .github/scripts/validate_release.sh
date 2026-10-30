@@ -152,87 +152,63 @@ checkout_release_source() {
   git archive "${release_sha}" | tar -x -C "${RELEASE_SOURCE_ROOT}"
 }
 
-select_scan_metadata() {
-  local scan_artifact_ids scan_artifact_id artifact_json artifact_run_id scan_run_id scan_run_attempt
-  local scan_run_json scan_workflow_name scan_workflow_path scan_head_branch scan_status scan_conclusion
-  local selected_scan_artifact_id selected_scan_run_id selected_scan_run_attempt selected_scan_status selected_scan_conclusion
-  local lookup_status scan_lookup_http_status
+# The newest <name> artifact from a completed <workflow> run on the release
+# branch decides: its run must have succeeded and <passed> must accept it.
+# <eligible> skips artifacts that are not about this release, such as an
+# evidence run that tested another commit against this build's images.
+# Usage: select_latest_artifact <name> <workflow> <file> <eligible> <passed> <dir>
+select_latest_artifact() {
+  local name=$1 workflow=$2 file=$3 eligible=$4 passed=$5 dir=$6
+  local artifact_ids artifact_id run_id run_json archive
 
-  scan_artifact_ids=$(
-    gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=scan-metadata-${BUILD_TAG}" \
+  artifact_ids=$(
+    gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}" \
       --jq '.artifacts[] | select(.expired == false) | [.id, .created_at] | @tsv' \
       | sort -k2,2r \
       | cut -f1
   )
-  [ -n "${scan_artifact_ids}" ] || fail "No non-expired full scan metadata found for ${BUILD_TAG}"
+  [ -n "${artifact_ids}" ] || fail "No ${name} artifact found"
+  archive=$(mktemp)
 
-  selected_scan_artifact_id=""
-  selected_scan_run_id=""
-  selected_scan_run_attempt=""
-  selected_scan_status=""
-  selected_scan_conclusion=""
-  while IFS= read -r scan_artifact_id; do
-    [ -n "${scan_artifact_id}" ] || continue
+  while IFS= read -r artifact_id; do
+    [ -n "${artifact_id}" ] || continue
+    run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" --jq '.workflow_run.id // empty')
+    [ -n "${run_id}" ] || continue
+    run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" 2>/dev/null) || continue
+    jq -e --arg workflow "${workflow}" --arg branch "${source_branch}" '
+      .path == $workflow and .head_branch == $branch and .status == "completed"' \
+      <<<"${run_json}" >/dev/null || continue
 
-    rm -rf release-input/scan
-    mkdir -p release-input/scan
-    rm -f scan-metadata.zip
+    rm -rf "${dir}"
+    mkdir -p "${dir}"
+    gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" >"${archive}"
+    unzip -q "${archive}" -d "${dir}"
+    "${eligible}" "${dir}/${file}" || continue
 
-    artifact_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}")
-    artifact_run_id=$(printf '%s' "${artifact_json}" | jq -r '.workflow_run.id // empty')
-    gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${scan_artifact_id}/zip" > scan-metadata.zip
-    unzip -q scan-metadata.zip -d release-input/scan
-
-    if ! python3 "${script_dir}/images.py" check-scan release-input/scan/scan-metadata.json >/dev/null 2>&1; then
-      echo "Ignoring scan artifact ${scan_artifact_id}: metadata is not full scan metadata for ${BUILD_TAG}" >&2
-      continue
+    rm -f "${archive}"
+    if [ "$(jq -r '.conclusion' <<<"${run_json}")" != success ] || ! "${passed}" "${dir}/${file}"; then
+      rm -rf "${dir}"
+      fail "The latest ${name} (run ${run_id}) did not pass"
     fi
+    echo "${name}: passed (run ${run_id})"
+    return 0
+  done <<< "${artifact_ids}"
 
-    scan_run_id=$(jq -r '.run_id' release-input/scan/scan-metadata.json)
-    scan_run_attempt=$(jq -r '.run_attempt' release-input/scan/scan-metadata.json)
-    if [ "${artifact_run_id}" != "${scan_run_id}" ]; then
-      echo "Ignoring scan artifact ${scan_artifact_id}: artifact run ${artifact_run_id} does not match metadata run ${scan_run_id}" >&2
-      continue
-    fi
-
-    lookup_status=0
-    scan_run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${scan_run_id}/attempts/${scan_run_attempt}" 2>/dev/null) || lookup_status=$?
-    if [ "${lookup_status}" -ne 0 ]; then
-      scan_lookup_http_status=$(jq -r '(.status // empty) | tostring' <<< "${scan_run_json}" 2>/dev/null || true)
-      if [ "${scan_lookup_http_status}" = "404" ]; then
-        echo "Ignoring scan artifact ${scan_artifact_id}: scan run ${scan_run_id}-${scan_run_attempt} was not found" >&2
-        continue
-      fi
-      fail "Could not read scan run ${scan_run_id}-${scan_run_attempt} for artifact ${scan_artifact_id}"
-    fi
-
-    scan_workflow_name=$(printf '%s' "${scan_run_json}" | jq -r '.name')
-    scan_workflow_path=$(printf '%s' "${scan_run_json}" | jq -r '.path')
-    scan_head_branch=$(printf '%s' "${scan_run_json}" | jq -r '.head_branch')
-    scan_status=$(printf '%s' "${scan_run_json}" | jq -r '.status')
-    scan_conclusion=$(printf '%s' "${scan_run_json}" | jq -r '.conclusion')
-
-    if [ "${scan_workflow_name}" != "scan-images" ] || \
-      [ "${scan_workflow_path}" != ".github/workflows/scan.yaml" ] || \
-      [ "${scan_head_branch}" != "${source_branch}" ] || \
-      [ "${scan_status}" != "completed" ]; then
-      echo "Ignoring scan artifact ${scan_artifact_id}: scan run ${scan_run_id}-${scan_run_attempt} is not a completed scan-images run on ${source_branch}" >&2
-      continue
-    fi
-
-    selected_scan_artifact_id="${scan_artifact_id}"
-    selected_scan_run_id="${scan_run_id}"
-    selected_scan_run_attempt="${scan_run_attempt}"
-    selected_scan_status=$(jq -r '.scan_status' release-input/scan/scan-metadata.json)
-    selected_scan_conclusion="${scan_conclusion}"
-    break
-  done <<< "${scan_artifact_ids}"
-
-  [ -n "${selected_scan_artifact_id}" ] || fail "No validated full scan metadata found for ${BUILD_TAG}"
-  if [ "${selected_scan_status}" != "passed" ] || [ "${selected_scan_conclusion}" != "success" ]; then
-    fail "Latest full scan for ${BUILD_TAG} did not pass: scan run ${selected_scan_run_id}-${selected_scan_run_attempt} has metadata status '${selected_scan_status}' and conclusion '${selected_scan_conclusion}'"
-  fi
+  rm -f "${archive}"
+  rm -rf "${dir}"
+  fail "No ${name} from a completed ${workflow} run on ${source_branch}"
 }
+
+scan_is_full() { python3 "${script_dir}/images.py" check-scan "$1" >/dev/null 2>&1; }
+scan_passed() { [ "$(jq -r '.scan_status' "$1")" = passed ]; }
+
+# An evidence run is about this release when it tested the build's own commit.
+evidence_is_release() {
+  jq -e --arg tag "${BUILD_TAG}" --arg sha "${release_sha}" '
+    .release_evidence == true and .build_tag == $tag and
+    .build_sha == $sha and .source_sha == $sha' "$1" >/dev/null
+}
+evidence_passed() { [ "$(jq -r '.result' "$1")" = PASSED ]; }
 
 validate_metadata() {
   # The same model is parsed again at packaging; this is not a bypass token.
@@ -301,36 +277,6 @@ validate_registry_conflicts() {
     | registry_preflight_release_images
 }
 
-verify_evidence() (
-  set -euo pipefail
-  local image_ref verify_json=release-input/evidence-verify.json
-  # Never leave an old successful report usable after failed verification.
-  rm -f release-input/evidence-report.json
-  : "${RELEASE_SOURCE_ROOT:?RELEASE_SOURCE_ROOT is required}"
-  [ -f release-input/build/build-metadata.json ] || fail "evidence gate: build metadata is missing"
-  [ "$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)" = "${release_sha}" ] \
-    || fail "evidence gate: build SHA differs from the release source"
-  image_ref=$(jq -er '.images[0] | "oci://" + .repo + "@" + .digest' release-input/build/build-metadata.json)
-  if ! gh attestation verify "${image_ref}" \
-    --repo "${GITHUB_REPOSITORY}" \
-    --predicate-type "https://in-toto.io/attestation/test-result/v0.1" \
-    --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/evidence.yaml" \
-    --source-ref "refs/heads/${source_branch}" \
-    --deny-self-hosted-runners \
-    --format json >"${verify_json}" 2>release-input/evidence-verify.err; then
-    sed 's/^/  /' release-input/evidence-verify.err >&2
-    fail "evidence gate: no valid evidence attestation found for ${image_ref}"
-  fi
-  python3 "${script_dir}/evidence/release_gate.py" \
-    --verified "${verify_json}" \
-    --build-metadata release-input/build/build-metadata.json \
-    --source-root "${RELEASE_SOURCE_ROOT}" \
-    --default-ros-distro "${DEFAULT_ROS_DISTRO:-humble}" \
-    --repository "${GITHUB_REPOSITORY}" \
-    --source-ref "refs/heads/${source_branch}" \
-    --output release-input/evidence-report.json
-)
-
 write_outputs() {
   {
     echo "release_sha=${release_sha}"
@@ -347,11 +293,13 @@ main() {
   checkout_release_source
   validate_manifest_consistency
   download_build_metadata
-  select_scan_metadata
+  select_latest_artifact "scan-metadata-${BUILD_TAG}" .github/workflows/scan.yaml \
+    scan-metadata.json scan_is_full scan_passed release-input/scan
   validate_metadata
   validate_release_rules
   validate_autoware_line
-  verify_evidence
+  select_latest_artifact "evidence-summary-${BUILD_TAG}" .github/workflows/evidence.yaml \
+    evidence-summary.json evidence_is_release evidence_passed release-input/evidence
   validate_git_tag
   validate_registry_conflicts
   write_outputs

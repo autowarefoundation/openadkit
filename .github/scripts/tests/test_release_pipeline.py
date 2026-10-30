@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import tarfile
+import zipfile
 
 import pytest
 from release_fixtures import (
@@ -15,8 +16,10 @@ from release_fixtures import (
     VERSION,
     WRITE_NOTES,
     build_images,
+    build_metadata,
     executable,
     packager_env,
+    passing_summary,
     run_packager,
     run_validator,
     write_plan,
@@ -107,6 +110,103 @@ def test_plan_requires_complete_pinned_dual_distro_images(tmp_path, problem):
     # The BOM names the ROS apt snapshot every distro's images were built from.
     assert set(plan["rosSnapshots"]) == {"humble", "jazzy"}
     assert all(f'default = "{date}"' in (ROOT / "components/docker-bake.hcl").read_text() for date in plan["rosSnapshots"].values())
+
+
+@pytest.mark.parametrize("problem", [None, "failed", "not-release", "other-build", "other-commit"])
+def test_plan_takes_only_this_release_passing_evidence(tmp_path, problem):
+    summary = passing_summary(build_metadata())
+    if problem == "failed":
+        summary["result"] = "FAILED"
+    elif problem == "not-release":
+        summary["release_evidence"] = False
+    elif problem == "other-build":
+        summary["build_tag"] = "999-1"
+    elif problem == "other-commit":
+        summary["source_sha"] = "f" * 40
+    result, output = write_plan(tmp_path, summary=summary)
+    assert (result.returncode == 0) is (problem is None), result.stderr
+    if problem is None:
+        evidence = json.loads(output.read_text())["evidence"]
+        assert evidence["result"] == "PASSED" and evidence["build_tag"] == BUILD_TAG
+        assert evidence["cells"] == summary["cells"] and "exempt" in evidence
+
+
+def select_latest(tmp_path, name, workflow, file, runs, eligible, passed, directory):
+    """Run the gate's artifact selection against stubbed runs, newest first:
+    (run conclusion, branch, artifact content)."""
+    artifacts, run_json = [], {}
+    for index, (conclusion, branch, content) in enumerate(runs):
+        artifact, run = 100 + index, 200 + index
+        with zipfile.ZipFile(tmp_path / f"{artifact}.zip", "w") as archive:
+            archive.writestr(file, json.dumps(content))
+        artifacts.append(f"{artifact}\t2026-10-{30 - index:02d}T00:00:00Z")
+        run_json[str(artifact)] = run
+        run_json[str(run)] = {"path": workflow, "head_branch": branch,
+                              "status": "completed", "conclusion": conclusion}
+    (tmp_path / "runs.json").write_text(json.dumps(run_json))
+    executable(tmp_path / "bin/gh", f'''#!/usr/bin/env python3
+import json, sys
+path = [arg for arg in sys.argv[1:] if arg.startswith("repos/")][0]
+runs = json.load(open({str(tmp_path / "runs.json")!r}))
+if "artifacts?name={name}" in path:
+    print("\\n".join({artifacts!r}))
+elif path.endswith("/zip"):
+    sys.stdout.buffer.write(open({str(tmp_path)!r} + "/" + path.split("/")[-2] + ".zip", "rb").read())
+elif "/artifacts/" in path:
+    print(runs[path.split("/")[-1]])
+else:
+    print(json.dumps(runs[path.split("/")[-1]]))
+''')
+    result = run_validator(
+        tmp_path,
+        f"source_branch=release/9.8; select_latest_artifact {name} {workflow} {file} {eligible} {passed} {directory}",
+        PATH=f"{tmp_path / 'bin'}:{os.environ['PATH']}")
+    return result, tmp_path / directory / file
+
+
+# (run conclusion, branch, summary result, tested the build's own commit), newest first.
+@pytest.mark.parametrize(("runs", "accepted"), [
+    ([("success", "release/9.8", "PASSED", True)], True),
+    ([("failure", "release/9.8", "FAILED", True)], False),
+    ([("success", "main", "PASSED", True)], False),
+    ([("success", "release/9.8", "PASSED", False)], False),
+    # The newest run of this release decides: a passing rerun supersedes a
+    # failed run, and a newer failure blocks an older pass.
+    ([("success", "release/9.8", "PASSED", True), ("failure", "release/9.8", "FAILED", True)], True),
+    ([("failure", "release/9.8", "FAILED", True), ("success", "release/9.8", "PASSED", True)], False),
+    # A run that tested another commit against the build is not about this release.
+    ([("failure", "release/9.8", "FAILED", False), ("success", "release/9.8", "PASSED", True)], True),
+])
+def test_evidence_gate_takes_the_newest_run_of_this_release(tmp_path, runs, accepted):
+    summaries = [(conclusion, branch, passing_summary(build_metadata()) | {"result": result, "release_evidence": release})
+                 for conclusion, branch, result, release in runs]
+    result, selected = select_latest(
+        tmp_path, f"evidence-summary-{BUILD_TAG}", ".github/workflows/evidence.yaml", "evidence-summary.json",
+        summaries, "evidence_is_release", "evidence_passed", "release-input/evidence")
+    assert (result.returncode == 0) is accepted, result.stderr
+    assert selected.exists() is accepted
+
+
+# (run conclusion, scan status), newest first; a partial scan is not about the release.
+@pytest.mark.parametrize(("runs", "accepted"), [
+    ([("success", "passed")], True),
+    ([("failure", "failed")], False),
+    ([("failure", "failed"), ("success", "passed")], False),
+    ([("success", "partial"), ("success", "passed")], True),
+])
+def test_scan_gate_takes_the_newest_full_scan(tmp_path, runs, accepted):
+    def scan(status):
+        return {"build_tag": BUILD_TAG, "policy_sha": "c" * 40, "run_id": "300", "run_attempt": "1",
+                "scan_scope": "all" if status != "partial" else "changed", "scan_status": "passed" if status == "partial" else status,
+                "scanned_images": [{"repo": "ghcr.io/example/openadkit", "target": "api", "ros_distro": "humble",
+                                    "digest": DIGEST, "platform": "linux/amd64",
+                                    "image_ref": f"ghcr.io/example/openadkit@{DIGEST}"}]}
+    result, selected = select_latest(
+        tmp_path, f"scan-metadata-{BUILD_TAG}", ".github/workflows/scan.yaml", "scan-metadata.json",
+        [(conclusion, "release/9.8", scan(status)) for conclusion, status in runs],
+        "scan_is_full", "scan_passed", "release-input/scan")
+    assert (result.returncode == 0) is accepted, result.stderr
+    assert selected.exists() is accepted
 
 
 @pytest.mark.parametrize(("problem", "messages"), [

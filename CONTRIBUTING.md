@@ -92,7 +92,7 @@ mkdocs build
 The `.github/scripts/tests/` suite is risk-focused, not exhaustive. Keep regression
 coverage for managed-data deletion/replacement, checksums and unsafe archives,
 failed install/upgrade recovery, immutable image pins, split-node isolation, and
-the complete signed `PASSED` release gate. Share release inputs through
+the `PASSED` evidence release gate. Share release inputs through
 `release_fixtures.py`; do not import one test module from another.
 
 Help wording, exhaustive schema-error and option combinations, terminal signals,
@@ -130,9 +130,9 @@ For split-host (`--node`) topology testing, follow the [documentation](https://a
 
 Run the `scan-images`, `evidence` and `release.yaml` workflows (GitHub Actions) on a `release/X.Y` branch to promote its build to a `vX.Y.Z` release or pre-release. `release-pipeline.yaml` runs the build and these three in order. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
 
-Both release candidates and stable releases require complete signed `PASSED`
-runtime evidence for the promoted build. CI quarantine does not bypass the gate;
-reviewed manifest exemptions remain explicitly unverified. Read the
+Both release candidates and stable releases require a successful evidence run
+that passed every cell for the promoted build; reviewed manifest exemptions
+remain explicitly unverified. Read the
 [evidence policy](https://autowarefoundation.github.io/openadkit/releases/evidence/),
 [verification guide](https://autowarefoundation.github.io/openadkit/releases/verification/)
 and [toolchain RFC](https://autowarefoundation.github.io/openadkit/development/rfc-0001-toolchain-model/).

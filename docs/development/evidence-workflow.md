@@ -1,7 +1,7 @@
 # Run the Evidence Workflow
 
 The reusable `.github/workflows/evidence.yaml` verifies a specific Open AD Kit
-build and emits a signed in-toto Test Result. It runs automatically after a
+build and publishes the run's summary. It runs automatically after a
 successful `build-all-images` run on `main`. For a release, dispatch it with
 `build_tag` on the `release/X.Y` branch that built it.
 
@@ -25,8 +25,6 @@ on:
 permissions:
   actions: read
   contents: read
-  attestations: write
-  id-token: write
 
 jobs:
   evidence:
@@ -37,10 +35,9 @@ jobs:
 
 {% endraw %}
 
-This runs containers and publishes attestations. A fork's attestations belong
-to that fork, not the Autoware Foundation release identity. For release
-verification the source ref must be a `release/X.Y` branch and the signer must be the expected
-evidence workflow. Do not replace the signer check with merely an owner check.
+This runs containers on the caller's runners. A fork's evidence runs belong to
+that fork; only runs on a `release/X.Y` branch of the releasing repository can
+be release evidence.
 
 The current reusable interface takes **only `build_tag`**. Metadata and source
 come from the caller's build-owning repository. It stages that exact source's
@@ -65,19 +62,9 @@ and `log` products. Hosted runners execute L0-L2 cells, retry a failed cell once
 and aggregate all expected cells, including missing-cell failures.
 
 The workflow uploads per-cell diagnostics and the
-`evidence-attestation-<build_tag>` artifact with predicate, subject list, summary,
-JUnit and attestation bundle. Retention is bounded; release verification uses
-the published attestations rather than assuming CI ZIP artifacts last forever.
+`evidence-summary-<build_tag>` artifact. The release gate reads that summary; see the [release policy](../releases/evidence.md).
 
-New runner cells use `schemaVersion: 1`. The same payload is embedded under
-Test Result `configuration[].annotations.openadkitCell` and stored in the
-schema-v2 summary; CI, JUnit and release views are derived from it. Release
-reports store the original verified statement and its hash, not a second cell
-copy. Readers accept only these versioned payloads: a cell without
-`schemaVersion: 1` and `metrics`, or a report that does not match its verified
-statement, is rejected. Summary readers should use `metrics` rather than
-top-level timings.
-
-Inspect the workflow summary and failures before release. A CI quarantine
-warning never grants release permission: the
-[release policy](../releases/evidence.md) requires `PASSED`.
+Runner cells use `schemaVersion: 1`, and the summary (`schemaVersion: 3`)
+carries them as written. Readers accept only these versioned payloads: a cell
+without `schemaVersion: 1` and `metrics` is rejected. Summary readers should use
+`metrics` rather than top-level timings.

@@ -12,8 +12,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
 
-from evidence_fixtures import passing_report  # noqa: E402
-
 PACKAGER = ROOT / ".github/scripts/package_release_bundles.sh"
 PLANNER = ROOT / ".github/scripts/release_plan.py"
 VALIDATOR = ROOT / ".github/scripts/validate_release.sh"
@@ -49,15 +47,34 @@ def build_metadata(images=None):
             "upstream_images_sha256": "f" * 64, "images": build_images() if images is None else images}
 
 
-def write_plan(tmp_path, *, images=None):
+def passing_summary(metadata):
+    """An evidence run's summary that passed this build at its own commit."""
+    return {
+        "schemaVersion": 3, "result": "PASSED", "release_evidence": True, "missing": [],
+        "build_tag": metadata["build_tag"], "build_sha": metadata["openadkit_sha"],
+        "source_sha": metadata["openadkit_sha"], "url": "https://github.com/example/repo/actions/runs/456",
+        "cells": [{
+            "schemaVersion": 1, "name": "planning-simulation-humble-linux-amd64",
+            "deployment": "planning-simulation", "distro": "humble", "result": "PASSED",
+            "levels": {"L0": {"ok": True}, "L1": {"ok": True}, "L2": {"ok": True}},
+            "metrics": {"ready_s": 26, "arrival_s": 35, "peak_mib": 2151},
+        }],
+    }
+
+
+def write_plan(tmp_path, *, images=None, summary=None):
     metadata = tmp_path / "build-metadata.json"
     metadata.write_text(json.dumps(build_metadata(images)))
     output = tmp_path / "release-plan.json"
+    evidence = []
+    if summary is not None:
+        (tmp_path / "evidence-summary.json").write_text(json.dumps(summary))
+        evidence = ["--evidence-summary", str(tmp_path / "evidence-summary.json")]
     result = subprocess.run([
         "python3", str(PLANNER), "--source-root", str(ROOT), "--build-metadata", str(metadata),
         "--version", VERSION, "--release-sha", RELEASE_SHA, "--packager-sha", "c" * 40,
         "--default-ros-distro", "humble", "--stable-release", "true",
-        "--publish-latest-aliases", "true", "--output", str(output),
+        "--publish-latest-aliases", "true", "--output", str(output), *evidence,
     ], text=True, capture_output=True, timeout=30)
     return result, output
 
@@ -90,7 +107,8 @@ def packager_env(tmp_path):
     build.mkdir(parents=True)
     metadata = build_metadata()
     (build / "build-metadata.json").write_text(json.dumps(metadata))
-    (tmp_path / "release-input/evidence-report.json").write_text(json.dumps(passing_report(metadata)))
+    (tmp_path / "release-input/evidence").mkdir()
+    (tmp_path / "release-input/evidence/evidence-summary.json").write_text(json.dumps(passing_summary(metadata)))
     return os.environ | {
         "PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}", "SOURCE_DIR": str(ROOT), "VERSION": VERSION,
         "RELEASE_SHA": RELEASE_SHA, "PACKAGER_SHA": "c" * 40, "DEFAULT_ROS_DISTRO": "humble",

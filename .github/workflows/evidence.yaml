@@ -1,18 +1,15 @@
 name: evidence
 
-# Run the verification cells against one build and emit a signed in-toto Test
-# Result attestation. The subjects are the built image digests plus the
-# deployment and shared asset checksums of the staged release kit.
-#
-# The release gate requires a complete PASSED attestation. CI quarantine remains
-# visible as WARNED and never bypasses the release gate.
+# Run the verification cells against one build, staged as the release would
+# ship it, and publish the run's summary as evidence-summary-<build_tag>. The
+# release gate requires a successful run of this workflow whose summary is
+# PASSED for the build it promotes.
 #
 # A change that rebuilds no image is tested against an existing build: a pull
 # request uses its base branch's latest successful build, and a dispatch with
 # source_ref tests that commit. Its deployments, CLI and checks come from the
 # tested commit and its images from the build. Such a run is not release
-# evidence: it is not attested, and its cells name the tested commit, which the
-# release gate rejects.
+# evidence: its summary names the tested commit, which the release gate rejects.
 
 permissions:
   contents: read
@@ -31,7 +28,6 @@ on:
       - 'deployments/**'
       - 'openadkit'
       - 'openadkit.json'
-      - '.github/evidence-quarantine.json'
       - '.github/scripts/evidence/**'
       - '.github/scripts/validation_matrix.py'
       - '.github/workflows/evidence.yaml'
@@ -276,7 +272,7 @@ jobs:
             fi
           fi
 
-          # Collect the final attempt even when it failed: the attestation must
+          # Collect the final attempt even when it failed: the summary must
           # carry a FAILED cell instead of silently missing one.
           final="$output/attempt-2"
           [ -d "$final" ] || final="$output/attempt-1"
@@ -295,16 +291,14 @@ jobs:
             cell-output
           retention-days: 14
 
-  attest:
+  summarize:
     needs: [prepare, cell]
     if: ${{ always() && needs.prepare.result == 'success' && needs.prepare.outputs.skip != 'true' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
       actions: read
-      attestations: write
       contents: read
-      id-token: write
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -324,38 +318,25 @@ jobs:
           name: evidence-build-metadata-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
-      - name: Build attestation inputs
+      - name: Summarize the cells
         env:
           EVIDENCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          python3 .github/scripts/evidence/test_result.py \
+          python3 .github/scripts/evidence/summary.py \
             --cells-dir evidence-cells/cells \
             --build-metadata build-metadata/build-metadata.json \
-            --source-root . \
             --source-sha "${{ needs.prepare.outputs.source_sha }}" \
-            --quarantine .github/evidence-quarantine.json \
             --expected-cells '${{ needs.prepare.outputs.cells }}' \
-            --output-dir attestation
+            --output-dir evidence-summary
 
-      - name: Attest the test result
-        # Only a build tested at its own commit is release evidence.
-        if: needs.prepare.outputs.release_evidence == 'true'
-        id: attest
-        uses: actions/attest@v4
-        with:
-          subject-checksums: attestation/evidence-subjects.txt
-          predicate-path: attestation/evidence-predicate.json
-          predicate-type: https://in-toto.io/attestation/test-result/v0.1
-
-      - name: Upload attestation inputs
+      - name: Upload the summary
+        # The release gate and release notes read it from here.
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: evidence-attestation-${{ needs.prepare.outputs.build_tag }}
-          path: |
-            attestation
-            ${{ steps.attest.outputs.bundle-path }}
+          name: evidence-summary-${{ needs.prepare.outputs.build_tag }}
+          path: evidence-summary
           retention-days: 90
 
       - name: Write job summary
@@ -366,11 +347,11 @@ jobs:
             echo "## Evidence for build \`${{ needs.prepare.outputs.build_tag }}\`"
             echo
             if [ "${{ needs.prepare.outputs.release_evidence }}" != true ]; then
-              echo "Tested \`${{ needs.prepare.outputs.source_sha }}\` against the images of \`${{ needs.prepare.outputs.build_sha }}\`. Not release evidence; not attested."
+              echo "Tested \`${{ needs.prepare.outputs.source_sha }}\` against the images of \`${{ needs.prepare.outputs.build_sha }}\`. Not release evidence."
               echo
             fi
             python3 .github/scripts/evidence/report.py \
-              --current attestation/evidence-summary.json
+              --current evidence-summary/evidence-summary.json
           } >> "$GITHUB_STEP_SUMMARY"
         shell: bash
 
@@ -378,10 +359,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          result=$(jq -r '.result' attestation/evidence-summary.json)
-          if [ "${result}" = "WARNED" ]; then
-            echo "::warning title=evidence warned::quarantined cells did not pass; see .github/evidence-quarantine.json"
-          elif [ "${result}" != "PASSED" ]; then
+          result=$(jq -r '.result' evidence-summary/evidence-summary.json)
+          if [ "${result}" != "PASSED" ]; then
             echo "evidence result is ${result}" >&2
             exit 1
           fi
@@ -390,7 +369,7 @@ jobs:
   # Report evidence for the weekly Autoware snapshot bump (bump-autoware.yaml)
   # as a commit status on its pull request, where a dispatched run shows no check.
   bump-status:
-    needs: [prepare, attest]
+    needs: [prepare, summarize]
     if: ${{ always() && github.ref == 'refs/heads/ci/bump-autoware' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -401,13 +380,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source_sha || github.sha }}
-          ATTESTED: ${{ needs.attest.result }}
+          RESULT: ${{ needs.summarize.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           state=failure
-          [ "${ATTESTED}" != success ] || state=success
+          [ "${RESULT}" != success ] || state=success
           gh api "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" -f state="${state}" \
-            -f context="bump-autoware / evidence" -f description="evidence cells: ${ATTESTED}" \
+            -f context="bump-autoware / evidence" -f description="evidence cells: ${RESULT}" \
             -f target_url="${RUN_URL}" >/dev/null
         shell: bash

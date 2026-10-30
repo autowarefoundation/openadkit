@@ -28,7 +28,6 @@ def load(name):
 
 
 conformance = load("overlay_conformance")
-subjects = load("subjects")
 
 
 def test_example_evidence_cells_follow_the_base_distros():
@@ -63,25 +62,6 @@ def test_staged_flat_example_inherits_pins_without_host_build_products(tmp_path)
     assert all("@sha256:" in ref for refs in kit.images.values() for ref in refs.values())
     assert (example / "overlay_ws/src/acme_probe/src/probe.cpp").is_file()
     assert not any((example / "overlay_ws" / product).exists() for product in ("build", "install", "log"))
-
-
-def test_overlay_subject_ignores_build_products_but_binds_sources(tmp_path):
-    tree = tmp_path / "source"
-    for directory in ("cli", "deployments"):
-        shutil.copytree(ROOT / directory, tree / directory, ignore=shutil.ignore_patterns("__pycache__", "build", "install", "log"))
-    shutil.copy2(ROOT / "openadkit.json", tree / "openadkit.json")
-    kit = tree / "deployments/custom-kit"
-
-    def digest():
-        return dict((name, digest) for digest, name in subjects.build_subjects({}, tree))["overlay:deployments/custom-kit"]
-
-    initial = digest()
-    generated = kit / "overlay_ws/install"
-    generated.mkdir()
-    (generated / "host-binary").write_bytes(b"binary")
-    assert digest() == initial
-    (kit / "config.env").write_text("VEHICLE_ID=changed\n")
-    assert digest() != initial
 
 
 @pytest.mark.parametrize("report, expected", [
@@ -135,7 +115,7 @@ def test_a_package_is_unknown_only_when_no_service_has_it():
     assert [item["conformant"] for item in reports] == [False, False]
 
 
-def test_test_result_preserves_overlay_conformance(tmp_path):
+def test_summary_preserves_overlay_conformance(tmp_path):
     cells = tmp_path / "cells"
     cells.mkdir()
     (cells / "cell.json").write_text(json.dumps({
@@ -146,12 +126,10 @@ def test_test_result_preserves_overlay_conformance(tmp_path):
     }))
     metadata = tmp_path / "metadata.json"
     metadata.write_text('{}')
-    output = tmp_path / "attestation"
+    output = tmp_path / "summary"
     result = subprocess.run([
-        sys.executable, str(SCRIPTS / "evidence/test_result.py"), "--cells-dir", str(cells),
-        "--build-metadata", str(metadata), "--source-root", str(ROOT), "--output-dir", str(output),
+        sys.executable, str(SCRIPTS / "evidence/summary.py"), "--cells-dir", str(cells),
+        "--build-metadata", str(metadata), "--output-dir", str(output),
     ], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    predicate = json.loads((output / "evidence-predicate.json").read_text())
-    assert predicate["configuration"][0]["annotations"]["openadkitCell"]["overlayConformant"] is False
     assert json.loads((output / "evidence-summary.json").read_text())["cells"][0]["overlayConformant"] is False

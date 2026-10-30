@@ -76,7 +76,7 @@ A [deployment](deployments/index.md) runs the subset of these stages a task need
 | **Config overlay** | Parameter/file differences layered over package configuration; not a copy of the full base file. |
 | **Overlay workspace** | Custom ROS packages built against the matching pinned devel image and sourced over the base. |
 | **Node** | A deployment's host-local view, with its own services, Compose project, ROS domain and Zenoh endpoint. |
-| **Evidence** | A signed Test Result for exact runtime cells and image/source subjects; the release gate requires `PASSED`. |
+| **Evidence** | The runtime test cells run against one build; the release gate requires a successful run that passed every cell. |
 | **CI exemption** | A reasoned manifest entry for a deployment without hosted runtime evidence, not a passing-test claim. |
 | **BOM** | The release's pinned Autoware input, runtime images and upstream artifacts. |
 | **Tag alias** | A moving image tag such as `planning-control-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |

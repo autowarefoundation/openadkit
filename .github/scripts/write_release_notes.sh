@@ -7,15 +7,13 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
-# release_plan.py validated this plan, and the workflow checks its digest
-# before every use. It also plans evidence kits, which carry no evidence:
-# release notes need the release's own PASSED report.
+# release_plan.py validated this plan. It also plans evidence kits, which
+# carry no evidence: release notes need the release's own PASSED summary.
 jq -e '
   .schemaVersion == 1 and
   .evidence.result == "PASSED" and
   .evidence.build_tag == .release.buildTag and
-  .evidence.source_sha == .release.releaseSha and
-  .evidence.defaultRosDistroDecision.selected == .release.defaultRosDistro
+  .evidence.source_sha == .release.releaseSha
 ' "${plan_file}" >/dev/null
 
 VERSION=$(jq -r '.release.version' "${plan_file}")
@@ -76,7 +74,6 @@ jq \
     scan: $scan[0],
     evidence_exempt: $evidence_exempt,
     evidence: $evidence,
-    default_ros_distro_decision: $evidence.defaultRosDistroDecision,
     bom: $bom
   }' \
   release-input/build/build-metadata.json >release-metadata.json
@@ -162,10 +159,10 @@ build_tag=$(jq -r '.build_tag' release-metadata.json)
   jq '.evidence' "${plan_file}" >"${temporary}/current.json"
   python3 "${script_dir}/evidence/report.py" --current "${temporary}/current.json"
   echo ""
-  echo "Default ROS distro: \`${DEFAULT_ROS_DISTRO}\`, explicitly selected in the release source manifest and covered by passing evidence."
+  echo "Default ROS distro: \`${DEFAULT_ROS_DISTRO}\`, selected in the release source manifest and covered by passing evidence."
   echo ""
-  echo "The gate verified one complete signed Test Result from \`$(jq -r '.evidence.signerWorkflow' "${plan_file}")\`."
-  echo "See [release verification](https://autowarefoundation.github.io/openadkit/releases/verification/) for signature and result checks."
+  echo "Evidence run: $(jq -r '.evidence.url // "not recorded"' "${plan_file}")"
+  echo "See [release verification](https://autowarefoundation.github.io/openadkit/releases/verification/) for how to verify the release."
   if [ "$(jq '.evidence.exempt | length' "${plan_file}")" -gt 0 ]; then
     echo ""
     echo "Not verified in CI (the CLI warns when you run these):"

@@ -176,10 +176,8 @@ Releases promote an existing CI build; nothing is rebuilt.
   release run warns when the branch has such changes.
 - **A passing scan** of `scan-images` exists for that `build_tag`, dispatched on
   the same `release/X.Y` branch.
-- **Complete signed `PASSED` evidence** exists for that same build, from
-  `evidence` dispatched on the same branch. Required
-  cells, source checksums and image digests must match; quarantine does not waive
-  the gate. See [Evidence Policy](../releases/evidence.md).
+- **A successful `evidence` run** dispatched on the same branch passed every
+  cell for that same build. See [Evidence Policy](../releases/evidence.md).
 
 ### Workflow
 
@@ -204,7 +202,7 @@ flowchart LR
 1. **validate**: runs the release gates in
    [`validate_release.sh`](https://github.com/autowarefoundation/openadkit/blob/main/.github/scripts/validate_release.sh)
    (version format, build provenance and age, scan results, metadata and file
-   integrity, image coverage, signed L0-L2 evidence, registry digests, Git tag). Nothing is tagged if a
+   integrity, image coverage, passing L0-L2 evidence, registry digests, Git tag). Nothing is tagged if a
    gate fails.
 2. **package-bundles**: writes the immutable release plan and the runtime bundle
    for both distros.

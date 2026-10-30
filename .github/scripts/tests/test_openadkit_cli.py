@@ -798,13 +798,50 @@ def test_checksum_failure_preserves_managed_data_and_cleans_staging(tmp_path, mo
 def test_rerun_counts_only_restarts_since_up(monkeypatch):
     # "kept" restarted once before this `up` and was left in place; "crashed" restarted after it.
     # Reset services may exit, but not fail: "init" finished, "rosbag" crashed.
+    # A long-running service that exits cleanly is gone too: on-failure does not restart it.
     inspect = ("kept api 1 running 0\ncrashed planning 1 running 0\nreset init 3 exited 0\n"
-               "bag rosbag 0 exited 1\n")
+               "bag rosbag 0 exited 1\nquit system 0 exited 0\n")
     monkeypatch.setattr(cli_compose, "capture_process",
                         lambda *_, **__: subprocess.CompletedProcess([], 0, stdout=inspect))
     deployment = type("Deployment", (), {"reset_services": staticmethod(lambda node: {"init", "rosbag"})})()
     selection = cli_manifest.Selection("humble", False, None, {}, {})
-    assert cli_compose.failed_services(deployment, selection, [], {"kept": 1}) == ["planning", "rosbag"]
+    assert cli_compose.failed_services(deployment, selection, [], {"kept": 1}) == ["planning", "rosbag", "system"]
+
+
+@pytest.mark.parametrize(("interrupt", "failed"), [(True, False), (False, True)])
+def test_record_keeps_an_interrupted_bag_but_reports_a_recorder_failure(monkeypatch, tmp_path, interrupt, failed):
+    monkeypatch.setattr(cli_compose, "compose_capture",
+                        lambda *_, **__: subprocess.CompletedProcess([], 0, stdout="api\n"))
+    monkeypatch.setattr(cli_compose, "capture_process", lambda *_, **__: subprocess.CompletedProcess(
+        [], 0, stdout=json.dumps([{"Config": {"Image": "api-image", "Env": ["ROS_DOMAIN_ID=7"], "User": "1000"}}])))
+    runs = []
+
+    class Recorder:
+        def __init__(self, command, **_):
+            runs.append(command)
+            (tmp_path / "bags" / Path(command[-2]).name).mkdir(parents=True)
+            self.interrupt = interrupt
+
+        def wait(self):
+            if self.interrupt:
+                self.interrupt = False
+                raise KeyboardInterrupt
+            return 2
+
+    monkeypatch.setattr(cli_compose.subprocess, "Popen", Recorder)
+    deployment = type("Deployment", (), {"name": "example"})()
+    selection = cli_manifest.Selection("humble", False, None, {}, {})
+    if failed:
+        with pytest.raises(cli_manifest.OpenADKitError, match="exit status 2; partial bag"):
+            cli_compose.record(deployment, selection, ["/clock"], tmp_path / "bags")
+    else:
+        bag = cli_compose.record(deployment, selection, ["/clock"], tmp_path / "bags")
+        assert bag.parent == tmp_path / "bags" and bag.name.startswith("example-")
+    command = runs[0]
+    assert command[:4] == ["docker", "run", "--rm", "--init"]
+    assert ["--volumes-from", "api:ro"] == command[command.index("--volumes-from"):][:2]
+    assert ["--env", "ROS_DOMAIN_ID=7"] == command[command.index("--env"):][:2]
+    assert command[-1] == "/clock" and command[-2].startswith("/openadkit/recordings/example-")
 
 
 def test_run_reports_overrides_that_changed_nothing(monkeypatch, capsys):

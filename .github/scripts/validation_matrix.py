@@ -4,10 +4,9 @@
 A validation cell is one `./openadkit validate` invocation: a deployment, ROS
 distro, GPU mode, and optional split-host node. An evidence cell is the complete
 plan of one runtime evidence run, which run_cell.sh executes as given. The kit
-inventory is what a release bundle ships and evidence attests. Lint, the
-release planner, the evidence workflow and the release gate all read these
-views, so a new deployment or node is walked everywhere without editing a
-hardcoded list.
+inventory is what a release bundle ships. Lint, the release planner and the
+evidence workflow all read these views, so a new deployment or node is walked
+everywhere without editing a hardcoded list.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ EVIDENCE_PLATFORM = "linux/amd64"
 # Topics that flow without a route or an initial pose, in every deployment.
 FRESH_TOPICS = ("/system/operation_mode/availability",)
 # What each curated behaviour proves beyond readiness: extra fresh topics (L1)
-# and the end-to-end check run_cell.sh runs (L2). The release gate requires L2,
+# and the end-to-end check run_cell.sh runs (L2). A cell passes only with L2,
 # so every deployment that is not exempt needs an entry. Scenario simulation
 # runs on sim time; planning simulation runs on wall time and has no /clock.
 BEHAVIOUR_CHECKS: dict[str, dict[str, Any]] = {
@@ -170,7 +169,7 @@ def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, 
 
 
 def evidence_cell_name(cell: dict[str, Any]) -> str:
-    """The hosted runtime cell identity, shared by aggregation and release policy."""
+    """The hosted runtime cell identity, shared by the workflow matrix and the summary."""
     node = cell.get("node") or ""
     suffix = f"-{node}" if node else ""
     platform = EVIDENCE_PLATFORM.replace("/", "-")
@@ -184,9 +183,8 @@ def kit_inventory(
 ) -> dict[str, dict[str, Any]]:
     """What a kit ships: deployment paths and checksums, and shared asset checksums.
 
-    The release plan, bundle staging and verification, and the evidence
-    subjects all read this one view, so packaging and evidence cannot disagree
-    about a kit's contents.
+    The release plan and bundle staging and verification read this one view,
+    so packaging and the evidence kit cannot disagree about a kit's contents.
     """
     kit = kit if kit is not None else runtime.load_kit(source_root)
     deployments: dict[str, dict[str, str]] = {}
@@ -204,16 +202,6 @@ def kit_inventory(
             name: runtime.deployment_checksum(source_root / "deployments" / name)
             for name in sorted(shared)
         },
-    }
-
-
-def example_kit_checksums(runtime: ModuleType, source_root: Path) -> dict[str, str]:
-    """Example-kit source and config checksums, without host colcon products."""
-    return {
-        root.relative_to(source_root).as_posix(): runtime.deployment_checksum(
-            root, exclude_dirs=COLCON_PRODUCTS
-        )
-        for root in example_kit_roots(runtime, source_root)
     }
 
 

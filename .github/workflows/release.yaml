@@ -1,6 +1,7 @@
 # Manually promotes an existing build-all-images run to an OpenADKit release.
 # The build records provenance; this workflow only assigns the OpenADKit version
-# after validating build metadata, full scan metadata, and registry digests.
+# after validating build metadata, a passing full scan, a passing evidence run,
+# and registry digests.
 
 name: release
 
@@ -37,7 +38,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       actions: read
-      attestations: read
       contents: read
       packages: read
     outputs:
@@ -55,8 +55,6 @@ jobs:
             .github/scripts/stable_alias_policy.sh
             .github/scripts/validate_release.sh
             .github/scripts/images.py
-            .github/scripts/evidence/
-            .github/scripts/validation_matrix.py
             openadkit.json
 
       - name: Set up Docker Buildx
@@ -111,7 +109,6 @@ jobs:
             .github/scripts/autoware_patches.py
             .github/scripts/images.py
             .github/scripts/validation_matrix.py
-            .github/scripts/evidence/
 
       - name: Verify packager revision
         id: packager

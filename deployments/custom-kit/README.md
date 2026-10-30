@@ -46,8 +46,7 @@ renders/checks the model; it does not prove that the runtime or overlay works.
 
 The evidence cell checks fresh `/acme/probe` publication, this kit's velocity
 limit and an untouched base parameter, then runs the Planning Simulation golden path. Static contract
-warnings and every container's hook report produce `overlayConformant`; the
-kit source/config checksum is an attestation subject.
+warnings and every container's hook report produce `overlayConformant`.
 
 See the [Integrator Guide](../../docs/deployments/integrator-guide.md) for the
 interface, validation warnings and upgrade procedure.

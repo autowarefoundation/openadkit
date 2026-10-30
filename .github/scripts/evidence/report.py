@@ -27,9 +27,6 @@ def render(current, previous=None):
         values.extend(cell["metrics"].get(name) for name in METRICS)
         values.append(cell.get("overlayConformant"))
         lines.append("| " + " | ".join(fmt(value) for value in values) + " |")
-    for note in current.get("quarantine", []):
-        state = "expired" if note["expired"] else "quarantined"
-        lines.append(f"- {note['cell']} ({state}, expires {note['expires']}): {note['reason']}")
     for name in current.get("missing", []):
         lines.append(f"- Missing cell: {name}")
 

@@ -39,7 +39,7 @@ AD Kit image digest here when our packaging or configuration is involved.
 Digest pins, vulnerability and secret scans and signed provenance improve
 traceability; they do not prove that software is vulnerability-free or safe
 for a vehicle.
-Test Result attestations are runtime test claims, not security certification.
+Runtime evidence is a test result, not security certification.
 
 Run only trusted kits and images: a kit can launch additional containers and
 load custom code. Host networking and mounted host directories are not a

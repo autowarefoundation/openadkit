@@ -96,7 +96,7 @@ inherited mounts and extra services' own commands/images are not violations.
 
 Artifact replacement is mechanically possible, but replacing a base image
 does not inherit its conformance claim. It requires the integrator's own
-runtime evidence. The signed `overlayConformant` value combines static checks
+runtime evidence. The `overlayConformant` value combines static checks
 and every mounted hooked service's report; missing/invalid reports are not clean.
 The reference example requires `overlayConformant: true` as well as L0-L2.
 
@@ -134,11 +134,10 @@ resilience, two physical hosts, HIL or a vehicle.
 
 ### Evidence, releases and upgrade confidence
 
-Use an in-toto Statement v1 with the standard Test Result v0.1 predicate,
-signed by GitHub Actions. Subjects bind build image digests, deployment/shared
-checksums and example-kit source/config checksums. Colcon products are omitted
-from source checksums. Cell annotations bind build tag, source commit, distro,
-node, kit, platform, passed levels, conformance and measured runtime metrics.
+An evidence run tests one build, staged with its image digests as the release
+would ship it, and publishes a summary. Each cell records build tag, source
+commit, distro, node, kit, platform, passed levels, conformance and measured
+runtime metrics.
 
 | Level | Meaning | v2.0 release boundary |
 |-------|---------|-----------------------|
@@ -150,14 +149,12 @@ node, kit, platform, passed levels, conformance and measured runtime metrics.
 | L5 | Field behavior | Partner |
 
 Run every variation on a fresh stack. The runner computes semantic results;
-missing expected test cases fail. Retry a failed cell once. CI quarantine is
-an investigation annotation, never release permission.
+missing expected test cases fail. Retry a failed cell once.
 
-The blocking gate separately verifies signer identity, subject equality, exact
-manifest-derived cell coverage and **`PASSED`**. `WARNED`, failed, unknown and
-missing evidence block release candidates and stable releases alike. Never
-combine incomplete statements into a passing claim. A complete successful
-retry is valid evidence; a failed record does not permanently poison that build.
+The blocking gate requires a successful evidence run on the release line whose
+summary is **`PASSED`** for the promoted build at its own commit. Failed and
+missing evidence block release candidates and stable releases alike. A passing
+rerun is valid evidence; a failed run does not permanently poison that build.
 
 CI-infeasible deployments have reviewed, reasoned manifest exemptions and remain
 visible in the CLI, metadata and release notes. An exemption makes no runtime
@@ -169,7 +166,7 @@ agree with the release input and passing evidence; the gate never silently
 chooses another distro or drops failed cells. Stable releases pin a stable
 Autoware tag and record the resolved source/lock and upstream image digests.
 
-The immutable plan embeds the selected verified report and BOM. Release notes
+The immutable plan embeds the selected evidence summary and BOM. Release notes
 derive current metrics from it. Bundle, installer, plan and metadata receive
 release-workflow provenance. The verification report shows current passing-cell
 count, readiness/arrival time and memory. Release never looks up historical
@@ -178,9 +175,9 @@ Historical metrics are not an upgrade acceptance test or a safety/performance SL
 
 `workflow_call` currently reuses the reference-build verifier in the repository
 owning the build, including its example kits. Arbitrary external kit intake is
-not implemented. That extension must keep runner/attestation code in a pinned
-trusted workflow, explicitly pin caller kit inputs and bind them as subjects;
-calling a trusted workflow that executes arbitrary caller code is insufficient.
+not implemented. That extension must keep runner code in a pinned trusted
+workflow and explicitly pin caller kit inputs; calling a trusted workflow that
+executes arbitrary caller code is insufficient.
 
 ## Selected delivery design beyond v2.0
 

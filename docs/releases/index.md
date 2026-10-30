@@ -12,7 +12,7 @@ metadata. Each stable release publishes:
 - a versionless `openadkit` installer
 - the versioned `openadkit-vX.Y.Z.tar.gz` bundle
 - the pinned Autoware meta-release, ROS 2 distro(s), and image tags and digests
-- a BOM, signed runtime evidence summary, explicit CI exemptions and distro decision
+- a BOM, the passing runtime evidence summary, explicit CI exemptions and default distro
 - build provenance for the installer, bundle, plan and metadata
 
 Installed releases move to the latest stable version with `openadkit upgrade`.

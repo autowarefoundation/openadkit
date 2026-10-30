@@ -301,35 +301,51 @@ validate_registry_conflicts() {
     | registry_preflight_release_images
 }
 
-verify_evidence() (
-  set -euo pipefail
-  local image_ref verify_json=release-input/evidence-verify.json
-  # Never leave an old successful report usable after failed verification.
-  rm -f release-input/evidence-report.json
-  : "${RELEASE_SOURCE_ROOT:?RELEASE_SOURCE_ROOT is required}"
-  [ -f release-input/build/build-metadata.json ] || fail "evidence gate: build metadata is missing"
-  [ "$(jq -r '.openadkit_sha' release-input/build/build-metadata.json)" = "${release_sha}" ] \
-    || fail "evidence gate: build SHA differs from the release source"
-  image_ref=$(jq -er '.images[0] | "oci://" + .repo + "@" + .digest' release-input/build/build-metadata.json)
-  if ! gh attestation verify "${image_ref}" \
-    --repo "${GITHUB_REPOSITORY}" \
-    --predicate-type "https://in-toto.io/attestation/test-result/v0.1" \
-    --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/evidence.yaml" \
-    --source-ref "refs/heads/${source_branch}" \
-    --deny-self-hosted-runners \
-    --format json >"${verify_json}" 2>release-input/evidence-verify.err; then
-    sed 's/^/  /' release-input/evidence-verify.err >&2
-    fail "evidence gate: no valid evidence attestation found for ${image_ref}"
-  fi
-  python3 "${script_dir}/evidence/release_gate.py" \
-    --verified "${verify_json}" \
-    --build-metadata release-input/build/build-metadata.json \
-    --source-root "${RELEASE_SOURCE_ROOT}" \
-    --default-ros-distro "${DEFAULT_ROS_DISTRO:-humble}" \
-    --repository "${GITHUB_REPOSITORY}" \
-    --source-ref "refs/heads/${source_branch}" \
-    --output release-input/evidence-report.json
-)
+# The evidence gate: a successful evidence run on this release line that tested
+# this build at its own commit and passed every cell. A passing rerun may
+# supersede a failed run; a failed run never counts.
+select_evidence_summary() {
+  local artifact_ids artifact_id evidence_run_id run_json
+
+  # Never leave an old summary usable after a failed selection.
+  rm -rf release-input/evidence release-input/evidence-summary.json
+  artifact_ids=$(
+    gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=evidence-summary-${BUILD_TAG}" \
+      --jq '.artifacts[] | select(.expired == false) | [.id, .created_at] | @tsv' \
+      | sort -k2,2r \
+      | cut -f1
+  )
+  [ -n "${artifact_ids}" ] || fail "evidence gate: no evidence summary found for ${BUILD_TAG}"
+
+  while IFS= read -r artifact_id; do
+    [ -n "${artifact_id}" ] || continue
+    evidence_run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" --jq '.workflow_run.id // empty')
+    [ -n "${evidence_run_id}" ] || continue
+    run_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${evidence_run_id}") || continue
+    if ! jq -e --arg branch "${source_branch}" '
+        .path == ".github/workflows/evidence.yaml" and .head_branch == $branch and
+        .status == "completed" and .conclusion == "success"' <<<"${run_json}" >/dev/null; then
+      echo "Ignoring evidence run ${evidence_run_id}: not a successful evidence run on ${source_branch}" >&2
+      continue
+    fi
+
+    rm -rf release-input/evidence
+    mkdir -p release-input/evidence
+    gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" >evidence-summary.zip
+    unzip -q evidence-summary.zip -d release-input/evidence
+    if jq -e --arg tag "${BUILD_TAG}" --arg sha "${release_sha}" '
+        .result == "PASSED" and .release_evidence == true and
+        .build_tag == $tag and .build_sha == $sha and .source_sha == $sha' \
+        release-input/evidence/evidence-summary.json >/dev/null; then
+      cp release-input/evidence/evidence-summary.json release-input/evidence-summary.json
+      echo "evidence gate: PASSED (evidence run ${evidence_run_id})"
+      return 0
+    fi
+    echo "Ignoring evidence run ${evidence_run_id}: its summary did not pass ${BUILD_TAG} at ${release_sha}" >&2
+  done <<< "${artifact_ids}"
+
+  fail "evidence gate: no successful evidence run on ${source_branch} passed build ${BUILD_TAG} at ${release_sha}"
+}
 
 write_outputs() {
   {
@@ -351,7 +367,7 @@ main() {
   validate_metadata
   validate_release_rules
   validate_autoware_line
-  verify_evidence
+  select_evidence_summary
   validate_git_tag
   validate_registry_conflicts
   write_outputs

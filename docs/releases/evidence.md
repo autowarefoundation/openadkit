@@ -1,29 +1,24 @@
 # Evidence and Release Policy
 
 A release promotes an existing build. It does not rebuild images or silently
-relax its tests. Both stable releases and release candidates require **one
-complete, cryptographically verified Test Result with `result: PASSED`**.
+relax its tests. Both stable releases and release candidates require **a
+successful evidence run that passed every cell for the promoted build**.
 
 ## What the gate checks
 
-The release validation job checks these independently before creating a tag:
+Before creating a tag, the release validation job looks for an
+`evidence-summary-<build_tag>` artifact and accepts it only when:
 
-1. **Identity:** GitHub verifies the signature, the repository, the
-   `.github/workflows/evidence.yaml` signer, the `release/X.Y` source ref,
-   and that the attestation was signed on a hosted runner.
-2. **Subject:** all build image digests and the deployment, shared asset and
-   example-kit source/config checksums match the exact promoted source tree.
-   The dispatch-time scripts and the promoted source are checked out separately.
-3. **Coverage:** every required manifest-derived cell appears exactly once in
-   the signed configuration and in `passedTests`. Cell build/source identity,
-   distro, node, kit and platform must match; L0, L1 and L2 must all be true.
-   The example-kit cells must also have `overlayConformant: true`.
-4. **Result:** only the exact value `PASSED` is accepted. `WARNED`, `FAILED`,
-   unknown/malformed results, failed/warned test lists, and missing evidence block
-   publication. Several incomplete statements cannot be combined into a pass.
+1. **The run succeeded:** it is a completed, successful run of
+   `.github/workflows/evidence.yaml` on the same `release/X.Y` branch.
+2. **It tested this build:** the summary names the promoted build tag, and it
+   tested the build's own commit, not another commit against its images.
+3. **Every cell passed:** the summary result is `PASSED`. A cell passes only
+   when L0, L1 and L2 all pass, and a missing expected cell fails the run.
 
-A complete passing retry may supersede a failed attempt; a failed attempt is
-never itself treated as passed. There is no release bypass input.
+A passing rerun may supersede a failed run; a failed run never counts. There is
+no release bypass input. The release also requires the latest full scan of the
+build to pass.
 
 ## Cells and levels
 
@@ -44,10 +39,9 @@ presented as arm64 runtime, two-machine LAN, GPU, HIL or vehicle evidence.
 - **L2:** the planning golden path arrives, or the scenario and split-node
   checks pass. Each run starts a fresh stack.
 
-The workflow retries a failed runtime cell once. A short, reasoned, dated CI
-quarantine can label a failure `WARNED` for investigation; **it still blocks a
-release**. The release gate does not consult quarantine to waive a failed test.
-The cells start deployments with `openadkit run --no-visualizer`.
+The workflow retries a failed runtime cell once. A cell that still fails fails
+the run and blocks a release. The cells start deployments with
+`openadkit run --no-visualizer`.
 
 A 4-vCPU GitHub-hosted runner cannot run Autoware main in real time: the ego
 drives late and the bundled samples take about three times as long as on a
@@ -69,9 +63,8 @@ check, runs the cells against an existing build:
   `build_tag` defaults to the dispatched branch's latest successful build.
 
 The cells take the deployments, CLI and checks from the tested commit and the
-images from the build. Such a run is not release evidence: it is not attested,
-its summary names both commits, and its cells carry the tested commit, which
-the gate rejects.
+images from the build. Such a run is not release evidence: its summary names
+both commits, which the gate rejects.
 
 ## Explicit CI exemptions
 
@@ -125,11 +118,10 @@ change and build/test that revision. Humble remains the initial default.
 
 ## Metadata and verification report
 
-`release-plan.json` seals the validated `evidence` report before packaging.
-`release-metadata.json` includes that same report, the BOM, CI exemptions and
-`default_ros_distro_decision`. The current release-note metrics come from the
-selected signed statement, not an independently downloaded, unsigned summary.
-Bundle, installer, plan and metadata receive release-workflow build provenance.
+`release-plan.json` seals the selected evidence summary (result, build, commit,
+run URL and cells) before packaging. `release-metadata.json` includes that same
+evidence, the BOM and the CI exemptions. Bundle, installer, plan and metadata
+receive release-workflow build provenance.
 
 The verification table shows passing-cell count, readiness time, arrival time
 and peak memory for the current build. Release never searches older runs or

@@ -14,7 +14,6 @@ from typing import Any, NoReturn
 
 import autoware_patches
 import validation_matrix
-from evidence.release_gate import validate_report
 from images import build_images, image_ref
 
 _IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
@@ -163,6 +162,17 @@ def ros_snapshots(source_root: Path, distros: list[str]) -> dict[str, str]:
     return {distro: snapshots[distro] for distro in sorted(distros)}
 
 
+def passing_evidence(summary: dict[str, Any], build_tag: str, release_sha: str) -> dict[str, Any]:
+    """The release's evidence summary, which the release gate selected."""
+    if summary.get("result") != "PASSED" or summary.get("release_evidence") is not True:
+        fail("evidence summary did not pass this release")
+    if summary.get("build_tag") != build_tag:
+        fail("evidence summary is for another build")
+    if summary.get("build_sha") != release_sha or summary.get("source_sha") != release_sha:
+        fail("evidence summary tested another commit")
+    return {key: summary.get(key) for key in ("result", "build_tag", "source_sha", "url", "cells")}
+
+
 def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     source_root = args.source_root.resolve()
     metadata = load_json(args.build_metadata)
@@ -251,10 +261,9 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "shared": product["shared"],
         "version": args.version,
     }
-    evidence = {"exempt": product["evidenceExempt"]}
-    if args.evidence_report is not None:
-        evidence = load_json(args.evidence_report)
-        validate_report(evidence, metadata, source_root, args.default_ros_distro)
+    evidence: dict[str, Any] = {"exempt": product["evidenceExempt"]}
+    if args.evidence_summary is not None:
+        evidence.update(passing_evidence(load_json(args.evidence_summary), build_tag, args.release_sha))
     return {
         "bundle": {
             "asset": asset_name,
@@ -293,7 +302,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         },
         "releaseContext": release_context,
         "rosSnapshots": ros_snapshots(source_root, product["distros"]),
-        # Deployments that ship without CI evidence, with the reason.
+        # The passing evidence summary, and the deployments that ship without
+        # CI evidence, with the reason.
         "evidence": evidence,
         "schemaVersion": 1,
     }
@@ -325,7 +335,7 @@ def main() -> int:
     )
     parser.add_argument("--include-example-kits", action="store_true")
     parser.add_argument("--build-metadata", type=Path)
-    parser.add_argument("--evidence-report", type=Path)
+    parser.add_argument("--evidence-summary", type=Path)
     parser.add_argument("--version")
     parser.add_argument("--release-sha")
     parser.add_argument("--packager-sha")

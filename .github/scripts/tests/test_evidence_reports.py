@@ -32,10 +32,7 @@ def test_comparison_is_explicit_and_uses_the_same_canonical_metrics():
     assert "not an upgrade acceptance test" in text
 
 
-def test_diagnostic_report_keeps_quarantine_and_missing_cells_visible():
-    current = {"result": "WARNED", "cells": [], "missing": ["absent"], "quarantine": [{
-        "cell": "flaky", "expires": "2026-10-10", "expired": False, "reason": "tracked issue",
-    }]}
-    text = render(current)
-    assert "flaky (quarantined, expires 2026-10-10): tracked issue" in text
+def test_report_keeps_missing_cells_visible():
+    text = render({"result": "FAILED", "cells": [], "missing": ["absent"]})
+    assert "Evidence result: **FAILED**" in text
     assert "Missing cell: absent" in text

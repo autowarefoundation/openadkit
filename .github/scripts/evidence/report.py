@@ -1,4 +1,4 @@
-"""Derived CI/release view; optional local comparison, no history/network lookup."""
+"""The evidence summary as a Markdown table, for the job summary and release notes."""
 
 import argparse
 import json
@@ -13,7 +13,7 @@ def fmt(value):
     return "-" if value is None else str(value)
 
 
-def render(current, previous=None):
+def render(current):
     cells = report_cells(current)
     passed = sum(cell.get("result") == "PASSED" for cell in cells)
     lines = [
@@ -29,34 +29,16 @@ def render(current, previous=None):
         lines.append("| " + " | ".join(fmt(value) for value in values) + " |")
     for name in current.get("missing", []):
         lines.append(f"- Missing cell: {name}")
-
-    if previous is not None:
-        baseline = {cell["name"]: cell for cell in report_cells(previous)}
-        lines.extend([
-            "", f"### Metrics comparison vs build `{previous.get('build_tag', 'unknown')}`", "",
-            "Informational only; not an upgrade acceptance test or release gate.", "",
-            "| Cell | Metric | Previous | Current | Delta |", "|---|---|---|---|---|",
-        ])
-        for cell in cells:
-            if cell["name"] not in baseline:
-                continue
-            for metric in METRICS:
-                before = baseline[cell["name"]]["metrics"].get(metric)
-                after = cell["metrics"].get(metric)
-                delta = None if before is None or after is None else after - before
-                lines.append(f"| {cell['name']} | {metric} | {fmt(before)} | {fmt(after)} | {fmt(delta)} |")
     return "\n".join(lines) + "\n"
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--current", type=Path, required=True)
-    parser.add_argument("--previous", type=Path, help="explicit local input; never used during release")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     current = json.loads(args.current.read_text(encoding="utf-8"))
-    previous = json.loads(args.previous.read_text(encoding="utf-8")) if args.previous else None
-    text = render(current, previous)
+    text = render(current)
     if args.output:
         args.output.write_text(text, encoding="utf-8")
     else:

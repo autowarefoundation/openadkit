@@ -12,7 +12,7 @@ export PYTHONDONTWRITEBYTECODE=1
 
 source_dir=${SOURCE_DIR:-src}
 build_metadata=${BUILD_METADATA_FILE:-release-input/build/build-metadata.json}
-evidence_summary=${EVIDENCE_SUMMARY_FILE:-release-input/evidence-summary.json}
+evidence_summary=${EVIDENCE_SUMMARY_FILE:-release-input/evidence/evidence-summary.json}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 planner=${RELEASE_PLAN_SCRIPT:-${script_dir}/release_plan.py}
 root_name="openadkit-${VERSION}"

@@ -107,7 +107,8 @@ def packager_env(tmp_path):
     build.mkdir(parents=True)
     metadata = build_metadata()
     (build / "build-metadata.json").write_text(json.dumps(metadata))
-    (tmp_path / "release-input/evidence-summary.json").write_text(json.dumps(passing_summary(metadata)))
+    (tmp_path / "release-input/evidence").mkdir()
+    (tmp_path / "release-input/evidence/evidence-summary.json").write_text(json.dumps(passing_summary(metadata)))
     return os.environ | {
         "PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}", "SOURCE_DIR": str(ROOT), "VERSION": VERSION,
         "RELEASE_SHA": RELEASE_SHA, "PACKAGER_SHA": "c" * 40, "DEFAULT_ROS_DISTRO": "humble",

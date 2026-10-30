@@ -62,8 +62,7 @@ and `log` products. Hosted runners execute L0-L2 cells, retry a failed cell once
 and aggregate all expected cells, including missing-cell failures.
 
 The workflow uploads per-cell diagnostics and the
-`evidence-summary-<build_tag>` artifact with the summary and a JUnit view. The
-release gate reads that summary; see the [release policy](../releases/evidence.md).
+`evidence-summary-<build_tag>` artifact. The release gate reads that summary; see the [release policy](../releases/evidence.md).
 
 Runner cells use `schemaVersion: 1`, and the summary (`schemaVersion: 3`)
 carries them as written. Readers accept only these versioned payloads: a cell

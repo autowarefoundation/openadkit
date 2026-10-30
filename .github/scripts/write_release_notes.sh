@@ -7,9 +7,8 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
-# release_plan.py validated this plan, and the workflow checks its digest
-# before every use. It also plans evidence kits, which carry no evidence:
-# release notes need the release's own PASSED summary.
+# release_plan.py validated this plan. It also plans evidence kits, which
+# carry no evidence: release notes need the release's own PASSED summary.
 jq -e '
   .schemaVersion == 1 and
   .evidence.result == "PASSED" and

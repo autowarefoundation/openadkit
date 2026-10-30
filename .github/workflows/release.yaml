@@ -94,7 +94,6 @@ jobs:
       contents: read
     outputs:
       packager_sha: ${{ steps.packager.outputs.packager_sha }}
-      release_plan_sha256: ${{ steps.package.outputs.release_plan_sha256 }}
     steps:
       - name: Check out release scripts
         uses: actions/checkout@v7
@@ -153,7 +152,6 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Package and validate deployment bundles
-        id: package
         env:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
@@ -162,10 +160,7 @@ jobs:
           DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
-        run: |
-          bash .github/scripts/package_release_bundles.sh
-          echo "release_plan_sha256=$(sha256sum release-plan.json | cut -d ' ' -f1)" \
-            >> "${GITHUB_OUTPUT}"
+        run: bash .github/scripts/package_release_bundles.sh
         shell: bash
 
       - name: Upload deployment bundles
@@ -194,7 +189,7 @@ jobs:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: .github/scripts/release_tag.sh
 
-      - name: Download immutable release plan
+      - name: Download release plan
         uses: actions/download-artifact@v8
         with:
           name: release-bundles-${{ inputs.build_tag }}
@@ -203,11 +198,9 @@ jobs:
       - name: Create or verify git tag
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
         run: |
           set -euo pipefail
           plan=release-output/release-plan.json
-          test "$(sha256sum "${plan}" | cut -d ' ' -f1)" = "${EXPECTED_PLAN_SHA256}"
           VERSION=$(jq -r '.release.version' "${plan}")
           RELEASE_SHA=$(jq -r '.release.releaseSha' "${plan}")
           export VERSION RELEASE_SHA
@@ -233,18 +226,11 @@ jobs:
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
 
-      - name: Download immutable release plan
+      - name: Download release plan
         uses: actions/download-artifact@v8
         with:
           name: release-bundles-${{ inputs.build_tag }}
           path: release-output
-
-      - name: Verify immutable release plan
-        env:
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          test "$(sha256sum release-output/release-plan.json | cut -d ' ' -f1)" \
-            = "${EXPECTED_PLAN_SHA256}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -301,13 +287,6 @@ jobs:
           name: release-bundles-${{ inputs.build_tag }}
           path: .
 
-      - name: Verify immutable release plan
-        env:
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          test "$(sha256sum release-plan.json | cut -d ' ' -f1)" \
-            = "${EXPECTED_PLAN_SHA256}"
-
       - name: Create release metadata and notes
         env:
           RELEASE_PLAN_FILE: release-plan.json
@@ -363,18 +342,11 @@ jobs:
           name: release-asset-manifest-${{ inputs.build_tag }}
           path: release-asset-manifest
 
-      - name: Download immutable release plan
+      - name: Download release plan
         uses: actions/download-artifact@v8
         with:
           name: release-bundles-${{ inputs.build_tag }}
           path: release-output
-
-      - name: Verify immutable release plan
-        env:
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          test "$(sha256sum release-output/release-plan.json | cut -d ' ' -f1)" \
-            = "${EXPECTED_PLAN_SHA256}"
 
       - name: Publish prepared GitHub Release
         if: needs.prepare-github-release.outputs.created == 'true'

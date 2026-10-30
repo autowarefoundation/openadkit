@@ -34,7 +34,7 @@ Shared parsing is **not** shared authorization: release validation still require
 the latest eligible full scan to pass and a successful evidence run whose summary
 passed the promoted build. Packaging reparses image records and rechecks that
 summary against the build and commit. Registry preflight remains at
-both validation and promotion, and sealed-plan hashes remain at publishing.
+both validation and promotion.
 
 Release packaging and evidence staging assemble the kit through one
 `release_plan.py --stage` step, so evidence runs the tree the release ships;

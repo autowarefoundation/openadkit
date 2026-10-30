@@ -131,31 +131,24 @@ def test_plan_takes_only_this_release_passing_evidence(tmp_path, problem):
         assert evidence["cells"] == summary["cells"] and "exempt" in evidence
 
 
-@pytest.mark.parametrize(("runs", "accepted"), [
-    ([("success", "release/9.8", "PASSED", True)], True),
-    ([("failure", "release/9.8", "FAILED", True)], False),
-    ([("success", "main", "PASSED", True)], False),
-    ([("success", "release/9.8", "PASSED", False)], False),
-    # A passing rerun supersedes a failed run, newest first or not.
-    ([("failure", "release/9.8", "FAILED", True), ("success", "release/9.8", "PASSED", True)], True),
-])
-def test_evidence_gate_needs_a_successful_run_that_passed_this_build(tmp_path, runs, accepted):
+def select_latest(tmp_path, name, workflow, file, runs, eligible, passed, directory):
+    """Run the gate's artifact selection against stubbed runs, newest first:
+    (run conclusion, branch, artifact content)."""
     artifacts, run_json = [], {}
-    for index, (conclusion, branch, result, release) in enumerate(runs):
+    for index, (conclusion, branch, content) in enumerate(runs):
         artifact, run = 100 + index, 200 + index
-        summary = passing_summary(build_metadata()) | {"result": result, "release_evidence": release}
         with zipfile.ZipFile(tmp_path / f"{artifact}.zip", "w") as archive:
-            archive.writestr("evidence-summary.json", json.dumps(summary))
+            archive.writestr(file, json.dumps(content))
         artifacts.append(f"{artifact}\t2026-10-{30 - index:02d}T00:00:00Z")
         run_json[str(artifact)] = run
-        run_json[str(run)] = {"path": ".github/workflows/evidence.yaml", "head_branch": branch,
+        run_json[str(run)] = {"path": workflow, "head_branch": branch,
                               "status": "completed", "conclusion": conclusion}
     (tmp_path / "runs.json").write_text(json.dumps(run_json))
     executable(tmp_path / "bin/gh", f'''#!/usr/bin/env python3
 import json, sys
 path = [arg for arg in sys.argv[1:] if arg.startswith("repos/")][0]
 runs = json.load(open({str(tmp_path / "runs.json")!r}))
-if "artifacts?name=evidence-summary-{BUILD_TAG}" in path:
+if "artifacts?name={name}" in path:
     print("\\n".join({artifacts!r}))
 elif path.endswith("/zip"):
     sys.stdout.buffer.write(open({str(tmp_path)!r} + "/" + path.split("/")[-2] + ".zip", "rb").read())
@@ -164,13 +157,56 @@ elif "/artifacts/" in path:
 else:
     print(json.dumps(runs[path.split("/")[-1]]))
 ''')
-    result = run_validator(tmp_path, "source_branch=release/9.8; select_evidence_summary",
-                           PATH=f"{tmp_path / 'bin'}:{os.environ['PATH']}")
+    result = run_validator(
+        tmp_path,
+        f"source_branch=release/9.8; select_latest_artifact {name} {workflow} {file} {eligible} {passed} {directory}",
+        PATH=f"{tmp_path / 'bin'}:{os.environ['PATH']}")
+    return result, tmp_path / directory / file
+
+
+# (run conclusion, branch, summary result, tested the build's own commit), newest first.
+@pytest.mark.parametrize(("runs", "accepted"), [
+    ([("success", "release/9.8", "PASSED", True)], True),
+    ([("failure", "release/9.8", "FAILED", True)], False),
+    ([("success", "main", "PASSED", True)], False),
+    ([("success", "release/9.8", "PASSED", False)], False),
+    # The newest run of this release decides: a passing rerun supersedes a
+    # failed run, and a newer failure blocks an older pass.
+    ([("success", "release/9.8", "PASSED", True), ("failure", "release/9.8", "FAILED", True)], True),
+    ([("failure", "release/9.8", "FAILED", True), ("success", "release/9.8", "PASSED", True)], False),
+    # A run that tested another commit against the build is not about this release.
+    ([("failure", "release/9.8", "FAILED", False), ("success", "release/9.8", "PASSED", True)], True),
+])
+def test_evidence_gate_takes_the_newest_run_of_this_release(tmp_path, runs, accepted):
+    summaries = [(conclusion, branch, passing_summary(build_metadata()) | {"result": result, "release_evidence": release})
+                 for conclusion, branch, result, release in runs]
+    result, selected = select_latest(
+        tmp_path, f"evidence-summary-{BUILD_TAG}", ".github/workflows/evidence.yaml", "evidence-summary.json",
+        summaries, "evidence_is_release", "evidence_passed", "release-input/evidence")
     assert (result.returncode == 0) is accepted, result.stderr
-    selected = tmp_path / "release-input/evidence-summary.json"
     assert selected.exists() is accepted
-    if accepted:
-        assert json.loads(selected.read_text())["result"] == "PASSED"
+
+
+# (run conclusion, scan status), newest first; a partial scan is not about the release.
+@pytest.mark.parametrize(("runs", "accepted"), [
+    ([("success", "passed")], True),
+    ([("failure", "failed")], False),
+    ([("failure", "failed"), ("success", "passed")], False),
+    ([("success", "partial"), ("success", "passed")], True),
+])
+def test_scan_gate_takes_the_newest_full_scan(tmp_path, runs, accepted):
+    def scan(status):
+        return {"build_tag": BUILD_TAG, "policy_sha": "c" * 40, "run_id": "300", "run_attempt": "1",
+                "scan_scope": "all" if status != "partial" else "changed", "scan_status": "passed" if status == "partial" else status,
+                "scanned_images": [{"repo": "ghcr.io/example/openadkit", "target": "api", "ros_distro": "humble",
+                                    "digest": DIGEST, "platform": "linux/amd64",
+                                    "image_ref": f"ghcr.io/example/openadkit@{DIGEST}"}]}
+    result, selected = select_latest(
+        tmp_path, f"scan-metadata-{BUILD_TAG}", ".github/workflows/scan.yaml", "scan-metadata.json",
+        [(conclusion, "release/9.8", scan(status)) for conclusion, status in runs],
+        "scan_is_full", "scan_passed", "release-input/scan")
+    assert (result.returncode == 0) is accepted, result.stderr
+    assert selected.exists() is accepted
 
 
 @pytest.mark.parametrize(("problem", "messages"), [

@@ -1,16 +1,12 @@
-"""Aggregate evidence cells into the run's summary and JUnit view.
+"""Aggregate evidence cells into the run's summary, evidence-summary.json.
 
-Outputs, under --output-dir:
-  evidence-summary.json   result and cells, read by the release gate and notes
-  evidence.junit.xml      JUnit view of the run
-
-The result is PASSED only when every expected cell produced a passing result.
+The release gate and release notes read it. The result is PASSED only when
+every expected cell produced a passing result.
 """
 import argparse
 import json
 import os
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,25 +34,6 @@ def summarize(cells, expected_names):
     failed = [cell["name"] for cell in cells if cell.get("result") != "PASSED"]
     result = "PASSED" if cells and not missing and not failed else "FAILED"
     return result, missing
-
-
-def write_junit(path: Path, cells) -> None:
-    suite = ET.Element("testsuite", {"name": "evidence"})
-    cases = failures = 0
-    for cell in cells:
-        for level, data in sorted(cell.get("levels", {}).items()):
-            cases += 1
-            case = ET.SubElement(
-                suite,
-                "testcase",
-                {"name": f'{cell["name"]}.{level}', "classname": cell["deployment"]},
-            )
-            if not data.get("ok"):
-                failures += 1
-                ET.SubElement(case, "failure", {"message": f"{level} failed"})
-    suite.set("tests", str(cases))
-    suite.set("failures", str(failures))
-    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
 
 
 def main():
@@ -105,7 +82,6 @@ def main():
     (output / "evidence-summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    write_junit(output / "evidence.junit.xml", cells)
 
     print(json.dumps({"result": result, "cells": len(cells), "missing": len(missing)}))
     return 0

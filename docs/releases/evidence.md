@@ -125,19 +125,8 @@ receive release-workflow build provenance.
 
 The verification table shows passing-cell count, readiness time, arrival time
 and peak memory for the current build. Release never searches older runs or
-releases; its notes depend only on the sealed plan. Missing metrics are shown
+releases; its notes depend only on the release plan. Missing metrics are shown
 as `-`, never replaced with zeroes.
-
-Historical comparison is optional, outside release. With two explicitly chosen
-local summaries, run:
-
-```bash
-python3 .github/scripts/evidence/report.py \
-  --current current.json --previous previous.json --output comparison.md
-```
-
-This is a timing/memory comparison, not an `openadkit upgrade` acceptance test,
-performance SLA or safety gate.
 
 See [Verify a Release](verification.md) and
 [Run the Evidence Workflow](../development/evidence-workflow.md).

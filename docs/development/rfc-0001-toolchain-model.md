@@ -170,8 +170,7 @@ The immutable plan embeds the selected evidence summary and BOM. Release notes
 derive current metrics from it. Bundle, installer, plan and metadata receive
 release-workflow provenance. The verification report shows current passing-cell
 count, readiness/arrival time and memory. Release never looks up historical
-runs; an optional local comparison takes explicitly selected input files.
-Historical metrics are not an upgrade acceptance test or a safety/performance SLA.
+runs. These metrics are not an upgrade acceptance test or a safety/performance SLA.
 
 `workflow_call` currently reuses the reference-build verifier in the repository
 owning the build, including its example kits. Arbitrary external kit intake is

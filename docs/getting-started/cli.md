@@ -62,8 +62,8 @@ openadkit validate planning-simulation --data
 ```
 
 `validate` checks the manifest and the Compose configuration without starting
-anything. `--data` also reports each data resource as `ok`, `missing`, or
-`incomplete` and fails on any gap. It follows the same GPU selection as `run`:
+anything. `--data` also reports each data resource as `ok`, `missing`, `incomplete`,
+or `outdated` and fails on any gap. It follows the same GPU selection as `run`:
 use `openadkit validate logging-simulation --gpu --data` to include the
 CenterPoint models.
 

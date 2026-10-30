@@ -1,7 +1,7 @@
-"""The four release-version checks must accept exactly the same tags.
+"""The release-version checks must accept exactly the same tags.
 
 The bash bootstrap cannot import Python, so the pattern exists in four places:
-the launcher's regex, the upgrade comparison in cli/installation.py,
+the launcher's regex, cli/manifest.py (kit extends and upgrade comparison),
 release_plan.py and validate_release.sh. Each is run against the same vectors
 here.
 """
@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / ".github/scripts"))
 sys.path.insert(0, str(ROOT / "cli"))
 
 import installation  # noqa: E402
+import manifest  # noqa: E402
 import release_plan  # noqa: E402
 
 VALID = [
@@ -72,6 +73,7 @@ CHECKS = {
     ),
     "upgrade-compare": upgrade_compare_accepts,
     "release_plan": lambda v: release_plan.SEMVER_RE.fullmatch(v) is not None,
+    "kit-extends": lambda v: manifest.VERSION_RE.fullmatch(v) is not None,
     "validate_release": lambda v: bash_accepts(
         bash_pattern(ROOT / ".github/scripts/validate_release.sh", "openadkit_semver_re"), v
     ),

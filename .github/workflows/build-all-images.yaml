@@ -21,6 +21,7 @@ on:
       - '!.github/scripts/tests/**'
       - '.github/workflows/build-all-images.yaml'
       - 'components/**'
+      - '!components/README.md'
       - '!components/*/README.md'
 
   schedule:

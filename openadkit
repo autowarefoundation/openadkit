@@ -186,7 +186,7 @@ PY
     mv -T "$final_root" "$moved_aside"
   fi
   # On failure or interruption, cleanup_install moves the old release back.
-  mv "${INSTALL_STAGE}/${root_name}" "$final_root" || fail "could not replace ${final_root}"
+  mv -T "${INSTALL_STAGE}/${root_name}" "$final_root" || fail "could not replace ${final_root}"
   INSTALL_ASIDE=
   if [[ -n $moved_aside ]]; then
     rm -rf "$moved_aside"

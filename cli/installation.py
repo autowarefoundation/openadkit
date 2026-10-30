@@ -20,14 +20,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import compose
-from manifest import OpenADKitError, expand_home, root_path
+from manifest import VERSION_RE, OpenADKitError, expand_home, root_path
 
-_IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
-# Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
-VERSION_RE = re.compile(
-    r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    rf"(?:-({_IDENTIFIER}(?:\.{_IDENTIFIER})*))?$"
-)
 KEPT_RELEASE_RE = re.compile(r"^openadkit-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$")
 
 UPGRADE_USAGE = """\

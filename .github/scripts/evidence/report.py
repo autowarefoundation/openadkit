@@ -19,13 +19,12 @@ def render(current):
     lines = [
         f"Evidence result: **{current.get('result', 'UNKNOWN')}**", "",
         f"Passing cells: **{passed}/{len(cells)}**", "",
-        "| Cell | Deployment | Distro | Node | Result | Ready (s) | Arrival (s) | Peak MiB | Overlay conformant |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Cell | Deployment | Distro | Node | Result | Ready (s) | Arrival (s) | Peak MiB |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for cell in cells:
         values = [cell["name"], cell.get("deployment"), cell.get("distro"), cell.get("node"), cell.get("result")]
         values.extend(cell["metrics"].get(name) for name in METRICS)
-        values.append(cell.get("overlayConformant"))
         lines.append("| " + " | ".join(fmt(value) for value in values) + " |")
     for name in current.get("missing", []):
         lines.append(f"- Missing cell: {name}")

@@ -31,7 +31,7 @@ vehicle certification.
 | Work | Status |
 |------|--------|
 | Release evidence: releases need a passing evidence run of their build; build provenance stays | Done |
-| Kit: drop the static overlay-contract check and shorten the integrator guide | Planned |
+| Kit: drop the static overlay-contract check and shorten the integrator guide | Done |
 | R-Car X5H board support moves to its own repository; AutoSD planning simulation stays | Planned |
 | CLI: `build`, `run --ws`, `restart`, deployment paths, and commands that find the running stack from any directory | Planned |
 | Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Planned |

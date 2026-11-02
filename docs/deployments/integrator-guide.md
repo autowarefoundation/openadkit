@@ -27,10 +27,6 @@ The example has just one deployment, also named `custom-kit`. Its
 directory; `deployments.custom-kit.path` is `"."`. No nested `deployments/`
 directory is needed. Run commands from that directory, not the base repository.
 
-The loader resolves the inherited image/artifact set and ordered env, GPU and
-config layers once. Runtime selection consumes that resolved model. The base
-is retained only for provenance and comparison against the overlay contract.
-
 ## Extension Points
 
 ### 1. Values
@@ -108,18 +104,13 @@ openadkit build-overlay <deployment> [--ros-distro humble]  # and the deployment
 ```
 
 Without a deployment it builds the kit's workspace, which all its deployments
-share. With one, it builds each workspace that deployment mounts, the kit's
-first. Each builds at the path the services mount it, and the CLI records the image and distro in
-`install/.openadkit-overlay.json`. After a base upgrade or a distro change,
-`validate` and `run` warn until you rebuild. A workspace builds
-incrementally only on its own last build in the same image and distro;
-otherwise (an upgrade, a build by hand, a rebuilt layer below) its `build/`
-and `install/` are removed first, since CMake caches record the paths they
-were configured with. Releases before this pin, and
-source checkouts, pin no devel image: set `DEVEL_IMAGE` to the matching
-`universe-common-devel` digest from the build metadata or release BOM. The
-CLI mounts the workspace and the hook sources `overlay_ws/install/local_setup.bash`
-on top of Autoware.
+share; with one, it also builds that deployment's own. The CLI records the
+image and distro in `install/.openadkit-overlay.json`, and `validate` and `run`
+warn after a base upgrade or a distro change until you rebuild. Such a rebuild
+starts from a clean `build/` and `install/`, since CMake caches record the paths
+they were configured with. A source checkout pins no devel image: set
+`DEVEL_IMAGE` to the matching `universe-common-devel` digest from the build
+metadata. The hook sources `overlay_ws/install/local_setup.bash` on top of Autoware.
 
 The workspace belongs to the kit: `overlay_ws` at the kit root serves every
 deployment of the kit, since they all extend one base and its images. A
@@ -150,16 +141,7 @@ other side's service layer instead of the base's Compose file. For example, a
 kit that brings its own simulator to `carla-simulation` includes
 `${OPENADKIT_BASE_DEPLOYMENT}/services.autoware.yaml`: no service in it depends
 on a CARLA service. The base's `resetServices` that the kit's services leave
-out are skipped; the kit's own must exist. `validate` then checks the kit
-against that layer only, and a deployment that includes no base file inherits
-no base service: a service of the same name the kit defines itself, such as
-its own `carla`, is the kit's. The kit's Compose files are its entry files and
-the kit files they include (a world file several deployments share). A
-variable the kit both sets in its env file and reads in those files is its own
-setting, and one read with a default or a message (`${DISPLAY:?...}`,
-`${TOWN:-Town01}`) is meant to come from the host or the site file. A variable
-only set, or only read plainly, and unknown to the base, is still reported as
-a likely typo.
+out are skipped; the kit's own must exist.
 
 ### 5. Image Replacement
 
@@ -169,39 +151,23 @@ artifact name matching a component image variable replaces that component;
 other artifact names can supply images for new services. Use `${NAME:?}` in
 Compose to require the declared reference.
 
-Replacing a base image is allowed but warns that the base overlay contract no
-longer holds. It needs your own runtime evidence; pinning alone does not prove
-that a replacement honors the entrypoint, launch or parameter interfaces.
+A replaced base image needs your own runtime evidence: pinning alone does not
+prove that it honors the entrypoint, launch or parameter interfaces.
 
 ## Validation and Evidence
 
-`openadkit validate <deployment> --json` reports `overlayWarnings` and a static
-`overlayConformant` value. It warns about:
+`openadkit validate <deployment>` renders the deployment and checks its manifest
+and data. It does not pull images or prove that the runtime works; `run` reports
+overrides that changed nothing (see [Config Differences](#2-config-differences)).
 
-- Replacing a base service's command
-- Changing a base service's image
-- Adding or changing mounts over image-internal paths on base services
-- Using variables not declared by the base, kit artifacts or data destinations
+The example kit's evidence cell checks its parameters, the fresh `/acme/probe`
+publication of its C++ package and Planning Simulation's golden path. Humble and
+Jazzy each build the workspace against their matching devel digest.
 
-These warnings do not make `validate` fail. Public value changes, inherited
-mounts and commands/images of new services are not reported as replacements.
-Validation does not pull images or inspect their parameter files.
-
-The evidence runner combines the static result with every mounted service's
-hook report and records `overlayConformant` in the evidence summary. Missing
-or invalid hook reports are nonconformant, not silently clean. The example
-acceptance cell additionally requires conformance, checks shared/kit/inherited
-parameters and fresh C++ publication, and runs Planning Simulation's golden
-path. Humble and Jazzy each build the workspace against their matching devel
-digest, without host-specific `build`, `install` and `log` products.
-
-Base deployments with a reasoned CI evidence exemption retain that exemption
-in the kit. An exemption is not evidence of runtime compatibility.
-
-The [release gate](../releases/evidence.md) requires `PASSED`; static validation
-alone is not runtime evidence. See [Evidence Workflow](../development/evidence-workflow.md)
-for `workflow_call` and its current build-owning-repository/example-kit scope.
-Arbitrary external kit input is not yet supported by that interface.
+A base deployment's CI exemption stays with the kit; an exemption is not runtime
+evidence. The [release gate](../releases/evidence.md) requires `PASSED`. See
+[Evidence Workflow](../development/evidence-workflow.md) for reusing the verifier;
+it does not yet accept arbitrary external kits.
 
 ## Upgrade Without Losing Your Work
 

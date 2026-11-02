@@ -5,20 +5,18 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
-import re
 import shlex
 import shutil
 import subprocess
 import sys
 import time
 from collections.abc import Iterable
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from manifest import (
     Deployment,
     OpenADKitError,
-    RuntimeContext,
     Selection,
     parse_dotenv,
 )
@@ -27,9 +25,6 @@ PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
 # Launch failures show up within seconds; watch this long after `up`.
 SETTLE_SECONDS = 10
-INTERNAL_IMAGE_ROOTS = {"opt", "usr", "etc", "bin", "sbin", "lib", "lib64", "home", "root"}
-OVERLAY_RUNTIME_ROOT = PurePosixPath("/tmp/openadkit")
-
 
 COMPOSE_CONTROL_ENV = {
     "COMPOSE_ENV_FILES",
@@ -128,22 +123,16 @@ def compose_process_environment(
     return environment
 
 
-def compose_command(
-    deployment: Deployment,
-    selection: Selection,
-    *,
-    environment_from: Deployment | None = None,
-    files: list[Path] | None = None,
-) -> list[str]:
+def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
     command = [
         "docker",
         "compose",
         "--project-name",
         deployment.project_name(selection.node),
     ]
-    for env_file in (environment_from or deployment).env_files(selection.gpu):
+    for env_file in deployment.env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
-    for compose_file in files or deployment.compose_files(selection.gpu, selection.node):
+    for compose_file in deployment.compose_files(selection.gpu, selection.node):
         command.extend(("--file", str(compose_file)))
     for profile in deployment.compose["profiles"]:
         command.extend(("--profile", profile))
@@ -416,208 +405,6 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
         )
     return configured
-
-
-def compose_model(
-    deployment: Deployment,
-    selection: Selection,
-    *,
-    environment_from: Deployment | None = None,
-    files: list[Path] | None = None,
-) -> dict[str, Any]:
-    result = capture_process(
-        compose_command(deployment, selection, environment_from=environment_from, files=files)
-        + ["config", "--format", "json"],
-        cwd=deployment.directory,
-        env=compose_process_environment(environment_from or deployment, selection),
-    )
-    try:
-        services = json.loads(result.stdout)["services"]
-        if not isinstance(services, dict):
-            raise ValueError("services must be an object")
-    except (ValueError, KeyError, TypeError) as error:
-        raise OpenADKitError("could not parse the Compose configuration") from error
-    return services
-
-
-def overlay_warnings(
-    base: dict[str, Any], services: dict[str, Any], unknown_variables: set[str]
-) -> list[dict[str, str]]:
-    """Compare resolved services, not YAML text; inherited mounts are allowed.
-
-    Both models use the kit's values, so changing a public value is not mistaken
-    for replacing a command or an internal mount. New services have no base
-    command/image contract.
-    """
-    warnings = []
-    for name in sorted(base.keys() & services.keys()):
-        original, current = base[name], services[name]
-        for field in ("command", "image"):
-            if current.get(field) != original.get(field):
-                warnings.append({
-                    "rule": field, "service": name,
-                    "message": f"{name}: replaces the base {field}",
-                })
-        original_mounts = {item["target"]: item for item in original.get("volumes", [])}
-        for mount in current.get("volumes", []):
-            target = PurePosixPath(mount["target"])
-            internal = (
-                target == PurePosixPath("/")
-                or (len(target.parts) > 1 and target.parts[1] in INTERNAL_IMAGE_ROOTS)
-                or target == OVERLAY_RUNTIME_ROOT
-                or OVERLAY_RUNTIME_ROOT in target.parents
-                or target in OVERLAY_RUNTIME_ROOT.parents
-            )
-            if internal and mount != original_mounts.get(mount["target"]):
-                warnings.append({
-                    "rule": "internal-mount", "service": name,
-                    "message": f"{name}: mounts over an image-internal path: {target}",
-                })
-    for name in sorted(unknown_variables):
-        warnings.append({
-            "rule": "variable", "variable": name,
-            "message": f"{name}: variable is not declared by the base, kit artifacts or data",
-        })
-    return warnings
-
-
-INTERPOLATION_RE = re.compile(r"(?<!\$)\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)")
-
-
-def baseline_injections(
-    deployment: Deployment, selection: Selection, kit: RuntimeContext, base_selection: Selection
-) -> dict[str, str]:
-    """The kit's injections with the base's images, as the base runs on this host.
-
-    The kit's config/state mounts and public env values stay, so only what the
-    kit replaces differs. An image override in the host's site file applies to
-    the base as well: a source checkout reads it there (a pinned one ignores
-    image overrides), and it is the host's choice, not the kit's replacement.
-    """
-    injections = dict(selection.injections)
-    image_names = set(kit.base.component_images) | set(kit.base.artifacts) if kit.base else set()
-    images = {name: value for name, value in base_selection.injections.items() if name in image_names}
-    if not kit.pinned and deployment.site_config.is_file():
-        site = parse_dotenv(deployment.site_config)
-        images.update({name: value for name, value in site.items() if name in image_names and value})
-    injections.update(images)
-    return injections
-
-
-# A list item naming a relative Compose file, as in a kit's include: list.
-LOCAL_INCLUDE_RE = re.compile(r"^\s*-\s*(?:path:\s*)?['\"]?([^\s'\"$][^\s'\"]*\.ya?ml)['\"]?\s*$", re.MULTILINE)
-BASE_REFERENCE_RE = re.compile(r"\$\{(OPENADKIT_BASE_DEPLOYMENT|KIT_openadkit)\}/([^\s'\"]+\.ya?ml)")
-COMPOSE_DOCUMENT_RE = re.compile(r"^(services|include):", re.MULTILINE)
-# ${NAME:-default}, ${NAME:?message} and their unset-only forms: a value the
-# file means to take from the host or the site file, not a typo.
-DELIBERATE_READ_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*):?[-?]")
-
-
-def is_compose_document(path: Path) -> bool:
-    return path.is_file() and COMPOSE_DOCUMENT_RE.search(path.read_text(encoding="utf-8")) is not None
-
-
-def kit_compose_files(deployment: Deployment, gpu: bool) -> list[Path]:
-    """The kit's own Compose files: its entry files and the kit files they include."""
-    root = deployment.root.resolve()
-    pending = [path.resolve() for path in deployment.compose_files(gpu)]
-    found: list[Path] = []
-    while pending:
-        path = pending.pop(0)
-        if path in found:
-            continue
-        found.append(path)
-        for relative in LOCAL_INCLUDE_RE.findall(path.read_text(encoding="utf-8")):
-            candidate = (path.parent / relative).resolve()
-            if candidate.is_relative_to(root) and is_compose_document(candidate):
-                pending.append(candidate)
-    return found
-
-
-def kit_variables(deployment: Deployment, gpu: bool) -> set[str]:
-    """Variables the kit sets or reads that only one side of the kit knows.
-
-    A variable the kit sets in its env files and reads in its own Compose
-    files is the kit's own setting, such as one of its services' options, and
-    one read with a default or a required message (${NAME:-x}, ${NAME:?x})
-    is meant to come from the host or the site file. One only set, or only
-    read plainly, and that the base does not declare, is a likely typo. The
-    host's site file is not part of the kit: what it sets, such as the
-    documented *_IMAGE overrides, belongs to this host.
-    """
-    set_by_kit: set[str] = set()
-    for path in deployment.env_layers[-1].files(gpu):
-        set_by_kit.update(parse_dotenv(path))
-    read_by_kit: set[str] = set()
-    deliberate: set[str] = set()
-    for path in kit_compose_files(deployment, gpu):
-        text = path.read_text(encoding="utf-8")
-        read_by_kit.update(INTERPOLATION_RE.findall(text))
-        deliberate.update(DELIBERATE_READ_RE.findall(text))
-    return (set_by_kit - read_by_kit) | (read_by_kit - deliberate - set_by_kit)
-
-
-def included_base_files(deployment: Deployment, gpu: bool) -> list[Path] | None:
-    """The base Compose files the kit includes; None means all of them.
-
-    A kit that includes the base's entry file inherits every base service.
-    One that includes only a service layer (services.autoware.yaml) inherits
-    that layer's services, and one that includes no base file inherits none;
-    a service of the same name elsewhere in the kit is its own, not a
-    replacement of the base's. A kit reaches the base only through
-    OPENADKIT_BASE_DEPLOYMENT or KIT_openadkit, since it cannot know where
-    the base is installed.
-    """
-    base = deployment.base
-    assert base is not None
-    roots = {"OPENADKIT_BASE_DEPLOYMENT": base.directory, "KIT_openadkit": base.root}
-    entry = {path.resolve() for path in base.compose_files(gpu)}
-    found: list[Path] = []
-    for path in kit_compose_files(deployment, gpu):
-        for variable, relative in BASE_REFERENCE_RE.findall(path.read_text(encoding="utf-8")):
-            candidate = (roots[variable] / relative).resolve()
-            if candidate in entry:
-                return None
-            if candidate not in found and is_compose_document(candidate):
-                found.append(candidate)
-    return found
-
-
-def check_overlay(
-    deployment: Deployment, selection: Selection, kit: RuntimeContext
-) -> list[dict[str, str]]:
-    if deployment.base is None:
-        return []
-    assert kit.base is not None
-    base = deployment.base
-    base_selection = base.select(kit.base, selection.ros_distro, selection.gpu)
-    injections = baseline_injections(deployment, selection, kit, base_selection)
-    baseline = Selection(selection.ros_distro, selection.gpu, None, injections, selection.environment)
-    layers = included_base_files(deployment, selection.gpu)
-    original = (
-        compose_model(base, baseline, environment_from=deployment, files=layers)
-        if layers != []
-        else {}
-    )
-    current = compose_model(deployment, selection)
-    declared = set(selection.injections)
-    for layer in base.env_layers:
-        for path in layer.files(selection.gpu):
-            declared.update(parse_dotenv(path))
-    declared.update(item["destinationEnv"] for item in deployment.data)
-    # Include variables used by shared services and their env files, including
-    # host values such as HOME. This remains static: no image pull or inspection
-    # is needed.
-    for directory in [base.directory, *(base.root / "deployments" / name for name in base.shared)]:
-        for path in directory.rglob("*"):
-            if path.suffix not in (".yaml", ".yml", ".env") or not path.is_file():
-                continue
-            declared.update(INTERPOLATION_RE.findall(path.read_text(encoding="utf-8")))
-    used = kit_variables(deployment, selection.gpu)
-    warnings = overlay_warnings(original, current, used - declared)
-    for warning in warnings:
-        print(f"warning: overlay contract: {warning['message']}", file=sys.stderr)
-    return warnings
 
 
 def create_writable_mounts(deployment: Deployment, selection: Selection) -> None:

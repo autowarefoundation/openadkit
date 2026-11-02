@@ -463,7 +463,7 @@ class Deployment:
         base: Deployment | None = None,
     ) -> None:
         self.root = root
-        # Retained only as provenance and the static overlay-contract baseline.
+        # Kept for provenance and the inherited reset services.
         # Runtime layers below are resolved once; they never delegate to base.
         self.base = base
         self.directory = directory

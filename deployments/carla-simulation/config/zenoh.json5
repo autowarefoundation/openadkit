@@ -9,9 +9,10 @@
 // carla-interface image and sensor_mapping.yaml. It covers the interface
 // inputs that only exist on the Autoware host (localization odometry and the
 // RViz initial pose), the enabled lidar/IMU/GNSS sensors, clock, control,
-// vehicle status, and transforms. Cameras are disabled. Reconcile with the
-// live ROS graph and add any remaining service endpoints before the two-host
-// acceptance gate.
+// vehicle status, and transforms. Cameras are disabled. The topics the
+// visualizer shows follow; Zenoh sends a topic across only when the other
+// host subscribes to it. CI cannot run CARLA, so check this list against the live
+// ROS graph of a two-host run after an Autoware update.
 {
   plugins: {
     ros2dds: {
@@ -27,6 +28,22 @@
           "/sensing/lidar/top/pointcloud_before_sync",
           "/sensing/imu/tamagawa/imu_raw",
           "/sensing/gnss/pose_with_covariance",
+          // RViz on the CARLA host, which split-host runs there rather than on the edge;
+          // its panels use the Autoware ADAPI.
+          "/api/.*",
+          "/robot_description",
+          "/map/vector_map_marker",
+          "/planning/trajectory",
+          "/planning/scenario_planning/lane_driving/behavior_planning/path",
+          "/planning/scenario_planning/modified_goal",
+          "/planning/path_candidate/.*",
+          "/planning/mission_planning/(goal|echo_back_goal_pose|route_marker)",
+          "/(planning|control)/.*/virtual_walls?(/.*)?",
+          "/perception/object_recognition/objects",
+          "/localization/pose_twist_fusion_filter/pose",
+          "/planning/planning_factors/.*",
+          "/sensing/lidar/concatenated/pointcloud",
+          "/perception/obstacle_segmentation/pointcloud",
         ],
         subscribers: [
           "/clock",
@@ -39,16 +56,42 @@
           "/sensing/lidar/top/pointcloud_before_sync",
           "/sensing/imu/tamagawa/imu_raw",
           "/sensing/gnss/pose_with_covariance",
+          // RViz on the CARLA host, which split-host runs there rather than on the edge;
+          // its panels use the Autoware ADAPI.
+          "/api/.*",
+          "/robot_description",
+          "/map/vector_map_marker",
+          "/planning/trajectory",
+          "/planning/scenario_planning/lane_driving/behavior_planning/path",
+          "/planning/scenario_planning/modified_goal",
+          "/planning/path_candidate/.*",
+          "/planning/mission_planning/(goal|echo_back_goal_pose|route_marker)",
+          "/(planning|control)/.*/virtual_walls?(/.*)?",
+          "/perception/object_recognition/objects",
+          "/localization/pose_twist_fusion_filter/pose",
+          "/planning/planning_factors/.*",
+          "/sensing/lidar/concatenated/pointcloud",
+          "/perception/obstacle_segmentation/pointcloud",
         ],
         service_servers: [
           "/control/control_mode_request",
+          "/api/.*",
         ],
         service_clients: [
           "/control/control_mode_request",
+          "/api/.*",
         ],
         action_servers: [],
         action_clients: [],
       },
+
+      // The processed clouds only feed RViz: a few frames a second shows them
+      // without sending every LiDAR frame back across the LAN. The pointcloud
+      // map is not bridged at all.
+      pub_max_frequencies: [
+        "/sensing/lidar/concatenated/pointcloud=2",
+        "/perception/obstacle_segmentation/pointcloud=2",
+      ],
 
       // Keep bridge-side query timeouts generous enough for the vehicle
       // control-mode request; add endpoints from the live-graph audit here.

@@ -13,7 +13,6 @@ include:
   - ../shared/services/simulator.yaml
   - ../shared/services/perception-simulation.yaml
   - ../shared/services/api.yaml
-  - ../shared/services/visualizer.yaml
 
 services:
   map:
@@ -56,10 +55,6 @@ services:
       - map
 
   api:
-    depends_on:
-      - map
-
-  visualizer:
     depends_on:
       - map
 

@@ -11,7 +11,9 @@ services:
     network_mode: host
     init: true
     ipc: host
-    pid: service:map
+    # No pid: service:map. RViz runs without ros2 launch, so it has no
+    # launch_ros_<PID> node to keep unique, and a split simulator node has no
+    # map service to join.
     env_file:
       - ../runtime.env
     environment:

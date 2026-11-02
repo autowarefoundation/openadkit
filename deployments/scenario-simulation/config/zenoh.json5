@@ -17,6 +17,11 @@
 // can wait for them before a scenario switches Autoware to STOP; nothing on the
 // scenario host calls them. Map blobs, camera images, and visualization/teleop
 // interfaces are intentionally excluded.
+//
+// The visualizer runs on the scenario host, so the topics its RViz config
+// shows come across too (the Autoware ADAPI, which its panels use, as /api/.*).
+// Zenoh sends a topic across only when the other host subscribes to it, so
+// without a visualizer they do not cross the LAN.
 {
   plugins: {
     ros2dds: {
@@ -34,15 +39,19 @@
           "/sensing/imu/imu_data",
           "/localization/acceleration",
           "/localization/kinematic_state",
-          "/localization/pose_estimator/pose_with_covariance",
           "/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id",
           "/autoware/state",
-          "/api/localization/initialization_state",
-          "/api/routing/state",
-          "/api/operation_mode/state",
-          "/api/external/get/rtc_status",
-          "/api/external/get/emergency",
-          "/api/fail_safe/mrm_state",
+          "/api/.*",
+          // RViz on this host, which split-host runs here rather than on the edge.
+          "/robot_description",
+          "/map/vector_map_marker",
+          "/planning/trajectory",
+          "/planning/scenario_planning/lane_driving/behavior_planning/path",
+          "/planning/scenario_planning/modified_goal",
+          "/planning/path_candidate/.*",
+          "/planning/mission_planning/(goal|echo_back_goal_pose|route_marker)",
+          "/(planning|control)/.*/virtual_walls?(/.*)?",
+          "/perception/object_recognition/objects",
         ],
         subscribers: [
           "/clock",
@@ -57,15 +66,19 @@
           "/sensing/imu/imu_data",
           "/localization/acceleration",
           "/localization/kinematic_state",
-          "/localization/pose_estimator/pose_with_covariance",
           "/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id",
           "/autoware/state",
-          "/api/localization/initialization_state",
-          "/api/routing/state",
-          "/api/operation_mode/state",
-          "/api/external/get/rtc_status",
-          "/api/external/get/emergency",
-          "/api/fail_safe/mrm_state",
+          "/api/.*",
+          // RViz on this host, which split-host runs here rather than on the edge.
+          "/robot_description",
+          "/map/vector_map_marker",
+          "/planning/trajectory",
+          "/planning/scenario_planning/lane_driving/behavior_planning/path",
+          "/planning/scenario_planning/modified_goal",
+          "/planning/path_candidate/.*",
+          "/planning/mission_planning/(goal|echo_back_goal_pose|route_marker)",
+          "/(planning|control)/.*/virtual_walls?(/.*)?",
+          "/perception/object_recognition/objects",
         ],
         service_servers: [
           "/control/control_mode_request",
@@ -73,17 +86,7 @@
           "/control/control_command_gate/source/change",
           "/control/control_command_gate/filter/change",
           "/simulation/.*",
-          "/api/localization/initialize",
-          "/api/routing/set_route",
-          "/api/routing/set_route_points",
-          "/api/routing/clear_route",
-          "/api/operation_mode/change_to_stop",
-          "/api/operation_mode/enable_autoware_control",
-          "/api/operation_mode/change_to_autonomous",
-          "/api/external/set/engage",
-          "/api/external/set/rtc_commands",
-          "/api/external/set/rtc_auto_mode",
-          "/api/autoware/set/velocity_limit",
+          "/api/.*",
         ],
         service_clients: [
           "/control/control_mode_request",
@@ -91,17 +94,7 @@
           "/control/control_command_gate/source/change",
           "/control/control_command_gate/filter/change",
           "/simulation/.*",
-          "/api/localization/initialize",
-          "/api/routing/set_route",
-          "/api/routing/set_route_points",
-          "/api/routing/clear_route",
-          "/api/operation_mode/change_to_stop",
-          "/api/operation_mode/enable_autoware_control",
-          "/api/operation_mode/change_to_autonomous",
-          "/api/external/set/engage",
-          "/api/external/set/rtc_commands",
-          "/api/external/set/rtc_auto_mode",
-          "/api/autoware/set/velocity_limit",
+          "/api/.*",
         ],
         action_servers: [],
         action_clients: [],

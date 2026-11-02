@@ -105,9 +105,9 @@ openadkit run scenario-simulation --node scenario
 
 The runner waits up to `SCENARIO_READY_TIMEOUT` for Autoware readiness over
 Zenoh before launching the scenario. Results are written on the **scenario**
-host under `~/openadkit-output/scenario-simulation/results`. The visualizer stays on the
-Autoware host; noVNC is loopback-only (`WEBSOCKIFY_BIND`), so remote desks use
-an SSH tunnel.
+host under `~/openadkit-output/scenario-simulation/results`. The visualizer runs
+on the scenario host too, so RViz takes no CPU or GPU from Autoware on the edge;
+noVNC is loopback-only (`WEBSOCKIFY_BIND`), so remote desks use an SSH tunnel.
 
 Stop each host; the CLI finds the live node from its Compose project:
 
@@ -134,7 +134,8 @@ CARLA RPC (`127.0.0.1:2000`) and map loading stay local to the CARLA host.
 The interface publishes simulation time, the enabled lidar/IMU/GNSS sensors,
 vehicle status, and transforms; Autoware publishes control commands. Cameras
 are disabled in `sensor_mapping.yaml`; enabling them requires an allowlist and
-throughput update.
+throughput update. The visualizer runs on the CARLA host, where the raw LiDAR
+already originates.
 
 ## Allowlist
 
@@ -144,6 +145,18 @@ every node. Entries are full-name regular expressions, not globs. Both
 hosts use the same file: either side can own an endpoint. Review the list
 before routing anything new, and keep the host boundary on the lab LAN:
 the allowlist is not authentication.
+
+Both allowlists also carry what the visualizer on the simulator host shows:
+planning and control output, objects, the vector map marker, `/robot_description`
+and the ADAPI (`/api/.*`) its panels use. Zenoh sends a topic across only when
+the other host subscribes to it, so without a visualizer these stay on the edge.
+The processed CARLA pointclouds cross at 2 Hz (`pub_max_frequencies`), and the
+pointcloud map is not bridged. A visualizer on the edge is the single-host mode.
+
+The split scenario cell checks that every allowlisted topic exists in one of
+the two graphs, so an Autoware rename fails CI instead of silently stopping a
+topic. CI cannot run CARLA: check its allowlist against the live graph of a
+two-host run after an Autoware update.
 
 The scenario allowlist carries the simple sensor simulator's
 `/sensing/imu/imu_data` because autonomous emergency braking and
@@ -161,7 +174,8 @@ LAN; WAN and VPN links are best-effort and are not the supported setup.
 
 - `stop`, `status`, and `logs` find the live node from its Compose project, so
   you normally omit `--node`. When several nodes of one deployment run on the
-  same machine, pass `--node` to choose one.
+  same machine, `status` and `stop` act on all of them; pass `--node` to choose
+  one for the other commands.
 - Re-running a live node updates it in place. Starting the single-host graph
   while a node is live, or a node while the single-host graph is live, is
   refused: stop it first.

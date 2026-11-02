@@ -168,6 +168,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       geographiclib-tools \
+      "ros-${ROS_DISTRO}-domain-bridge" \
       "ros-${ROS_DISTRO}-topic-tools" && \
     geographiclib-get-geoids egm2008-1 && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \

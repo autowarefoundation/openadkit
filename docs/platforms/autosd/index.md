@@ -20,8 +20,8 @@ Builder files for its OS image.
 
 - [Planning Simulator](planning-simulator/index.md): Autoware planning and
   Scenario Simulator under Podman and Quadlet
-- [R-Car X5H](https://github.com/autowarefoundation/openadkit/tree/main/platforms/autosd/x5h):
-  AutoSD 10 image for the R-Car X5H board, tested in QEMU before board bring-up
+- [R-Car X5H](https://github.com/oguzkaganozt/rcar-x5h-autosd):
+  AutoSD 10 image for the R-Car X5H board, kept in its own repository
 
 !!! note "Current scope"
     These are platform demos. They run upstream Autoware images, not the modular

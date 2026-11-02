@@ -35,5 +35,5 @@ These figures come from the verified ADLINK AADP-AVA platform:
 | ADLINK AADP-AVA | arm64 (Ampere Altra) | <span class="oak-badge oak-badge--verified">Verified</span> | Primary edge platform |
 | AWS EC2 G5.4XLarge | amd64 | <span class="oak-badge oak-badge--verified">Verified</span> | GPU cloud instance for simulation |
 | NVIDIA Jetson Orin | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | JetPack 6 validation in progress |
-| R-Car X5H | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | AutoSD 10 bring-up; QEMU-tested, board tests manual |
+| R-Car X5H | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | AutoSD 10 bring-up in [its own repository](https://github.com/oguzkaganozt/rcar-x5h-autosd); board tests manual |
 | ADLINK ADM-AL30 | arm64 | <span class="oak-badge oak-badge--testing">Tests Ongoing</span> | No validation results recorded yet |

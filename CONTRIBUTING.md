@@ -133,9 +133,11 @@ Run the `scan-images`, `evidence` and `release.yaml` workflows (GitHub Actions) 
 Both release candidates and stable releases require a successful evidence run
 that passed every cell for the promoted build; reviewed manifest exemptions
 remain explicitly unverified. Read the
-[evidence policy](https://autowarefoundation.github.io/openadkit/releases/evidence/),
-[verification guide](https://autowarefoundation.github.io/openadkit/releases/verification/)
-and [toolchain RFC](https://autowarefoundation.github.io/openadkit/development/rfc-0001-toolchain-model/).
+[evidence policy](https://autowarefoundation.github.io/openadkit/releases/evidence/)
+and [verification guide](https://autowarefoundation.github.io/openadkit/releases/verification/).
+
+Manifest contract changes bump `schemaVersion` and come with migration notes.
+Removing a public variable or extension point is a breaking change under SemVer.
 
 ## DCO Requirement
 

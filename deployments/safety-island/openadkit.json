@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "kind": "kit",
+  "extends": "../..",
+  "deployments": {
+    "safety-island": {
+      "path": "."
+    }
+  }
+}

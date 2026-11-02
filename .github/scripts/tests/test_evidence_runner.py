@@ -27,8 +27,11 @@ def test_evidence_cells_carry_the_manifest_plan():
     assert split["nodes"].split() == list(nodes) and split["l2"] == "scenario" and "/clock" in split["fresh"].split()
     kit = matrix_cell("custom-kit")
     assert kit["l2"] == "golden" and kit["l1"] == "custom-kit" and "/acme/probe" in kit["fresh"].split()
+    island = matrix_cell("safety-island")
+    assert island["l2"] == "golden" and island["l1"] == "safety-island"
+    assert island["fresh"] == matrix_cell("planning-simulation")["fresh"]
     assert matrix_cell("planning-simulation")["nodes"] == ""
-    for cell in (split, kit):
+    for cell in (split, kit, island):
         assert cell["name"] == validation_matrix.evidence_cell_name(cell)
 
 

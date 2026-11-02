@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "name": "safety-island",
+  "description": "Planning Simulation driven by the Safety Island controller on its own DDS domain",
+  "base": "planning-simulation",
+  "compose": {
+    "files": [
+      "docker-compose.yaml"
+    ]
+  },
+  "data": [
+    {
+      "name": "safety-island",
+      "kind": "files",
+      "destinationEnv": "SAFETY_ISLAND_PATH",
+      "files": [
+        {
+          "path": "actuation_freertos",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0/actuation_freertos",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "bridge-config.yaml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0/bridge-config.yaml",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "cyclonedds-domain2.xml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0/cyclonedds-domain2.xml",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "requiredFiles": [
+        "actuation_freertos",
+        "bridge-config.yaml",
+        "cyclonedds-domain2.xml"
+      ]
+    }
+  ]
+}

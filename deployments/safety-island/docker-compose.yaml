@@ -1,0 +1,46 @@
+# Planning Simulation with the Safety Island as the controller.
+#
+# Autoware runs on DDS domain 1 without its trajectory follower (control preset).
+# The Safety Island runs on domain 2 and publishes the control command that the
+# follower would; domain_bridge carries the topics of the Safety Island's
+# released bridge-config.yaml between the two domains.
+include:
+  - ${OPENADKIT_BASE_DEPLOYMENT}/docker-compose.yaml
+
+services:
+  safety-island-bridge:
+    image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
+    container_name: safety-island-bridge
+    network_mode: host
+    init: true
+    ipc: host
+    env_file:
+      - ${KIT_openadkit}/deployments/shared/runtime.env
+    environment:
+      # The shared config applies to every domain, so both sides of the bridge
+      # stay on one interface; the release's domain-2 setting keeps datagrams
+      # within what the Safety Island receives.
+      CYCLONEDDS_URI: file:///etc/cyclonedds/cyclonedds.xml,file:///safety-island/cyclonedds-domain2.xml
+    volumes:
+      - ${KIT_openadkit}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${SAFETY_ISLAND_PATH:?set in config.env}:/safety-island:ro
+    command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
+    restart: on-failure
+
+  safety-island:
+    # The FreeRTOS POSIX build needs only glibc and libstdc++, which every
+    # runtime image ships. Downloaded data has no executable bit.
+    image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
+    container_name: safety-island
+    network_mode: host
+    init: true
+    environment:
+      SI_DDS_INTERFACE: ${CYCLONEDDS_NETWORK_INTERFACE:-lo}
+    volumes:
+      - ${SAFETY_ISLAND_PATH:?set in config.env}:/safety-island:ro
+    command: >
+      sh -c 'install -m 0755 /safety-island/actuation_freertos /tmp/actuation_freertos
+      && exec /tmp/actuation_freertos'
+    depends_on:
+      - safety-island-bridge
+    restart: on-failure

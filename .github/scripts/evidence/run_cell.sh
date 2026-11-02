@@ -233,10 +233,11 @@ if [ "${l1_ok}" = true ] && [ "${split}" = true ] && [ "${l2_check}" = scenario 
     fi
 fi
 
-if [ "${l1_ok}" = true ] && [ "${l1_check}" = custom-kit ]; then
-    docker cp "${script_dir}/custom_kit.py" "${api_container}:/tmp/openadkit-custom-kit.py" >/dev/null 2>&1
+# A kit's own acceptance check: evidence/<kit>.py, with - as _.
+if [ "${l1_ok}" = true ] && [ -n "${l1_check}" ]; then
+    docker cp "${script_dir}/${l1_check//-/_}.py" "${api_container}:/tmp/openadkit-${l1_check}.py" >/dev/null 2>&1
     if ! docker exec "${api_container}" bash -lc \
-        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-custom-kit.py" >"${out}/custom-kit.log" 2>&1; then
+        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-${l1_check}.py" >"${out}/${l1_check}.log" 2>&1; then
         l1_ok=false
         result=FAILED
     fi

@@ -230,14 +230,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y podman catatonit
 
       - name: Download build metadata for the overlay build
-        if: ${{ matrix.kit != '' }}
+        if: ${{ matrix.kit != '' && hashFiles(format('{0}/overlay_ws/build.sh', matrix.kit)) != '' }}
         uses: actions/download-artifact@v8
         with:
           name: evidence-build-metadata-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
-      - name: Build the example workspace in the pinned devel image
-        if: ${{ matrix.kit != '' }}
+      - name: Build the kit's overlay workspace in the pinned devel image
+        if: ${{ matrix.kit != '' && hashFiles(format('{0}/overlay_ws/build.sh', matrix.kit)) != '' }}
         env:
           KIT_PATH: ${{ matrix.kit }}
           DISTRO: ${{ matrix.distro }}

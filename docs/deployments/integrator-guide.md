@@ -99,24 +99,40 @@ A release pins that image next to its runtime images, so the CLI builds with
 the right one:
 
 ```bash
-openadkit build-overlay [--ros-distro humble]               # the kit's workspace
-openadkit build-overlay <deployment> [--ros-distro humble]  # and the deployment's own
+openadkit build [--ros-distro humble]   # in the kit: its overlay_ws
+openadkit build PATH                    # any workspace, with the pins of the kit around it
 ```
 
-Without a deployment it builds the kit's workspace, which all its deployments
-share; with one, it also builds that deployment's own. The CLI records the
-image and distro in `install/.openadkit-overlay.json`, and `validate` and `run`
-warn after a base upgrade or a distro change until you rebuild. Such a rebuild
+The CLI records the image and distro in `install/.openadkit-overlay.json`, and
+`validate` and `run` warn after a base upgrade or a distro change until you
+rebuild. Such a rebuild
 starts from a clean `build/` and `install/`, since CMake caches record the paths
 they were configured with. A source checkout pins no devel image: set
 `DEVEL_IMAGE` to the matching `universe-common-devel` digest from the build
 metadata. The hook sources `overlay_ws/install/local_setup.bash` on top of Autoware.
 
-The workspace belongs to the kit: `overlay_ws` at the kit root serves every
-deployment of the kit, since they all extend one base and its images. A
-deployment may add its own `overlay_ws` in its directory; the hook sources it
-after the kit's, so it can add packages or shadow the kit's. A kit whose
-deployment is the root itself (`"path": "."`) has the one workspace.
+The workspace belongs to the kit: the one `overlay_ws` at the kit root serves
+every deployment of the kit, since they all extend one base and its images.
+Every Autoware service mounts it, and the hook sources it on top of Autoware,
+so its packages are visible in every service. Whether your code runs depends on
+what starts it:
+
+- A changed copy of an Autoware package shadows the image's own. It runs where
+  Autoware already launches that package, with nothing more to configure.
+- A new node runs only where something starts it: an extra service (as the
+  example's `acme-probe`), a launch file you override under `config/autoware`,
+  or by hand with `openadkit shell <service> ros2 run <package> <node>`.
+
+To try a workspace with a reference deployment, without writing a kit, mount it
+with `--ws`:
+
+```bash
+openadkit build ~/my_ws
+openadkit run planning-simulation --ws ~/my_ws
+```
+
+`--ws` is for a deployment without a workspace of its own; on a kit that has
+one it is an error rather than a second layer.
 
 The devel and runtime images install ROS packages from the same
 [ROS snapshot](../getting-started/container-images.md#ros-package-snapshot), so
@@ -130,11 +146,12 @@ deliberately to test the devel/runtime ABI boundary, then publishes
 
 Include the base's Compose file using `OPENADKIT_BASE_DEPLOYMENT`, then define your services
 under `services:`. Keep communicating ROS services on the base ROS domain and
-middleware. An extra Open AD Kit runtime service can load the kit workspace by
-mounting `${OPENADKIT_OVERLAY_WS}` at `/openadkit/overlay_ws:ro`; add
-`${OPENADKIT_OVERLAY_WS_DEPLOYMENT}` at `/openadkit/overlay_ws_deployment:ro`
-if it also needs the deployment's own packages. The example's `acme-probe`
-service mounts the first: its kit has one workspace.
+middleware. An extra Open AD Kit runtime service loads the kit workspace by
+mounting `${OPENADKIT_OVERLAY_WS}` at `/openadkit/overlay_ws:ro`, as the
+example's `acme-probe` does. It needs no image of its own: a runtime image and
+the workspace are enough. Build your own image only for what the runtime images
+lack, such as a system package or a non-ROS application, and declare it as an
+artifact (point 5).
 
 To replace one side of a base that runs as split-host nodes, include only the
 other side's service layer instead of the base's Compose file. For example, a
@@ -173,11 +190,7 @@ it does not yet accept arbitrary external kits.
 
 Install the new base next to the old version, update `extends`, rebuild your
 workspace against its devel digest, then validate and run your acceptance
-checks. A workspace kept in a nested deployment directory still loads as that
-deployment's layer, but a kit service that mounts only
-`${OPENADKIT_OVERLAY_WS}` will not see it: mount
-`${OPENADKIT_OVERLAY_WS_DEPLOYMENT}` too, or move the shared workspace to the
-kit root. Your repository, host config, downloaded data and output directories
+checks. Your repository, host config, downloaded data and output directories
 are outside the base release. Updating the default launcher does not change a
 kit's explicit version pin. See [CLI & Maintenance](../getting-started/cli.md)
-for config/state roots and marker-protected data cleanup.
+for the config and output directories and marker-protected data cleanup.

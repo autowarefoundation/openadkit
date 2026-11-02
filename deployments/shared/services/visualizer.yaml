@@ -35,5 +35,4 @@ services:
       - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
       - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
       - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
-      - ${OPENADKIT_OVERLAY_WS_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/overlay_ws_deployment:ro
     restart: on-failure

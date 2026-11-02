@@ -18,6 +18,8 @@ from manifest import (
     Deployment,
     OpenADKitError,
     Selection,
+    load_json,
+    output_root,
     parse_dotenv,
 )
 
@@ -571,7 +573,7 @@ def start(
     report_overrides(deployment, selection)
 
 
-OVERLAY_MOUNTS = ("/openadkit/overlay_ws", "/openadkit/overlay_ws_deployment")
+OVERLAY_MOUNTS = ("/openadkit/overlay_ws",)
 
 
 def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
@@ -632,27 +634,16 @@ def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
 
 # Overlay workspaces build where the services mount them, so CMake paths
 # recorded against the kit's layer resolve in the deployment's layer too.
-OVERLAY_TARGETS = {
-    "OPENADKIT_OVERLAY_WS": "/openadkit/overlay_ws",
-    "OPENADKIT_OVERLAY_WS_DEPLOYMENT": "/openadkit/overlay_ws_deployment",
-}
-# Written into install/ by build-overlay: the image and distro it built with.
+# Workspaces build where the services mount them, so the paths CMake records
+# resolve at runtime too.
+OVERLAY_TARGET = "/openadkit/overlay_ws"
+# Written into install/ by build: the image and distro it built with.
 OVERLAY_STAMP = ".openadkit-overlay.json"
 OVERLAY_BUILD = """set -eo pipefail
 source "/opt/ros/${ROS_DISTRO}/setup.bash"
 source /opt/autoware/setup.bash
-for layer in "$@"; do source "${layer}/install/local_setup.bash"; done
 colcon build --install-base install --cmake-args -DCMAKE_BUILD_TYPE=Release
 """
-
-
-def overlay_workspaces(deployment: Deployment) -> list[tuple[Path, str]]:
-    """The deployment's overlay workspaces with sources, the kit's first."""
-    return [
-        (path, OVERLAY_TARGETS[name])
-        for name, path in deployment.overlay_paths.items()
-        if name in OVERLAY_TARGETS and path is not None and (path / "src").is_dir()
-    ]
 
 
 def read_overlay_stamp(workspace: Path) -> dict[str, Any] | None:
@@ -663,66 +654,55 @@ def read_overlay_stamp(workspace: Path) -> dict[str, Any] | None:
     return stamp if isinstance(stamp, dict) else None
 
 
-def build_overlay(workspaces: list[tuple[Path, str]], image: str, ros_distro: str) -> None:
-    """Build each overlay layer in the devel image, on top of the ones before it.
+def build_overlay(workspace: Path, image: str, ros_distro: str) -> None:
+    """Build a workspace in the devel image.
 
-    A layer builds incrementally only on its own last build in this image and
+    It builds incrementally only on its own last build in this image and
     distro. Anything else (another image or distro, a build by hand at another
-    path, a layer below that was rebuilt) starts from a clean build and
-    install: CMake caches record the image's paths and the path they were
-    configured at, and links record the layers below.
+    path) starts from a clean build and install: CMake caches record the
+    image's paths and the path they were configured at.
     """
     require_docker()
-    environment = _compose_ls_environment()
-    below: list[tuple[Path, str]] = []
-    clean = False
-    for host, target in workspaces:
-        clean = clean or read_overlay_stamp(host) != {"image": image, "rosDistro": ros_distro}
-        if clean:
-            for products in (host / "build", host / "install"):
-                if products.is_dir() and not products.is_symlink():
-                    shutil.rmtree(products)
-        mounts = [arg for path, mount in below for arg in ("--volume", f"{path}:{mount}:ro")]
-        # The image compiles through ccache in the aw home, which only uid
-        # 1000 can write; keep HOME and the cache in the container's /tmp.
-        run_process(
-            [
-                "docker", "run", "--rm",
-                "--user", f"{os.getuid()}:{os.getgid()}",
-                "--env", "HOME=/tmp",
-                "--env", "CCACHE_DIR=/tmp/ccache",
-                *mounts,
-                "--volume", f"{host}:{target}",
-                "--workdir", target,
-                "--entrypoint", "bash",
-                image, "-c", OVERLAY_BUILD, "bash", *(mount for _, mount in below),
-            ],
-            env=environment,
-        )
-        (host / "install").mkdir(exist_ok=True)
-        (host / "install" / OVERLAY_STAMP).write_text(
-            json.dumps({"image": image, "rosDistro": ros_distro}) + "\n",
-            encoding="utf-8",
-        )
-        print(f"built overlay: {host}")
-        below.append((host, target))
+    if read_overlay_stamp(workspace) != {"image": image, "rosDistro": ros_distro}:
+        for products in (workspace / "build", workspace / "install"):
+            if products.is_dir() and not products.is_symlink():
+                shutil.rmtree(products)
+    # The image compiles through ccache in the aw home, which only uid
+    # 1000 can write; keep HOME and the cache in the container's /tmp.
+    run_process(
+        [
+            "docker", "run", "--rm",
+            "--user", f"{os.getuid()}:{os.getgid()}",
+            "--env", "HOME=/tmp",
+            "--env", "CCACHE_DIR=/tmp/ccache",
+            "--volume", f"{workspace}:{OVERLAY_TARGET}",
+            "--workdir", OVERLAY_TARGET,
+            "--entrypoint", "bash",
+            image, "-c", OVERLAY_BUILD,
+        ],
+        env=_compose_ls_environment(),
+    )
+    (workspace / "install").mkdir(exist_ok=True)
+    (workspace / "install" / OVERLAY_STAMP).write_text(
+        json.dumps({"image": image, "rosDistro": ros_distro}) + "\n",
+        encoding="utf-8",
+    )
+    print(f"built: {workspace}")
 
 
-def check_overlay_builds(deployment: Deployment, selection: Selection, image: str | None) -> list[str]:
-    """Warn about overlay installs that build-overlay made for another image."""
-    warnings: list[str] = []
-    for host, _ in overlay_workspaces(deployment):
-        stamp = read_overlay_stamp(host)
-        if stamp is None:
-            continue
-        if stamp.get("rosDistro") != selection.ros_distro or (image and stamp.get("image") != image):
-            warnings.append(
-                f"{host} was built for {stamp.get('rosDistro')} in {stamp.get('image')}; "
-                f"rebuild it: openadkit build-overlay {deployment.name}"
-            )
-    for warning in warnings:
-        print(f"warning: overlay workspace: {warning}", file=sys.stderr)
-    return warnings
+def check_overlay_build(deployment: Deployment, selection: Selection, image: str | None) -> str | None:
+    """Warn about an overlay install that build made for another image."""
+    stamp = read_overlay_stamp(deployment.workspace)
+    if stamp is None:
+        return None
+    if stamp.get("rosDistro") == selection.ros_distro and (not image or stamp.get("image") == image):
+        return None
+    warning = (
+        f"{deployment.workspace} was built for {stamp.get('rosDistro')} in {stamp.get('image')}; "
+        f"rebuild it: openadkit build {deployment.workspace} --ros-distro {selection.ros_distro}"
+    )
+    print(f"warning: overlay workspace: {warning}", file=sys.stderr)
+    return warning
 
 
 # Sourced before a ROS command runs in a service container: docker exec skips
@@ -730,9 +710,7 @@ def check_overlay_builds(deployment: Deployment, selection: Selection, image: st
 ROS_SHELL = 'source "/opt/ros/${ROS_DISTRO}/setup.bash"; source /opt/autoware/setup.bash; '
 # As the entrypoint hook layers them, for an interactive shell or command.
 SHELL_SETUP = ROS_SHELL + (
-    "for workspace in /openadkit/overlay_ws /openadkit/overlay_ws_deployment; do "
-    '[ -f "$workspace/install/local_setup.bash" ] && source "$workspace/install/local_setup.bash"; '
-    "done; "
+    f'[ -f {OVERLAY_TARGET}/install/local_setup.bash ] && source {OVERLAY_TARGET}/install/local_setup.bash; '
 )
 HOOK_MOUNTS = ("/openadkit/config/", "/openadkit/overlay_ws")
 
@@ -869,7 +847,7 @@ def shell(project: str, service: str, command: list[str]) -> None:
     project_run(project, arguments)
 
 
-def record(project: str, topics: list[str], output: Path) -> Path:
+def record(project: str, topics: list[str], output: Path | None) -> Path:
     """Record topics into a bag on the host until interrupted.
 
     The recorder runs as a copy of the running api container: its image,
@@ -889,6 +867,7 @@ def record(project: str, topics: list[str], output: Path) -> Path:
         config = json.loads(inspected.stdout)[0]["Config"]
     except (ValueError, LookupError, TypeError) as error:
         raise OpenADKitError("could not inspect the api container") from error
+    output = output or output_root() / deployment_of(config, view_name(project)) / "recordings"
     bag = output / f"{view_name(project)}-{time.strftime('%Y%m%d-%H%M%S')}"
     output.mkdir(parents=True, exist_ok=True)
     # The container's own entrypoint, which a service may have overridden.
@@ -924,6 +903,16 @@ def record(project: str, topics: list[str], output: Path) -> Path:
             + (f"; partial bag: {bag}" if bag.is_dir() else "")
         )
     return bag
+
+
+def deployment_of(config: dict[str, Any], fallback: str) -> str:
+    """The deployment a container runs: its project's directory holds deployment.json."""
+    directory = (config.get("Labels") or {}).get("com.docker.compose.project.working_dir", "")
+    try:
+        name = load_json(Path(directory) / "deployment.json")["name"]
+    except (OpenADKitError, KeyError, TypeError):
+        name = None
+    return name if isinstance(name, str) and name else fallback
 
 
 def stop(project: str) -> None:

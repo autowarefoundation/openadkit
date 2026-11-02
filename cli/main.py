@@ -51,10 +51,10 @@ def read_extends(kit_root: Path) -> str:
     return require_string(load_json(kit_root / "openadkit.json").get("extends"), "extends")
 
 
-def load_context() -> tuple[Path, RuntimeContext]:
-    """The kit to act on, run by the CLI of the Open AD Kit it pins."""
+def load_context(start: Path) -> tuple[Path, RuntimeContext]:
+    """The kit around start, run by the CLI of the Open AD Kit it pins."""
     cli_root = root_path()
-    kit_root = find_kit(Path.cwd())
+    kit_root = find_kit(start)
     if kit_root is None:
         return cli_root, load_kit(cli_root)
     # Hand over before reading anything else: only the pinned release's CLI
@@ -87,7 +87,7 @@ class OpenADKitParser(argparse.ArgumentParser):
         if self.help_inventory != "catalog":
             return
         try:
-            root, kit = load_context()
+            root, kit = load_context(Path.cwd())
         except OpenADKitError:
             return
         print(file=file)
@@ -106,7 +106,7 @@ def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> N
     parser.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name; omit to print the catalog",
+        help="deployment name or directory; omit to print the catalog",
     )
     parser.add_argument(
         "--ros-distro",
@@ -119,6 +119,13 @@ def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> N
             action="store_true",
             help="use the GPU compose overlay when the deployment provides one",
         )
+
+
+def add_workspace_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--ws", metavar="PATH",
+        help="mount this built workspace as the overlay, for a deployment without its own",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -136,12 +143,6 @@ def build_parser() -> argparse.ArgumentParser:
             "  openadkit run logging-simulation --gpu\n"
             "  openadkit stop"
         ),
-    )
-    parser.add_argument(
-        "--version",
-        action="store_true",
-        dest="show_version",
-        help="show version information and exit",
     )
     subparsers = parser.add_subparsers(dest="command", parser_class=OpenADKitParser)
     subparsers.add_parser(
@@ -178,6 +179,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_run_arguments(validate)
     add_node_argument(validate, NODE_HELP)
+    add_workspace_argument(validate)
     validate.add_argument(
         "--data",
         action="store_true",
@@ -201,6 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="fetch data and start a deployment")
     add_run_arguments(run)
     add_node_argument(run, NODE_HELP)
+    add_workspace_argument(run)
     run.add_argument(
         "--pull",
         choices=("missing", "always", "never"),
@@ -212,27 +215,23 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="start without the visualizer, for hosts nobody watches",
     )
-    build_overlay = subparsers.add_parser(
-        "build-overlay",
-        help="build overlay workspaces in the pinned devel image (in a kit, its own without a deployment)",
+    build = subparsers.add_parser(
+        "build", help="build an overlay workspace in the pinned devel image"
     )
-    add_run_arguments(build_overlay, gpu=False)
-    for catalog in (validate, fetch, run, build_overlay):
-        catalog.help_inventory = "catalog"
+    build.add_argument(
+        "workspace", nargs="?", metavar="PATH",
+        help="workspace with a src/ directory (default: the kit's overlay_ws)",
+    )
+    build.add_argument("--ros-distro", metavar="DISTRO", help="ROS distro (default: bundle default)")
 
-    clean = subparsers.add_parser(
-        "clean", help="remove downloaded data for a deployment"
-    )
+    clean = subparsers.add_parser("clean", help="delete a deployment's downloaded data")
     clean.add_argument(
         "deployment",
         nargs="?",
-        help="curated deployment name; omit to print the catalog",
+        help="deployment name or directory; omit to print the catalog",
     )
-    clean.add_argument(
-        "--data",
-        action="store_true",
-        help="delete the deployment's downloaded data",
-    )
+    for catalog in (validate, fetch, run, clean):
+        catalog.help_inventory = "catalog"
 
     # These act on what runs on this host, from any directory: no deployment name.
     status = subparsers.add_parser("status", help="show the running deployment")
@@ -264,8 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument(
         "--output",
         metavar="DIRECTORY",
-        default="~/openadkit-recordings",
-        help="where bags go (default: ~/openadkit-recordings)",
+        help="where bags go (default: ~/openadkit-output/<deployment>/recordings)",
     )
     stop = subparsers.add_parser("stop", help="stop and remove the running deployment")
     for operational in (status, logs, restart, shell, record, stop):
@@ -337,6 +335,21 @@ def list_deployments(
     ]
     _print_table(("NAME", "KIND", "GPU", "DESCRIPTION"), rows)
     return 0
+
+
+def is_path(argument: str) -> bool:
+    """A deployment or workspace named by its directory, such as ./my-kit."""
+    return "/" in argument or argument.startswith(".")
+
+
+def deployment_name(root: Path, kit: RuntimeContext, argument: str) -> str:
+    if not is_path(argument):
+        return argument
+    directory = Path(argument).expanduser().resolve()
+    for name, reference in kit.deployments.items():
+        if (root / reference.path).resolve() == directory:
+            return name
+    raise OpenADKitError(f"{argument} is not a deployment of {root}")
 
 
 def require_deployment_name(command: str, extra: str = "") -> None:
@@ -502,7 +515,8 @@ def operate(args: argparse.Namespace) -> int:
     elif args.command == "shell":
         compose.shell(project, args.service, args.command_args)
     else:
-        bag = compose.record(project, args.topics, Path(args.output).expanduser().resolve())
+        output = Path(args.output).expanduser().resolve() if args.output else None
+        bag = compose.record(project, args.topics, output)
         print(f"recorded: {bag}")
     return 0
 
@@ -510,9 +524,6 @@ def operate(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    if args.show_version:
-        root, kit = load_context()
-        return show_version(root, kit)
     if not args.command:
         parser.print_help()
         return 2
@@ -529,83 +540,63 @@ def main() -> int:
     if args.command in OPERATIONAL_COMMANDS:
         return operate(args)
 
-    root, kit = load_context()
+    # A deployment or workspace named by its directory belongs to the kit around it.
+    target = getattr(args, "deployment", None) or getattr(args, "workspace", None)
+    start = Path(target).expanduser().resolve() if target and is_path(target) else Path.cwd()
+    root, kit = load_context(start)
 
     if args.command == "list":
         return list_deployments(root, kit, json_output=args.json_output)
     if args.command == "version":
         return show_version(root, kit, json_output=args.json_output)
 
-    if args.command == "clean":
-        if not args.deployment:
-            require_deployment_name("clean", "--data")
-            list_deployments(root, kit)
-            return 2
-        deployment = get_deployment(root, kit, args.deployment)
-        selection = deployment.select(kit, None, False, operational=True)
-        if deployment.data:
-            selection = compose.resolve_settings(deployment, selection)
-        installed = data.check_installed_data(
-            deployment, selection, include_gpu=True
-        )
-        if not args.data:
-            if not installed:
-                print("no data resources declared")
-                return 0
-            for item in installed:
-                print(
-                    f"{item['name']}: {item['status']} ({item['destination']})"
-                )
-            return 0
-        compose.require_stopped(deployment.name)
-        compose.require_data_unused(item["destination"] for item in installed)
-        data.remove_installed_data(deployment, selection, include_gpu=True)
-        return 0
-
-    if args.command == "build-overlay":
+    if args.command == "build":
         if os.geteuid() == 0 and os.environ.get("SUDO_USER"):
             raise OpenADKitError(
-                "run build-overlay without sudo: the build would leave root-owned files"
+                "run build without sudo: the build would leave root-owned files"
                 " that your next build cannot replace"
             )
-        if args.deployment:
-            deployment = get_deployment(root, kit, args.deployment)
-            ros_distro = deployment.select(kit, args.ros_distro, False, require_gpu=False).ros_distro
-            workspaces = compose.overlay_workspaces(deployment)
-            owner = deployment.name
+        if args.workspace:
+            workspace = Path(args.workspace).expanduser().resolve()
         elif kit.kind == "kit":
-            # The kit's workspace serves all of its deployments: no name needed.
-            ros_distro = args.ros_distro or kit.default_ros_distro
-            workspaces = [
-                (path, compose.OVERLAY_TARGETS["OPENADKIT_OVERLAY_WS"])
-                for path in [root / "overlay_ws"]
-                if (path / "src").is_dir()
-            ]
-            owner = "this kit"
+            workspace = root / "overlay_ws"
         else:
-            require_deployment_name(args.command)
-            list_deployments(root, kit)
-            return 2
-        if not workspaces:
-            raise OpenADKitError(f"{owner} has no overlay_ws/src to build")
+            raise OpenADKitError("name the workspace to build: openadkit build PATH")
+        if not (workspace / "src").is_dir():
+            raise OpenADKitError(f"{workspace} has no src/ to build")
+        ros_distro = args.ros_distro or kit.default_ros_distro
         image = os.environ.get("DEVEL_IMAGE") or kit.devel_image(ros_distro)
         if not image:
             raise OpenADKitError(
                 f"this Open AD Kit pins no {ros_distro} devel image; set DEVEL_IMAGE to the "
                 "universe-common-devel image of the build your runtime images come from"
             )
-        compose.build_overlay(workspaces, image, ros_distro)
+        compose.build_overlay(workspace, image, ros_distro)
+        return 0
+
+    if not args.deployment:
+        require_deployment_name(args.command)
+        list_deployments(root, kit, json_output=getattr(args, "json_output", False))
+        return 2
+    deployment = get_deployment(root, kit, deployment_name(root, kit, args.deployment))
+
+    if args.command == "clean":
+        selection = deployment.select(kit, None, False, operational=True)
+        if deployment.data:
+            selection = compose.resolve_settings(deployment, selection)
+        installed = data.check_installed_data(deployment, selection, include_gpu=True)
+        if not installed:
+            print("no data resources declared")
+            return 0
+        compose.require_stopped(deployment.name)
+        compose.require_data_unused(item["destination"] for item in installed)
+        data.remove_installed_data(deployment, selection, include_gpu=True)
         return 0
 
     if args.command in ("fetch", "validate", "run"):
-        if not args.deployment:
-            require_deployment_name(args.command)
-            list_deployments(
-                root, kit, json_output=getattr(args, "json_output", False)
-            )
-            return 2
-        deployment = get_deployment(root, kit, args.deployment)
         warn_if_modified(root, deployment, kit)
+        if getattr(args, "ws", None):
+            deployment.use_workspace(Path(args.ws).expanduser().resolve())
         compose.ensure_runtime_user()
         selection = deployment.select(
             kit,
@@ -628,7 +619,7 @@ def main() -> int:
 
         data.validate_destinations(deployment, selection)
         configured_services = compose.render(deployment, selection)
-        compose.check_overlay_builds(deployment, selection, kit.devel_image(selection.ros_distro))
+        compose.check_overlay_build(deployment, selection, kit.devel_image(selection.ros_distro))
         if args.command == "validate":
             mode = "gpu" if selection.gpu else "cpu"
             results: list[dict[str, Any]] | None = (

@@ -33,7 +33,7 @@ vehicle certification.
 | Release evidence: releases need a passing evidence run of their build; build provenance stays | Done |
 | Kit: drop the static overlay-contract check and shorten the integrator guide | Done |
 | R-Car X5H board support moves to its own repository; AutoSD planning simulation stays | Done |
-| CLI: `build`, `run --ws`, `restart`, `shell`, deployment paths, and commands that find the running stack from any directory | In progress |
+| CLI: `build`, `run --ws`, `restart`, `shell`, deployment paths, and commands that find the running stack from any directory | Done |
 | Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Planned |
 | Safety Island: its DDS domain bridge and configuration become a generic part of the kit | Planned |
 | AutoSD: Quadlet units for the component images, with Compose as the single source | Planned |

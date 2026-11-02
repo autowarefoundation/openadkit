@@ -16,7 +16,6 @@ services:
       - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
       - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
       - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
-      - ${OPENADKIT_OVERLAY_WS_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/overlay_ws_deployment:ro
     command: >
       ros2 launch autoware_launch component_localization.launch.xml
       system_run_mode:=${SYSTEM_RUN_MODE}

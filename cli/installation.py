@@ -46,7 +46,7 @@ is still running, because uninstall removes the launcher `openadkit stop` needs.
   --all  also remove previously kept releases in the install destination
 
 Stop running deployments first (`openadkit stop`). Run
-`openadkit clean <deployment> --data` before uninstalling if you also want to
+`openadkit clean <deployment>` before uninstalling if you also want to
 delete downloaded data such as maps and perception models.
 """
 

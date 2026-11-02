@@ -32,14 +32,13 @@ the workspace. A kit that extends a release needs no `DEVEL_IMAGE`.
 ```bash
 cd deployments/custom-kit
 DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit-common@sha256:<digest> \
-  ../../openadkit build-overlay custom-kit
+  ../../openadkit build
 ../../openadkit validate custom-kit
 ../../openadkit run custom-kit
 ../../openadkit stop
 ```
 
-Rebuild the workspace per ROS distro (`build-overlay custom-kit --ros-distro
-jazzy`); CI builds it with `overlay_ws/build.sh` and a pinned devel image for
+Rebuild the workspace per ROS distro (`build --ros-distro jazzy`); CI builds it with `overlay_ws/build.sh` and a pinned devel image for
 both Humble and Jazzy. Add `--ros-distro jazzy` to `validate` and `run` after
 building the Jazzy workspace. `validate` only
 renders/checks the model; it does not prove that the runtime or overlay works.

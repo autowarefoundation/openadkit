@@ -316,3 +316,18 @@ def test_a_cell_only_runs_on_the_machine_it_is_planned_for(tmp_path, machine, pl
     if not ok:
         assert f"planned for {platform}" in result.stderr
         assert not (out / "cell.json").exists()
+
+
+def test_allowlists_name_their_topics_and_a_rename_is_caught():
+    sys.path.insert(0, str(ROOT / ".github/scripts/evidence"))
+    import allowlist
+    for deployment in ("scenario-simulation", "carla-simulation"):
+        entries = allowlist.allowed_topics((ROOT / f"deployments/{deployment}/config/zenoh.json5").read_text())
+        assert "/clock" in entries and "/api/.*" in entries
+        # Commented lines are not entries.
+        assert not any(entry.startswith("//") or " " in entry for entry in entries)
+    graph = {"/clock", "/api/routing/state", "/planning/scenario_planning/velocity_smoother/virtual_wall"}
+    assert allowlist.missing(["/clock", "/api/.*", "/(planning|control)/.*/virtual_walls?(/.*)?"], graph) == []
+    # Entries are full-name matches: a prefix or a renamed topic is missing.
+    assert allowlist.missing(["/clock_old", "/api", "/planning/trajectory"], graph) == [
+        "/clock_old", "/api", "/planning/trajectory"]

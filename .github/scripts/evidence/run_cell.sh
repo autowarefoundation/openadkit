@@ -192,6 +192,23 @@ if [ "${l0_rc}" -eq 0 ]; then
     fi
 fi
 
+# Every topic the split bridge allows must exist in one of the two graphs: an
+# Autoware rename would otherwise stop it crossing without any error.
+if [ "${l1_ok}" = true ] && [ "${split}" = true ] && [ "${l2_check}" = scenario ]; then
+    list_topics='timeout 60 ros2 topic list --no-daemon --spin-time 5'
+    docker exec "${api_container}" bash -lc \
+        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; ${list_topics}" \
+        >"${out}/topics-autoware.txt" 2>/dev/null
+    docker exec autoware-scenario-simulator bash -lc \
+        "source /opt/ros/${distro}/setup.bash; ${list_topics}" \
+        >"${out}/topics-scenario.txt" 2>/dev/null
+    if ! python3 "${script_dir}/allowlist.py" --config "deployments/${deployment}/config/zenoh.json5" \
+        --topics "${out}/topics-autoware.txt" --topics "${out}/topics-scenario.txt" >"${out}/allowlist.log" 2>&1; then
+        l1_ok=false
+        result=FAILED
+    fi
+fi
+
 if [ "${l1_ok}" = true ] && [ "${l1_check}" = custom-kit ]; then
     docker cp "${script_dir}/custom_kit.py" "${api_container}:/tmp/openadkit-custom-kit.py" >/dev/null 2>&1
     if ! docker exec "${api_container}" bash -lc \

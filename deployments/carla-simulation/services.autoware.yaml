@@ -4,8 +4,8 @@
 # the carla-interface edges) and the `--node autoware` view (this file plus
 # deployments/shared/compose.zenoh.yaml, attached by the CLI). No service here
 # depends on a CARLA service: the sim-local edges are added back only by the
-# default entry file. A kit that brings its own simulator includes this file
-# alone.
+# default entry file. A kit that brings its own simulator includes this file,
+# and ../shared/services/visualizer.yaml where it wants RViz.
 include:
   - ../shared/services/map-check.yaml
   - ../shared/services/map.yaml
@@ -17,7 +17,6 @@ include:
   - ../shared/services/vehicle.yaml
   - ../shared/services/control.yaml
   - ../shared/services/api.yaml
-  - ../shared/services/visualizer.yaml
 
 services:
   map:
@@ -80,16 +79,3 @@ services:
     depends_on:
       - map
       - system
-
-  # The visualizer renders CARLA on the GPU, so it needs the graphics caps.
-  visualizer:
-    container_name: autoware-e2e-visualizer
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
-    depends_on:
-      - map
-      - api
-      - planning
-      - control

@@ -23,3 +23,7 @@ services:
       - simulator
       - system
       - vehicle
+
+  visualizer:
+    depends_on:
+      - map

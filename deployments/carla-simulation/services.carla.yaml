@@ -1,12 +1,26 @@
-# CARLA-side services for carla simulation.
+# CARLA-side services for carla simulation: CARLA, its interface and map
+# loader, and the visualizer, which split-host runs on this host rather than
+# the edge.
 #
 # Shared by the single-host entry point (docker-compose.yaml) and the
 # `--node carla` view (this file plus deployments/shared/compose.zenoh.yaml,
 # attached by the CLI). All cross-service edges here are sim-local
 # (carla-interface waits on CARLA and the map loader), so they stay in this
-# file. CARLA RPC and map loading are host-local and never cross Zenoh. No
+# file; the visualizer's edges to Autoware are in docker-compose.yaml. CARLA
+# RPC and map loading are host-local and never cross Zenoh. No
 # pid: service:map: the CARLA host has no map service.
+include:
+  - ../shared/services/visualizer.yaml
+
 services:
+  # The visualizer renders CARLA on the GPU, so it needs the graphics caps.
+  visualizer:
+    container_name: autoware-e2e-visualizer
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,compute,utility,display
+
   carla:
     image: ${CARLA_CONTAINER_IMAGE:?pinned in openadkit.json artifacts}
     container_name: ${CARLA_CONTAINER_NAME}

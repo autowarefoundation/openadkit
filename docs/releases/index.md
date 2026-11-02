@@ -34,7 +34,7 @@ vehicle certification.
 | Kit: drop the static overlay-contract check and shorten the integrator guide | Done |
 | R-Car X5H board support moves to its own repository; AutoSD planning simulation stays | Done |
 | CLI: `build`, `run --ws`, `restart`, `shell`, deployment paths, and commands that find the running stack from any directory | Done |
-| Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Planned |
+| Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Done |
 | Safety Island: its DDS domain bridge and configuration become a generic part of the kit | Planned |
 | AutoSD: Quadlet units for the component images, with Compose as the single source | Planned |
 
@@ -46,7 +46,8 @@ vehicle certification.
   then full-scale vehicle, replacing the vehicle node rather than the application.
 - **Vehicle delivery:** an OCI package of the digest-pinned system and its BOM that
   can be mirrored offline; fleet rollout stays with the integrator's OTA system.
-- **rmw_zenoh:** replace the split-host bridge once Autoware supports it across hosts.
+- **rmw_zenoh:** evaluate it for split-host on Jazzy (Humble needs a launch patch); if it holds up,
+  replace the zenoh-bridge-ros2dds bridge.
 - **Image SBOMs.**
 - **CES 2027 demo:** hardware integration and partner evidence; not a general
   vehicle-support claim.

@@ -202,12 +202,14 @@ def compose_context(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize(("name", "node", "present", "absent"), [
-    ("scenario-simulation", None, {"scenario_simulator", "map", "mrm-state-relay"}, {"zenoh-bridge"}),
-    ("scenario-simulation", "autoware", {"map", "zenoh-bridge", "mrm-state-relay"}, {"scenario_simulator"}),
-    ("scenario-simulation", "scenario", {"scenario_simulator", "zenoh-bridge"}, {"map", "vehicle", "mrm-state-relay"}),
-    ("carla-simulation", None, {"carla", "carla-interface", "map"}, {"zenoh-bridge"}),
-    ("carla-simulation", "autoware", {"map", "zenoh-bridge"}, {"carla", "carla-interface"}),
-    ("carla-simulation", "carla", {"carla", "carla-interface", "carla-map-loader", "zenoh-bridge"}, {"map", "vehicle"}),
+    ("scenario-simulation", None, {"scenario_simulator", "map", "mrm-state-relay", "visualizer"}, {"zenoh-bridge"}),
+    ("scenario-simulation", "autoware", {"map", "zenoh-bridge", "mrm-state-relay"}, {"scenario_simulator", "visualizer"}),
+    ("scenario-simulation", "scenario", {"scenario_simulator", "zenoh-bridge", "visualizer"},
+     {"map", "vehicle", "mrm-state-relay"}),
+    ("carla-simulation", None, {"carla", "carla-interface", "map", "visualizer"}, {"zenoh-bridge"}),
+    ("carla-simulation", "autoware", {"map", "zenoh-bridge"}, {"carla", "carla-interface", "visualizer"}),
+    ("carla-simulation", "carla", {"carla", "carla-interface", "carla-map-loader", "zenoh-bridge", "visualizer"},
+     {"map", "vehicle"}),
 ])
 def test_real_compose_preserves_single_and_split_graphs(compose_context, name, node, present, absent):
     deployment = manifest.get_deployment(ROOT, compose_context, name)
@@ -228,6 +230,10 @@ def test_real_compose_preserves_single_and_split_graphs(compose_context, name, n
         assert "pid" not in services["scenario_simulator"]
     if name == "carla-simulation" and node == "autoware":
         assert "carla-interface" not in services["vehicle"].get("depends_on", {})
+    # The visualizer joins no PID namespace, and only the single-host graph waits on Autoware.
+    if "visualizer" in services:
+        assert "pid" not in services["visualizer"]
+        assert ("map" in services["visualizer"].get("depends_on", {})) is (node is None)
 
 
 def test_real_integrator_kit_validates_against_its_source_base(tmp_path, compose_context):

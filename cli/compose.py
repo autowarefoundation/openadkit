@@ -843,17 +843,23 @@ def hooked_services(project: str) -> list[str]:
     )
 
 
-def restart(project: str, services: list[str]) -> list[str]:
-    """Restart services so they reread their config and overlay workspaces.
+def restart(project: str, services: list[str], everything: bool) -> tuple[list[str], list[str]]:
+    """Restart services in place, with the settings they run with.
 
-    The default is every service that takes them, which leaves a simulator
-    such as CARLA running.
+    The default is every service that takes Open AD Kit config or an overlay
+    workspace, so a change to either applies without restarting a simulator
+    such as CARLA. Everything also reruns the one-shot services, as run did.
+    Returns the restarted services and the running ones left alone.
     """
+    running = project_capture(project, ["ps", "--services", "--status", "running"]).stdout.split()
+    if everything:
+        project_run(project, ["restart"])
+        return sorted(running), []
     services = services or hooked_services(project)
     if not services:
         raise OpenADKitError(f"{view_name(project)} has no service with Open AD Kit config to restart")
     project_run(project, ["restart", *services])
-    return services
+    return services, sorted(set(running) - set(services))
 
 
 def shell(project: str, service: str, command: list[str]) -> None:

@@ -56,7 +56,8 @@ _openadkit() {
         run) options="--ros-distro --gpu --node --pull --no-visualizer --help" ;;
         build-overlay) options="--ros-distro --help" ;;
         clean) options="--data --help" ;;
-        status | stop | restart | shell) options="--node --help" ;;
+        status | stop | shell) options="--node --help" ;;
+        restart) options="--node --all --help" ;;
         logs) options="--node --follow --help" ;;
         record) options="--node --all --output --help" ;;
     esac

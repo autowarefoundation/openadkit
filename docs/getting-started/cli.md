@@ -22,6 +22,7 @@ openadkit status
 openadkit logs --follow
 openadkit logs map planning        # only these services
 openadkit restart                  # services reread config and overlay workspaces
+openadkit restart --all            # the whole deployment, with the same settings
 openadkit shell                    # a shell in the api service with ROS sourced
 openadkit shell planning ros2 node list
 openadkit record /tf /localization/kinematic_state
@@ -34,8 +35,10 @@ host, pick one with `--node`; `status` and `stop` act on all of them.
 
 `restart` with no service restarts every service that takes Open AD Kit config
 or an overlay workspace, so a changed parameter file or a rebuilt workspace
-applies without restarting a simulator such as CARLA. Changes to Compose files
-or `.env` values need `run` again. `shell` sources ROS, Autoware and the overlay
+applies without restarting a simulator such as CARLA; it names the services it
+left running. `restart --all` restarts the whole deployment in place, one-shot
+services included, as a fresh start with the same settings. Changes to Compose
+files or `.env` values need `stop` and `run` again. `shell` sources ROS, Autoware and the overlay
 workspaces like the services' entrypoint; give it a service and a command to run
 one command instead.
 

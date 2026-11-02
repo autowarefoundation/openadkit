@@ -138,6 +138,8 @@ elif text == "compose ls --format json":
     print(live.read_text())
 elif text == "ps -aq":
     print("\\n".join(row['Id'] for row in {list(containers)!r}))
+elif args[0] == "compose" and "ps" in args and "--services" in args:
+    print({service_lines!r})
 elif args[0] == "compose" and "ps" in args and "--quiet" in args:
     print("\\n".join(row['Id'] for row in {list(containers)!r}))
 elif args[0] == "inspect":
@@ -930,11 +932,17 @@ def test_restart_defaults_to_the_services_with_open_ad_kit_config(tmp_path):
          "Mounts": [{"Destination": "/openadkit/overlay_ws"}]},
         {"Id": "c", "Config": {"Labels": {"com.docker.compose.service": "carla"}}, "Mounts": []},
     ]
-    calls = fake_docker(tmp_path, projects=["openadkit-example"], containers=containers)
+    calls = fake_docker(tmp_path, projects=["openadkit-example"], containers=containers,
+                        services=("acme", "carla", "planning"))
     result = run_cli(root, "restart")
     assert result.returncode == 0, result.stderr
     assert recorded(calls)[-1]["args"][-3:] == ["restart", "acme", "planning"]
-    assert "restarted: acme, planning" in result.stdout
+    assert "restarted: acme, planning" in result.stdout and "kept running: carla" in result.stdout
+    result = run_cli(root, "restart", "--all")
+    assert result.returncode == 0, result.stderr
+    assert recorded(calls)[-1]["args"][-1] == "restart" and "kept running" not in result.stdout
+    result = run_cli(root, "restart", "planning", "--all")
+    assert result.returncode != 0 and "or pass --all" in result.stderr
 
 
 def test_download_retries_cut_off_bodies_but_not_wrong_content(tmp_path, monkeypatch):

@@ -247,6 +247,10 @@ def build_parser() -> argparse.ArgumentParser:
         "services", nargs="*", metavar="SERVICE",
         help="services to restart (default: every service with Open AD Kit config)",
     )
+    restart.add_argument(
+        "--all", action="store_true", dest="all_services",
+        help="restart the whole deployment, one-shot services included",
+    )
     shell = subparsers.add_parser(
         "shell", help="open a shell, or run a command, in a running service with ROS sourced"
     )
@@ -472,6 +476,8 @@ def operate(args: argparse.Namespace) -> int:
     compose.require_docker()
     if args.command == "record" and bool(args.topics) == args.all_topics:
         raise OpenADKitError("name the topics to record, or pass --all")
+    if args.command == "restart" and args.services and args.all_services:
+        raise OpenADKitError("name the services to restart, or pass --all")
     if args.command in ("status", "stop"):
         projects = compose.live_views(args.node)
         if not projects:
@@ -489,7 +495,10 @@ def operate(args: argparse.Namespace) -> int:
     if args.command == "logs":
         compose.logs(project, args.follow, args.services)
     elif args.command == "restart":
-        print(f"restarted: {', '.join(compose.restart(project, args.services))}")
+        restarted, kept = compose.restart(project, args.services, args.all_services)
+        print(f"restarted: {', '.join(restarted)}")
+        if kept:
+            print(f"kept running: {', '.join(kept)} (restart --all includes them)")
     elif args.command == "shell":
         compose.shell(project, args.service, args.command_args)
     else:

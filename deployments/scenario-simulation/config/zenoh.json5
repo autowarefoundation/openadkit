@@ -39,7 +39,6 @@
           "/sensing/imu/imu_data",
           "/localization/acceleration",
           "/localization/kinematic_state",
-          "/localization/pose_estimator/pose_with_covariance",
           "/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id",
           "/autoware/state",
           "/api/.*",
@@ -53,7 +52,6 @@
           "/planning/mission_planning/(goal|echo_back_goal_pose|route_marker)",
           "/(planning|control)/.*/virtual_walls?(/.*)?",
           "/perception/object_recognition/objects",
-          "/localization/pose_twist_fusion_filter/pose",
         ],
         subscribers: [
           "/clock",
@@ -68,7 +66,6 @@
           "/sensing/imu/imu_data",
           "/localization/acceleration",
           "/localization/kinematic_state",
-          "/localization/pose_estimator/pose_with_covariance",
           "/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id",
           "/autoware/state",
           "/api/.*",
@@ -82,7 +79,6 @@
           "/planning/mission_planning/(goal|echo_back_goal_pose|route_marker)",
           "/(planning|control)/.*/virtual_walls?(/.*)?",
           "/perception/object_recognition/objects",
-          "/localization/pose_twist_fusion_filter/pose",
         ],
         service_servers: [
           "/control/control_mode_request",

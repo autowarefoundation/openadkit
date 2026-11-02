@@ -7,5 +7,5 @@ are required. See the [canonical documentation](https://autowarefoundation.githu
 cd ../..
 ./openadkit setup --gpu --verify
 ./openadkit run carla-simulation
-./openadkit stop carla-simulation
+./openadkit stop
 ```

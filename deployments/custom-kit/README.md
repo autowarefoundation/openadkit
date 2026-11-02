@@ -35,7 +35,7 @@ DEVEL_IMAGE=ghcr.io/autowarefoundation/openadkit-common@sha256:<digest> \
   ../../openadkit build-overlay custom-kit
 ../../openadkit validate custom-kit
 ../../openadkit run custom-kit
-../../openadkit stop custom-kit
+../../openadkit stop
 ```
 
 Rebuild the workspace per ROS distro (`build-overlay custom-kit --ros-distro

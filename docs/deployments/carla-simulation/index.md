@@ -39,7 +39,7 @@ In RViz2, set a goal with **2D Goal Pose** and select **Auto**.
 ## Stop and Recover
 
 ```bash
-openadkit stop carla-simulation
+openadkit stop
 ```
 
 Run `stop` also after a failed start, to release the GPU. If autonomous mode is

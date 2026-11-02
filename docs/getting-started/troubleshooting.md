@@ -13,10 +13,10 @@ Your user must be in the `docker` group. Log out and back in after
 
 1. Check that Docker is running: `docker info`.
 2. Check the configuration: `openadkit validate <deployment> --data`.
-3. Read the logs: `openadkit logs <deployment> --follow`.
+3. Read the logs: `openadkit logs --follow`.
 
 If `run` fails after the containers are created, they keep running so you can
-read their logs. Stop them with `openadkit stop <deployment>`.
+read their logs. Stop them with `openadkit stop`.
 
 ## Data
 
@@ -52,7 +52,7 @@ not fall back to CPU.
 ### Blank visualizer
 
 Wait 10 to 30 seconds after `run`, then reload the page. If it stays blank,
-check `openadkit logs <deployment> --follow`.
+check `openadkit logs --follow`.
 
 ### noVNC says "failed to connect"
 

@@ -341,7 +341,7 @@ def live_state_conflict(deployment: Deployment, selection: Selection) -> str | N
     running = ", ".join(view_label(node) for node in clashing)
     return (
         f"{deployment.name} is already running as {running}; "
-        f"stop it with openadkit stop {deployment.name} "
+        "stop it with openadkit stop "
         f"before starting {view_label(selection.node)}"
     )
 
@@ -353,7 +353,7 @@ def require_stopped(name: str) -> None:
     if name in running_names([name]):
         raise OpenADKitError(
             f"{name} is running; stop it before deleting data: "
-            f"openadkit stop {name}"
+            "openadkit stop"
         )
 
 
@@ -524,7 +524,7 @@ def check_services_stay_up(
         if failed:
             raise OpenADKitError(
                 f"{', '.join(failed)} failed after start; "
-                f"see: openadkit logs {deployment.name}"
+                f"see: openadkit logs {' '.join(failed)}"
             )
         time.sleep(1)
 
@@ -728,22 +728,22 @@ def check_overlay_builds(deployment: Deployment, selection: Selection, image: st
 # Sourced before a ROS command runs in a service container: docker exec skips
 # the entrypoint that sources them for the service itself.
 ROS_SHELL = 'source "/opt/ros/${ROS_DISTRO}/setup.bash"; source /opt/autoware/setup.bash; '
+# As the entrypoint hook layers them, for an interactive shell or command.
+SHELL_SETUP = ROS_SHELL + (
+    "for workspace in /openadkit/overlay_ws /openadkit/overlay_ws_deployment; do "
+    '[ -f "$workspace/install/local_setup.bash" ] && source "$workspace/install/local_setup.bash"; '
+    "done; "
+)
+HOOK_MOUNTS = ("/openadkit/config/", "/openadkit/overlay_ws")
 
 
-def autoware_state(deployment: Deployment, selection: Selection) -> dict[str, Any] | None:
+def autoware_state(project: str) -> dict[str, Any] | None:
     """The AD API state from the running api service, or None without one."""
-    command = compose_command(deployment, selection)
-    environment = compose_process_environment(deployment, selection)
-    running = capture_process(
-        command + ["ps", "--services", "--status", "running"],
-        cwd=deployment.directory, env=environment, check=False, trace=False,
-    )
-    if "api" not in running.stdout.split():
+    if "api" not in project_capture(project, ["ps", "--services", "--status", "running"]).stdout.split():
         return None
     script = (Path(__file__).parent / "autoware_state.py").read_text(encoding="utf-8")
-    result = capture_process(
-        command + ["exec", "-T", "api", "bash", "-c", ROS_SHELL + 'exec python3 -c "$0"', script],
-        cwd=deployment.directory, env=environment, check=False, trace=False,
+    result = project_capture(
+        project, ["exec", "-T", "api", "bash", "-c", ROS_SHELL + 'exec python3 -c "$0"', script]
     )
     try:
         state = json.loads(result.stdout.strip().splitlines()[-1])
@@ -771,26 +771,105 @@ def format_autoware_state(state: dict[str, Any]) -> list[str]:
     return lines
 
 
-def status(deployment: Deployment, selection: Selection) -> None:
-    compose_run(deployment, selection, ["ps"])
-    state = autoware_state(deployment, selection)
+# The running stack is found from Docker, not from a kit: any directory and
+# any release's CLI reach it. run allows one deployment per host, so the live
+# projects are its views, its single-host project or the nodes of it that
+# run here.
+def live_views(node: str | None = None) -> list[str]:
+    projects = sorted(live_projects())
+    if node is not None:
+        projects = [name for name in projects if name.endswith(f"-{node}")]
+    return projects
+
+
+def view_name(project: str) -> str:
+    return project[len(PROJECT_PREFIX):]
+
+
+def live_view(node: str | None) -> str:
+    """The one live project a command acts on."""
+    projects = live_views(node)
+    if not projects:
+        raise OpenADKitError(f"node {node} is not running here" if node else "nothing is running")
+    if len(projects) > 1:
+        names = ", ".join(view_name(project) for project in projects)
+        raise OpenADKitError(f"{names} run here; choose one with --node")
+    return projects[0]
+
+
+def project_command(project: str, arguments: list[str]) -> list[str]:
+    return ["docker", "compose", "--project-name", project, *arguments]
+
+
+# Compose finds a running project by its labels. From / it reads no Compose
+# file of the current directory, so none of the deployment's settings are needed.
+def project_run(project: str, arguments: list[str]) -> None:
+    run_process(project_command(project, arguments), cwd=Path("/"), env=_compose_ls_environment())
+
+
+def project_capture(project: str, arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    return capture_process(
+        project_command(project, arguments), cwd=Path("/"), env=_compose_ls_environment(),
+        check=False, trace=False,
+    )
+
+
+def status(project: str) -> None:
+    project_run(project, ["ps"])
+    state = autoware_state(project)
     if state is not None:
         print()
         print("\n".join(format_autoware_state(state)))
 
 
-def logs(
-    deployment: Deployment, selection: Selection, follow: bool, services: list[str] | None = None
-) -> None:
-    arguments = ["logs"]
-    if follow:
-        arguments.append("--follow")
-    compose_run(deployment, selection, arguments + list(services or []))
+def logs(project: str, follow: bool, services: list[str]) -> None:
+    project_run(project, ["logs", *(["--follow"] if follow else []), *services])
 
 
-def record(
-    deployment: Deployment, selection: Selection, topics: list[str], output: Path
-) -> Path:
+def hooked_services(project: str) -> list[str]:
+    """Services that take the integrator's layer: config overrides or overlay workspaces."""
+    ids = project_capture(project, ["ps", "--quiet"]).stdout.split()
+    inspected = capture_process(
+        ["docker", "inspect", *ids], env=_compose_ls_environment(), check=False, trace=False
+    ) if ids else None
+    try:
+        containers = json.loads(inspected.stdout) if inspected else []
+    except json.JSONDecodeError as error:
+        raise OpenADKitError("could not inspect the running services") from error
+    return sorted(
+        container["Config"]["Labels"]["com.docker.compose.service"]
+        for container in containers
+        if any(mount.get("Destination", "").startswith(HOOK_MOUNTS) for mount in container.get("Mounts", []))
+    )
+
+
+def restart(project: str, services: list[str], everything: bool) -> tuple[list[str], list[str]]:
+    """Restart services in place, with the settings they run with.
+
+    The default is every service that takes Open AD Kit config or an overlay
+    workspace, so a change to either applies without restarting a simulator
+    such as CARLA. Everything also reruns the one-shot services, as run did.
+    Returns the restarted services and the running ones left alone.
+    """
+    running = project_capture(project, ["ps", "--services", "--status", "running"]).stdout.split()
+    if everything:
+        project_run(project, ["restart"])
+        return sorted(running), []
+    services = services or hooked_services(project)
+    if not services:
+        raise OpenADKitError(f"{view_name(project)} has no service with Open AD Kit config to restart")
+    project_run(project, ["restart", *services])
+    return services, sorted(set(running) - set(services))
+
+
+def shell(project: str, service: str, command: list[str]) -> None:
+    """A shell, or one command, in a running service with ROS, Autoware and the overlays sourced."""
+    arguments = ["exec"] if sys.stdin.isatty() else ["exec", "-T"]
+    arguments += [service, "bash", "-c", SHELL_SETUP + 'exec "$@"', "bash", *(command or ["bash"])]
+    project_run(project, arguments)
+
+
+def record(project: str, topics: list[str], output: Path) -> Path:
     """Record topics into a bag on the host until interrupted.
 
     The recorder runs as a copy of the running api container: its image,
@@ -799,10 +878,10 @@ def record(
     integrator message types. The bag is written to a host directory, so it
     survives the deployment's containers.
     """
-    ids = compose_capture(deployment, selection, ["ps", "--quiet", "api"], check=False).stdout.split()
+    ids = project_capture(project, ["ps", "--quiet", "api"]).stdout.split()
     if not ids:
-        raise OpenADKitError(f"{deployment.name} has no running api service to record from")
-    environment = process_environment(selection)
+        raise OpenADKitError(f"{view_name(project)} has no running api service to record from")
+    environment = _compose_ls_environment()
     inspected = capture_process(
         ["docker", "inspect", ids[0]], env=environment, check=False, trace=False
     )
@@ -810,8 +889,7 @@ def record(
         config = json.loads(inspected.stdout)[0]["Config"]
     except (ValueError, LookupError, TypeError) as error:
         raise OpenADKitError("could not inspect the api container") from error
-    label = deployment.name if selection.node is None else f"{deployment.name}-{selection.node}"
-    bag = output / f"{label}-{time.strftime('%Y%m%d-%H%M%S')}"
+    bag = output / f"{view_name(project)}-{time.strftime('%Y%m%d-%H%M%S')}"
     output.mkdir(parents=True, exist_ok=True)
     # The container's own entrypoint, which a service may have overridden.
     entrypoint = config.get("Entrypoint") or []
@@ -848,5 +926,5 @@ def record(
     return bag
 
 
-def stop(deployment: Deployment, selection: Selection) -> None:
-    compose_run(deployment, selection, ["down", "--remove-orphans"])
+def stop(project: str) -> None:
+    project_run(project, ["down", "--remove-orphans"])

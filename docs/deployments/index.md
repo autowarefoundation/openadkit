@@ -20,9 +20,9 @@ Complete the [Quickstart](../getting-started/index.md) setup first.
 ```bash
 openadkit list
 openadkit run planning-simulation
-openadkit status planning-simulation
-openadkit logs planning-simulation --follow
-openadkit stop planning-simulation
+openadkit status
+openadkit logs --follow
+openadkit stop
 ```
 
 - Add `--ros-distro jazzy` to `validate`, `fetch`, or `run` to select Jazzy;

@@ -88,13 +88,15 @@ zenoh_port=7447
 node_cli() {
     local operation=$1 index=$2
     shift 2
-    local target_node=${nodes[index]} args=() environment=()
-    [ -n "${target_node}" ] && args=(--node "${target_node}")
+    local target_node=${nodes[index]} args=("${deployment}") environment=()
+    # stop acts on what runs here; it takes no deployment name.
+    [ "${operation}" = stop ] && args=()
+    [ -n "${target_node}" ] && args+=(--node "${target_node}")
     if [ "${split}" = true ] && { [ "${operation}" = run ] || [ "${operation}" = validate ]; }; then
         environment=("ZENOH_LISTEN=tcp/127.0.0.1:$((zenoh_port + index))")
         [ "${index}" -gt 0 ] && environment+=("ZENOH_PEER=tcp/127.0.0.1:${zenoh_port}")
     fi
-    env "${environment[@]}" "${cli}" "${operation}" "${deployment}" "${args[@]}" "$@"
+    env "${environment[@]}" "${cli}" "${operation}" "${args[@]}" "$@"
 }
 
 result="PASSED"

@@ -13,7 +13,7 @@ Complete the [Quickstart](../../getting-started/index.md) setup first.
 
 ```bash
 openadkit run scenario-simulation
-openadkit logs scenario-simulation --follow
+openadkit logs --follow
 ```
 
 Run Autoware on one host and the TIER IV runner on another with `--node`; see
@@ -68,7 +68,7 @@ file: `config/autoware/autoware_default_adapi_universe/config/default_adapi.para
 ## Stop and Recover
 
 ```bash
-openadkit stop scenario-simulation
+openadkit stop
 ```
 
 To replace missing map data, run `openadkit fetch scenario-simulation --force`.

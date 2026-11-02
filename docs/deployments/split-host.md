@@ -112,7 +112,7 @@ an SSH tunnel.
 Stop each host; the CLI finds the live node from its Compose project:
 
 ```bash
-openadkit stop scenario-simulation
+openadkit stop
 ```
 
 ## CARLA
@@ -182,5 +182,5 @@ available", a bridged vehicle-status topic has stopped flowing:
   can leave Zenoh routes half-created (a route is removed and not recreated),
   so the topic no longer crosses.
 - Remedy: stop the workload on both hosts and start the nodes again
-  (`openadkit stop <name>`, then `openadkit run <name> --node ...`). A
+  (`openadkit stop`, then `openadkit run <name> --node ...`). A
   clean restart restores the routes.

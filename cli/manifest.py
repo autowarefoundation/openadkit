@@ -313,8 +313,14 @@ def config_root() -> Path:
 
 
 def state_root() -> Path:
-    """Run results: ``<deployment>/output``."""
+    """The CLI's own files, such as the empty directory for an absent layer."""
     return _user_root("OPENADKIT_STATE_DIR", "XDG_STATE_HOME", ".local/state")
+
+
+def output_root() -> Path:
+    """What runs produce, where the user looks: ``<deployment>/{results,recordings}``."""
+    explicit = os.environ.get("OPENADKIT_OUTPUT_DIR")
+    return Path(explicit).expanduser() if explicit else Path(expand_home("$HOME")) / "openadkit-output"
 
 
 def host_user_environment() -> dict[str, str]:
@@ -484,18 +490,15 @@ class Deployment:
             (directory, name) for name in self.compose["gpuFiles"]
         ] + (base.gpu_files if base else [])
         owner = base if base else self
-        # A kit's ROS packages serve all of its deployments, so its workspace
-        # lives at the kit root; a deployment may layer its own on top. A kit
-        # whose deployment is the root itself has the one workspace.
-        own_workspace = base is not None and directory.resolve() != root.resolve()
-        self.overlay_paths = {
+        # A kit's ROS packages serve all of its deployments, so its one
+        # workspace lives at the kit root.
+        self.overlay_paths: dict[str, Path | None] = {
             "OPENADKIT_CONFIG_SHARED": (
                 owner.root / "deployments/shared/config" if "shared" in owner.shared else None
             ),
             "OPENADKIT_CONFIG_BASE": base.directory / "config" if base else None,
             "OPENADKIT_CONFIG_DEPLOYMENT": directory / "config",
             "OPENADKIT_OVERLAY_WS": (root if base else directory) / "overlay_ws",
-            "OPENADKIT_OVERLAY_WS_DEPLOYMENT": directory / "overlay_ws" if own_workspace else None,
         }
         self.kit_environment = {
             BASE_KIT_ENV: str(base.root),
@@ -513,7 +516,24 @@ class Deployment:
 
     @property
     def output_directory(self) -> Path:
-        return state_root() / self.name / "output"
+        return output_root() / self.name
+
+    @property
+    def workspace(self) -> Path:
+        workspace = self.overlay_paths["OPENADKIT_OVERLAY_WS"]
+        assert workspace is not None
+        return workspace
+
+    def use_workspace(self, path: Path) -> None:
+        """Mount a workspace built elsewhere (run --ws) as the overlay workspace."""
+        if (self.workspace / "src").is_dir():
+            raise OpenADKitError(
+                f"{self.name} has its own overlay workspace ({self.workspace}); "
+                "--ws is for a deployment without one"
+            )
+        if not (path / "install/local_setup.bash").is_file():
+            raise OpenADKitError(f"{path} is not built; run: openadkit build {path}")
+        self.overlay_paths["OPENADKIT_OVERLAY_WS"] = path
 
     @property
     def has_gpu_files(self) -> bool:
@@ -563,7 +583,7 @@ class Deployment:
         # config.env defaults OUTPUT_HOST_PATH to this directory.
         injections = {
             "ROS_DISTRO": distro,
-            "OPENADKIT_OUTPUT_DIR": str(self.output_directory),
+            "OPENADKIT_RESULTS_DIR": str(self.output_directory / "results"),
             **host_user_environment(),
         }
         injections.update(self.kit_environment)
@@ -575,9 +595,9 @@ class Deployment:
 
         Config overrides apply in order: shared (every deployment that uses
         the shared services), the base a kit builds on, then this deployment.
-        Overlay workspaces are sourced in order: the kit's, then this
-        deployment's. A missing layer mounts an empty directory, so Docker
-        never creates a root-owned one in its place.
+        The overlay workspace is sourced on top of Autoware. A missing layer
+        mounts an empty directory, so Docker never creates a root-owned one
+        in its place.
         """
         empty = state_root() / "empty"
 

@@ -105,7 +105,7 @@ openadkit run scenario-simulation --node scenario
 
 The runner waits up to `SCENARIO_READY_TIMEOUT` for Autoware readiness over
 Zenoh before launching the scenario. Results are written on the **scenario**
-host under `~/.local/state/openadkit/scenario-simulation/output`. The visualizer stays on the
+host under `~/openadkit-output/scenario-simulation/results`. The visualizer stays on the
 Autoware host; noVNC is loopback-only (`WEBSOCKIFY_BIND`), so remote desks use
 an SSH tunnel.
 

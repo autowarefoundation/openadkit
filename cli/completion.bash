@@ -19,11 +19,11 @@ except (ValueError, KeyError, TypeError):
 _openadkit() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]}
     local command=${COMP_WORDS[1]:-}
-    local commands="install upgrade setup uninstall list version validate fetch run build-overlay clean status logs restart shell record stop"
+    local commands="install upgrade setup uninstall list version validate fetch run build clean status logs restart shell record stop"
     COMPREPLY=()
 
     if ((COMP_CWORD == 1)); then
-        mapfile -t COMPREPLY < <(compgen -W "${commands} --version --help" -- "${cur}")
+        mapfile -t COMPREPLY < <(compgen -W "${commands} --help" -- "${cur}")
         return
     fi
 
@@ -35,7 +35,7 @@ _openadkit() {
         --pull)
             mapfile -t COMPREPLY < <(compgen -W "missing always never" -- "${cur}")
             return ;;
-        --output | --destination)
+        --output | --destination | --ws)
             mapfile -t COMPREPLY < <(compgen -d -- "${cur}")
             return ;;
         --node)
@@ -51,11 +51,11 @@ _openadkit() {
         setup) options="--gpu --verify --help" ;;
         uninstall) options="--all --help" ;;
         list | version) options="--json --help" ;;
-        validate) options="--ros-distro --gpu --node --data --json --help" ;;
+        validate) options="--ros-distro --gpu --node --ws --data --json --help" ;;
         fetch) options="--ros-distro --force --help" ;;
-        run) options="--ros-distro --gpu --node --pull --no-visualizer --help" ;;
-        build-overlay) options="--ros-distro --help" ;;
-        clean) options="--data --help" ;;
+        run) options="--ros-distro --gpu --node --ws --pull --no-visualizer --help" ;;
+        build) options="--ros-distro --help" ;;
+        clean) options="--help" ;;
         status | stop | shell) options="--node --help" ;;
         restart) options="--node --all --help" ;;
         logs) options="--node --follow --help" ;;
@@ -66,18 +66,24 @@ _openadkit() {
         return
     fi
 
+    # build takes a workspace directory.
+    if [[ ${command} == build ]]; then
+        mapfile -t COMPREPLY < <(compgen -d -- "${cur}")
+        return
+    fi
+
     # The deployment is the first word after the command that is neither an
     # option nor an option's value. The commands that act on the running
     # deployment take no name.
     case ${command} in
-        validate | fetch | run | build-overlay | clean) ;;
+        validate | fetch | run | clean) ;;
         *) return ;;
     esac
     local index word
     for ((index = 2; index < COMP_CWORD; index++)); do
         word=${COMP_WORDS[index]}
         case ${word} in
-            --ros-distro | --node | --pull | --output) ((index++)) ;;
+            --ros-distro | --node | --pull | --output | --ws) ((index++)) ;;
             -*) ;;
             *) return ;;
         esac

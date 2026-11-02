@@ -50,14 +50,16 @@ if [ "${platform}" != "${host_platform}" ]; then
 fi
 
 mkdir -p "${out}"
-# Keep run results with this cell's evidence instead of the runner's home.
+# Keep run results and the CLI's own files with this cell's evidence instead
+# of the runner's home.
+export OPENADKIT_OUTPUT_DIR="${out}/output"
 export OPENADKIT_STATE_DIR="${out}/state"
 # Read no host settings either: a site file, or an inherited kit selection,
 # would change the deployment, its data, or its DDS settings under the cell.
 export OPENADKIT_CONFIG_DIR="${out}/config"
 unset OPENADKIT_KIT OPENADKIT_DELEGATED
 mkdir -p "${OPENADKIT_CONFIG_DIR}"
-scenario_output="${OPENADKIT_STATE_DIR}/${deployment}/output"
+scenario_output="${OPENADKIT_OUTPUT_DIR}/${deployment}/results"
 # A 4-vCPU runner cannot run Autoware main in real time: the ego drives late
 # and the samples take three times as long as on 16 vCPUs, past the wall-clock
 # timeout. Half speed gives Autoware the CPU a larger host has per simulated

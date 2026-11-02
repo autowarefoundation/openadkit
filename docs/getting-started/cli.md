@@ -55,7 +55,7 @@ A line reads `no data` while nothing publishes that state yet, for example
 before localization starts.
 
 `record` writes a rosbag of the named topics (or `--all`) to
-`~/openadkit-recordings/<deployment>-<time>/` (`--output` to change) until
+`~/openadkit-output/<deployment>/recordings/` (`--output` to change) until
 Ctrl+C. It runs as a copy of the running api container, so it joins the
 deployment's ROS domain and knows the overlay's message types, and the bag stays
 on the host when the deployment stops.
@@ -66,7 +66,7 @@ split nodes of the same deployment can still run together.
 After starting, `run` watches the services for 10 seconds and fails if one
 crashes.
 `openadkit run <deployment> --pull always` refreshes images before starting,
-and `openadkit --version` prints the installed version. `--no-visualizer`
+and `openadkit version` prints the installed version. `--no-visualizer`
 starts everything except the visualizer, for a host nobody watches; its
 software-rendered RViz needs CPU that Autoware lacks on a small host. CI
 evidence runs this way.
@@ -85,6 +85,11 @@ CenterPoint models.
 
 `list`, `version`, and `validate` accept `--json` for scripting.
 
+`validate`, `fetch`, `run` and `clean` also take a deployment's directory
+instead of its name, such as `openadkit run ./my-kit`: an argument with a `/` or
+a leading `.` is a directory, and the kit around it is used wherever you run the
+command.
+
 ## Configuration
 
 Each deployment reads its settings from environment files, in this order
@@ -102,7 +107,7 @@ override component images there; release images stay pinned.
 | Directory | Default | Override |
 | --- | --- | --- |
 | Host settings | `~/.config/openadkit` | `OPENADKIT_CONFIG_DIR` (or `XDG_CONFIG_HOME`) |
-| Run results | `~/.local/state/openadkit/<name>/output` | `OPENADKIT_STATE_DIR` (or `XDG_STATE_HOME`) |
+| Results and recordings | `~/openadkit-output/<name>/{results,recordings}` | `OPENADKIT_OUTPUT_DIR` |
 
 `deployments/<name>/config.local.env` is no longer read; the CLI warns when it
 finds one. Move its settings to `~/.config/openadkit/<name>.env`.
@@ -137,19 +142,19 @@ openadkit uninstall --all    # remove kept versions too
 ```
 
 `uninstall` is for release installs; remove a source checkout with Git. Host
-settings in `~/.config/openadkit` and results in `~/.local/state/openadkit` are
-kept.
+settings in `~/.config/openadkit` and results and recordings in
+`~/openadkit-output` are kept.
 
 Downloaded data (maps, rosbags, and perception models) lives under
-`~/autoware_map` and `~/autoware_data` and is kept by `uninstall`. Inspect and
+`~/autoware_map` and `~/autoware_data` and is kept by `uninstall`. Check and
 delete a deployment's data with:
 
 ```bash
-openadkit clean planning-simulation            # report only
-openadkit clean planning-simulation --data     # delete
+openadkit validate planning-simulation --data   # report
+openadkit clean planning-simulation             # delete
 ```
 
-`clean --data` and `fetch --force` refuse while that deployment is running, or
+`clean` and `fetch --force` refuse while that deployment is running, or
 when any live container mounts the data (including another kit or deployment).
 If data usage cannot be checked, deletion or replacement is refused. If Scenario
 Simulation's Kashiwanoha map is removed, restore it with
@@ -162,7 +167,7 @@ now declares other content for it, for example a fixed map with a new checksum:
 `run`, `fetch` and `validate --data` then stop and ask for `fetch --force`.
 
 The CLI marks the data it installs with a `.openadkit-resource.json` file.
-`clean --data` and `--force` only delete or replace marked data. Data that was
+`clean` and `--force` only delete or replace marked data. Data that was
 already there, such as a map you copied yourself, is still used when it is
 complete, but the CLI never deletes or replaces it; move or remove it yourself.
 If a target changes during `fetch --force`, publication fails instead of deleting

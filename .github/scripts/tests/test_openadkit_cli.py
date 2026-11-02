@@ -318,8 +318,8 @@ def complete(root, words, directory=None):
 
 def test_completion_offers_commands_options_and_deployments(tmp_path):
     root, _ = runtime_tree(tmp_path)
-    assert {"run", "build-overlay", "record"} <= complete(root, ["openadkit", ""])
-    assert complete(root, ["adkit", "build-"]) == {"build-overlay"}
+    assert {"run", "build", "record"} <= complete(root, ["openadkit", ""])
+    assert complete(root, ["adkit", "bui"]) == {"build"}
     assert complete(root, ["openadkit", "run", "--no-"]) == {"--no-visualizer"}
     assert complete(root, ["openadkit", "run", "--ros-distro", ""]) == {"humble", "jazzy"}
     assert complete(root, ["openadkit", "run", "ex"]) == {"example"}
@@ -1111,7 +1111,7 @@ def test_zip_fetch_publishes_validated_data(tmp_path):
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "home/data/map/required.txt").read_text() == "map"
     fake_docker(tmp_path)
-    result = run_cli(root, "clean", "example", "--data")
+    result = run_cli(root, "clean", "example")
     assert result.returncode == 0, result.stderr
     assert not (tmp_path / "home/data/map").exists()
 
@@ -1138,7 +1138,7 @@ def test_clean_checks_all_targets_before_deleting_anything(tmp_path, unsafe):
         (second / cli_data.MARKER).unlink()
         (second / cli_data.MARKER).symlink_to(first / cli_data.MARKER)
     fake_docker(tmp_path, projects=["openadkit-example"] if unsafe == "running" else [])
-    result = run_cli(root, "clean", "example", "--data")
+    result = run_cli(root, "clean", "example")
     assert result.returncode != 0
     message = "example is running" if unsafe == "running" else (
         "refusing to remove symlinked data" if unsafe == "symlink" else "not installed by openadkit"
@@ -1162,7 +1162,7 @@ def test_clean_protects_shared_data_across_kit_catalogs(tmp_path, name, status, 
     container = {"Id": "abc", "Name": f"/{other}", "State": {"Status": status},
                  "Mounts": [{"Type": "bind", "Source": str(target if shared else tmp_path / "unrelated")}]}
     fake_docker(tmp_path, projects=[f"openadkit-{other}"], containers=[container])
-    result = run_cli(root, "clean", name, "--data", directory=kit if name == "custom" else root)
+    result = run_cli(root, "clean", name, directory=kit if name == "custom" else root)
     blocked = shared and status != "exited"
     assert (result.returncode != 0) is blocked, result.stderr
     if blocked:
@@ -1226,7 +1226,7 @@ def test_kit_inherits_pins_gpu_env_and_layers(tmp_path, monkeypatch, release):
     kit = integrator_kit(tmp_path, root, artifacts={"API_IMAGE": {"workload": "api", "ref": OTHER_PIN}})
     directory = kit / "deployments/custom"
     (directory / "config.gpu.env").write_text("VALUE=kit-gpu\n")
-    for path in (base / "config", directory / "config", kit / "overlay_ws", directory / "overlay_ws"):
+    for path in (base / "config", directory / "config", kit / "overlay_ws"):
         path.mkdir()
     site_config(root, "VALUE=site\n", name="custom")
     context = cli_manifest.load_kit(kit)
@@ -1242,12 +1242,8 @@ def test_kit_inherits_pins_gpu_env_and_layers(tmp_path, monkeypatch, release):
     assert result.returncode == 0, result.stderr
     env = recorded(calls)[0]["env"]
     assert [env[name] for name in (
-        "OPENADKIT_CONFIG_BASE", "OPENADKIT_CONFIG_DEPLOYMENT",
-        "OPENADKIT_OVERLAY_WS", "OPENADKIT_OVERLAY_WS_DEPLOYMENT",
-    )] == [
-        str(base / "config"), str(directory / "config"),
-        str(kit / "overlay_ws"), str(directory / "overlay_ws"),
-    ]
+        "OPENADKIT_CONFIG_BASE", "OPENADKIT_CONFIG_DEPLOYMENT", "OPENADKIT_OVERLAY_WS",
+    )] == [str(base / "config"), str(directory / "config"), str(kit / "overlay_ws")]
     bom = json.loads(run_cli(root, "version", "--json", directory=kit).stdout)["bom"]
     assert bom["artifacts"]["INHERITED_IMAGE"]["ref"] == PIN
     assert (bom["images"] is not None) is release
@@ -1274,92 +1270,79 @@ def test_kit_may_leave_out_the_base_side_its_inherited_oneshots_belong_to(tmp_pa
     assert result.returncode != 0 and "unknown Compose service(s): probe" in result.stderr
 
 
-def test_build_overlay_builds_each_layer_in_the_pinned_devel_image(tmp_path):
+def test_build_builds_one_workspace_in_the_pinned_devel_image(tmp_path):
     root, _ = runtime_tree(tmp_path, release=True)
     kit = integrator_kit(tmp_path, root)
-    directory = kit / "deployments/custom"
-    for workspace in (kit / "overlay_ws", directory / "overlay_ws"):
-        (workspace / "src").mkdir(parents=True)
-        (workspace / "install").mkdir()
+    workspace = kit / "overlay_ws"
+    (workspace / "src").mkdir(parents=True)
     calls = fake_docker(tmp_path)
     # A release from before the devel pin: only an explicit image will do.
-    result = run_cli(root, "build-overlay", "custom", directory=kit)
+    result = run_cli(root, "build", directory=kit)
     assert result.returncode != 0 and "set DEVEL_IMAGE" in result.stderr
 
     devel = "ghcr.io/example/openadkit-common:universe-common-devel-humble@sha256:" + "d" * 64
     edit_kit(root, lambda doc: doc["images"]["humble"].update({"universe-common-devel": devel}))
-    result = run_cli(root, "build-overlay", "custom", directory=kit)
+    # In a kit, build takes its workspace; it builds where the services mount it.
+    result = run_cli(root, "build", directory=kit)
     assert result.returncode == 0, result.stderr
     builds = [row["args"] for row in recorded(calls) if row["args"][:1] == ["run"]]
-    assert len(builds) == 2 and all(devel in args for args in builds)
-    # Each layer builds where the services mount it, on top of the layers below.
-    assert f"{kit / 'overlay_ws'}:/openadkit/overlay_ws" in builds[0]
-    assert f"{kit / 'overlay_ws'}:/openadkit/overlay_ws:ro" in builds[1]
-    assert f"{directory / 'overlay_ws'}:/openadkit/overlay_ws_deployment" in builds[1]
-    assert builds[1][-1] == "/openadkit/overlay_ws"
-    stamp = json.loads((directory / "overlay_ws/install/.openadkit-overlay.json").read_text())
+    assert len(builds) == 1 and devel in builds[0]
+    assert f"{workspace}:/openadkit/overlay_ws" in builds[0]
+    stamp = json.loads((workspace / "install/.openadkit-overlay.json").read_text())
     assert stamp == {"image": devel, "rosDistro": "humble"}
     assert "overlay workspace" not in run_cli(root, "validate", "custom", directory=kit).stderr
 
-    # After a base upgrade the installs are stale until rebuilt.
+    # After a base upgrade the install is stale until rebuilt.
     edit_kit(root, lambda doc: doc["images"]["humble"].update({"universe-common-devel": devel[:-1] + "e"}))
     result = run_cli(root, "validate", "custom", directory=kit)
-    assert result.returncode == 0 and "openadkit build-overlay custom" in result.stderr
-    result = run_cli(root, "build-overlay", "custom", directory=kit, DEVEL_IMAGE="local/devel:test")
+    assert result.returncode == 0 and f"openadkit build {workspace}" in result.stderr
+    result = run_cli(root, "build", directory=kit, DEVEL_IMAGE="local/devel:test")
     assert result.returncode == 0 and "local/devel:test" in recorded(calls)[-1]["args"]
 
-    # A build for another image starts clean, and so does every layer above it;
-    # the same image builds incrementally.
-    for workspace in (kit / "overlay_ws", directory / "overlay_ws"):
-        (workspace / "build").mkdir(exist_ok=True)
-        (workspace / "build/CMakeCache.txt").write_text("old")
-    assert run_cli(root, "build-overlay", "custom", directory=kit).returncode == 0
-    assert not (kit / "overlay_ws/build/CMakeCache.txt").exists()
-    assert not (directory / "overlay_ws/build/CMakeCache.txt").exists()
-    for workspace in (kit / "overlay_ws", directory / "overlay_ws"):
-        (workspace / "install").mkdir(exist_ok=True)
-        (workspace / "install/.openadkit-overlay.json").write_text(
-            json.dumps({"image": devel[:-1] + "e", "rosDistro": "humble"}))
-        (workspace / "build").mkdir(exist_ok=True)
-        (workspace / "build/CMakeCache.txt").write_text("current")
-    assert run_cli(root, "build-overlay", "custom", directory=kit).returncode == 0
-    assert (kit / "overlay_ws/build/CMakeCache.txt").read_text() == "current"
+    # A build for another image starts clean; the same image builds incrementally.
+    (workspace / "build").mkdir(exist_ok=True)
+    (workspace / "build/CMakeCache.txt").write_text("old")
+    assert run_cli(root, "build", directory=kit).returncode == 0
+    assert not (workspace / "build/CMakeCache.txt").exists()
+    (workspace / "build").mkdir(exist_ok=True)
+    (workspace / "build/CMakeCache.txt").write_text("current")
+    assert run_cli(root, "build", directory=kit).returncode == 0
+    assert (workspace / "build/CMakeCache.txt").read_text() == "current"
 
-    # Without a deployment a kit builds its own workspace, which all its deployments share.
-    before = len(recorded(calls))
-    result = run_cli(root, "build-overlay", directory=kit)
+    # A path builds that workspace, with the pins of the kit around it.
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    result = run_cli(root, "build", str(workspace), directory=elsewhere)
     assert result.returncode == 0, result.stderr
-    builds = [row["args"] for row in recorded(calls)[before:] if row["args"][:1] == ["run"]]
-    assert len(builds) == 1 and f"{kit / 'overlay_ws'}:/openadkit/overlay_ws" in builds[0]
-    # Outside a kit there is no such workspace: a deployment is required.
-    assert run_cli(root, "build-overlay").returncode == 2
+    assert devel[:-1] + "e" in recorded(calls)[-1]["args"]
+    # Outside a kit, build needs a path; a path needs a src/.
+    result = run_cli(root, "build", directory=elsewhere)
+    assert result.returncode != 0 and "openadkit build PATH" in result.stderr
+    result = run_cli(root, "build", str(elsewhere), directory=elsewhere)
+    assert result.returncode != 0 and "has no src/" in result.stderr
 
 
-OVERLAY_LAYERS = ("OPENADKIT_OVERLAY_WS", "OPENADKIT_OVERLAY_WS_DEPLOYMENT")
-
-
-def overlay_layers(root, name, monkeypatch, tmp_path):
+def overlay_workspace(root, name, monkeypatch, tmp_path, workspace=None):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     for variable in ISOLATED_ENV:
         monkeypatch.delenv(variable, raising=False)
     context = cli_manifest.load_kit(root)
-    injections = cli_manifest.get_deployment(root, context, name).select(context, "humble", False).injections
-    return [injections[variable] for variable in OVERLAY_LAYERS], str(cli_manifest.state_root() / "empty")
+    deployment = cli_manifest.get_deployment(root, context, name)
+    if workspace is not None:
+        deployment.use_workspace(workspace)
+    return deployment.select(context, "humble", False).injections["OPENADKIT_OVERLAY_WS"]
 
 
-@pytest.mark.parametrize("own", [False, True])
-def test_kit_overlay_serves_every_deployment_and_one_may_layer_its_own(tmp_path, monkeypatch, own):
+def test_a_kit_has_one_workspace_at_its_root(tmp_path, monkeypatch):
     root, _ = runtime_tree(tmp_path)
     kit = integrator_kit(tmp_path, root)
-    directory = kit / "deployments/custom"
     (kit / "overlay_ws").mkdir()
-    if own:
-        (directory / "overlay_ws").mkdir()
-    layers, empty = overlay_layers(kit, "custom", monkeypatch, tmp_path)
-    assert layers == [str(kit / "overlay_ws"), str(directory / "overlay_ws") if own else empty]
+    # A deployment's own overlay_ws is no second layer.
+    (kit / "deployments/custom/overlay_ws").mkdir()
+    assert overlay_workspace(kit, "custom", monkeypatch, tmp_path) == str(kit / "overlay_ws")
 
 
-def test_kit_whose_deployment_is_its_root_mounts_its_overlay_once(tmp_path, monkeypatch):
+def test_kit_whose_deployment_is_its_root_mounts_its_overlay(tmp_path, monkeypatch):
     root, _ = runtime_tree(tmp_path)
     kit = integrator_kit(tmp_path, root)
     directory = kit / "deployments/custom"
@@ -1370,15 +1353,49 @@ def test_kit_whose_deployment_is_its_root_mounts_its_overlay_once(tmp_path, monk
     # The deployment is the kit root, so the root is named after it (as deployments/custom-kit).
     kit = kit.rename(tmp_path / "custom")
     (kit / "overlay_ws").mkdir()
-    layers, empty = overlay_layers(kit, "custom", monkeypatch, tmp_path)
-    assert layers == [str(kit / "overlay_ws"), empty]
+    assert overlay_workspace(kit, "custom", monkeypatch, tmp_path) == str(kit / "overlay_ws")
 
 
 def test_base_deployment_keeps_its_own_overlay(tmp_path, monkeypatch):
     root, directory = runtime_tree(tmp_path)
+    assert overlay_workspace(root, "example", monkeypatch, tmp_path) == str(cli_manifest.state_root() / "empty")
     (directory / "overlay_ws").mkdir()
-    layers, empty = overlay_layers(root, "example", monkeypatch, tmp_path)
-    assert layers == [str(directory / "overlay_ws"), empty]
+    assert overlay_workspace(root, "example", monkeypatch, tmp_path) == str(directory / "overlay_ws")
+
+
+def test_ws_mounts_a_built_workspace_for_a_deployment_without_one(tmp_path, monkeypatch):
+    root, directory = runtime_tree(tmp_path)
+    workspace = tmp_path / "my_ws"
+    (workspace / "src").mkdir(parents=True)
+    with pytest.raises(cli_manifest.OpenADKitError, match="is not built; run: openadkit build"):
+        overlay_workspace(root, "example", monkeypatch, tmp_path, workspace)
+    (workspace / "install").mkdir()
+    (workspace / "install/local_setup.bash").write_text("")
+    assert overlay_workspace(root, "example", monkeypatch, tmp_path, workspace) == str(workspace)
+    calls = fake_docker(tmp_path)
+    result = run_cli(root, "run", "example", "--ws", str(workspace), "--pull", "never")
+    assert result.returncode == 0, result.stderr
+    up = next(row for row in recorded(calls) if "up" in row["args"])
+    assert up["env"]["OPENADKIT_OVERLAY_WS"] == str(workspace)
+    # One with its own workspace keeps it: --ws would hide its packages.
+    (directory / "overlay_ws/src").mkdir(parents=True)
+    with pytest.raises(cli_manifest.OpenADKitError, match="has its own overlay workspace"):
+        overlay_workspace(root, "example", monkeypatch, tmp_path, workspace)
+
+
+def test_a_deployment_can_be_named_by_its_directory(tmp_path):
+    root, directory = runtime_tree(tmp_path)
+    kit = integrator_kit(tmp_path, root)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    fake_docker(tmp_path)
+    # The kit around the directory is the one used, wherever the command runs.
+    result = run_cli(root, "validate", str(kit / "deployments/custom"), directory=elsewhere)
+    assert result.returncode == 0 and "valid: custom" in result.stdout, result.stderr
+    result = run_cli(root, "validate", "./deployments/example", directory=root)
+    assert result.returncode == 0 and "valid: example" in result.stdout, result.stderr
+    result = run_cli(root, "validate", str(kit), directory=elsewhere)
+    assert result.returncode != 0 and "is not a deployment of" in result.stderr
 
 
 @pytest.mark.parametrize("available", [False, True])

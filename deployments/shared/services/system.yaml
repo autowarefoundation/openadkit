@@ -18,7 +18,6 @@ services:
       - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
       - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
       - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
-      - ${OPENADKIT_OVERLAY_WS_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/overlay_ws_deployment:ro
     command: >
       ros2 launch autoware_launch tier4_system_component.launch.xml
       diagnostic_graph_aggregator_graph_path:=/tmp/openadkit/autoware_launch/share/autoware_launch/config/system/diagnostics/${SYSTEM_DIAGNOSTICS_GRAPH:-autoware-main.yaml}

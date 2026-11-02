@@ -23,7 +23,7 @@ Run Autoware on one host and the TIER IV runner on another with `--node`; see
 
 `run` downloads the Kashiwanoha map. Autoware takes about 90 seconds to
 initialize; the runner then executes the scenario and writes the results to
-`~/.local/state/openadkit/scenario-simulation/output` (`run` prints the path).
+`~/openadkit-output/scenario-simulation/results` (`run` prints the path).
 
 --8<-- "includes/visualizer-remote-access.md"
 
@@ -35,7 +35,7 @@ Put overrides in `~/.config/openadkit/scenario-simulation.env`:
 |----------|---------|---------|
 | `SCENARIO` | Scenario path inside the container | Bundled example |
 | `SCENARIO_HOST_DIR` | Host scenario directory, mounted at `/scenarios` | `./scenarios` |
-| `OUTPUT_HOST_PATH` | Host results directory | `~/.local/state/openadkit/scenario-simulation/output` |
+| `OUTPUT_HOST_PATH` | Host results directory | `~/openadkit-output/scenario-simulation/results` |
 | `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware before running | `600` |
 | `GLOBAL_REAL_TIME_FACTOR` | Simulated seconds per wall-clock second; below `1` on a host that cannot run Autoware in real time | `1.0` |
 | `GLOBAL_TIMEOUT` | Wall-clock seconds each scenario may take; scale it with the factor | `180` |

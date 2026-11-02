@@ -99,7 +99,7 @@ def add_node_argument(parser: argparse.ArgumentParser, help_text: str) -> None:
 
 
 NODE_HELP = "node from this deployment's manifest (omit for single host)"
-LIVE_NODE_HELP = "node to act on when several nodes of the deployment run here"
+LIVE_NODE_HELP = "node to act on when several nodes run on this host"
 
 
 def add_run_arguments(parser: argparse.ArgumentParser, *, gpu: bool = True) -> None:
@@ -134,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  openadkit list\n"
             "  openadkit run planning-simulation\n"
             "  openadkit run logging-simulation --gpu\n"
-            "  openadkit stop planning-simulation"
+            "  openadkit stop"
         ),
     )
     parser.add_argument(
@@ -234,27 +234,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="delete the deployment's downloaded data",
     )
 
-    status = subparsers.add_parser("status", help="show deployment status")
-    status.add_argument(
-        "deployment",
-        nargs="?",
-        help="curated deployment name; required when one is running",
-    )
-    logs = subparsers.add_parser("logs", help="show deployment logs")
-    logs.add_argument(
-        "deployment",
-        nargs="?",
-        help="curated deployment name; required when one is running",
-    )
+    # These act on what runs on this host, from any directory: no deployment name.
+    status = subparsers.add_parser("status", help="show the running deployment")
+    logs = subparsers.add_parser("logs", help="show the running deployment's logs")
     logs.add_argument("services", nargs="*", metavar="SERVICE", help="only these services")
     logs.add_argument("--follow", action="store_true", help="stream logs")
-    record = subparsers.add_parser(
-        "record", help="record topics of a running deployment into a bag on the host"
+    restart = subparsers.add_parser(
+        "restart",
+        help="restart services so they reread config and overlay workspaces",
     )
-    record.add_argument(
-        "deployment",
-        nargs="?",
-        help="curated deployment name; required when one is running",
+    restart.add_argument(
+        "services", nargs="*", metavar="SERVICE",
+        help="services to restart (default: every service with Open AD Kit config)",
+    )
+    shell = subparsers.add_parser(
+        "shell", help="open a shell, or run a command, in a running service with ROS sourced"
+    )
+    shell.add_argument("service", nargs="?", default="api", help="service (default: api)")
+    shell.add_argument("command_args", nargs=argparse.REMAINDER, metavar="COMMAND", help="command to run")
+    record = subparsers.add_parser(
+        "record", help="record topics of the running deployment into a bag on the host"
     )
     record.add_argument("topics", nargs="*", metavar="TOPIC", help="topics to record")
     record.add_argument("--all", action="store_true", dest="all_topics", help="record every topic")
@@ -264,13 +263,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="~/openadkit-recordings",
         help="where bags go (default: ~/openadkit-recordings)",
     )
-    stop = subparsers.add_parser("stop", help="stop and remove a deployment")
-    stop.add_argument(
-        "deployment",
-        nargs="?",
-        help="curated deployment name; required when one is running",
-    )
-    for operational in (status, logs, stop, record):
+    stop = subparsers.add_parser("stop", help="stop and remove the running deployment")
+    for operational in (status, logs, restart, shell, record, stop):
         add_node_argument(operational, LIVE_NODE_HELP)
     return parser
 
@@ -346,15 +340,6 @@ def require_deployment_name(command: str, extra: str = "") -> None:
     suffix = f" {extra}" if extra else ""
     print(f"usage: openadkit {command} <deployment>{suffix}", file=sys.stderr)
     print(file=sys.stderr)
-
-
-def show_running(root, kit, command: str, running: list[str], *, extra: str = "") -> int:
-    if not running:
-        print("no running deployments")
-        return 0
-    require_deployment_name(command, extra)
-    list_deployments(root, kit, running)
-    return 2
 
 
 def autoware_line(autoware: dict[str, Any]) -> str:
@@ -476,7 +461,41 @@ def print_run_next_steps(
         )
     if output:
         print(f"output: {output}")
-    print(f"stop with: openadkit stop {target}")
+    print("stop with: openadkit stop")
+
+
+OPERATIONAL_COMMANDS = ("status", "logs", "restart", "shell", "record", "stop")
+
+
+def operate(args: argparse.Namespace) -> int:
+    compose.ensure_runtime_user()
+    compose.require_docker()
+    if args.command == "record" and bool(args.topics) == args.all_topics:
+        raise OpenADKitError("name the topics to record, or pass --all")
+    if args.command in ("status", "stop"):
+        projects = compose.live_views(args.node)
+        if not projects:
+            print("nothing is running" if args.node is None else f"node {args.node} is not running here")
+            return 0
+        for project in projects:
+            if len(projects) > 1:
+                print(f"== {compose.view_name(project)}")
+            if args.command == "status":
+                compose.status(project)
+            else:
+                compose.stop(project)
+        return 0
+    project = compose.live_view(args.node)
+    if args.command == "logs":
+        compose.logs(project, args.follow, args.services)
+    elif args.command == "restart":
+        print(f"restarted: {', '.join(compose.restart(project, args.services))}")
+    elif args.command == "shell":
+        compose.shell(project, args.service, args.command_args)
+    else:
+        bag = compose.record(project, args.topics, Path(args.output).expanduser().resolve())
+        print(f"recorded: {bag}")
+    return 0
 
 
 def main() -> int:
@@ -497,6 +516,9 @@ def main() -> int:
         }[args.command]
         print(f"error: run: {usage}", file=sys.stderr)
         return 2
+
+    if args.command in OPERATIONAL_COMMANDS:
+        return operate(args)
 
     root, kit = load_context()
 
@@ -650,7 +672,7 @@ def main() -> int:
         if others:
             raise OpenADKitError(
                 f"{', '.join(others)} is already running; "
-                "stop it from its owning kit before starting this deployment"
+                "stop it with openadkit stop before starting this deployment"
             )
         conflict = compose.live_state_conflict(deployment, selection)
         if conflict:
@@ -665,44 +687,7 @@ def main() -> int:
         )
         return 0
 
-    compose.ensure_runtime_user()
-    compose.require_docker()
-    if not args.deployment:
-        extra = "--follow" if args.command == "logs" and args.follow else ""
-        running = compose.running_names(kit.deployments)
-        if extra and not running:
-            require_deployment_name(args.command, extra)
-            print("no running deployments")
-            return 2
-        return show_running(root, kit, args.command, running, extra=extra)
-    deployment = get_deployment(root, kit, args.deployment)
-    warn_if_modified(root, deployment, kit)
-    node = args.node
-    if node is None:
-        live = compose.live_nodes(deployment)
-        if len(live) > 1:
-            names = ", ".join(compose.view_label(item) for item in live)
-            raise OpenADKitError(
-                f"{deployment.name} runs as {names}; choose one with --node"
-            )
-        node = live[0] if live else None
-    selection = deployment.select(kit, None, False, node=node, operational=True)
-    if args.command == "status":
-        compose.status(deployment, selection)
-    elif args.command == "logs":
-        compose.logs(deployment, selection, args.follow, args.services)
-    elif args.command == "record":
-        if bool(args.topics) == args.all_topics:
-            raise OpenADKitError("name the topics to record, or pass --all")
-        if not compose.live_nodes(deployment):
-            raise OpenADKitError(f"{deployment.name} is not running")
-        bag = compose.record(
-            deployment, selection, args.topics, Path(args.output).expanduser().resolve()
-        )
-        print(f"recorded: {bag}")
-    elif args.command == "stop":
-        compose.stop(deployment, selection)
-    return 0
+    raise AssertionError(args.command)
 
 
 if __name__ == "__main__":

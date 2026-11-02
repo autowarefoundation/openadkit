@@ -45,7 +45,7 @@ is still running, because uninstall removes the launcher `openadkit stop` needs.
 
   --all  also remove previously kept releases in the install destination
 
-Stop running deployments first (`openadkit stop <deployment>`). Run
+Stop running deployments first (`openadkit stop`). Run
 `openadkit clean <deployment> --data` before uninstalling if you also want to
 delete downloaded data such as maps and perception models.
 """
@@ -231,7 +231,7 @@ def require_no_running_deployments() -> None:
     if running:
         raise OpenADKitError(
             f"stop running deployments before uninstall: {', '.join(running)}. "
-            "Run: openadkit stop <deployment>"
+            "Run: openadkit stop"
         )
 
 

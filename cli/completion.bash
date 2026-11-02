@@ -19,7 +19,7 @@ except (ValueError, KeyError, TypeError):
 _openadkit() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]}
     local command=${COMP_WORDS[1]:-}
-    local commands="install upgrade setup uninstall list version validate fetch run build-overlay clean status logs record stop"
+    local commands="install upgrade setup uninstall list version validate fetch run build-overlay clean status logs restart shell record stop"
     COMPREPLY=()
 
     if ((COMP_CWORD == 1)); then
@@ -56,7 +56,7 @@ _openadkit() {
         run) options="--ros-distro --gpu --node --pull --no-visualizer --help" ;;
         build-overlay) options="--ros-distro --help" ;;
         clean) options="--data --help" ;;
-        status | stop) options="--node --help" ;;
+        status | stop | restart | shell) options="--node --help" ;;
         logs) options="--node --follow --help" ;;
         record) options="--node --all --output --help" ;;
     esac
@@ -66,9 +66,10 @@ _openadkit() {
     fi
 
     # The deployment is the first word after the command that is neither an
-    # option nor an option's value.
+    # option nor an option's value. The commands that act on the running
+    # deployment take no name.
     case ${command} in
-        validate | fetch | run | build-overlay | clean | status | logs | record | stop) ;;
+        validate | fetch | run | build-overlay | clean) ;;
         *) return ;;
     esac
     local index word

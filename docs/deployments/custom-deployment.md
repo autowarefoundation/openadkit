@@ -56,7 +56,7 @@ cd deployments/custom-kit
 bash overlay_ws/build.sh humble
 ../../openadkit validate custom-kit
 ../../openadkit run custom-kit
-../../openadkit stop custom-kit
+../../openadkit stop
 ```
 
 For your copied kit, run `openadkit validate/run/stop custom-kit` from its root,

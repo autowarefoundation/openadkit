@@ -28,7 +28,7 @@ for details.
 ## Stop and Recover
 
 ```bash
-openadkit stop planning-simulation
+openadkit stop
 ```
 
 To replace missing or incomplete map data, run

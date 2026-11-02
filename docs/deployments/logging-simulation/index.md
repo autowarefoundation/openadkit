@@ -30,7 +30,7 @@ with a full recording.
 ## Stop and Recover
 
 ```bash
-openadkit stop logging-simulation
+openadkit stop
 ```
 
 To replace missing sample data, run `openadkit fetch logging-simulation --force`;

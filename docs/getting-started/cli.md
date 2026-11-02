@@ -18,14 +18,27 @@ install alone, and `openadkit uninstall` removes only its own links.
 ## Runtime Controls
 
 ```bash
-openadkit status planning-simulation
-openadkit logs planning-simulation --follow
-openadkit logs planning-simulation map planning   # only these services
-openadkit record planning-simulation /tf /localization/kinematic_state
-openadkit stop planning-simulation
+openadkit status
+openadkit logs --follow
+openadkit logs map planning        # only these services
+openadkit restart                  # services reread config and overlay workspaces
+openadkit shell                    # a shell in the api service with ROS sourced
+openadkit shell planning ros2 node list
+openadkit record /tf /localization/kinematic_state
+openadkit stop
 ```
 
-Pass the deployment name. Without it, these commands only list what is running.
+These act on the deployment running on this host, from any directory, so they
+take no deployment name. When several nodes of a split deployment run on one
+host, pick one with `--node`; `status` and `stop` act on all of them.
+
+`restart` with no service restarts every service that takes Open AD Kit config
+or an overlay workspace, so a changed parameter file or a rebuilt workspace
+applies without restarting a simulator such as CARLA. Changes to Compose files
+or `.env` values need `run` again. `shell` sources ROS, Autoware and the overlay
+workspaces like the services' entrypoint; give it a service and a command to run
+one command instead.
+
 Below its services, `status` shows Autoware's state from the AD API:
 
 ```text
@@ -44,8 +57,8 @@ Ctrl+C. It runs as a copy of the running api container, so it joins the
 deployment's ROS domain and knows the overlay's message types, and the bag stays
 on the host when the deployment stops.
 One deployment runs at a time, including deployments from other kits, even one
-with the same name. `run` refuses conflicting projects; stop them from their
-owning kit first. Declared
+with the same name. `run` refuses conflicting projects; stop them first with
+`openadkit stop`. Declared
 split nodes of the same deployment can still run together.
 After starting, `run` watches the services for 10 seconds and fails if one
 crashes.
@@ -115,7 +128,7 @@ Stop running deployments first; `uninstall` refuses while any is running,
 because it removes the launcher that `openadkit stop` needs.
 
 ```bash
-openadkit stop planning-simulation
+openadkit stop
 openadkit uninstall          # keep previously installed versions
 openadkit uninstall --all    # remove kept versions too
 ```

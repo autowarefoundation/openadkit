@@ -138,6 +138,8 @@ elif text == "compose ls --format json":
     print(live.read_text())
 elif text == "ps -aq":
     print("\\n".join(row['Id'] for row in {list(containers)!r}))
+elif args[0] == "compose" and "ps" in args and "--quiet" in args:
+    print("\\n".join(row['Id'] for row in {list(containers)!r}))
 elif args[0] == "inspect":
     print(json.dumps({list(containers)!r}))
 elif "config --format json" in text:
@@ -512,7 +514,8 @@ def test_split_node_run_discovery_and_safe_stop(tmp_path):
     assert str(root / "deployments/example/compose.secondary.yaml") in up["args"]
     assert not any("zenoh" in arg or arg.endswith("docker-compose.yaml") for arg in up["args"])
     calls.write_text("")
-    result = run_cli(root, "stop", "example")
+    # stop finds the stack from Docker, from any directory.
+    result = run_cli(root, "stop", directory=tmp_path)
     assert result.returncode == 0, result.stderr
     down = next(row["args"] for row in recorded(calls) if "down" in row["args"])
     assert "openadkit-example-secondary" in down and "--volumes" not in down
@@ -596,12 +599,18 @@ def test_run_treats_a_same_named_project_from_another_directory_as_foreign(tmp_p
     assert cli_compose.live_nodes(deployment) == [None, "primary"]
 
 
-def test_several_live_nodes_require_an_explicit_stop_target(tmp_path):
+def test_several_live_nodes_stop_together_but_take_one_target_otherwise(tmp_path):
     root, _ = runtime_tree(tmp_path, document=manifest(nodes=True))
     calls = fake_docker(tmp_path, projects=["openadkit-example-primary", "openadkit-example-secondary"])
-    result = run_cli(root, "stop", "example")
+    result = run_cli(root, "logs")
     assert result.returncode != 0 and "choose one with --node" in result.stderr
-    assert not any("down" in row["args"] for row in recorded(calls))
+    assert run_cli(root, "logs", "--node", "primary").returncode == 0
+    assert recorded(calls)[-1]["args"][:4] == ["compose", "--project-name", "openadkit-example-primary", "logs"]
+    assert run_cli(root, "stop", "--node", "secondary").returncode == 0
+    assert [row["args"][2] for row in recorded(calls) if "down" in row["args"]] == ["openadkit-example-secondary"]
+    assert run_cli(root, "stop").returncode == 0
+    assert [row["args"][2] for row in recorded(calls) if "down" in row["args"]][1:] == [
+        "openadkit-example-primary", "openadkit-example-secondary"]
 
 
 @pytest.mark.parametrize("unsafe", ["missing", "symlink", "escape"])
@@ -810,7 +819,7 @@ def test_rerun_counts_only_restarts_since_up(monkeypatch):
 
 @pytest.mark.parametrize(("interrupt", "failed"), [(True, False), (False, True)])
 def test_record_keeps_an_interrupted_bag_but_reports_a_recorder_failure(monkeypatch, tmp_path, interrupt, failed):
-    monkeypatch.setattr(cli_compose, "compose_capture",
+    monkeypatch.setattr(cli_compose, "project_capture",
                         lambda *_, **__: subprocess.CompletedProcess([], 0, stdout="api\n"))
     monkeypatch.setattr(cli_compose, "capture_process", lambda *_, **__: subprocess.CompletedProcess(
         [], 0, stdout=json.dumps([{"Config": {"Image": "api-image", "Env": ["ROS_DOMAIN_ID=7"], "User": "1000"}}])))
@@ -829,13 +838,11 @@ def test_record_keeps_an_interrupted_bag_but_reports_a_recorder_failure(monkeypa
             return 2
 
     monkeypatch.setattr(cli_compose.subprocess, "Popen", Recorder)
-    deployment = type("Deployment", (), {"name": "example"})()
-    selection = cli_manifest.Selection("humble", False, None, {}, {})
     if failed:
         with pytest.raises(cli_manifest.OpenADKitError, match="exit status 2; partial bag"):
-            cli_compose.record(deployment, selection, ["/clock"], tmp_path / "bags")
+            cli_compose.record("openadkit-example", ["/clock"], tmp_path / "bags")
     else:
-        bag = cli_compose.record(deployment, selection, ["/clock"], tmp_path / "bags")
+        bag = cli_compose.record("openadkit-example", ["/clock"], tmp_path / "bags")
         assert bag.parent == tmp_path / "bags" and bag.name.startswith("example-")
     command = runs[0]
     assert command[:4] == ["docker", "run", "--rm", "--init"]
@@ -893,17 +900,41 @@ def test_status_shows_the_ad_api_state_in_one_line_each():
     assert cli_compose.format_autoware_state(dict.fromkeys(state))[1] == "routing      no data"
 
 
-def test_logs_and_record_take_services_and_topics(tmp_path):
+def test_operational_commands_act_on_the_running_stack_without_a_name(tmp_path):
     root, _ = runtime_tree(tmp_path)
     calls = fake_docker(tmp_path, projects=["openadkit-example"])
-    assert run_cli(root, "logs", "example", "map", "planning").returncode == 0
-    assert recorded(calls)[-1]["args"][-3:] == ["logs", "map", "planning"]
+    assert run_cli(root, "logs", "map", "planning", directory=tmp_path).returncode == 0
+    assert recorded(calls)[-1]["args"] == ["compose", "--project-name", "openadkit-example", "logs", "map", "planning"]
+    assert run_cli(root, "restart", "planning").returncode == 0
+    assert recorded(calls)[-1]["args"][-2:] == ["restart", "planning"]
+    assert run_cli(root, "shell", "planning", "ros2", "topic", "list", "--include-hidden-topics").returncode == 0
+    shell = recorded(calls)[-1]["args"]
+    assert shell[3:6] == ["exec", "-T", "planning"] and shell[-4:] == ["ros2", "topic", "list", "--include-hidden-topics"]
     for arguments in ((), ("/tf", "--all")):
-        result = run_cli(root, "record", "example", *arguments)
+        result = run_cli(root, "record", *arguments)
         assert result.returncode != 0 and "or pass --all" in result.stderr
     fake_docker(tmp_path)
-    result = run_cli(root, "record", "example", "/tf")
-    assert result.returncode != 0 and "example is not running" in result.stderr
+    for operation in ("logs", "restart", "shell"):
+        result = run_cli(root, operation)
+        assert result.returncode != 0 and "nothing is running" in result.stderr
+    result = run_cli(root, "status")
+    assert result.returncode == 0 and "nothing is running" in result.stdout
+
+
+def test_restart_defaults_to_the_services_with_open_ad_kit_config(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    containers = [
+        {"Id": "a", "Config": {"Labels": {"com.docker.compose.service": "planning"}},
+         "Mounts": [{"Destination": "/openadkit/config/shared"}]},
+        {"Id": "b", "Config": {"Labels": {"com.docker.compose.service": "acme"}},
+         "Mounts": [{"Destination": "/openadkit/overlay_ws"}]},
+        {"Id": "c", "Config": {"Labels": {"com.docker.compose.service": "carla"}}, "Mounts": []},
+    ]
+    calls = fake_docker(tmp_path, projects=["openadkit-example"], containers=containers)
+    result = run_cli(root, "restart")
+    assert result.returncode == 0, result.stderr
+    assert recorded(calls)[-1]["args"][-3:] == ["restart", "acme", "planning"]
+    assert "restarted: acme, planning" in result.stdout
 
 
 def test_download_retries_cut_off_bodies_but_not_wrong_content(tmp_path, monkeypatch):

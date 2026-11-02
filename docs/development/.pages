@@ -3,4 +3,3 @@ nav:
   - Build from Source: build-from-source.md
   - Contributing: contributing.md
   - Evidence Workflow: evidence-workflow.md
-  - "RFC 0001: Toolchain Model": rfc-0001-toolchain-model.md

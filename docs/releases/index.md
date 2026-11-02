@@ -23,14 +23,36 @@ See [Evidence Policy](evidence.md) for the blocking gate and verification report
 
 ## Roadmap
 
-The [toolchain RFC](../development/rfc-0001-toolchain-model.md) records the
-selected design and its delivery boundaries. Roadmap entries are not claims of
-published releases, external team approval or vehicle certification.
+These are plans, not claims of published releases, external team approval or
+vehicle certification.
 
-| Phase or milestone | Status | Focus |
-|-------|--------|-------|
-| **v2.0 foundation** | <span class="oak-badge oak-badge--testing">Release validation pending</span> | Reference/integrator kits, pinned inputs, user-data boundaries, Compose nodes, L0-L2 evidence and blocking releases |
-| **v2.0.x confidence** | <span class="oak-badge oak-badge--neutral">Planned</span> | Evidence-backed upstream updates, richer upgrade/scenario metrics and image SBOMs |
-| **CES 2027 demo** | <span class="oak-badge oak-badge--neutral">Milestone</span> | Hardware integration and partner evidence; not a general vehicle-support claim |
-| **v2.1 delivery** | <span class="oak-badge oak-badge--neutral">Planned</span> | OCI package, vehicle-path flattening, Quadlet/BlueChi backend and pinned upstream applications |
-| **Later evidence views** | <span class="oak-badge oak-badge--neutral">Planned</span> | Generated compatibility views and partner-backed HIL/field coverage; fleet orchestration remains external |
+### Before v2.0
+
+| Work | Status |
+|------|--------|
+| Release evidence: releases need a passing evidence run of their build; build provenance stays | Done |
+| Kit: drop the static overlay-contract check and shorten the integrator guide | Planned |
+| R-Car X5H board support moves to its own repository; AutoSD planning simulation stays | Planned |
+| CLI: `build`, `run --ws`, `restart`, deployment paths, and commands that find the running stack from any directory | Planned |
+| Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Planned |
+| Safety Island: its DDS domain bridge and configuration become a generic part of the kit | Planned |
+| AutoSD: Quadlet units for the component images, with Compose as the single source | Planned |
+
+### After v2.0
+
+- **Performance visibility:** latency and resource use per component in runs and evidence.
+- **Vehicle integration:** a supported path from simulation to a real vehicle interface.
+- **Validation ladder:** SIL, virtual vehicle network, bench HIL, small-scale and
+  then full-scale vehicle, replacing the vehicle node rather than the application.
+- **Vehicle delivery:** an OCI package of the digest-pinned system and its BOM that
+  can be mirrored offline; fleet rollout stays with the integrator's OTA system.
+- **rmw_zenoh:** replace the split-host bridge once Autoware supports it across hosts.
+- **Image SBOMs.**
+- **CES 2027 demo:** hardware integration and partner evidence; not a general
+  vehicle-support claim.
+
+### Non-goals
+
+No custom OTA service, Kubernetes stack, fork of upstream workloads, or ASIL or
+NCAP certification claim. Safety Island owns its safety boundary; Open AD Kit
+integrates it.

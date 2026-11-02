@@ -82,6 +82,3 @@ A [deployment](deployments/index.md) runs the subset of these stages a task need
 | **Tag alias** | A moving image tag such as `planning-control-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |
 | **Digest pin** | An image reference by content hash (`@sha256:…`) instead of a tag, so the same image bits are always used. |
 | **Mixed criticality** | Running safety-critical and non-critical workloads in separate containers or partitions on the same hardware. |
-
-The [toolchain RFC](development/rfc-0001-toolchain-model.md) distinguishes
-implemented v2.0 interfaces from the selected future OCI and vehicle-backend design.

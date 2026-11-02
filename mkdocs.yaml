@@ -81,6 +81,7 @@ plugins:
         hardware/index.md: platforms/hardware/index.md
         tools/index.md: development/index.md
         roadmap.md: releases/index.md
+        development/rfc-0001-toolchain-model.md: releases/index.md
         components/sensing.md: components/index.md#sensing-perception
         components/perception.md: components/index.md#sensing-perception
         components/sensing-perception.md: components/index.md#sensing-perception

@@ -47,7 +47,7 @@ from pathlib import Path
 args = sys.argv[1:]
 with Path(os.environ['CALLS']).open('a') as log:
     log.write(json.dumps([args, os.getenv('ZENOH_LISTEN'), os.getenv('ZENOH_PEER')]) + '\\n')
-if args[0] == 'validate': print(json.dumps({'overlayConformant': True, 'deployment': args[1]}))
+if args[0] == 'validate': print(json.dumps({'deployment': args[1]}))
 sys.exit(1 if args[0] == os.environ['FAILURE'] else 0)
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
@@ -96,7 +96,7 @@ report = {
 with Path(os.environ["CALLS"]).open("a") as log:
     log.write(json.dumps(report) + "\\n")
 if args[0] == "validate":
-    print(json.dumps({"overlayConformant": True, "deployment": args[1]}))
+    print(json.dumps({"deployment": args[1]}))
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
     home = tmp_path / "home"
@@ -131,7 +131,7 @@ args = sys.argv[1:]
 if args[0] == 'validate':
     root = Path({str(ROOT)!r}); kit = manifest.load_kit(root)
     manifest.get_deployment(root, kit, args[1]).select(kit, 'humble', False, node=args[args.index('--node') + 1])
-    print(json.dumps({{'overlayConformant': True}}))
+    print(json.dumps({{'deployment': args[1]}}))
 sys.exit(1 if args[0] == 'run' else 0)
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")

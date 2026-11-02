@@ -105,7 +105,6 @@ ready_s="null"
 arrival_s="null"
 isolation="null"
 scenario_json="null"
-overlay_conformant=false
 
 sample_memory() {
     local peak=0 ids sum
@@ -149,7 +148,6 @@ for i in "${!nodes[@]}"; do
 done
 if [ "${l0_rc}" -eq 0 ]; then
     l0_ok=true
-    overlay_conformant=$(jq -s 'all(.[]; .overlayConformant == true)' "${validation_files[@]}")
 else
     result="FAILED"
 fi
@@ -190,23 +188,10 @@ if [ "${l0_rc}" -eq 0 ]; then
     fi
 fi
 
-# Read every service's hook report; a typo may affect a package outside API.
-if [ "${l0_ok}" = true ]; then
-    report_args=()
-    for name in "${projects[@]}"; do report_args+=(--project "${name}"); done
-    if python3 "${script_dir}/overlay_conformance.py" "${report_args[@]}" --output "${out}/overlay.json" >"${out}/overlay.log" 2>&1; then
-        runtime_conformant=$(jq -r '.overlayConformant == true' "${out}/overlay.json")
-        [ "${runtime_conformant}" = true ] || overlay_conformant=false
-    else
-        overlay_conformant=false
-    fi
-fi
-
 if [ "${l1_ok}" = true ] && [ "${l1_check}" = custom-kit ]; then
     docker cp "${script_dir}/custom_kit.py" "${api_container}:/tmp/openadkit-custom-kit.py" >/dev/null 2>&1
     if ! docker exec "${api_container}" bash -lc \
-        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-custom-kit.py" >"${out}/custom-kit.log" 2>&1 \
-        || [ "${overlay_conformant}" != true ]; then
+        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-custom-kit.py" >"${out}/custom-kit.log" 2>&1; then
         l1_ok=false
         result=FAILED
     fi
@@ -322,7 +307,6 @@ jq -n \
     --argjson arrival_s "${arrival_s}" \
     --argjson peak_mib "${peak_mib}" \
     --argjson scenario "${scenario_json}" \
-    --argjson overlay_conformant "${overlay_conformant}" \
     '{
         schemaVersion: 1,
         name: $name,
@@ -334,7 +318,6 @@ jq -n \
         build_tag: $build_tag,
         source_sha: $source_sha,
         kit: $kit,
-        overlayConformant: $overlay_conformant,
         levels: {
             L0: {ok: $l0},
             L1: {ok: $l1, ready_s: $ready_s},

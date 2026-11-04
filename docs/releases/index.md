@@ -49,8 +49,7 @@ vehicle certification.
   can be mirrored offline; fleet rollout stays with the integrator's OTA system.
 - **rmw_zenoh:** evaluate it for split-host on Jazzy (Humble needs a launch patch); if it holds up,
   replace the zenoh-bridge-ros2dds bridge.
-- **Safety Island on CARLA:** a kit on CARLA Simulation with the Safety Island's closed loop over CAN,
-  starting from the closed [#146](https://github.com/autowarefoundation/openadkit/pull/146).
+- **Safety Island on CARLA:** a kit on CARLA Simulation with the Safety Island's closed loop over CAN.
   Hosted CI cannot run CARLA, so it needs its own evidence.
 - **Image SBOMs.**
 - **CES 2027 demo:** hardware integration and partner evidence; not a general

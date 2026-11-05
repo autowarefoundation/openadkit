@@ -163,6 +163,21 @@ def capture(directory: Path, env: dict[str, str]) -> dict[str, Any]:
     return metadata
 
 
+def summary(metadata: dict[str, Any]) -> str:
+    """One table for the run page: what was built, on what, and each image's digest."""
+    lines = [
+        f'Build `{metadata["build_tag"]}` · Autoware {metadata["autoware_base_version"]} '
+        f'(`{metadata["autoware_ref"][:7]}`) · Open AD Kit `{metadata["openadkit_sha"][:7]}`',
+        "",
+        "| Image | Distro | Platforms | Digest |",
+        "|---|---|---|---|",
+    ]
+    for image in metadata["images"]:
+        platforms = ", ".join(platform.removeprefix("linux/") for platform in image["platforms"])
+        lines.append(f'| `{image["target"]}` | {image["ros_distro"]} | {platforms} | `{image["digest"][:19]}` |')
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("capture", "scan-matrix", "scan-report", "check-scan", "validate"))
@@ -171,7 +186,10 @@ def main() -> None:
     try:
         if args.operation == "capture":
             directory = Path("build-metadata")
-            (directory / "build-metadata.json").write_text(json.dumps(capture(directory, dict(os.environ)), indent=2) + "\n")
+            metadata = capture(directory, dict(os.environ))
+            with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as page:
+                page.write(summary(metadata))
+            (directory / "build-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         elif args.operation == "scan-matrix":
             print(json.dumps({"include": scan_rows(load_json(args.paths[0]))}, separators=(",", ":")))
         elif args.operation == "scan-report":

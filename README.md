@@ -40,7 +40,7 @@ The CLI downloads required data, pulls missing images, starts the services, and 
 | [`scenario-simulation`](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/) | Run predefined traffic scenarios | No |
 | [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data through sensing and perception | Optional |
 | [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Run Autoware in closed loop with CARLA | Required |
-| [`safety-island-planning-simulation`](deployments/safety-island-planning-simulation) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller | No |
+| [`safety-island-simulation`](deployments/safety-island-simulation) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller | No |
 
 Use `./openadkit list` to inspect the deployment catalog. CARLA requires Humble, amd64, and an NVIDIA GPU. [Split-host simulation](https://autowarefoundation.github.io/openadkit/deployments/split-host/) (`--node` over Zenoh) is experimental.
 

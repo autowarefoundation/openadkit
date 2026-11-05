@@ -1,4 +1,4 @@
-"""Runtime acceptance checks for deployments/safety-island-planning-simulation (inside the API image).
+"""Runtime acceptance checks for deployments/safety-island-simulation (inside the API image).
 
 The golden path then proves the vehicle drives; this proves who drives it: the
 control command reaches Autoware only through the Safety Island's bridge, and

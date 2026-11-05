@@ -10,7 +10,7 @@ start with Planning Simulation.
 | [Logging Simulation](logging-simulation/index.md) | Replay recorded sensor data through sensing, perception, and localization | Recommended |
 | [CARLA Simulation](carla-simulation/index.md) | Drive a CARLA vehicle in closed loop | Required |
 | [Split-host simulation](split-host.md) | Run Autoware on one host and the simulator on another over Zenoh | CARLA only |
-| [Safety Island Planning Simulation](https://github.com/autowarefoundation/openadkit/tree/main/deployments/safety-island-planning-simulation) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller instead of Autoware's trajectory follower | No |
+| [Safety Island Simulation](https://github.com/autowarefoundation/openadkit/tree/main/deployments/safety-island-simulation) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller instead of Autoware's trajectory follower | No |
 
 ## Running a Deployment
 

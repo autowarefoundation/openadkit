@@ -14,7 +14,7 @@ CLI and release bundle:
 - [Scenario Simulation](./scenario-simulation) — Predefined scenario validation with TIER IV Scenario Simulator
 - [Logging Simulation](./logging-simulation) — End-to-end stack with rosbag replay
 - [CARLA Simulation](./carla-simulation) — Closed-loop planning with CARLA (`./openadkit run carla-simulation`)
-- [Safety Island Planning Simulation](./safety-island-planning-simulation) — Planning Simulation driven by the Autoware Safety Island controller
+- [Safety Island Simulation](./safety-island-simulation) — Planning Simulation driven by the Autoware Safety Island controller
 
 Split-host (`--node` over Zenoh) is experimental. See the
 [split-host guide](https://autowarefoundation.github.io/openadkit/deployments/split-host/).
@@ -28,5 +28,5 @@ deployments/
 ├── scenario-simulation/      # complete deployment config.env
 ├── logging-simulation/       # complete deployment config.env
 ├── carla-simulation/         # CLI deployment (Humble, amd64, GPU)
-└── safety-island-planning-simulation/  # planning-simulation plus the Safety Island
+└── safety-island-simulation/     # planning-simulation plus the Safety Island
 ```

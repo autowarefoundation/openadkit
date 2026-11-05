@@ -39,7 +39,7 @@ PLATFORM_CELLS: dict[str, dict[str, str]] = {
 # A deployment's L1 script beyond readiness (evidence/<l1 with _>.py, run in the
 # API image). safety_island.py checks that the Safety Island, not Autoware's
 # follower, publishes the control command the golden path then drives with.
-L1_CHECKS = {"safety-island-planning-simulation": "safety-island"}
+L1_CHECKS = {"safety-island-simulation": "safety-island"}
 # The in-tree kits and their acceptance beyond the base's checks: extra fresh
 # topics, and an L1 script. custom-kit: fresh publication proves its C++
 # overlay node survived the ABI boundary, and custom_kit.py checks its

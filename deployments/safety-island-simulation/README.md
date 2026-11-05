@@ -1,4 +1,4 @@
-# Safety Island Planning Simulation
+# Safety Island Simulation
 
 Planning Simulation driven by the
 [Autoware Safety Island](https://github.com/autowarefoundation/autoware-safety-island)
@@ -23,7 +23,7 @@ the rest of the stack (`lo` unless the host settings set
 ## Run
 
 ```bash
-openadkit run safety-island-planning-simulation
+openadkit run safety-island-simulation
 ```
 
 `run` fetches the release on first use. Set the initial pose and a goal in RViz

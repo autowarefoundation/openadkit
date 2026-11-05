@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "name": "safety-island-planning-simulation",
+  "name": "safety-island-simulation",
   "description": "Planning Simulation driven by the Safety Island controller on its own DDS domain",
   "base": "planning-simulation",
   "compose": {
@@ -10,7 +10,7 @@
   },
   "data": [
     {
-      "name": "safety-island-planning-simulation",
+      "name": "safety-island-simulation",
       "kind": "files",
       "destinationEnv": "SAFETY_ISLAND_PATH",
       "files": [

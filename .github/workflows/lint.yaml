@@ -11,7 +11,7 @@ on:
       - 'cli/**'
       - 'pyproject.toml'
       - 'deployments/custom-kit/**'
-      - 'deployments/safety-island-planning-simulation/**'
+      - 'deployments/safety-island-simulation/**'
       - '**/*.sh'
       - '**/*.json'
       - '**/*.json5'

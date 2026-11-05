@@ -580,9 +580,10 @@ def main() -> int:
     deployment = get_deployment(root, kit, deployment_name(root, kit, args.deployment))
 
     if args.command == "clean":
-        selection = deployment.select(kit, None, False, operational=True)
-        if deployment.data:
-            selection = compose.resolve_settings(deployment, selection)
+        if not deployment.data:
+            print("no data resources declared")
+            return 0
+        selection = compose.resolve_settings(deployment, deployment.select(kit, None, False, operational=True))
         installed = data.check_installed_data(deployment, selection, include_gpu=True)
         if not installed:
             print("no data resources declared")

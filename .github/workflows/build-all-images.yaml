@@ -318,37 +318,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  manifest-report:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    needs: [prepare, create-manifests]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Write manifest report
-        env:
-          MANIFEST_MATRIX: ${{ needs.prepare.outputs.manifest_matrix }}
-          IMAGE_PREFIX_COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
-          IMAGE_PREFIX_COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
-        run: bash .github/scripts/report_manifests.sh >> "$GITHUB_STEP_SUMMARY"
-        shell: bash
-
   capture-metadata:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
@@ -414,26 +383,6 @@ jobs:
             build-metadata/image-inventory.json
             build-metadata/upstream-images.json
           retention-days: 90
-
-  summarize:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [prepare, capture-metadata]
-    if: success()
-    steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@v7
-
-      - name: Write job summary
-        env:
-          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
-          AUTOWARE_INPUT_REF: ${{ needs.prepare.outputs.autoware_input_ref }}
-          AUTOWARE_REF_TYPE: ${{ needs.prepare.outputs.autoware_ref_type }}
-          AUTOWARE_REF: ${{ needs.prepare.outputs.autoware_ref }}
-          AUTOWARE_BASE_VERSION: ${{ needs.prepare.outputs.autoware_base_version }}
-          SCAN_REQUESTED: ${{ needs.prepare.outputs.scan_requested }}
-          SOURCE_REF: ${{ github.ref }}
-        run: bash .github/scripts/write_build_summary.sh >> "$GITHUB_STEP_SUMMARY"
 
   # The weekly Autoware snapshot bump (bump-autoware.yaml) is verified like
   # main. A dispatched run does not show as a pull request check, so report the

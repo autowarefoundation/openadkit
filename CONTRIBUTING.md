@@ -75,7 +75,6 @@ npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.g
 # Python tests + shell tests
 pytest .github/scripts/
 bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
-bash .github/scripts/tests/test_report_manifests.sh
 bash .github/scripts/tests/test_setup_helpers.sh
 
 # Deployment validation for both supported ROS distros

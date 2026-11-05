@@ -25,8 +25,6 @@ from release_fixtures import (
     write_plan,
 )
 
-MARKER = "<!-- openadkit-release-workflow:v1 -->\n"
-
 
 @pytest.mark.parametrize(("version", "branch", "ref_type", "input_ref", "accepted"), [
     ("v2.0.0", "release/2.0", "tag", "1.9.0", True),
@@ -222,85 +220,63 @@ print(json.dumps({{"manifest": {{"digest": digest}}}}))
     assert all(message in result.stderr for message in messages), result.stderr
 
 
-def manager_env(tmp_path, problem):
-    """One asset is sufficient to exercise ownership, race and content guards."""
+def run_manager(tmp_path, operation, *, existing, stable=True):
     asset = tmp_path / "bundle.tar.gz"
     asset.write_bytes(b"validated bundle")
-    # GitHub returns the title the release was created with, not the tag.
-    state = {"id": 42, "tag_name": VERSION, "target_commitish": RELEASE_SHA,
-             "name": f"Open AD Kit {VERSION} · Autoware 1.9.0",
-             "draft": True, "prerelease": False, "body": MARKER, "assets": [{"id": 101, "name": asset.name}]}
-    (tmp_path / "release-notes.md").write_text(MARKER)
-    (tmp_path / "release-assets.sha256").write_text(f"{hashlib.sha256(asset.read_bytes()).hexdigest()}  {asset.name}\n")
+    (tmp_path / "release-notes.md").write_text("notes\n")
     (tmp_path / "release-plan.json").write_text(json.dumps({
         "schemaVersion": 1, "release": {"version": VERSION, "releaseSha": RELEASE_SHA,
-                                       "stable": True, "publishLatestAliases": True},
+                                       "stable": stable, "publishLatestAliases": stable},
         "githubAssets": [{"name": asset.name, "path": asset.name}],
         "releaseContext": {"autoware": {"version": "1.9.0"}},
     }))
-    refreshed = dict(state)
-    if problem == "unowned":
-        state["body"] = "manual draft\n"
-    elif problem == "source":
-        refreshed["target_commitish"] = "f" * 40
-    elif problem == "body":
-        refreshed["body"] += "changed\n"
-    (tmp_path / "listed.json").write_text(json.dumps([[state]]))
-    if problem == "lagging":
-        # No release yet; the list shows the new draft only on its second read.
-        (tmp_path / "listed.json").write_text(json.dumps([[]]))
-        (tmp_path / "created.json").write_text(json.dumps([[state]]))
-    (tmp_path / "refreshed.json").write_text(json.dumps(refreshed))
-    downloaded = tmp_path / "downloaded"
-    downloaded.write_bytes(b"tampered" if problem == "asset" else asset.read_bytes())
     log = tmp_path / "gh-calls"
     executable(tmp_path / "bin/gh", f'''#!/usr/bin/env python3
-import json, sys
-from pathlib import Path
+import sys
 args = " ".join(sys.argv[1:])
-root = Path({str(tmp_path)!r})
-with (root / "gh-calls").open("a") as output:
-    output.write(args + "\\n")
-if "/git/refs/tags/" in args:
-    print(json.dumps({{"object": {{"type": "commit", "sha": {RELEASE_SHA!r}}}}}))
-elif "--method PATCH" in args or "--method DELETE" in args:
-    pass
-elif "/releases/assets/" in args:
-    sys.stdout.buffer.write((root / "downloaded").read_bytes())
-elif args.startswith("release create"):
-    (root / "list-reads").write_text("0")
-elif "--paginate --slurp" in args and (root / "list-reads").exists():
-    reads = int((root / "list-reads").read_text()) + 1
-    (root / "list-reads").write_text(str(reads))
-    print((root / ("created.json" if reads > 1 else "listed.json")).read_text())
-elif "--paginate --slurp" in args:
-    print((root / "listed.json").read_text())
-elif "/releases/42" in args:
-    print((root / "refreshed.json").read_text())
+if args.startswith("release view"):
+    existing = {existing!r}
+    if existing is None:
+        sys.exit("release not found")
+    print(existing)
 else:
-    sys.exit("unexpected gh call: " + args)
+    with open({str(log)!r}, "a") as output:
+        output.write(args + "\\n")
 ''')
-    return os.environ | {
-        "PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "example/repo",
-        "GITHUB_OUTPUT": str(tmp_path / "output"), "RELEASE_ID": "42",
-        "RELEASE_BODY_SHA256": hashlib.sha256(MARKER.encode()).hexdigest(),
-    }, log
-
-
-@pytest.mark.parametrize(("operation", "problem"), [
-    ("prepare", "unowned"), ("prepare", "source"),
-    ("publish", "body"), ("publish", "asset"), ("publish", None),
-])
-def test_release_manager_revalidates_before_mutation(tmp_path, operation, problem):
-    env, log = manager_env(tmp_path, problem)
     result = subprocess.run(["bash", str(ROOT / ".github/scripts/manage_github_release.sh"), operation],
-                            cwd=tmp_path, env=env, text=True, capture_output=True, timeout=30)
-    assert (result.returncode == 0) is (problem is None), result.stderr
-    mutations = [call for call in log.read_text().splitlines() if "--method" in call]
-    if problem:
-        assert mutations == []
-    else:
-        assert len(mutations) == 1 and "releases/42" in mutations[0] and "draft=false" in mutations[0]
+                            cwd=tmp_path, text=True, capture_output=True, timeout=30,
+                            env=os.environ | {"PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}"})
+    return result, log.read_text().splitlines() if log.exists() else []
+
+
+def test_a_new_release_starts_as_a_draft_with_its_title_and_assets(tmp_path):
+    result, calls = run_manager(tmp_path, "draft", existing=None)
+    assert result.returncode == 0, result.stderr
+    assert len(calls) == 1 and calls[0].startswith(f"release create {VERSION} --target {RELEASE_SHA}")
+    assert f"--title Open AD Kit {VERSION} · Autoware 1.9.0 " in calls[0]
+    assert "--draft bundle.tar.gz" in calls[0]
+
+
+def test_a_draft_of_an_earlier_attempt_is_replaced(tmp_path):
+    result, calls = run_manager(tmp_path, "draft", existing="true")
+    assert result.returncode == 0, result.stderr
+    assert calls[0] == f"release delete {VERSION} --yes" and calls[1].startswith("release create")
+
+
+def test_a_published_release_is_never_touched(tmp_path):
+    result, calls = run_manager(tmp_path, "draft", existing="false")
+    assert result.returncode != 0 and "release the next version" in result.stderr
+    assert calls == []
+
+
+@pytest.mark.parametrize(("stable", "flags"), [
+    (True, "--draft=false --prerelease=false --latest=true"),
+    (False, "--draft=false --prerelease=true --latest=false"),
+])
+def test_publishing_marks_a_stable_release_latest(tmp_path, stable, flags):
+    result, calls = run_manager(tmp_path, "publish", existing="true", stable=stable)
+    assert result.returncode == 0, result.stderr
+    assert calls == [f"release edit {VERSION} {flags}"]
 
 
 @pytest.mark.parametrize("problem", [None, "source", "conflict", "create", "policy"])
@@ -383,14 +359,3 @@ def test_bundle_pins_integrity_and_reproducibility(tmp_path):
     assert metadata["bundles"] == [{"name": asset.name, "sha256": first_asset}]
     assert metadata["release_plan_sha256"] == hashlib.sha256(first_plan).hexdigest()
     assert metadata["evidence"]["result"] == "PASSED"
-
-
-def test_release_manager_waits_for_a_created_draft_to_be_listed(tmp_path):
-    env, log = manager_env(tmp_path, "lagging")
-    result = subprocess.run(["bash", str(ROOT / ".github/scripts/manage_github_release.sh"), "prepare"],
-                            cwd=tmp_path, env=env, text=True, capture_output=True, timeout=30)
-    assert result.returncode == 0, result.stderr
-    assert "created=true" in (tmp_path / "output").read_text()
-    assert "release_id=42" in (tmp_path / "output").read_text()
-    # The title pairs the version with the Autoware it builds on.
-    assert f"--title Open AD Kit {VERSION} · Autoware 1.9.0 " in log.read_text()

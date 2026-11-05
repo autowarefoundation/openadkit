@@ -3,8 +3,6 @@
 set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=.github/scripts/release_tag.sh
-source "${script_dir}/release_tag.sh"
 # shellcheck source=.github/scripts/registry_lookup.sh
 source "${script_dir}/registry_lookup.sh"
 # shellcheck source=.github/scripts/stable_alias_policy.sh
@@ -246,17 +244,15 @@ validate_autoware_line() {
     || fail "${VERSION} must build on Autoware $(release_line).x (got ${autoware_base_version})"
 }
 
+# Publishing creates the tag; one that already exists must be on this commit.
 validate_git_tag() {
-  local lookup_status tag_sha
+  local existing tag_sha
 
-  if tag_sha=$(release_tag_sha); then
-    if [ "${tag_sha}" != "${release_sha}" ]; then
-      fail "Tag ${VERSION} already exists at ${tag_sha}, expected ${release_sha}"
-    fi
-  else
-    lookup_status=$?
-    [ "${lookup_status}" -eq 1 ] || return "${lookup_status}"
-  fi
+  existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${VERSION}" \
+    --jq "map(select(.ref == \"refs/tags/${VERSION}\")) | length")
+  [ "${existing}" != 0 ] || return 0
+  tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${VERSION}" --jq .sha)
+  [ "${tag_sha}" = "${release_sha}" ] || fail "Tag ${VERSION} already exists at ${tag_sha}, expected ${release_sha}"
 }
 
 validate_registry_conflicts() {

@@ -22,31 +22,11 @@ DEFAULT_ROS_DISTRO=$(jq -r '.release.defaultRosDistro' "${plan_file}")
 PACKAGER_SHA=$(jq -r '.release.packagerSha' "${plan_file}")
 PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
 bundle_name=$(jq -r '.bundle.asset' "${plan_file}")
-bundle_root=$(jq -r '.bundle.root' "${plan_file}")
 bundle="dist/${bundle_name}"
 installer="dist/openadkit"
 
-[ -f "${bundle}" ] || {
-  echo "Expected release bundle is missing: ${bundle}" >&2
-  exit 1
-}
-[ -f "${installer}" ] || {
-  echo "Expected release installer is missing: ${installer}" >&2
-  exit 1
-}
-mapfile -t archives < <(find dist -maxdepth 1 -type f -name '*.tar.gz' -printf '%f\n' | sort)
-if [ "${#archives[@]}" -ne 1 ] || [ "${archives[0]}" != "${bundle_name}" ]; then
-  echo "dist/ must contain exactly the planned release bundle" >&2
-  exit 1
-fi
-
 temporary=$(mktemp -d)
 trap 'rm -rf "${temporary}"' EXIT
-tar -xOf "${bundle}" "${bundle_root}/openadkit.json" \
-  | jq -S . >"${temporary}/bundle-context.json"
-jq -S '.releaseContext' "${plan_file}" >"${temporary}/plan-context.json"
-cmp "${temporary}/plan-context.json" "${temporary}/bundle-context.json"
-
 bundle_sha256=$(sha256sum "${bundle}" | cut -d ' ' -f1)
 installer_sha256=$(sha256sum "${installer}" | cut -d ' ' -f1)
 plan_sha256=$(sha256sum "${plan_file}" | cut -d ' ' -f1)
@@ -78,19 +58,6 @@ jq \
   }' \
   release-input/build/build-metadata.json >release-metadata.json
 
-jq -e '
-  (.release_sha | test("^[0-9a-f]{40}$")) and
-  (.packager_sha | test("^[0-9a-f]{40}$")) and
-  (.release_plan_sha256 | test("^[0-9a-f]{64}$")) and
-  .release_sha == .openadkit_sha and
-  (.latest_aliases_updated | type == "boolean") and
-  (.bundles | type == "array" and length == 1) and
-  all(.bundles[];
-    (.name | test("^[^/]+\\.tar\\.gz$")) and
-    (.sha256 | test("^[0-9a-f]{64}$"))
-  )
-' release-metadata.json >/dev/null
-
 autoware_input_ref=$(jq -r '.autoware_input_ref' release-metadata.json)
 autoware_ref_type=$(jq -r '.autoware_ref_type' release-metadata.json)
 autoware_ref=$(jq -r '.autoware_ref' release-metadata.json)
@@ -102,8 +69,6 @@ openadkit_sha=$(jq -r '.openadkit_sha' release-metadata.json)
 build_tag=$(jq -r '.build_tag' release-metadata.json)
 
 {
-  echo '<!-- openadkit-release-workflow:v1 -->'
-  echo ""
   echo "Open AD Kit ${VERSION} builds on Autoware ${autoware_base_version}. Every v$(printf '%s' "${VERSION#v}" | cut -d. -f1-2).x release builds on Autoware $(printf '%s' "${autoware_base_version}" | cut -d. -f1-2).x."
   echo ""
   echo "## Provenance"

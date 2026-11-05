@@ -50,7 +50,6 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
-            .github/scripts/release_tag.sh
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
             .github/scripts/validate_release.sh
@@ -175,94 +174,19 @@ jobs:
           retention-days: 7
           overwrite: true
 
-  release-tag:
+  publish:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: [validate, package-bundles]
     environment: release
     permissions:
-      contents: write
-    steps:
-      - name: Check out release tag helper
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: .github/scripts/release_tag.sh
-
-      - name: Download release plan
-        uses: actions/download-artifact@v8
-        with:
-          name: release-bundles-${{ inputs.build_tag }}
-          path: release-output
-
-      - name: Create or verify git tag
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          plan=release-output/release-plan.json
-          VERSION=$(jq -r '.release.version' "${plan}")
-          RELEASE_SHA=$(jq -r '.release.releaseSha' "${plan}")
-          export VERSION RELEASE_SHA
-          bash .github/scripts/release_tag.sh
-        shell: bash
-
-  release-images:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    needs: [validate, package-bundles, prepare-github-release]
-    environment: release
-    permissions:
       actions: read
-      contents: read
+      contents: write
       packages: write
-    steps:
-      - name: Check out release scripts
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: |
-            .github/scripts/promote_release_images.sh
-            .github/scripts/registry_lookup.sh
-            .github/scripts/stable_alias_policy.sh
-
-      - name: Download release plan
-        uses: actions/download-artifact@v8
-        with:
-          name: release-bundles-${{ inputs.build_tag }}
-          path: release-output
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Promote image digests
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_PLAN_FILE: release-output/release-plan.json
-        run: bash .github/scripts/promote_release_images.sh
-        shell: bash
-
-  prepare-github-release:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-    needs: [validate, package-bundles, release-tag]
-    environment: release
-    permissions:
-      actions: read
-      contents: write
       attestations: write
       id-token: write
-    outputs:
-      created: ${{ steps.prepare-release.outputs.created }}
-      release_body_sha256: ${{ steps.prepare-release.outputs.release_body_sha256 }}
-      release_id: ${{ steps.prepare-release.outputs.release_id }}
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out release scripts
         uses: actions/checkout@v7
@@ -270,7 +194,9 @@ jobs:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
             .github/scripts/manage_github_release.sh
-            .github/scripts/release_tag.sh
+            .github/scripts/promote_release_images.sh
+            .github/scripts/registry_lookup.sh
+            .github/scripts/stable_alias_policy.sh
             .github/scripts/write_release_notes.sh
             .github/scripts/evidence/report.py
             .github/scripts/evidence/cells.py
@@ -287,9 +213,17 @@ jobs:
           name: release-bundles-${{ inputs.build_tag }}
           path: .
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create release metadata and notes
-        env:
-          RELEASE_PLAN_FILE: release-plan.json
         run: bash .github/scripts/write_release_notes.sh
         shell: bash
 
@@ -302,65 +236,20 @@ jobs:
             release-plan.json
             release-metadata.json
 
-      - name: Verify existing release or create draft
-        id: prepare-release
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_PLAN_FILE: release-plan.json
-        run: bash .github/scripts/manage_github_release.sh prepare
+      - name: Create the draft release
+        run: bash .github/scripts/manage_github_release.sh draft
         shell: bash
 
-      - name: Upload expected release asset manifest
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-asset-manifest-${{ inputs.build_tag }}
-          path: release-assets.sha256
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
+      - name: Promote image digests
+        run: bash .github/scripts/promote_release_images.sh
+        shell: bash
 
-  release-github:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-    needs: [validate, package-bundles, prepare-github-release, release-images]
-    environment: release
-    permissions:
-      actions: read
-      contents: write
-    steps:
-      - name: Check out release manager
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: |
-            .github/scripts/manage_github_release.sh
-            .github/scripts/release_tag.sh
-
-      - name: Download expected release asset manifest
-        uses: actions/download-artifact@v8
-        with:
-          name: release-asset-manifest-${{ inputs.build_tag }}
-          path: release-asset-manifest
-
-      - name: Download release plan
-        uses: actions/download-artifact@v8
-        with:
-          name: release-bundles-${{ inputs.build_tag }}
-          path: release-output
-
-      - name: Publish prepared GitHub Release
-        if: needs.prepare-github-release.outputs.created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ needs.prepare-github-release.outputs.release_id }}
-          RELEASE_BODY_SHA256: ${{ needs.prepare-github-release.outputs.release_body_sha256 }}
-          RELEASE_ASSET_MANIFEST: release-asset-manifest/release-assets.sha256
-          RELEASE_PLAN_FILE: release-output/release-plan.json
+      - name: Publish the release
         run: bash .github/scripts/manage_github_release.sh publish
         shell: bash
 
   deploy-docs:
-    needs: [validate, release-github]
+    needs: [validate, publish]
     if: needs.validate.outputs.is_stable_release == 'true' && needs.validate.outputs.publish_latest_aliases == 'true'
     permissions:
       contents: write

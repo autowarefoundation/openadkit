@@ -99,3 +99,14 @@ def test_scan_duplicates_and_distro_overrides_are_supported(artifacts):
     assert images.inventory_images({"ros_distros": ["humble", "jazzy"], "images": [
         {"repo": "component", "target": "api", "ros_distros": ["jazzy"], "platforms": ["linux/amd64"]}]}, "common", "component") == [
         {"repo": "component", "target": "api", "ros_distro": "jazzy", "platforms": ["linux/amd64"]}]
+
+
+def test_the_run_page_summary_names_the_build_and_each_image():
+    text = images.summary({
+        "build_tag": "1-1", "autoware_base_version": "2.0.0", "autoware_ref": "6f91fff359e8",
+        "openadkit_sha": "5e3837ac7b80",
+        "images": [{"target": "api", "ros_distro": "humble", "platforms": ["linux/amd64", "linux/arm64"],
+                    "digest": "sha256:" + "a" * 64}],
+    })
+    assert "Build `1-1` · Autoware 2.0.0 (`6f91fff`) · Open AD Kit `5e3837a`" in text
+    assert "| `api` | humble | amd64, arm64 | `sha256:aaaaaaaaaaaa` |" in text

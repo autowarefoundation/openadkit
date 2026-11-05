@@ -196,7 +196,7 @@ change how an older line is validated. Its jobs run in order:
 
 ```mermaid
 flowchart LR
-    V[validate] --> P[package-bundles] --> T[release-tag] --> D[prepare-github-release] --> I[release-images] --> G[release-github] --> W[deploy-docs]
+    V[validate] --> P[package-bundles] --> R[publish] --> O[deploy-docs]
 ```
 
 1. **validate**: runs the release gates in
@@ -206,13 +206,13 @@ flowchart LR
    gate fails.
 2. **package-bundles**: writes the immutable release plan and the runtime bundle
    for both distros.
-3. **release-tag**: creates or verifies the Git tag.
-4. **prepare-github-release**: writes notes/metadata from the validated plan,
-   attests bundle/installer/plan/metadata, then creates the draft with its assets.
-5. **release-images**: creates the release tags and, for stable releases, the
-   moving aliases (see [Tag Reference](../getting-started/container-images.md#tag-reference)).
-6. **release-github**: publishes the draft.
-7. **deploy-docs**: republishes the docs when the stable aliases moved.
+3. **publish**: writes notes/metadata from the validated plan, attests
+   bundle/installer/plan/metadata and creates the draft with its assets. It then
+   creates the image release tags and, for stable releases, the moving aliases (see
+   [Tag Reference](../getting-started/container-images.md#tag-reference)), and
+   publishes the draft, which creates the Git tag. A published release cannot be
+   changed: a bad one is followed by the next version.
+4. **deploy-docs**: republishes the docs when the stable aliases moved.
 
 The release plan (`release-plan.json`) attached to each GitHub Release records
 the exact image digests, aliases, assets, and checksums of that release.

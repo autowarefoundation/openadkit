@@ -30,10 +30,11 @@ BEHAVIOUR_CHECKS: dict[str, dict[str, Any]] = {
     "planning-simulation": {"fresh": (), "l2": "golden"},
     "scenario-simulation": {"fresh": ("/clock",), "l2": "scenario"},
 }
-# Cells beyond Compose on Docker: the backend run_cell.sh starts the stack with,
-# on the runner it needs. quadlet runs platforms/autosd under Podman and systemd.
+# Cells beyond Compose on Docker, for each distro: the backend run_cell.sh starts
+# the stack with, on the runner it needs. quadlet runs platforms/autosd under
+# Podman and systemd.
 PLATFORM_CELLS: dict[str, dict[str, str]] = {
-    "planning-simulation": {"backend": "quadlet", "distro": "humble", "runner": "ubuntu-24.04"},
+    "planning-simulation": {"backend": "quadlet", "runner": "ubuntu-24.04"},
 }
 # The in-tree kits and their acceptance beyond the base's checks: extra fresh
 # topics, and an L1 script (evidence/<l1 with _>.py, run in the API image).
@@ -158,9 +159,9 @@ def evidence_cells(
                     "l2": checks["l2"],
                 })
         if name in PLATFORM_CELLS:
-            cell = next(row for row in cells if row["deployment"] == name and row["distro"] == PLATFORM_CELLS[name]["distro"])
-            cell = cell | PLATFORM_CELLS[name]
-            cells.append(cell | {"name": evidence_cell_name(cell)})
+            for row in [row for row in cells if row["deployment"] == name and "node" not in row]:
+                cell = row | PLATFORM_CELLS[name]
+                cells.append(cell | {"name": evidence_cell_name(cell)})
     return cells
 
 

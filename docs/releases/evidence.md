@@ -26,7 +26,7 @@ Runtime cells are enumerated from the source deployment manifests:
 
 | Deployment | Distros | Topologies |
 |------------|---------|------------|
-| Planning Simulation | Humble, Jazzy | Single host; Humble also under Podman and systemd with the [AutoSD](../platforms/autosd/index.md) units |
+| Planning Simulation | Humble, Jazzy | Single host; also under Podman and systemd with the [AutoSD](../platforms/autosd/index.md) units |
 | Scenario Simulation | Humble, Jazzy | Single host; two isolated nodes on one host |
 | `deployments/custom-kit` | Humble, Jazzy | Planning Simulation extended with the example's C++ overlay |
 | `deployments/safety-island` | Humble, Jazzy | Planning Simulation driven by the pinned Safety Island release over `domain_bridge` |

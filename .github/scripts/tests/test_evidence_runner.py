@@ -38,12 +38,13 @@ def test_evidence_cells_carry_the_manifest_plan():
 def test_quadlet_cell_runs_the_golden_path_on_a_runner_with_quadlet():
     runtime = validation_matrix.load_runtime(ROOT)
     cells = [cell for cell in validation_matrix.evidence_cells(runtime, ROOT) if cell.get("backend")]
-    assert len(cells) == 1
-    cell = cells[0]
-    assert (cell["deployment"], cell["distro"], cell["backend"]) == ("planning-simulation", "humble", "quadlet")
-    assert cell["runner"] == "ubuntu-24.04" and cell["l2"] == "golden" and cell["nodes"] == ""
-    assert cell["name"] == "planning-simulation-humble-quadlet-linux-amd64"
-    assert cell["name"] == validation_matrix.evidence_cell_name(cell)
+    assert [cell["name"] for cell in cells] == [
+        f"planning-simulation-{distro}-quadlet-linux-amd64" for distro in ("humble", "jazzy")
+    ]
+    for cell in cells:
+        assert cell["backend"] == "quadlet" and cell["runner"] == "ubuntu-24.04"
+        assert cell["l2"] == "golden" and cell["nodes"] == ""
+        assert cell["name"] == validation_matrix.evidence_cell_name(cell)
 
 
 def test_unexempt_deployment_without_an_l2_check_fails_enumeration(monkeypatch):

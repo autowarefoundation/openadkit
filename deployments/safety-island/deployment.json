@@ -16,17 +16,17 @@
       "files": [
         {
           "path": "actuation_freertos",
-          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0-rc.1/actuation_freertos",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0/actuation_freertos",
           "sha256": "93cf5a867a11a95cc15b981d637672bab6485da87b895fe77d6cb65d63671d57"
         },
         {
           "path": "bridge-config.yaml",
-          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0-rc.1/bridge-config.yaml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0/bridge-config.yaml",
           "sha256": "48c609b434cdb54bdf12e7cc01ef75ba5e0c1a3d05986457b1f4dc33e3c6c33e"
         },
         {
           "path": "cyclonedds-domain2.xml",
-          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0-rc.1/cyclonedds-domain2.xml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.2.0/cyclonedds-domain2.xml",
           "sha256": "5d0b2b1ba647d95f348914346867996d7313bb62a5015ad0fc75c5b0a3f0070b"
         }
       ],

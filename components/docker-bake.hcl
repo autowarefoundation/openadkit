@@ -14,7 +14,7 @@ variable "ROS_DISTRO" {
   default = "humble"
 }
 
-// Upstream Autoware release the images build on (e.g. "1.9.0"); CI sets it
+// Upstream Autoware release the images build on (e.g. "2.0.0"); CI sets it
 // from .github/autoware.ref. Empty builds for upstream development: core
 // compiles from the imported sources on the plain upstream base image, and ROS
 // installs from the live repository.
@@ -22,13 +22,13 @@ variable "UPSTREAM_TAG" {
   default = ""
 }
 // ROS snapshot (snapshots.ros.org) each distro's upstream images were built
-// from, for UPSTREAM_TAG 1.9.0. Change both together: the builds fail when the
+// from, for UPSTREAM_TAG 2.0.0. Change both together: the builds fail when the
 // snapshot does not match the upstream images (components/shared/ros-snapshot).
 variable "ROS_SNAPSHOT_HUMBLE" {
-  default = "2026-07-02"
+  default = "2026-10-12"
 }
 variable "ROS_SNAPSHOT_JAZZY" {
-  default = "2026-06-18"
+  default = "2026-10-05"
 }
 function "ros_snapshot" {
   params = []

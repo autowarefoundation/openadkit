@@ -137,7 +137,7 @@ remain explicitly unverified. Read the
 and [verification guide](https://autowarefoundation.github.io/openadkit/releases/verification/).
 
 Manifest contract changes bump `schemaVersion` and come with migration notes.
-Removing a public variable or extension point is a breaking change under SemVer.
+Removing a public variable or extension point is a breaking change, so it waits for the next Autoware release (see [Versioning](docs/getting-started/container-images.md#versioning)).
 
 ## DCO Requirement
 

@@ -632,10 +632,9 @@ class Deployment:
             )
         distro = ros_distro or current_context.default_ros_distro
 
-        # Operational commands (status/logs/stop) do not select images or
-        # profiles; they only need the deployment's Compose and env files.
-        # Skip requirement validation and component image injection so a
-        # missing default-distro image map can never block a stop.
+        # clean selects no images; it only needs the data paths of the env
+        # files. Skip requirement validation and component image injection so
+        # a missing default-distro image map can never block it.
         injections: dict[str, str]
         if operational:
             injections = self._base_injections(distro)

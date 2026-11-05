@@ -4,9 +4,8 @@
 # Chained after the upstream /docker-entrypoint.sh, so ROS and Autoware are
 # already sourced and this runs as the aw user. /tmp/openadkit is rebuilt on
 # every start, so an override that was removed never lingers:
-#   1. the integrator's overlay workspaces, if mounted, are sourced on top of
-#      Autoware: the kit's, then the deployment's, so a deployment can add to
-#      or shadow the kit's packages;
+#   1. the integrator's overlay workspace, if mounted, is sourced on top of
+#      Autoware;
 #   2. overlay.py copies autoware_launch and every package with overrides into
 #      /tmp/openadkit, merges the YAML overrides parameter by parameter and
 #      links the selected vehicle description;
@@ -24,11 +23,9 @@ if [ -z "${AMENT_PREFIX_PATH:-}" ]; then
     fi
 fi
 
-for workspace in /openadkit/overlay_ws /openadkit/overlay_ws_deployment; do
-    if [ -f "${workspace}/install/local_setup.bash" ]; then
-        source "${workspace}/install/local_setup.bash"
-    fi
-done
+if [ -f /openadkit/overlay_ws/install/local_setup.bash ]; then
+    source /openadkit/overlay_ws/install/local_setup.bash
+fi
 
 prefixes=$(python3 /opt/openadkit/overlay.py)
 if [ -n "${prefixes}" ]; then

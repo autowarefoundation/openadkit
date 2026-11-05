@@ -136,7 +136,7 @@ runs:
         PUBLISH: ${{ inputs.publish }}
         SHARED_COMMON: ${{ inputs.shared-common }}
         COMMON_CACHED: ${{ inputs.common-cached }}
-        CORE_DEVEL_IMAGE: ${{ steps.recipe.outputs.core_image }}@${{ fromJSON(steps.core.outputs.metadata)['autoware-core-devel']['containerimage.digest'] }}
+        CORE_DEVEL_IMAGE: ${{ steps.recipe.outputs.core_image }}@${{ fromJSON(steps.core.outputs.metadata || '{}')['autoware-core-devel']['containerimage.digest'] }}
       run: python3 .github/scripts/build.py recipe
       shell: bash
 

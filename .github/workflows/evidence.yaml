@@ -26,6 +26,7 @@ on:
     paths:
       - 'cli/**'
       - 'deployments/**'
+      - 'platforms/autosd/**'
       - 'openadkit'
       - 'openadkit.json'
       - '.github/scripts/evidence/**'
@@ -195,7 +196,7 @@ jobs:
   cell:
     needs: prepare
     if: needs.prepare.outputs.skip != 'true'
-    runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
+    runs-on: ${{ matrix.runner || vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
     timeout-minutes: 120
     permissions:
       actions: read
@@ -223,6 +224,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/install-compose.sh
+
+      - name: Install Podman for the AutoSD units
+        if: ${{ matrix.backend == 'quadlet' }}
+        run: sudo apt-get update && sudo apt-get install -y podman catatonit
 
       - name: Download build metadata for the overlay build
         if: ${{ matrix.kit != '' }}

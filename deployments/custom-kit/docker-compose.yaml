@@ -19,9 +19,9 @@ services:
     network_mode: host
     ipc: host
     env_file:
-      - ${KIT_openadkit}/deployments/shared/runtime.env
+      - ${OPENADKIT_BASE_ROOT}/deployments/shared/runtime.env
     volumes:
-      - ${KIT_openadkit}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${OPENADKIT_BASE_ROOT}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
     command: ros2 run acme_probe probe
     restart: on-failure

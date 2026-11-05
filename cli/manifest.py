@@ -47,9 +47,6 @@ ALLOWED_INTEGRATOR_DEPLOYMENT_KEYS = {
     "schemaVersion", "name", "description", "base", "compose", "data",
 }
 ALLOWED_INTEGRATOR_COMPOSE_KEYS = {"files", "resetServices", "waitTimeout"}
-# The include variable for the pinned kit, named per kit so a later layer
-# (a Tier-1 kit extended by an OEM kit) can add its own.
-BASE_KIT_ENV = "KIT_openadkit"
 _IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
 # Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
 VERSION_RE = re.compile(
@@ -76,14 +73,12 @@ ALLOWED_COMPOSE_KEYS = {
     "waitTimeout",
 }
 ALLOWED_NODE_KEYS = {
-    "backend",
     "files",
     "resetServices",
     "requiredEnv",
     "requiredFiles",
     "rosDomainId",
 }
-NODE_BACKENDS = {"compose"}
 # Linux keeps DDS ports for domains 0-101 clear of the ephemeral port range.
 MAX_ROS_DOMAIN_ID = 101
 ALLOWED_REQUIREMENT_KEYS = {
@@ -501,7 +496,7 @@ class Deployment:
             "OPENADKIT_OVERLAY_WS": (root if base else directory) / "overlay_ws",
         }
         self.kit_environment = {
-            BASE_KIT_ENV: str(base.root),
+            "OPENADKIT_BASE_ROOT": str(base.root),
             "OPENADKIT_BASE_DEPLOYMENT": str(base.directory),
         } if base else {}
 
@@ -938,11 +933,6 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
         if not isinstance(node, dict):
             raise OpenADKitError(f"{where} must be an object")
         reject_unknown(node, ALLOWED_NODE_KEYS, where)
-        node["backend"] = node.get("backend", "compose")
-        if node["backend"] not in NODE_BACKENDS:
-            raise OpenADKitError(
-                f"{where}.backend must be one of: {', '.join(sorted(NODE_BACKENDS))}"
-            )
         node["files"] = require_string_list(
             node.get("files"), f"{where}.files", nonempty=True
         )

@@ -42,7 +42,7 @@ reads these files in order (later wins):
 
 Container ROS/DDS defaults come from the included services' `runtime.env`.
 Shell exports do not hide values in the configuration files. The CLI injects
-the ROS distro, host UID/GID, overlay mount paths, `KIT_openadkit` (the base root)
+the ROS distro, host UID/GID, overlay mount paths, `OPENADKIT_BASE_ROOT` (the base root)
 and `OPENADKIT_BASE_DEPLOYMENT` (the directory selected by `base`); release
 component images and artifact references remain pinned.
 

@@ -24,7 +24,7 @@ custom-kit/
   Compose entrypoint. Architecture, ROS distro, GPU and downloads are inherited.
 - `docker-compose.yaml` includes `${OPENADKIT_BASE_DEPLOYMENT}/docker-compose.yaml`
   and adds the heartbeat and overlay node. The CLI resolves that base directory;
-`KIT_openadkit` names the base root for shared assets.
+`OPENADKIT_BASE_ROOT` names the base root for shared assets.
 - `config.env` contains only changed values, such as `VEHICLE_ID=acme-01`.
 - `config/autoware/` changes one parameter, the control command gate's
   `nominal_filter.vel_lim=8.0`.

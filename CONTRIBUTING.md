@@ -27,27 +27,13 @@ If you are a member of the Autoware Foundation contributing to active developmen
 
 ### Branch Strategy
 
-- `main` — integration with upstream Autoware development
-- `release/X.Y` — an Open AD Kit release line, pinned to one Autoware release
+- `main` — Open AD Kit development; releases come from it
+- `release/X.Y` — created from a release tag only when an older line needs a fix
 - `feat/...`, `fix/...`, `refactor/...` — active development branches merged into `main` via PR
 
-`.github/autoware.ref` pins the Autoware sources a branch builds: an exact
-release such as `2.0.0` on `release/2.0`, and a commit of upstream `main` on
-`main`, with every dependency pinned next to it in `.github/autoware-lock.repos`
-and the upstream base images it builds on in `.github/autoware-base-images.json`.
-A change that only upstream development needs, such as a moved package, lands
-on `main` without breaking the release line. Create `release/X.Y` from `main`
-when stabilizing a release, set its pin to the release tag, remove
-`.github/autoware-lock.repos` and `.github/autoware-base-images.json`, and
-cherry-pick fixes into it.
-
-`main` moves to upstream development once a week: `bump-autoware.yaml` opens a
-`chore(autoware): bump development snapshot` pull request from
-`ci/bump-autoware`, builds every image on it and runs the evidence cells,
-reported as its `bump-autoware / build` and `bump-autoware / evidence` statuses. When
-upstream breaks a deployment, only that pull request fails; push the
-adaptation to its branch, and merge it once its checks pass. Run the workflow
-by hand to move sooner.
+`.github/autoware.ref` pins the Autoware release a branch builds on, such as
+`2.0.0`. Moving `main` to a new Autoware release is a pull request that changes
+the pin and adapts the deployments to it.
 
 ### Local CI Commands
 
@@ -127,7 +113,7 @@ For split-host (`--node`) topology testing, follow the [documentation](https://a
 
 ### Releasing
 
-Run the `scan-images`, `evidence` and `release.yaml` workflows (GitHub Actions) on a `release/X.Y` branch to promote its build to a `vX.Y.Z` release or pre-release. `release-pipeline.yaml` runs the build and these three in order. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
+Every build of `main` (or of a `release/X.Y` branch) is scanned and runs the evidence cells. Run `release.yaml` (GitHub Actions) on the same branch with a version and the `build_tag` of a build whose scan and evidence passed to promote it to a `vX.Y.Z` release or pre-release. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
 
 Both release candidates and stable releases require a successful evidence run
 that passed every cell for the promoted build; reviewed manifest exemptions

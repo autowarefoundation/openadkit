@@ -17,9 +17,7 @@ image digest.
 | **Pre-release** | `planning-control-humble-v2.0.0-rc.1` | Pre-releases | No |
 | **CI build** | `planning-control-humble-123456789-1` | Every CI build (`<run_id>-<run_attempt>`) | No |
 
-CI builds of `main` follow upstream Autoware development and are never
-released; releases come from `release/X.Y` branches (see
-[Versioning](#versioning)).
+Releases promote a CI build of `main` (see [Versioning](#versioning)).
 
 The moving aliases also exist with a `-latest` suffix
 (`planning-control-humble-latest`, `planning-control-latest`). Pre-releases
@@ -39,28 +37,22 @@ the same patterns with `-jazzy` (for example `planning-control-jazzy`).
 
 ## Versioning
 
-An Open AD Kit version says which Autoware it builds on: `vX.Y.Z`.
+Open AD Kit versions follow [Semantic Versioning](https://semver.org/) on their
+own, starting at `v2.0.0`: a backward-incompatible change to the CLI, the
+manifests or a deployment raises the major version, and a move to a new
+Autoware release raises at least the minor version. The release notes list what
+breaks.
 
-| Part | Meaning |
-|------|---------|
-| **X.Y** | The Autoware release: `v2.0.x` builds on Autoware 2.0.x |
-| **Z** | Open AD Kit's own counter: fixes, backward-compatible additions, image refreshes and moves to an Autoware patch release |
-
-`Z` does not follow Autoware's patch number. A kit that works on one `vX.Y.Z` keeps
-working on later `vX.Y` releases; backward-incompatible changes wait for the next
-Autoware release, and its release notes list them.
-
-A `release/X.Y` branch produces the `vX.Y.Z` releases and pins their Autoware
-release in `.github/autoware.ref`; the release gate refuses a version whose `X.Y`
-is not its Autoware's. Every release pairs the two in its
+Releases come from `main`, which pins one Autoware release in
+`.github/autoware.ref`. Every release pairs the two in its
 [GitHub Release](https://github.com/autowarefoundation/openadkit/releases) title,
 `Open AD Kit v2.0.1 · Autoware 2.0.0`, and so do `openadkit install` and
 `openadkit version`. The release also pins the ROS 2 distros and every image
 digest, and its images carry `org.opencontainers.image.autoware-base-version`.
 A fix that is upstream but not yet in an Autoware release can be
-[backported](../releases/evidence.md#backporting-an-autoware-fix) on a line;
-the release notes list it, and the Autoware version stays the tag's.
-`main` builds a snapshot of upstream development that moves weekly.
+[backported](../releases/evidence.md#backporting-an-autoware-fix); the release
+notes list it, and the Autoware version stays the tag's. A `release/X.Y` branch
+is created from a release tag only to fix an older version.
 
 ## ROS 2 Distro Support
 

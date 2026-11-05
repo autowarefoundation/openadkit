@@ -9,7 +9,6 @@ data and behavior contracts; local actions own repeated execution recipes.
 | Build matrices, changed-target selection, contexts and Bake overrides | `scripts/build.py` |
 | CI image tags, Bake execution and ccache restore/save/prune | `actions/build-image/` |
 | Source lock import, Buildx and registry login | `actions/setup-build-env/` |
-| `main`'s weekly Autoware development snapshot and its pull request | `scripts/bump_autoware.py`, `workflows/bump-autoware.yaml` |
 | Image metadata capture, inventory coverage, scan rows and artifact validation | `scripts/images.py` |
 | Validation and evidence cell plans (nodes, checks) and the kit inventory | `scripts/validation_matrix.py` |
 | Executing one evidence cell: validate/start/cleanup and the L0–L2 checks it names | `scripts/evidence/run_cell.sh` |

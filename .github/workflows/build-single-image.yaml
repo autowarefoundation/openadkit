@@ -24,8 +24,6 @@ on:
     paths:
       - ".dockerignore"
       - ".github/autoware.ref"
-      - ".github/autoware-lock.repos"
-      - ".github/autoware-base-images.json"
       - ".github/autoware-patches/**"
       - ".github/scripts/autoware_patches.py"
       - "components/**"

@@ -12,7 +12,7 @@ import images
 @pytest.fixture
 def artifacts(tmp_path):
     metadata = build_metadata()
-    metadata.update(run_id="123", run_attempt="1", scan_requested=False)
+    metadata.update(run_id="123", run_attempt="1")
     upstream = [{"name": name, "ros_distro": distro, "ref": f"ghcr.io/autowarefoundation/autoware:{name}-{distro}-1.8.0",
                  "digest": DIGEST, "uri": f"docker-image://ghcr.io/autowarefoundation/autoware:{name}-{distro}-1.8.0@{DIGEST}"}
                 for name in ("core-devel", "base", "base-cuda-runtime", "base-cuda-devel") for distro in ("humble", "jazzy")]

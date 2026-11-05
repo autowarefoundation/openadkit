@@ -8,8 +8,6 @@ on:
     paths:
       - '.dockerignore'
       - '.github/autoware.ref'
-      - '.github/autoware-lock.repos'
-      - '.github/autoware-base-images.json'
       - '.github/autoware-patches/**'
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
@@ -24,16 +22,8 @@ on:
       - '!components/README.md'
       - '!components/*/README.md'
 
-  schedule:
-    - cron: '0 0 * * 0'
   # The branch's .github/autoware.ref selects the Autoware sources.
   workflow_dispatch:
-    inputs:
-      run_scan:
-        description: 'Run a full image scan after this build completes (main only; release branches dispatch scan-images on the branch).'
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: build-all-images-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
@@ -44,7 +34,7 @@ env:
   IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
   IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
   IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-  SAVE_CCACHE: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && (github.event_name == 'push' || github.event_name == 'schedule') }}
+  SAVE_CCACHE: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && github.event_name == 'push' }}
 
 jobs:
   prepare:
@@ -62,7 +52,6 @@ jobs:
       upstream_images: ${{ steps.upstream.outputs.upstream_images }}
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
-      scan_requested: ${{ steps.prepare.outputs.scan_requested }}
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
       carla_matrix: ${{ steps.inventory.outputs.carla_matrix }}
@@ -73,8 +62,6 @@ jobs:
 
       - name: Resolve shared build inputs
         id: prepare
-        env:
-          RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
 
@@ -94,7 +81,6 @@ jobs:
         id: upstream
         env:
           UPSTREAM_TAG: ${{ steps.prepare.outputs.upstream_tag }}
-          UPSTREAM_PINS: ${{ steps.prepare.outputs.upstream_pins }}
         run: |
           set -euo pipefail
           bash .github/scripts/resolve_upstream_images.sh
@@ -125,19 +111,13 @@ jobs:
         id: lock
         env:
           AUTOWARE_OVERLAY: ${{ steps.prepare.outputs.autoware_overlay }}
-          AUTOWARE_LOCK_FILE: ${{ steps.prepare.outputs.autoware_lock_file }}
         run: |
           set -euo pipefail
           mkdir -p autoware-lock
-          if [ -n "${AUTOWARE_LOCK_FILE}" ]; then
-            # A commit pin builds the dependency lock committed with it.
-            cp "${AUTOWARE_LOCK_FILE}" autoware-lock/autoware-lock.repos
-          else
-            python3 .github/scripts/export_autoware_lock.py \
-              autoware-metadata/repositories/autoware.repos \
-              autoware-lock/autoware-lock.repos \
-              "${AUTOWARE_OVERLAY}"
-          fi
+          python3 .github/scripts/export_autoware_lock.py \
+            autoware-metadata/repositories/autoware.repos \
+            autoware-lock/autoware-lock.repos \
+            "${AUTOWARE_OVERLAY}"
           autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
           echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "$GITHUB_OUTPUT"
         shell: bash
@@ -367,7 +347,6 @@ jobs:
           AUTOWARE_REF: ${{ needs.prepare.outputs.autoware_ref }}
           AUTOWARE_BASE_VERSION: ${{ needs.prepare.outputs.autoware_base_version }}
           PREPARED_LOCK_SHA256: ${{ needs.prepare.outputs.autoware_lock_sha256 }}
-          SCAN_REQUESTED: ${{ needs.prepare.outputs.scan_requested }}
           COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
           COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
         run: python3 .github/scripts/images.py capture
@@ -383,60 +362,3 @@ jobs:
             build-metadata/image-inventory.json
             build-metadata/upstream-images.json
           retention-days: 90
-
-  # The weekly Autoware snapshot bump (bump-autoware.yaml) is verified like
-  # main. A dispatched run does not show as a pull request check, so report the
-  # build as a commit status, then start the evidence cells, which follow
-  # main's builds only on their own.
-  bump-report:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [prepare, capture-metadata]
-    if: always() && github.ref == 'refs/heads/ci/bump-autoware'
-    permissions:
-      actions: write
-      statuses: write
-    steps:
-      - name: Report the build and dispatch the evidence cells
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
-          BUILT: ${{ needs.capture-metadata.result }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          status() {  # context, state, description
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$2" \
-              -f context="bump-autoware / $1" -f description="$3" -f target_url="${RUN_URL}" >/dev/null
-          }
-          if [ "${BUILT}" = success ]; then
-            status build success "build ${BUILD_TAG}"
-            gh workflow run evidence.yaml --repo "${GITHUB_REPOSITORY}" --ref ci/bump-autoware -f build_tag="${BUILD_TAG}"
-          else
-            status build failure "the image build did not complete"
-            status evidence error "not run: the image build did not complete"
-          fi
-        shell: bash
-
-  notify-failure:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [prepare, build-common, build-components, build-carla-interface, create-manifests, capture-metadata]
-    if: failure() && github.event_name == 'schedule'
-    permissions:
-      issues: write
-    steps:
-      - name: Create failure issue
-        uses: actions/github-script@v9
-        with:
-          script: |
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Scheduled build failed (${new Date().toISOString().split('T')[0]})`,
-              body: [
-                '**Scheduled build-all-images workflow failed.**',
-                '',
-                `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              ].join('\n'),
-            })

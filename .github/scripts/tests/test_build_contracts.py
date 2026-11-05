@@ -44,8 +44,6 @@ def test_inventory_bake_and_runtime_catalog_agree():
      {"use_local_common": True, "use_local_simulator": True}),
     (".github/autoware.ref", {image["target"] for image in INVENTORY["images"]} - {"simulator"},
      {"use_local_common": True, "use_local_simulator": True}),
-    (".github/autoware-base-images.json", {image["target"] for image in INVENTORY["images"]} - {"simulator"},
-     {"use_local_common": True, "use_local_simulator": True}),
     ("components/sensing-perception/Dockerfile.cuda", {"sensing-perception-cuda"}, {}),
     ("components/sensing-perception/scripts/build.sh", {"sensing-perception", "sensing-perception-cuda"}, {}),
     ("components/simulator/Dockerfile", {"carla-interface"}, {"use_local_simulator": True}),

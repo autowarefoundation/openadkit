@@ -112,8 +112,8 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
             # These shape every image's sources, context and dependency graph.
             # Autoware patches change the sources every image compiles, as a new
             # Autoware revision does.
-            if changed_file in ("components/docker-bake.hcl", ".dockerignore", ".github/autoware.ref", ".github/autoware-lock.repos",
-                                ".github/autoware-base-images.json", ".github/scripts/autoware_patches.py") or fnmatch.fnmatchcase(
+            if changed_file in ("components/docker-bake.hcl", ".dockerignore", ".github/autoware.ref",
+                                ".github/scripts/autoware_patches.py") or fnmatch.fnmatchcase(
                 changed_file, ".github/autoware-patches/*"
             ):
                 targets.update(all_targets)

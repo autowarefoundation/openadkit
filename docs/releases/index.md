@@ -37,7 +37,7 @@ vehicle certification.
 | Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Done |
 | Safety Island: `safety-island-simulation`, Planning Simulation driven by the pinned Safety Island release over `domain_bridge`, with its own evidence cell | Done |
 | AutoSD: Quadlet units for the component images, with Compose as the single source | Done |
-| Release line: `release/2.0` cut from `main` and pinned to Autoware 2.0 | Planned |
+| Releases from `main`, pinned to Autoware 2.0.0; Open AD Kit's own SemVer from v2.0.0 | Done |
 
 ### After v2.0
 
@@ -51,7 +51,7 @@ vehicle certification.
   replace the zenoh-bridge-ros2dds bridge.
 - **Safety Island on CARLA:** a kit on CARLA Simulation with the Safety Island's closed loop over CAN.
   Hosted CI cannot run CARLA, so it needs its own evidence.
-- **One build path:** build `main` and release lines from the same lock and digest files, so `main`'s evidence also covers the release path.
+- **Autoware main canary:** a weekly, non-blocking build against Autoware `main` that warns of upstream breaks before the next Autoware release; its images must not be released or reused by pull request checks.
 - **Image SBOMs.**
 - **CES 2027 demo:** hardware integration and partner evidence; not a general
   vehicle-support claim.

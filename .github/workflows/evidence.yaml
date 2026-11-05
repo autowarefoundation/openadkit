@@ -15,12 +15,11 @@ permissions:
   contents: read
 
 on:
-  # Builds of main only: a release line scans and verifies its builds by
-  # dispatch on its own branch, where the release gate expects them.
+  # Every build of main or a maintenance branch, where the release gate expects it.
   workflow_run:
     workflows: [build-all-images]
     types: [completed]
-    branches: [main]
+    branches: [main, 'release/*']
   # Changes that need no new image; one that does is verified after its build.
   pull_request:
     paths:
@@ -369,29 +368,4 @@ jobs:
             echo "evidence result is ${result}" >&2
             exit 1
           fi
-        shell: bash
-
-  # Report evidence for the weekly Autoware snapshot bump (bump-autoware.yaml)
-  # as a commit status on its pull request, where a dispatched run shows no check.
-  bump-status:
-    needs: [prepare, summarize]
-    if: ${{ always() && github.ref == 'refs/heads/ci/bump-autoware' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      statuses: write
-    steps:
-      - name: Report the evidence result
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha || github.sha }}
-          RESULT: ${{ needs.summarize.result }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          state=failure
-          [ "${RESULT}" != success ] || state=success
-          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SOURCE_SHA}" -f state="${state}" \
-            -f context="bump-autoware / evidence" -f description="evidence cells: ${RESULT}" \
-            -f target_url="${RUN_URL}" >/dev/null
         shell: bash

@@ -10,7 +10,7 @@ SCRIPT = ROOT / ".github/scripts/resolve_upstream_images.sh"
 DIGEST = f"sha256:{'a' * 64}"
 
 
-def resolver_env(tmp_path, distro=None, image_names=None, upstream_tag="1.8.0", pins=None):
+def resolver_env(tmp_path, distro=None, image_names=None, upstream_tag="1.8.0"):
     inventory = tmp_path / "inventory.json"
     inventory.write_text(json.dumps({"ros_distros": ["humble", "jazzy"]}))
     output = tmp_path / "upstream-images.json"
@@ -36,15 +36,11 @@ printf '{"manifest":{"digest":"%s"}}\n' "${DIGEST}"
         env["UPSTREAM_ROS_DISTRO"] = distro
     if image_names is not None:
         env["UPSTREAM_IMAGE_NAMES"] = image_names
-    if pins is not None:
-        pins_file = tmp_path / "autoware-base-images.json"
-        pins_file.write_text(json.dumps(pins))
-        env["UPSTREAM_PINS"] = str(pins_file)
     return env, output, docker_log
 
 
-def run_resolver(tmp_path, distro=None, image_names=None, upstream_tag="1.8.0", pins=None):
-    env, output, docker_log = resolver_env(tmp_path, distro, image_names, upstream_tag, pins)
+def run_resolver(tmp_path, distro=None, image_names=None, upstream_tag="1.8.0"):
+    env, output, docker_log = resolver_env(tmp_path, distro, image_names, upstream_tag)
     result = subprocess.run(
         ["bash", str(SCRIPT)], env=env, text=True, capture_output=True
     )
@@ -81,22 +77,6 @@ def test_development_uses_plain_tags_and_compiles_core(tmp_path):
     assert all(ref.endswith("-humble") for ref in inspected)
 
 
-PINNED = {f"{name}-{distro}": f"sha256:{digit * 64}"
-          for digit, name in zip("bcd", ("base", "base-cuda-runtime", "base-cuda-devel"), strict=True)
-          for distro in ("humble", "jazzy")}
-
-
-def test_development_pins_the_snapshots_base_images(tmp_path):
-    result, data, inspected = run_resolver(tmp_path, upstream_tag="", pins=PINNED)
-    assert result.returncode == 0, result.stderr
-    assert inspected == []
-    assert len(data) == 6
-    for item in data:
-        tag = f"{item['name']}-{item['ros_distro']}"
-        assert item["ref"] == f"ghcr.io/autowarefoundation/autoware:{tag}"
-        assert item["uri"] == f"docker-image://{item['ref']}@{PINNED[tag]}"
-
-
 def test_a_missing_inventory_fails_instead_of_resolving_nothing(tmp_path):
     env, output, _ = resolver_env(tmp_path)
     env["IMAGE_INVENTORY"] = str(tmp_path / "missing.json")
@@ -104,22 +84,6 @@ def test_a_missing_inventory_fails_instead_of_resolving_nothing(tmp_path):
     assert result.returncode != 0
     assert not output.exists()
     assert "Image inventory not found" in result.stderr
-
-
-@pytest.mark.parametrize(
-    ("upstream_tag", "pins", "message"),
-    [
-        ("", {k: v for k, v in PINNED.items() if k != "base-jazzy"}, "pins no digest for base-jazzy"),
-        ("", PINNED | {"base-jazzy": "latest"}, "pins no digest for base-jazzy"),
-        ("1.8.0", PINNED, "Base image pins are for development builds"),
-    ],
-)
-def test_rejects_unusable_pins_before_registry_lookup(tmp_path, upstream_tag, pins, message):
-    result, data, inspected = run_resolver(tmp_path, upstream_tag=upstream_tag, pins=pins)
-    assert result.returncode != 0
-    assert data is None
-    assert inspected == []
-    assert message in result.stderr
 
 
 @pytest.mark.parametrize(

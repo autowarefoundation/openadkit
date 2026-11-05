@@ -13,9 +13,7 @@
 // Autoware host consumes/visualizes them and the single-host graph kept them
 // local; autonomous emergency braking needs the IMU, and autonomous-mode
 // availability on the Autoware host depends on that control stack coming up.
-// The driving mode gates' change services are bridged only so that the runner
-// can wait for them before a scenario switches Autoware to STOP; nothing on the
-// scenario host calls them. Map blobs, camera images, and visualization/teleop
+// Map blobs, camera images, and visualization/teleop
 // interfaces are intentionally excluded.
 //
 // The visualizer runs on the scenario host, so the topics its RViz config
@@ -82,17 +80,11 @@
         ],
         service_servers: [
           "/control/control_mode_request",
-          "/control/trajectory_gate/source/change",
-          "/control/control_command_gate/source/change",
-          "/control/control_command_gate/filter/change",
           "/simulation/.*",
           "/api/.*",
         ],
         service_clients: [
           "/control/control_mode_request",
-          "/control/trajectory_gate/source/change",
-          "/control/control_command_gate/source/change",
-          "/control/control_command_gate/filter/change",
           "/simulation/.*",
           "/api/.*",
         ],

@@ -40,8 +40,8 @@
     },
     "AUTOWARE_UNIVERSE_IMAGE": {
       "distros": {
-        "humble": "ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175",
-        "jazzy": "ghcr.io/autowarefoundation/autoware:universe-jazzy@sha256:a392e1b331a59774f59751f82535e29bf26967ff4601ed78a1770d7dfeed7a02"
+        "humble": "ghcr.io/autowarefoundation/autoware:universe-humble-2.0.0@sha256:7c12bd85012ad72be9b633173cfa6f20315791d4e92fe5e4adb1a0d19a883b34",
+        "jazzy": "ghcr.io/autowarefoundation/autoware:universe-jazzy-2.0.0@sha256:a28c076c264c0ae1cf389d2686ffebedfd577a6523a04a2b173afe0c968b4d2e"
       }
     },
     "ZENOH_BRIDGE_IMAGE": {

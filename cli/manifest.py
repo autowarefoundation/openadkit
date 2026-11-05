@@ -446,7 +446,7 @@ class Deployment:
             ),
             "OPENADKIT_CONFIG_BASE": base.directory / "config" if base else None,
             "OPENADKIT_CONFIG_DEPLOYMENT": directory / "config",
-            "OPENADKIT_OVERLAY_WS": (root if base else directory) / "overlay_ws",
+            "OPENADKIT_OVERLAY_WS": (root if base and base.root != root else directory) / "overlay_ws",
         }
         self.kit_environment = {
             "OPENADKIT_BASE_ROOT": str(base.root),
@@ -958,6 +958,8 @@ def validate_kit_deployment(
             f"base deployment {base_name} is not in the pinned kit; "
             f"available: {available_deployments(base_kit)}"
         )
+    if declares_base(base_root, base_kit, base_name):
+        raise OpenADKitError(f"base deployment {base_name} has a base of its own")
     base = get_deployment(base_root, base_kit, base_name)
 
     compose = manifest.get("compose")
@@ -1240,6 +1242,12 @@ def available_deployments(kit: RuntimeContext) -> str:
     return ", ".join(kit.deployments)
 
 
+def declares_base(root: Path, kit: RuntimeContext, name: str) -> bool:
+    directory = root.joinpath(*safe_relative(kit.deployments[name].path, "deployment path").parts)
+    manifest = directory / "deployment.json"
+    return manifest.is_file() and not manifest.is_symlink() and "base" in load_json(manifest)
+
+
 def get_deployment(root: Path, kit: RuntimeContext, name: str) -> Deployment:
     available = available_deployments(kit)
     if not NAME_RE.fullmatch(name):
@@ -1256,6 +1264,9 @@ def get_deployment(root: Path, kit: RuntimeContext, name: str) -> Deployment:
     if kit.base is not None:
         assert kit.base_root is not None
         deployment = validate_kit_deployment(root, directory, kit.base, kit.base_root)
+    elif declares_base(root, kit, name):
+        # A deployment on another of the same catalog, as a kit's is on its pinned kit.
+        deployment = validate_kit_deployment(root, directory, kit, root)
     else:
         deployment = validate_manifest(root, directory)
     if deployment.name != name:
@@ -1315,4 +1326,6 @@ def deployment_integrity(
         for name in deployment.shared
     ):
         return "modified"
+    if deployment.base is not None and deployment.base.root == root:
+        return deployment_integrity(root, deployment.base, kit)
     return "intact"

@@ -36,15 +36,16 @@ BEHAVIOUR_CHECKS: dict[str, dict[str, Any]] = {
 PLATFORM_CELLS: dict[str, dict[str, str]] = {
     "planning-simulation": {"backend": "quadlet", "runner": "ubuntu-24.04"},
 }
-# The in-tree kits and their acceptance beyond the base's checks: extra fresh
-# topics, and an L1 script (evidence/<l1 with _>.py, run in the API image).
-# custom-kit: fresh publication proves its C++ overlay node survived the ABI
-# boundary, and custom_kit.py checks its parameter overrides.
-# safety-island: safety_island.py checks that the Safety Island, not Autoware's
+# A deployment's L1 script beyond readiness (evidence/<l1 with _>.py, run in the
+# API image). safety_island.py checks that the Safety Island, not Autoware's
 # follower, publishes the control command the golden path then drives with.
+L1_CHECKS = {"safety-island-planning-simulation": "safety-island"}
+# The in-tree kits and their acceptance beyond the base's checks: extra fresh
+# topics, and an L1 script. custom-kit: fresh publication proves its C++
+# overlay node survived the ABI boundary, and custom_kit.py checks its
+# parameter overrides.
 EXAMPLE_KIT_CHECKS: dict[str, dict[str, Any]] = {
     "custom-kit": {"fresh": ("/acme/probe",), "l1": "custom-kit"},
-    "safety-island": {"fresh": (), "l1": "safety-island"},
 }
 # Host build products of an overlay workspace; never kit content.
 COLCON_PRODUCTS = ("build", "install", "log")
@@ -155,7 +156,7 @@ def evidence_cells(
                     # Started in manifest order and stopped in reverse.
                     "nodes": " ".join(deployment.nodes) if "node" in identity else "",
                     "fresh": " ".join((*FRESH_TOPICS, *checks["fresh"])),
-                    "l1": "",
+                    "l1": L1_CHECKS.get(name, ""),
                     "l2": checks["l2"],
                 })
         if name in PLATFORM_CELLS:

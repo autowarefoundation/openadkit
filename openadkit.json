@@ -26,6 +26,9 @@
     },
     "carla-simulation": {
       "path": "deployments/carla-simulation"
+    },
+    "safety-island-planning-simulation": {
+      "path": "deployments/safety-island-planning-simulation"
     }
   },
   "artifacts": {

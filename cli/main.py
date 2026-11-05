@@ -192,6 +192,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="print machine-readable JSON",
     )
 
+    config = subparsers.add_parser(
+        "config", help="print a deployment's resolved Compose model as JSON"
+    )
+    add_run_arguments(config)
+    add_node_argument(config, NODE_HELP)
+    add_workspace_argument(config)
+
     fetch = subparsers.add_parser("fetch", help="download deployment data")
     add_run_arguments(fetch, gpu=False)
     fetch.add_argument(
@@ -230,7 +237,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         help="deployment name or directory; omit to print the catalog",
     )
-    for catalog in (validate, fetch, run, clean):
+    for catalog in (validate, config, fetch, run, clean):
         catalog.help_inventory = "catalog"
 
     # These act on what runs on this host, from any directory: no deployment name.
@@ -593,7 +600,7 @@ def main() -> int:
         data.remove_installed_data(deployment, selection, include_gpu=True)
         return 0
 
-    if args.command in ("fetch", "validate", "run"):
+    if args.command in ("fetch", "validate", "config", "run"):
         warn_if_modified(root, deployment, kit)
         if getattr(args, "ws", None):
             deployment.use_workspace(Path(args.ws).expanduser().resolve())
@@ -615,6 +622,10 @@ def main() -> int:
                     for item in data.check_installed_data(deployment, selection, include_gpu=True)
                 )
             data.install_data(deployment, selection, args.force, include_gpu=True)
+            return 0
+
+        if args.command == "config":
+            print(compose.compose_capture(deployment, selection, ["config", "--format", "json"]).stdout, end="")
             return 0
 
         data.validate_destinations(deployment, selection)

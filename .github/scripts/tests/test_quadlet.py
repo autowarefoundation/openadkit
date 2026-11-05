@@ -165,7 +165,8 @@ def test_planning_simulation_translates_from_openadkit_config(tmp_path):
     result = subprocess.run(
         [str(ROOT / "openadkit"), "config", "planning-simulation"],
         capture_output=True, text=True, timeout=60, cwd=ROOT,
-        env={**os.environ, "HOME": str(tmp_path)},
+        # CI installs Compose v5 into ~/.docker, which the new HOME would hide.
+        env={**os.environ, "HOME": str(tmp_path), "DOCKER_CONFIG": os.environ.get("DOCKER_CONFIG", str(Path.home() / ".docker"))},
     )
     assert result.returncode == 0, result.stderr
     data = json.loads(result.stdout)

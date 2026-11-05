@@ -429,13 +429,6 @@ def warn_if_modified(root, deployment, kit) -> None:
             f"{deployment.evidence_exemption}",
             file=sys.stderr,
         )
-    legacy = deployment.directory / "config.local.env"
-    if legacy.exists():
-        print(
-            f"warning: {legacy} is no longer read; move its settings to "
-            f"{deployment.site_config}",
-            file=sys.stderr,
-        )
 
 
 def output_path(selection) -> str | None:

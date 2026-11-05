@@ -1194,15 +1194,15 @@ def test_fetch_checks_every_destination_before_download(tmp_path):
 @pytest.mark.parametrize("base_refs", [{"ref": PIN}, {"distros": {"humble": PIN, "jazzy": PIN}}])
 def test_kit_artifact_fallback_and_wildcard_override(tmp_path, base_refs):
     root, _ = runtime_tree(tmp_path)
-    edit_kit(root, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"workload": "api", **base_refs}}))
-    kit = integrator_kit(tmp_path, root, artifacts={"EXTERNAL_IMAGE": {"workload": "api", "distros": {"humble": OTHER_PIN}}})
+    edit_kit(root, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {**base_refs}}))
+    kit = integrator_kit(tmp_path, root, artifacts={"EXTERNAL_IMAGE": {"distros": {"humble": OTHER_PIN}}})
     context = cli_manifest.load_kit(kit)
     assert context.artifact_environment("humble")["EXTERNAL_IMAGE"] == OTHER_PIN
     assert context.artifact_environment("jazzy")["EXTERNAL_IMAGE"] == PIN
-    edit_kit(kit, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"workload": "api", "ref": OTHER_PIN}}))
+    edit_kit(kit, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"ref": OTHER_PIN}}))
     assert cli_manifest.load_kit(kit).artifact_environment("jazzy")["EXTERNAL_IMAGE"] == OTHER_PIN
     # Every distro is `ref`, never a "*" distro.
-    edit_kit(kit, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"workload": "api", "distros": {"*": OTHER_PIN}}}))
+    edit_kit(kit, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"distros": {"*": OTHER_PIN}}}))
     with pytest.raises(cli_manifest.OpenADKitError, match="invalid ROS distro"):
         cli_manifest.load_kit(kit)
 
@@ -1223,8 +1223,8 @@ def test_kit_inherits_pins_gpu_env_and_layers(tmp_path, monkeypatch, release):
         monkeypatch.delenv(name, raising=False)
     root, base = runtime_tree(tmp_path, release=release,
                               document=manifest(gpu=True, data=[files_resource(tmp_path)]), config="VALUE=base\nMAP_PATH=$HOME/data/map\n")
-    edit_kit(root, lambda doc: doc.update(artifacts={"INHERITED_IMAGE": {"workload": "sim", "ref": PIN}}))
-    kit = integrator_kit(tmp_path, root, artifacts={"API_IMAGE": {"workload": "api", "ref": OTHER_PIN}})
+    edit_kit(root, lambda doc: doc.update(artifacts={"INHERITED_IMAGE": {"ref": PIN}}))
+    kit = integrator_kit(tmp_path, root, artifacts={"API_IMAGE": {"ref": OTHER_PIN}})
     directory = kit / "deployments/custom"
     (directory / "config.gpu.env").write_text("VALUE=kit-gpu\n")
     for path in (base / "config", directory / "config", kit / "overlay_ws"):

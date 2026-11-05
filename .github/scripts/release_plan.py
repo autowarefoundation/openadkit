@@ -81,7 +81,7 @@ def stage_bundle(
         *(meta["path"] for meta in plan["releaseContext"]["deployments"].values()),
         *(f"deployments/{name}" for name in plan["bundle"]["shared"]),
     ]
-    scrubbed = ["config.local.env", "__pycache__", "*.pyc"]
+    scrubbed = ["__pycache__", "*.pyc"]
     examples: list[str] = []
     if include_example_kits:
         runtime = load_runtime(source_root)

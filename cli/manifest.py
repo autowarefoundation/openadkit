@@ -40,7 +40,7 @@ ALLOWED_KIT_KEYS = {
     "artifacts",
     "autoware",
 }
-ALLOWED_ARTIFACT_KEYS = {"workload", "ref", "distros"}
+ALLOWED_ARTIFACT_KEYS = {"ref", "distros"}
 # An integrator kit: its own deployments on top of one pinned Open AD Kit.
 ALLOWED_INTEGRATOR_KIT_KEYS = {"schemaVersion", "kind", "extends", "deployments", "artifacts"}
 ALLOWED_INTEGRATOR_DEPLOYMENT_KEYS = {
@@ -352,7 +352,7 @@ class RuntimeContext:
     images: dict[str, dict[str, str]]
     deployments: dict[str, DeploymentRef]
     shared: dict[str, str]
-    # Pinned images we consume rather than build: name -> {workload, refs}.
+    # Pinned images we consume rather than build: name -> {ref or distros}.
     artifacts: dict[str, dict[str, Any]]
     # Release only: the Autoware version, commit and lock file it was built from.
     autoware: dict[str, str] | None = None
@@ -1112,9 +1112,6 @@ def _parse_artifacts(value: Any, component_images: dict[str, str]) -> dict[str, 
         if not isinstance(artifact, dict):
             raise OpenADKitError(f"{where} must be an object")
         reject_unknown(artifact, ALLOWED_ARTIFACT_KEYS, where)
-        workload = require_string(artifact.get("workload"), f"{where}.workload")
-        if not NAME_RE.fullmatch(workload):
-            raise OpenADKitError(f"invalid {where}.workload: {workload}")
         if ("ref" in artifact) == ("distros" in artifact):
             raise OpenADKitError(f"{where} needs exactly one of ref or distros")
         # `ref` serves every distro; `distros` names each one.
@@ -1335,8 +1332,7 @@ def deployment_checksum(directory: Path, *, exclude_dirs: tuple[str, ...] = ()) 
     ):
         relative = candidate.relative_to(directory)
         if (
-            relative.name == "config.local.env"
-            or any(part in exclude_dirs for part in relative.parts)
+            any(part in exclude_dirs for part in relative.parts)
             or "__pycache__" in relative.parts
             or relative.suffix == ".pyc"
         ):

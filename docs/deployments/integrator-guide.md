@@ -163,8 +163,8 @@ out are skipped; the kit's own must exist.
 
 ### 5. Image Replacement
 
-Declare consumed images in your kit's `artifacts`, with a `workload` and either
-one digest-pinned `ref` or a `distros` map of digest-pinned references. An
+Declare consumed images in your kit's `artifacts`, each with either one
+digest-pinned `ref` or a `distros` map of digest-pinned references. An
 artifact name matching a component image variable replaces that component;
 other artifact names can supply images for new services. Use `${NAME:?}` in
 Compose to require the declared reference.

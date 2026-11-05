@@ -111,9 +111,6 @@ override component images there; release images stay pinned.
 | Host settings | `~/.config/openadkit` | `OPENADKIT_CONFIG_DIR` (or `XDG_CONFIG_HOME`) |
 | Results and recordings | `~/openadkit-output/<name>/{results,recordings}` | `OPENADKIT_OUTPUT_DIR` |
 
-`deployments/<name>/config.local.env` is no longer read; the CLI warns when it
-finds one. Move its settings to `~/.config/openadkit/<name>.env`.
-
 ## Upgrading
 
 ```bash

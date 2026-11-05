@@ -15,11 +15,12 @@ permissions:
   contents: read
 
 on:
-  # Every build of main or a maintenance branch, where the release gate expects it.
+  # Builds of main. A workflow_run run is main's, so a maintenance branch's
+  # build dispatches its evidence on its own branch (build-all-images.yaml).
   workflow_run:
     workflows: [build-all-images]
     types: [completed]
-    branches: [main, 'release/*']
+    branches: [main]
   # Changes that need no new image; one that does is verified after its build.
   pull_request:
     paths:

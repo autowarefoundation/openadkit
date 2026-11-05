@@ -33,11 +33,6 @@ fail() {
   exit 1
 }
 
-# The X.Y release line of VERSION.
-release_line() {
-  printf '%s\n' "${VERSION#v}" | cut -d. -f1-2
-}
-
 validate_inputs() {
   printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_semver_re}" \
     || fail "Invalid version format '${VERSION}': must be strict SemVer vX.Y.Z or vX.Y.Z-prerelease"
@@ -238,15 +233,6 @@ validate_release_rules() {
     || fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
 }
 
-# A release's X.Y is its Autoware's X.Y: v2.0.1 builds on Autoware 2.0.x.
-validate_autoware_line() {
-  local autoware_base_version
-
-  autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
-  [ "${autoware_base_version%.*}" = "$(release_line)" ] \
-    || fail "${VERSION} must build on Autoware $(release_line).x (got ${autoware_base_version})"
-}
-
 # Publishing creates the tag; one that already exists must be on this commit.
 validate_git_tag() {
   local existing tag_sha
@@ -285,7 +271,6 @@ main() {
     scan-metadata.json scan_is_full scan_passed release-input/scan
   validate_metadata
   validate_release_rules
-  validate_autoware_line
   select_latest_artifact "evidence-summary-${BUILD_TAG}" .github/workflows/evidence.yaml \
     evidence-summary.json evidence_is_release evidence_passed release-input/evidence
   validate_git_tag

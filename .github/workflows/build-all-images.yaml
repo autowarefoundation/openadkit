@@ -358,3 +358,25 @@ jobs:
             build-metadata/image-inventory.json
             build-metadata/upstream-images.json
           retention-days: 90
+
+  # A workflow_run run is main's, so scan and evidence follow main's builds on
+  # their own; a maintenance branch's build dispatches them on its branch, where
+  # the release gate looks for them.
+  verify-maintenance-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, capture-metadata]
+    if: startsWith(github.ref, 'refs/heads/release/')
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the scan and the evidence cells on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+        run: |
+          set -euo pipefail
+          for workflow in scan.yaml evidence.yaml; do
+            gh workflow run "${workflow}" --repo "${GITHUB_REPOSITORY}" --ref "${GITHUB_REF_NAME}" -f build_tag="${BUILD_TAG}"
+          done
+        shell: bash

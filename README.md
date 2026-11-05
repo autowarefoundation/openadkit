@@ -20,17 +20,17 @@ Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the soft
 Run the CPU-based planning simulation on Ubuntu 22.04 or 24.04. No GPU is required.
 
 ```bash
-git clone https://github.com/autowarefoundation/openadkit.git
-cd openadkit
-./openadkit setup --verify
+curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \
+  | bash -s -- install
+openadkit setup --verify
 # Run this if setup adds you to the Docker group, or start a new login session:
 newgrp docker
-./openadkit run planning-simulation
+openadkit run planning-simulation
 ```
 
-When the stack is ready, open [the noVNC visualizer](http://localhost:6080/vnc.html) and sign in with the password `openadkit`.
+The installer verifies the release bundle and puts `openadkit` in `~/.local/bin`. When the stack is ready, `openadkit status` prints the visualizer address; open it and sign in with the password `openadkit`.
 
-The CLI downloads required data, pulls missing images, starts the services, and verifies readiness. See the [guided quick start](https://autowarefoundation.github.io/openadkit/getting-started/) for installation options, runtime controls, and troubleshooting.
+The CLI downloads required data, pulls missing images, starts the services, and verifies readiness. To work from a source checkout instead, clone this repository and run `./openadkit` from its root. See the [guided quick start](https://autowarefoundation.github.io/openadkit/getting-started/) for installation options, runtime controls, and troubleshooting.
 
 ## Deployments
 

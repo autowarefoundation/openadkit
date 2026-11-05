@@ -1,8 +1,8 @@
 # AutoSD
 
-This directory contains the AutoSD deployment assets for Open AD Kit use cases.
+Run an Open AD Kit deployment on AutoSD: `quadlet.py` turns `openadkit config`
+into Quadlet units, the files they mount, and an Automotive Image Builder manifest.
 
-- [Planning simulator](./planning-simulator/README.md): run the planning and simulator services in containers.
 - [R-Car X5H](https://github.com/oguzkaganozt/rcar-x5h-autosd): board support for the R-Car X5H, in its own repository
 
-Canonical build, run, and QEMU instructions are in the [AutoSD documentation](https://autowarefoundation.github.io/openadkit/platforms/autosd/).
+Build, run, and QEMU instructions are in the [AutoSD documentation](https://autowarefoundation.github.io/openadkit/platforms/autosd/).

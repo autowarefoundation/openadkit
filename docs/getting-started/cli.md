@@ -83,9 +83,11 @@ or `outdated` and fails on any gap. It follows the same GPU selection as `run`:
 use `openadkit validate logging-simulation --gpu --data` to include the
 CenterPoint models.
 
-`list`, `version`, and `validate` accept `--json` for scripting.
+`list`, `version`, and `validate` accept `--json` for scripting. `config` prints
+the resolved Compose model of a deployment as JSON, with the same options as
+`validate`; [AutoSD](../platforms/autosd/index.md) builds on it.
 
-`validate`, `fetch`, `run` and `clean` also take a deployment's directory
+`validate`, `config`, `fetch`, `run` and `clean` also take a deployment's directory
 instead of its name, such as `openadkit run ./my-kit`: an argument with a `/` or
 a leading `.` is a directory, and the kit around it is used wherever you run the
 command.

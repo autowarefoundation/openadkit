@@ -36,7 +36,8 @@ vehicle certification.
 | CLI: `build`, `run --ws`, `restart`, `shell`, deployment paths, and commands that find the running stack from any directory | Done |
 | Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Done |
 | Safety Island: its DDS domain bridge and configuration become a generic part of the kit | Planned |
-| AutoSD: Quadlet units for the component images, with Compose as the single source | Planned |
+| AutoSD: Quadlet units for the component images, with Compose as the single source | Done |
+| Release line: `release/2.0` cut from `main` and pinned to Autoware 2.0 | Planned |
 
 ### After v2.0
 

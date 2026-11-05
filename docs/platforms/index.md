@@ -42,7 +42,7 @@ documented as if it worked. Individual boards are listed on the
 | Component images, amd64 + arm64 | **Committed** | `sensing-perception-cuda` and `carla-interface` are amd64-only |
 | Jazzy images | **Best-effort** | Published where the builds pass; Humble is the default |
 | CARLA deployment | **Experimental** | Humble, amd64, NVIDIA GPU |
-| AutoSD planning-simulator demo | **Experimental** | Uses upstream Autoware images, not the component images |
+| AutoSD with Podman and Quadlet | **Experimental** | Component images, generated from Compose; Planning Simulation only |
 | EWAOL | **Unsupported** | No assets in this repository |
 
 Other Linux distributions may work but are not tested.

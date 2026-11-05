@@ -32,6 +32,17 @@ def test_evidence_cells_carry_the_manifest_plan():
         assert cell["name"] == validation_matrix.evidence_cell_name(cell)
 
 
+def test_quadlet_cell_runs_the_golden_path_on_a_runner_with_quadlet():
+    runtime = validation_matrix.load_runtime(ROOT)
+    cells = [cell for cell in validation_matrix.evidence_cells(runtime, ROOT) if cell.get("backend")]
+    assert len(cells) == 1
+    cell = cells[0]
+    assert (cell["deployment"], cell["distro"], cell["backend"]) == ("planning-simulation", "humble", "quadlet")
+    assert cell["runner"] == "ubuntu-24.04" and cell["l2"] == "golden" and cell["nodes"] == ""
+    assert cell["name"] == "planning-simulation-humble-quadlet-linux-amd64"
+    assert cell["name"] == validation_matrix.evidence_cell_name(cell)
+
+
 def test_unexempt_deployment_without_an_l2_check_fails_enumeration(monkeypatch):
     monkeypatch.delitem(validation_matrix.BEHAVIOUR_CHECKS, "scenario-simulation")
     with pytest.raises(ValueError, match="scenario-simulation has no L2 evidence check"):

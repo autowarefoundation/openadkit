@@ -29,6 +29,7 @@ deployment=$(field deployment)
 distro=$(field distro)
 node=$(field node)
 kit=$(field kit)
+backend=$(field backend)
 platform=$(field platform)
 fresh_topics=$(field fresh)
 l1_check=$(field l1)
@@ -80,6 +81,9 @@ for target_node in "${nodes[@]}"; do
     validation_files+=("${out}/validate${suffix}.json")
 done
 
+# The engine the stack runs on: Docker under Compose, or Podman under the AutoSD units.
+engine=(docker)
+[ "${backend}" = quadlet ] && engine=(sudo podman)
 api_container=autoware-api
 api_services=${API_SERVICES:-/api/localization/initialize /api/routing/set_route_points /api/operation_mode/change_to_autonomous}
 api_topics=${API_TOPICS:-/api/routing/state /api/localization/initialization_state /api/operation_mode/state}
@@ -99,6 +103,21 @@ node_cli() {
         [ "${index}" -gt 0 ] && environment+=("ZENOH_PEER=tcp/127.0.0.1:${zenoh_port}")
     fi
     env "${environment[@]}" "${cli}" "${operation}" "${args[@]}" "$@"
+}
+
+# Generate the AutoSD units, install them as an image would and start them.
+start_quadlet() {
+    local tree="${out}/quadlet" units
+    "${cli}" fetch "${deployment}" --ros-distro "${distro}" || return 1
+    "${cli}" config "${deployment}" --ros-distro "${distro}" |
+        python3 "${script_dir}/../../../platforms/autosd/quadlet.py" --output "${tree}" --without visualizer || return 1
+    sudo cp -a "${tree}/rootfs/." / || return 1
+    units=$(basename -a -s .container "${tree}"/rootfs/etc/containers/systemd/*.container)
+    # The map is in the tree too; keep it out of the cell's artifacts.
+    rm -rf "${tree}"
+    sudo systemctl daemon-reload || return 1
+    # shellcheck disable=SC2086
+    sudo systemctl start ${units}
 }
 
 result="PASSED"
@@ -136,6 +155,7 @@ sample_memory() {
 cleanup() {
     kill "${sampler_pid:-}" 2>/dev/null
     wait "${sampler_pid:-}" 2>/dev/null
+    [ "${backend}" = quadlet ] && sudo systemctl stop 'autoware-*' >/dev/null 2>&1
     for ((i=${#nodes[@]}-1; i>=0; i--)); do
         node_cli stop "${i}" >/dev/null 2>&1 || true
     done
@@ -160,26 +180,30 @@ fi
 if [ "${l0_rc}" -eq 0 ]; then
     run_start=$(date +%s)
     run_rc=0
-    for i in "${!nodes[@]}"; do
+    if [ "${backend}" = quadlet ]; then
+        start_quadlet >"${out}/run.log" 2>&1 || run_rc=1
+    else
+      for i in "${!nodes[@]}"; do
         suffix=""
         [ "${split}" = true ] && suffix="-${nodes[i]}"
         # Nothing watches the visualizer here; its software-rendered RViz
         # would take CPU from Autoware on a 4-vCPU runner.
         node_cli run "${i}" --ros-distro "${distro}" --no-visualizer >"${out}/run${suffix}.log" 2>&1 || run_rc=1
-    done
+      done
+    fi
 
-    if [ "${run_rc}" -eq 0 ] && docker inspect "${api_container}" >/dev/null 2>&1; then
-        docker cp "${script_dir}/readiness.py" "${api_container}:/tmp/openadkit-readiness.py" >/dev/null 2>&1 || true
+    if [ "${run_rc}" -eq 0 ] && "${engine[@]}" inspect "${api_container}" >/dev/null 2>&1; then
+        "${engine[@]}" cp "${script_dir}/readiness.py" "${api_container}:/tmp/openadkit-readiness.py" >/dev/null 2>&1 || true
         # A 4-vCPU runner loads the Autoware containers in about five minutes.
         read_args=(--timeout 600 --output /tmp/readiness.json)
         for name in ${api_services}; do read_args+=(--service "${name}"); done
         for name in ${api_topics}; do read_args+=(--topic "${name}"); done
         for name in ${fresh_topics}; do read_args+=(--fresh "${name}"); done
-        docker exec "${api_container}" bash -lc \
+        "${engine[@]}" exec "${api_container}" bash -lc \
             "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-readiness.py \"\$@\"" \
             readiness "${read_args[@]}" >"${out}/readiness.log" 2>&1
         ready_rc=$?
-        docker cp "${api_container}:/tmp/readiness.json" "${out}/readiness.json" >/dev/null 2>&1 || true
+        "${engine[@]}" cp "${api_container}:/tmp/readiness.json" "${out}/readiness.json" >/dev/null 2>&1 || true
         ready_s=$(( $(date +%s) - run_start ))
         if [ "${ready_rc}" -eq 0 ]; then
             l1_ok=true
@@ -222,9 +246,9 @@ fi
 if [ "${l1_ok}" = true ]; then
     case "${l2_check}" in
         golden)
-            docker cp "${script_dir}/golden.py" "${api_container}:/tmp/openadkit-golden.py" >/dev/null 2>&1 || true
+            "${engine[@]}" cp "${script_dir}/golden.py" "${api_container}:/tmp/openadkit-golden.py" >/dev/null 2>&1 || true
             golden_start=$(date +%s)
-            docker exec "${api_container}" bash -lc \
+            "${engine[@]}" exec "${api_container}" bash -lc \
                 "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; timeout 900 python3 /tmp/openadkit-golden.py" \
                 >"${out}/golden.log" 2>&1
             golden_rc=$?
@@ -302,6 +326,8 @@ rm -f "${out}/.peak_mib"
 
 if [ "${result}" != "PASSED" ]; then
     mkdir -p "${out}/logs"
+    # shellcheck disable=SC2024 # The cell's own log file, written as the cell's user.
+    [ "${backend}" = quadlet ] && sudo journalctl --no-pager -u 'autoware-*' >"${out}/logs/units.log" 2>&1
     for name in "${projects[@]}"; do
         for container_id in $(docker ps -aq --filter "label=com.docker.compose.project=${name}" 2>/dev/null); do
             container_name=$(docker inspect -f '{{.Name}}' "${container_id}" | sed 's#^/##')

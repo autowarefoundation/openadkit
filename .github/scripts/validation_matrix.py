@@ -30,6 +30,11 @@ BEHAVIOUR_CHECKS: dict[str, dict[str, Any]] = {
     "planning-simulation": {"fresh": (), "l2": "golden"},
     "scenario-simulation": {"fresh": ("/clock",), "l2": "scenario"},
 }
+# Cells beyond Compose on Docker: the backend run_cell.sh starts the stack with,
+# on the runner it needs. quadlet runs platforms/autosd under Podman and systemd.
+PLATFORM_CELLS: dict[str, dict[str, str]] = {
+    "planning-simulation": {"backend": "quadlet", "distro": "humble", "runner": "ubuntu-24.04"},
+}
 # The example kit's acceptance: fresh publication proves its C++ overlay node
 # survived the ABI boundary, and custom_kit.py checks its parameter overrides.
 EXAMPLE_KIT_CHECKS: dict[str, Any] = {"fresh": ("/acme/probe",), "l1": "custom-kit"}
@@ -145,6 +150,10 @@ def evidence_cells(
                     "l1": "",
                     "l2": checks["l2"],
                 })
+        if name in PLATFORM_CELLS:
+            cell = next(row for row in cells if row["deployment"] == name and row["distro"] == PLATFORM_CELLS[name]["distro"])
+            cell = cell | PLATFORM_CELLS[name]
+            cells.append(cell | {"name": evidence_cell_name(cell)})
     return cells
 
 
@@ -170,8 +179,8 @@ def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, 
 
 def evidence_cell_name(cell: dict[str, Any]) -> str:
     """The hosted runtime cell identity, shared by the workflow matrix and the summary."""
-    node = cell.get("node") or ""
-    suffix = f"-{node}" if node else ""
+    variant = cell.get("node") or cell.get("backend") or ""
+    suffix = f"-{variant}" if variant else ""
     platform = EVIDENCE_PLATFORM.replace("/", "-")
     return f"{cell['deployment']}-{cell['distro']}{suffix}-{platform}"
 

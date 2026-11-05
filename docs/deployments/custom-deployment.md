@@ -26,8 +26,8 @@ custom-kit/
   and adds the heartbeat and overlay node. The CLI resolves that base directory;
 `OPENADKIT_BASE_ROOT` names the base root for shared assets.
 - `config.env` contains only changed values, such as `VEHICLE_ID=acme-01`.
-- `config/autoware/` changes one parameter, the control command gate's
-  `nominal_filter.vel_lim=8.0`.
+- `config/autoware/` changes one parameter, the lane departure checker's
+  `update_rate=20.0`.
 - `overlay_ws/` builds a small C++ node publishing `/acme/probe`.
 
 Keep the directory named `custom-kit`. To use another name, rename the directory,

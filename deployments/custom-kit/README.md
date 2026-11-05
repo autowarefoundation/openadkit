@@ -12,7 +12,7 @@ both JSON manifests; the CLI checks that they agree.
 | `deployment.json` | The base deployment (`planning-simulation`) and Compose entrypoint |
 | `config.env` | Values that differ from the base |
 | `docker-compose.yaml` | Includes the base and adds the pinned heartbeat and overlay node |
-| `config/autoware/` | One parameter difference: the control command gate's `nominal_filter.vel_lim=8.0` |
+| `config/autoware/` | One parameter difference: the lane departure checker's `update_rate=20.0` |
 | `overlay_ws/src/acme_probe` | A small C++ node publishing `/acme/probe` |
 
 Here `extends` points at this source checkout (`../..`). After copying the

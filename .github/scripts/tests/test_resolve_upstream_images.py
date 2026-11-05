@@ -70,11 +70,10 @@ def test_resolves_requested_distros_and_images(tmp_path, distro, names, distros,
     assert all(item["uri"] == f"docker-image://{item['ref']}@{DIGEST}" for item in data)
 
 
-def test_development_uses_plain_tags_and_compiles_core(tmp_path):
+def test_an_upstream_release_is_required(tmp_path):
     result, data, inspected = run_resolver(tmp_path, "humble", upstream_tag="")
-    assert result.returncode == 0, result.stderr
-    assert {item["name"] for item in data} == {"base", "base-cuda-runtime", "base-cuda-devel"}
-    assert all(ref.endswith("-humble") for ref in inspected)
+    assert result.returncode != 0 and data is None and inspected == []
+    assert "UPSTREAM_TAG is required" in result.stderr
 
 
 def test_a_missing_inventory_fails_instead_of_resolving_nothing(tmp_path):

@@ -9,7 +9,6 @@ set -euo pipefail
 # binaries, and ours, link against. See README.md.
 #
 # Usage: ros-snapshot.sh <YYYY-MM-DD> [--check [BASE_DPKG_DIR]]
-#   An empty date keeps the live source, for upstream development builds.
 #   --check  fail when an installed ROS package is newer than the snapshot
 #            serves, or when one this image installed over the image whose
 #            dpkg database is BASE_DPKG_DIR is not the snapshot's version
@@ -18,14 +17,10 @@ set -euo pipefail
 # installed later from another. The packages core added are what it compiled
 # against and must be the snapshot's; the base's may be older.
 
-snapshot="${1?usage: ros-snapshot.sh <YYYY-MM-DD> [--check [BASE_DPKG_DIR]]}"
+snapshot="${1:?usage: ros-snapshot.sh <YYYY-MM-DD> [--check [BASE_DPKG_DIR]]}"
 check="${2:-}"
 base_dpkg="${3:-}"
 : "${ROS_DISTRO:?ROS_DISTRO is required}"
-if [ -z "${snapshot}" ]; then
-    echo "ros snapshot: none, keeping the live ROS source"
-    exit 0
-fi
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=/dev/null
 . /etc/os-release

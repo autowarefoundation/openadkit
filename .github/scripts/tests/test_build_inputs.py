@@ -21,7 +21,7 @@ case "${args[0]}" in
       *refs/tags/"${FAKE_TAG:-}") [ -n "${FAKE_TAG:-}" ] && echo "${FAKE_SHA} x" && exit 0 ;;
     esac
     exit 2 ;;
-  fetch) mkdir -p autoware-metadata/repositories && touch autoware-metadata/repositories/autoware-nightly.repos ;;
+  fetch) exit 0 ;;
   rev-parse) echo "${FAKE_SHA}" ;;
   describe) echo 2.0.0 ;;
 esac
@@ -51,24 +51,22 @@ def resolve(tmp_path, pin, *, ref_name="main", **fake):
     return result, values
 
 
-def test_a_release_pin_uses_the_release_manifest_and_images(tmp_path):
+def test_a_release_pin_uses_the_release_sources_and_images(tmp_path):
     result, values = resolve(tmp_path, "2.0.0", FAKE_TAG="2.0.0")
     assert result.returncode == 0, result.stderr
     assert values["autoware_ref_type"] == "tag" and values["autoware_ref"] == SHA
-    assert values["upstream_tag"] == "2.0.0" and values["autoware_overlay"] == ""
+    assert values["upstream_tag"] == values["autoware_base_version"] == "2.0.0"
 
 
-def test_a_branch_pin_resolves_the_development_manifest(tmp_path):
-    result, values = resolve(tmp_path, "main", FAKE_BRANCH="main")
-    assert result.returncode == 0, result.stderr
-    assert values["autoware_ref_type"] == "branch" and values["upstream_tag"] == ""
-    assert values["autoware_overlay"].endswith("autoware-nightly.repos")
-
-
-def test_a_commit_pin_is_refused(tmp_path):
-    result, _ = resolve(tmp_path, SHA)
+@pytest.mark.parametrize(("pin", "fake", "message"), [
+    ("main", {"FAKE_BRANCH": "main"}, "must be a release tag"),
+    (SHA, {}, "must be a release tag"),
+    ("9.9.9", {}, "no release tag 9.9.9"),
+])
+def test_only_an_autoware_release_tag_is_a_pin(tmp_path, pin, fake, message):
+    result, _ = resolve(tmp_path, pin, **fake)
     assert result.returncode != 0
-    assert "as a branch or tag" in result.stderr
+    assert message in result.stderr
 
 
 @pytest.mark.parametrize(("ref_name", "scope"), [("main", "main"), ("release/2.0", "release-2.0")])

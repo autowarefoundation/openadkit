@@ -44,7 +44,7 @@ The workflow retries a failed runtime cell once. A cell that still fails fails
 the run and blocks a release. The cells start deployments with
 `openadkit run --no-visualizer`.
 
-A 4-vCPU GitHub-hosted runner cannot run Autoware main in real time: the ego
+A 4-vCPU GitHub-hosted runner cannot run Autoware in real time: the ego
 drives late and the bundled samples take about three times as long as on a
 16-vCPU host. The scenario-simulation cells therefore run the simulation at
 half speed (`GLOBAL_REAL_TIME_FACTOR=0.5`, with `GLOBAL_TIMEOUT=400` wall-clock

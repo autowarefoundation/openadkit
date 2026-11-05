@@ -70,15 +70,12 @@ jobs:
 
       - name: Export Autoware dependency lockfile
         id: lock
-        env:
-          AUTOWARE_OVERLAY: ${{ steps.prepare.outputs.autoware_overlay }}
         run: |
           set -euo pipefail
           mkdir -p autoware-lock
           python3 .github/scripts/export_autoware_lock.py \
             autoware-metadata/repositories/autoware.repos \
-            autoware-lock/autoware-lock.repos \
-            "${AUTOWARE_OVERLAY}"
+            autoware-lock/autoware-lock.repos
           autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
           echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "${GITHUB_OUTPUT}"
         shell: bash
@@ -178,8 +175,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
-    # Development builds also compile Autoware core.
-    timeout-minutes: ${{ needs.prepare.outputs.upstream_tag == '' && 240 || 120 }}
+    timeout-minutes: 120
     permissions:
       actions: read
       contents: read
@@ -222,7 +218,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
     # planning-control can take nearly two hours before the bounded Trivy scan;
     # fork PRs may also compile development core and universe-common first.
-    timeout-minutes: ${{ needs.prepare.outputs.upstream_tag == '' && 300 || 180 }}
+    timeout-minutes: 180
     permissions:
       actions: read
       contents: read

@@ -3,9 +3,8 @@
 # Optional filters narrow PR checks; release builds leave them unset.
 set -euo pipefail
 
-# UPSTREAM_TAG names the upstream release; empty selects the development tags,
-# for which core is compiled rather than pulled.
-: "${UPSTREAM_TAG?UPSTREAM_TAG is required}"
+# UPSTREAM_TAG names the upstream release whose images the build starts from.
+: "${UPSTREAM_TAG:?UPSTREAM_TAG is required}"
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=.github/scripts/registry_lookup.sh
 # shellcheck disable=SC1091
@@ -52,10 +51,7 @@ mkdir -p "$(dirname -- "${output}")"
 
 for distro in "${distros[@]}"; do
   for name in "${names[@]}"; do
-    if [ -z "${UPSTREAM_TAG}" ] && [ "${name}" = core-devel ]; then
-      continue
-    fi
-    ref="${repo}:${name}-${distro}${UPSTREAM_TAG:+-${UPSTREAM_TAG}}"
+    ref="${repo}:${name}-${distro}-${UPSTREAM_TAG}"
     digest=$(registry_manifest_digest "${ref}")
     jq -n \
       --arg name "${name}" \

@@ -23,9 +23,8 @@ INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 def test_inventory_bake_and_runtime_catalog_agree():
     bake = (ROOT / "components/docker-bake.hcl").read_text()
     targets = {image["target"] for image in INVENTORY["images"]}
-    # universe-common-build is CI's unpublished compile base for components, and
-    # development builds compile autoware-core-devel for it.
-    assert set(re.findall(r'^target\s+"(?!_|docker-metadata-action-)([\w-]+)"', bake, re.M)) == targets | {"universe-common-build", "autoware-core-devel"}
+    # universe-common-build is CI's unpublished compile base for components.
+    assert set(re.findall(r'^target\s+"(?!_|docker-metadata-action-)([\w-]+)"', bake, re.M)) == targets | {"universe-common-build"}
     assert set(re.findall(r'target\s+"docker-metadata-action-([\w-]+)"', bake)) == targets
     kit = json.loads((ROOT / "openadkit.json").read_text())
     assert set(kit["componentImages"].values()) == {image["target"] for image in INVENTORY["images"] if image["stage"] == "component"}
@@ -111,64 +110,13 @@ def test_shared_build_recipe_keeps_pins_provenance_and_local_graphs(target, publ
             assert build["cache-to"] == [cache.format("universe-common-build") + ",mode=max"]
             assert row["cache-to"] == [cache.format("universe-common") + ",mode=max"]
             assert "cache-to" not in recipe["target"]["universe-common-devel"]
-            assert row["cache-from"] == [cache.format(name) for name in ("autoware-core-devel", "universe-common-build", "universe-common")]
+            assert row["cache-from"] == [cache.format(name) for name in ("universe-common-build", "universe-common")]
         else:
             assert row["contexts"]["universe-common-devel"] == "docker-image://" + common_build
     else:
         assert not row["labels"] and "cache-to" not in row
         assert ("universe-common" in row["contexts"]) is (not local)
         assert ("simulator" in row["contexts"]) is (target == "carla-interface" and not local)
-
-
-def test_development_recipe_compiles_core_on_the_pinned_base():
-    uri = "docker-image://example/base@sha256:" + "c" * 64
-    prepared = {"build_tag": "123-1", "cache_scope": "release-2.0", "autoware_input_ref": "main", "autoware_ref_type": "branch",
-                "autoware_ref": "a" * 40, "autoware_base_version": "1.9.0", "autoware_lock_sha256": "e" * 64,
-                "upstream_images": json.dumps({"humble": {name: {"uri": uri} for name in ("base", "base-cuda-runtime", "base-cuda-devel")}})}
-    recipe, _ = matrices.bake_recipe(INVENTORY, prepared, "universe-common", "humble", "linux/amd64", publish=True,
-                                     shared_common=False, common_cached=False, owner="example", source_sha="b" * 40, run_id="123")
-    core = recipe["target"]["autoware-core-devel"]
-    # HCL compiles core; the recipe pins its base and keeps per-build labels
-    # off it, since it is the compile base's FROM.
-    assert "autoware-core-devel" not in recipe["target"]["universe-common"]["contexts"]
-    assert core["contexts"]["autoware-base"] == uri and not core["labels"]
-    assert core["cache-to"] == ["type=registry,ref=ghcr.io/example/openadkit-buildcache:autoware-core-devel-amd64-humble-release-2.0,mode=max"]
-
-
-def test_development_core_is_pushed_and_pinned_by_digest():
-    uri = "docker-image://example/base@sha256:" + "c" * 64
-    prepared = {"build_tag": "123-1", "cache_scope": "main", "autoware_input_ref": "a" * 40, "autoware_ref_type": "sha",
-                "autoware_ref": "a" * 40, "autoware_base_version": "1.9.0", "autoware_lock_sha256": "e" * 64,
-                "upstream_images": json.dumps({"humble": {name: {"uri": uri} for name in ("base", "base-cuda-runtime", "base-cuda-devel")}})}
-    recipe, image = matrices.core_recipe(prepared, "humble", "linux/amd64", owner="example")
-    core = recipe["target"]["autoware-core-devel"]
-    assert image == "ghcr.io/example/openadkit-buildcache:autoware-core-devel-amd64-humble-123-1"
-    # Nothing per build may reach the image universe-common starts from.
-    assert core["tags"] == [image] and not core["labels"]
-    assert core["args"] == {"ROS_DISTRO": "humble", "SOURCE_DATE_EPOCH": matrices.COMPILE_BASE_EPOCH}
-    assert core["attest"] == ["type=provenance,disabled=true"] and core["contexts"]["autoware-base"] == uri
-    assert core["cache-to"] == ["type=registry,ref=ghcr.io/example/openadkit-buildcache:autoware-core-devel-amd64-humble-main,mode=max"]
-
-    pinned = image + "@sha256:" + "d" * 64
-    recipe, _ = matrices.bake_recipe(INVENTORY, prepared, "universe-common", "humble", "linux/amd64", publish=True,
-                                     shared_common=False, common_cached=False, owner="example", source_sha="b" * 40, run_id="123",
-                                     core_devel=pinned)
-    for name in ("universe-common-build", "universe-common-devel", "universe-common"):
-        assert recipe["target"][name]["contexts"]["autoware-core-devel"] == "docker-image://" + pinned
-
-    # Release builds start from the upstream core image.
-    prepared["upstream_images"] = json.dumps({"humble": {name: {"uri": uri} for name in ("core-devel", "base")}})
-    assert matrices.core_recipe(prepared, "humble", "linux/amd64", owner="example") is None
-
-
-def test_lock_overlay_moves_repositories_to_development_versions(tmp_path):
-    import export_autoware_lock
-    source, overlay, lock = tmp_path / "a.repos", tmp_path / "b.repos", tmp_path / "lock.repos"
-    source.write_text(f"repositories:\n  core/a:\n    type: git\n    url: https://x/a.git\n    version: {'1' * 40}\n"
-                      f"  core/b:\n    type: git\n    url: https://x/b.git\n    version: {'2' * 40}\n")
-    overlay.write_text(f"repositories:\n  core/b:\n    type: git\n    url: https://x/b.git\n    version: {'3' * 40}\n")
-    export_autoware_lock.export_lock(source, lock, overlay)
-    assert [line.split()[-1] for line in lock.read_text().splitlines() if "version" in line] == ['"' + "1" * 40 + '"', '"' + "3" * 40 + '"']
 
 
 @pytest.mark.parametrize("path", ["components/universe-common/Dockerfile", "components/sensing-perception/Dockerfile.cuda"])

@@ -105,7 +105,7 @@ docker buildx bake -f components/docker-bake.hcl --load sensing-perception      
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ROS_DISTRO` | `humble` or `jazzy` | `humble` |
-| `UPSTREAM_TAG` | Upstream Autoware release to build on (e.g. `2.0.0`). Empty builds for upstream development: core compiles from `autoware/src` on the moving `base-<distro>` image, and ROS installs from the live repository. | `""` |
+| `UPSTREAM_TAG` | Upstream Autoware release to build on, the tag in `.github/autoware.ref` (e.g. `2.0.0`); required | `""` |
 | `UPSTREAM_REPO` | Upstream Autoware image repository | `ghcr.io/autowarefoundation/autoware` |
 | `ROS_SNAPSHOT_HUMBLE`, `ROS_SNAPSHOT_JAZZY` | ROS apt snapshot the `UPSTREAM_TAG` images were built from. The build fails when they do not match; see [ROS snapshot](https://github.com/autowarefoundation/openadkit/blob/main/components/shared/ros-snapshot/README.md). | Snapshots for `2.0.0` |
 

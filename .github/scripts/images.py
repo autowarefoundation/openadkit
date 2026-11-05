@@ -107,7 +107,7 @@ def validate_artifacts(directory: Path, scan: dict[str, Any], build_tag: str, co
     for key in ("openadkit_sha", "autoware_ref"):
         require(matches(SHA_RE, metadata.get(key)), f"invalid build {key}")
     string(metadata.get("autoware_input_ref"), "autoware_input_ref")
-    require(metadata.get("autoware_ref_type") in ("branch", "tag"), "invalid Autoware ref type")
+    require(metadata.get("autoware_ref_type") == "tag", "invalid Autoware ref type")
     require(matches(VERSION_RE, metadata.get("autoware_base_version")), "invalid Autoware base version")
     for file, key in (("autoware-lock.repos", "autoware_lock_sha256"), ("image-inventory.json", "image_inventory_sha256"), ("upstream-images.json", "upstream_images_sha256")):
         require(matches(HASH_RE, metadata.get(key)), f"invalid {key}")

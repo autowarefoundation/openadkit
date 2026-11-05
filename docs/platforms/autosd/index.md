@@ -43,8 +43,9 @@ done yet.
 
 !!! warning "Evidence scope"
     Evidence runs these units under Podman and systemd on Ubuntu 24.04 and drives
-    the golden path. It does not run AutoSD: its SELinux policy and read-only
-    `/usr` are not covered, and CI does not build or boot the image below.
+    the golden path. CI does not build or boot the image below. An image built from
+    these units was driven once by hand: it booted in QEMU with SELinux enforcing
+    and no outside network, and the golden path arrived.
 
 ## Run on a Podman Host
 
@@ -76,11 +77,13 @@ sudo bash ./auto-image-builder.sh build-builder --distro autosd10-sig
 ```
 
 Build the image from the directory you generated `out` in, because the manifest
-names its large files by path. The arguments are the manifest, the container
+names its large files by path. `/var/tmp` goes on disk because the runner's own
+is in memory and too small for this image. The arguments are the manifest, the container
 image name, and the disk image to write:
 
 ```bash
-sudo bash ./auto-image-builder.sh build \
+sudo mkdir -p /var/tmp/aib-work
+sudo AIB_PODMAN_OPTIONS="-v /var/tmp/aib-work:/var/tmp" bash ./auto-image-builder.sh build \
   --distro autosd10-sig \
   --target qemu \
   --define-file platforms/autosd/vars.yml \
@@ -119,7 +122,8 @@ Or with QEMU directly:
 ```
 
 `-m 16384` (16 GB) is the minimum for the Autoware stack; use `-m 32768` for
-heavier workloads. `-m 2G` is enough only to boot and explore the OS.
+heavier workloads. `-m 2G` is enough only to boot and explore the OS. Log in as
+`root` with the password `password`, which is for this demo image only.
 
 ## Boards
 

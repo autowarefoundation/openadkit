@@ -1389,6 +1389,43 @@ def test_kit_whose_deployment_is_its_root_mounts_its_overlay(tmp_path, monkeypat
     assert overlay_workspace(kit, "custom", monkeypatch, tmp_path) == str(kit / "overlay_ws")
 
 
+def on_top(root, name="on-top", base="example"):
+    """A catalog deployment on another of the same catalog."""
+    directory = root / "deployments" / name
+    directory.mkdir()
+    (directory / "deployment.json").write_text(json.dumps({
+        "schemaVersion": 2, "name": name, "description": "On top", "base": base,
+        "compose": {"files": ["docker-compose.yaml"]},
+    }))
+    (directory / "docker-compose.yaml").write_text("services:\n  extra:\n    image: busybox:1.36.1\n")
+    edit_kit(root, lambda document: document["deployments"].update({name: {"path": f"deployments/{name}"}}))
+    return directory
+
+
+def test_a_catalog_deployment_can_build_on_another(tmp_path):
+    root, base = runtime_tree(tmp_path)
+    directory = on_top(root)
+    kit = cli_manifest.load_kit(root)
+    deployment = cli_manifest.get_deployment(root, kit, "on-top")
+    assert deployment.base.directory == base and deployment.requirements == deployment.base.requirements
+    assert deployment.overlay_paths["OPENADKIT_OVERLAY_WS"] == directory / "overlay_ws"
+    on_top(root, "on-on-top", base="on-top")
+    with pytest.raises(cli_manifest.OpenADKitError, match="base deployment on-top has a base of its own"):
+        cli_manifest.get_deployment(root, cli_manifest.load_kit(root), "on-on-top")
+
+
+def test_a_released_deployment_is_intact_only_with_its_base(tmp_path):
+    root, base = runtime_tree(tmp_path, release=True)
+    directory = on_top(root)
+    edit_kit(root, lambda document: document["deployments"]["on-top"].update(
+        checksum=cli_manifest.deployment_checksum(directory)))
+    kit = cli_manifest.load_kit(root)
+    deployment = cli_manifest.get_deployment(root, kit, "on-top")
+    assert cli_manifest.deployment_integrity(root, deployment, kit) == "intact"
+    (base / "config.env").write_text("MAP_PATH=/elsewhere\n")
+    assert cli_manifest.deployment_integrity(root, deployment, kit) == "modified"
+
+
 def test_base_deployment_keeps_its_own_overlay(tmp_path, monkeypatch):
     root, directory = runtime_tree(tmp_path)
     assert overlay_workspace(root, "example", monkeypatch, tmp_path) == str(cli_manifest.state_root() / "empty")

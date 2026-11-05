@@ -11,7 +11,7 @@ on:
       - 'cli/**'
       - 'pyproject.toml'
       - 'deployments/custom-kit/**'
-      - 'deployments/safety-island/**'
+      - 'deployments/safety-island-simulation/**'
       - '**/*.sh'
       - '**/*.json'
       - '**/*.json5'
@@ -138,7 +138,7 @@ jobs:
           REMOTE_PASSWORD: ci-validate
         run: |
           set -euo pipefail
-          for kit in custom-kit safety-island; do
+          for kit in custom-kit; do
             (cd "deployments/${kit}" && ../../openadkit validate "${kit}")
           done
 

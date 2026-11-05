@@ -39,29 +39,22 @@ the same patterns with `-jazzy` (for example `planning-control-jazzy`).
 
 ## Versioning
 
-Open AD Kit uses [Semantic Versioning](https://semver.org/)
-(`vMAJOR.MINOR.PATCH`):
+An Open AD Kit version says which Autoware it builds on: `vX.Y.Z`.
 
-| Part | Increments when |
-|------|-----------------|
-| **MAJOR** | A backward-incompatible change to the image set, the documented deployment layout, or a supported platform is removed. |
-| **MINOR** | New backward-compatible capability: components, platforms, deployments, or tooling; or a move to the next Autoware minor release. |
-| **PATCH** | Backward-compatible fixes: bugs, CVE remediation, image refreshes, and documentation. |
+| Part | Meaning |
+|------|---------|
+| **X.Y** | The Autoware release: `v2.0.x` builds on Autoware 2.0.x |
+| **Z** | Open AD Kit's own counter: fixes, backward-compatible additions, image refreshes and moves to an Autoware patch release |
 
-The Open AD Kit version is its own: it follows the CLI, kit and deployment
-contract, not Autoware's numbering. Each **release line builds on one Autoware
-minor release**, so the version still tells the Autoware:
-
-| Open AD Kit | Autoware |
-|-------------|----------|
-| v2.0.x | 1.9.x |
+`Z` does not follow Autoware's patch number. A kit that works on one `vX.Y.Z` keeps
+working on later `vX.Y` releases; backward-incompatible changes wait for the next
+Autoware release, and its release notes list them.
 
 A `release/X.Y` branch produces the `vX.Y.Z` releases and pins their Autoware
-release in `.github/autoware.ref`. An Autoware patch release may join its line;
-the next Autoware minor release starts a new line, and the release gate refuses
-a release that would leave its line's Autoware. Every release pairs the two in
-its [GitHub Release](https://github.com/autowarefoundation/openadkit/releases)
-title, `Open AD Kit v2.0.1 · Autoware 1.9.0`, and so do `openadkit install` and
+release in `.github/autoware.ref`; the release gate refuses a version whose `X.Y`
+is not its Autoware's. Every release pairs the two in its
+[GitHub Release](https://github.com/autowarefoundation/openadkit/releases) title,
+`Open AD Kit v2.0.1 · Autoware 2.0.0`, and so do `openadkit install` and
 `openadkit version`. The release also pins the ROS 2 distros and every image
 digest, and its images carry `org.opencontainers.image.autoware-base-version`.
 A fix that is upstream but not yet in an Autoware release can be

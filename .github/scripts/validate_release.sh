@@ -237,24 +237,13 @@ validate_release_rules() {
     || fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
 }
 
-# One Open AD Kit release line builds on one Autoware minor release: v2.0.x is
-# Autoware 1.9.x. The line's first release sets it, from the release/X.Y pin;
-# every later release must keep it, so the version alone tells the Autoware.
+# A release's X.Y is its Autoware's X.Y: v2.0.1 builds on Autoware 2.0.x.
 validate_autoware_line() {
-  local autoware_base_version releases previous previous_autoware
+  local autoware_base_version
 
   autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
-  releases=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100") \
-    || fail "Could not list releases to check the Autoware of release line $(release_line)"
-  previous=$(jq -r --arg line "v$(release_line)." --arg version "${VERSION}" '
-    [.[][] | select(.draft | not) | select(.tag_name | startswith($line)) | select(.tag_name != $version)]
-    | sort_by(.published_at) | last | .tag_name // empty' <<<"${releases}")
-  [ -n "${previous}" ] || return 0
-  previous_autoware=$(gh release download "${previous}" --repo "${GITHUB_REPOSITORY}" \
-      --pattern release-metadata.json --output - | jq -r '.autoware_base_version') \
-    || fail "Could not read the Autoware of ${previous}"
-  [ "${previous_autoware%.*}" = "${autoware_base_version%.*}" ] \
-    || fail "Release line $(release_line) builds on Autoware ${previous_autoware%.*}.x (${previous}); ${VERSION} would build on ${autoware_base_version}. Start a new release line for another Autoware minor release"
+  [ "${autoware_base_version%.*}" = "$(release_line)" ] \
+    || fail "${VERSION} must build on Autoware $(release_line).x (got ${autoware_base_version})"
 }
 
 validate_git_tag() {

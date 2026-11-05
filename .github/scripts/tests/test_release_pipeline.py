@@ -48,40 +48,22 @@ def test_release_ref_policy(tmp_path, version, branch, ref_type, input_ref, acce
     assert (result.returncode == 0) is accepted, result.stderr
 
 
-@pytest.mark.parametrize(("previous", "current", "accepted"), [
-    (None, "1.9.0", True),                 # the line's first release sets it
-    (("v2.0.0", "1.9.0"), "1.9.0", True),
-    (("v2.0.0", "1.9.0"), "1.9.1", True),  # an Autoware patch release stays on the line
-    (("v2.0.0", "1.9.0"), "1.10.0", False),
-    (("v2.1.0", "1.10.0"), "1.9.0", True), # another line's release does not count
+@pytest.mark.parametrize("version, autoware, accepted", [
+    ("v2.0.0", "2.0.0", True),
+    ("v2.0.3", "2.0.1", True),
+    ("v2.1.0-rc.1", "2.1.0", True),
+    ("v2.0.1", "1.9.0", False),
+    ("v2.1.0", "2.0.0", False),
 ])
-def test_a_release_line_keeps_one_autoware_minor_release(tmp_path, previous, current, accepted):
-    build = tmp_path / "release-input/build"
-    build.mkdir(parents=True)
-    (build / "build-metadata.json").write_text(json.dumps({"autoware_base_version": current}))
-    releases = [{"tag_name": "v2.0.1", "draft": True, "published_at": None}]  # this release's own draft
-    metadata = {}
-    if previous:
-        releases.append({"tag_name": previous[0], "draft": False, "published_at": "2026-10-01T00:00:00Z"})
-        metadata[previous[0]] = {"autoware_base_version": previous[1]}
-    (tmp_path / "metadata.json").write_text(json.dumps(metadata))
-    (tmp_path / "releases.json").write_text(json.dumps([releases]))
-    (tmp_path / "bin").mkdir()
-    gh = tmp_path / "bin/gh"
-    gh.write_text(f"""#!/usr/bin/env python3
-import json, sys
-args = sys.argv[1:]
-if args[0] == "api":
-    print(open({str(tmp_path / "releases.json")!r}).read())
-elif args[:2] == ["release", "download"]:
-    print(json.dumps(json.load(open({str(tmp_path / "metadata.json")!r}))[args[2]]))
-""")
-    gh.chmod(0o755)
-    result = run_validator(tmp_path, "validate_autoware_line", VERSION="v2.0.1",
-                           PATH=f"{tmp_path / 'bin'}:{os.environ['PATH']}")
+def test_a_version_names_its_autoware(tmp_path, version, autoware, accepted):
+    metadata = tmp_path / "release-input/build/build-metadata.json"
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text(json.dumps({"autoware_base_version": autoware}))
+    result = run_validator(tmp_path, "validate_autoware_line", VERSION=version)
     assert (result.returncode == 0) is accepted, result.stderr
     if not accepted:
-        assert "Release line 2.0 builds on Autoware 1.9.x (v2.0.0)" in result.stderr
+        assert f"must build on Autoware {version[1:].rsplit('.', 1)[0]}.x" in result.stderr
+
 
 
 @pytest.mark.parametrize("problem", [None, "missing", "duplicate"])

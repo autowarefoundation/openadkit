@@ -32,7 +32,7 @@ If you are a member of the Autoware Foundation contributing to active developmen
 - `feat/...`, `fix/...`, `refactor/...` — active development branches merged into `main` via PR
 
 `.github/autoware.ref` pins the Autoware sources a branch builds: an exact
-release such as `1.9.0` on `release/X.Y`, and a commit of upstream `main` on
+release such as `2.0.0` on `release/2.0`, and a commit of upstream `main` on
 `main`, with every dependency pinned next to it in `.github/autoware-lock.repos`
 and the upstream base images it builds on in `.github/autoware-base-images.json`.
 A change that only upstream development needs, such as a moved package, lands

@@ -125,12 +125,26 @@ import json, os, sys
 from pathlib import Path
 args = sys.argv[1:]
 text = " ".join(args)
-with open({str(calls)!r}, "a") as output:
-    env = {{name: value for name, value in os.environ.items()
-           if name.startswith("OPENADKIT_") or name in ("API_IMAGE", "VALUE", "ROS_DISTRO", "CYCLONEDDS_NETWORK_INTERFACE")}}
-    output.write(json.dumps({{"args": args, "env": env}}) + "\\n")
+# Reading what the env files set, in a clean environment, is not a call to check.
+if not ("config --environment" in text and "OPENADKIT_UID" not in os.environ):
+    with open({str(calls)!r}, "a") as output:
+        env = {{name: value for name, value in os.environ.items()
+               if name.startswith("OPENADKIT_") or name in ("API_IMAGE", "VALUE", "ROS_DISTRO", "CYCLONEDDS_NETWORK_INTERFACE")}}
+        output.write(json.dumps({{"args": args, "env": env}}) + "\\n")
 live = Path({str(live)!r})
-if text == "info":
+if "config --environment" in text:
+    values = dict(os.environ)
+    for index, argument in enumerate(args):
+        if argument == "--env-file":
+            for line in Path(args[index + 1]).read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    name, value = line.removeprefix("export ").split("=", 1)
+                    name = name.strip()
+                    if "OPENADKIT_UID" not in os.environ or name not in os.environ:
+                        values[name] = value.strip().strip('"').replace("$HOME", os.environ["HOME"])
+    print(chr(10).join(f"{{name}}={{value}}" for name, value in values.items() if chr(10) not in value))
+elif text == "info":
     sys.exit({daemon})
 if text == "info --format {{{{json .Runtimes}}}}":
     print({runtimes!r})
@@ -690,11 +704,21 @@ def test_zip_expected_root_is_one_directory(tmp_path):
         cli_manifest._validate_data([resource], {}, tmp_path)
 
 
-def test_env_file_that_is_not_utf8_is_a_cli_error(tmp_path):
+def test_env_file_settings_are_what_the_files_set_as_compose_reads_them(tmp_path, monkeypatch):
+    monkeypatch.setenv("FROM_SHELL", "shell")
+    monkeypatch.setenv("SET_IN_FILE", "shell")
     path = tmp_path / "config.env"
-    path.write_bytes(b"NAME=\xff\n")
-    with pytest.raises(cli_manifest.OpenADKitError, match="could not read environment file"):
-        cli_manifest.parse_dotenv(path)
+    path.write_text('SET_IN_FILE=file\nQUOTED="a b" # note\nHOME_PATH=$HOME/data\nFROM_SHELL\n')
+    assert cli_manifest._env_file_settings((path,)) == {
+        "SET_IN_FILE": "file", "QUOTED": "a b", "HOME_PATH": f"{os.environ['HOME']}/data",
+    }
+
+
+def test_env_file_compose_refuses_is_a_cli_error(tmp_path):
+    path = tmp_path / "config.env"
+    path.write_text('NAME="unterminated\n')
+    with pytest.raises(cli_manifest.OpenADKitError, match="could not read the settings"):
+        cli_manifest._env_file_settings((path,))
 
 def test_only_explicit_fetch_force_replaces_managed_data(tmp_path):
     root, _ = runtime_tree(tmp_path, document=manifest(data=[files_resource(tmp_path)]))
@@ -1051,10 +1075,7 @@ class SettingsDeployment:
         return self.files + (self.gpu_files if gpu else [])
 
     def configuration_environment(self, gpu=False):
-        values = {}
-        for path in self.env_files(gpu):
-            values.update(cli_manifest.parse_dotenv(path))
-        return values
+        return dict(cli_manifest._env_file_settings(tuple(self.env_files(gpu))))
 
 
 @pytest.mark.skipif(

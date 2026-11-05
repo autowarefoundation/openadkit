@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import os
 import platform
 import re
 import stat
+import subprocess
 import urllib.parse
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-# Compose also reads env file keys with dots and dashes; only interpolation
-# names are limited to ENV_NAME_RE.
-ENV_FILE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.\-]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_REFERENCE_RE = re.compile(r"^\S+@sha256:[0-9a-f]{64}$")
 GPU_COMPONENT_IMAGE = "SENSING_PERCEPTION_GPU_IMAGE"
@@ -193,91 +193,44 @@ def ensure_safe_existing(
     return current
 
 
-# The escapes Compose applies inside a double-quoted value.
-DOTENV_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "\\": "\\", '"': '"', "$": "$"}
+# What Compose adds to `config --environment` on its own.
+COMPOSE_OWN_SETTINGS = {"COMPOSE_PROJECT_NAME", "PWD"}
 
 
-def _dotenv_unescape(value: str) -> str:
-    result, index = [], 0
-    while index < len(value):
-        char = value[index]
-        if char == "\\" and index + 1 < len(value):
-            following = value[index + 1]
-            if following in DOTENV_ESCAPES:
-                result.append(DOTENV_ESCAPES[following])
-                index += 2
-                continue
-        result.append(char)
-        index += 1
-    return "".join(result)
+def compose_environment(files: Iterable[Path], environment: dict[str, str], cwd: Path) -> dict[str, str]:
+    """The settings of env files as Compose reads them.
 
-
-def parse_dotenv(path: Path) -> dict[str, str]:
-    """Read a Compose env file the way Compose does.
-
-    A name is followed by "=" or ":". A name alone takes its value from the
-    shell, so the file does not set it. Quoted values may span lines and keep
-    comments; a double-quoted value unescapes \\n, \\r, \\t, \\", \\\\ and
-    \\$; an unquoted one ends at " #".
+    The empty project leaves out the deployment's own required variables.
     """
+    command = ["docker", "compose", "--project-name", "openadkit-settings", "--file", "-"]
+    for path in files:
+        command.extend(("--env-file", str(path)))
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as error:
-        raise OpenADKitError(f"could not read environment file {path}: {error}") from error
-    values: dict[str, str] = {}
-    index, line = 0, 1
-    length = len(text)
-    while index < length:
-        start_of_line = index
-        line_end = text.find("\n", index)
-        line_end = length if line_end == -1 else line_end
-        raw = text[start_of_line:line_end]
-        index = line_end + 1
-        where = f"{path}:{line}"
-        stripped = raw.strip()
-        line += 1
-        if not stripped or stripped.startswith("#"):
-            continue
-        separators = [position for position in (raw.find("="), raw.find(":")) if position != -1]
-        separator = min(separators, default=len(raw))
-        name, value_start = raw[:separator].strip(), raw[separator + 1 :]
-        words = name.split(None, 1)
-        if len(words) == 2 and words[0] == "export":
-            name = words[1]
-        if not ENV_FILE_NAME_RE.fullmatch(name):
-            raise OpenADKitError(f"invalid environment name at {where}: {name}")
-        if not separators:
-            continue
-        # Position of the value in the whole text, for multi-line values.
-        offset = start_of_line + separator + 1
-        while offset < length and text[offset] in " \t":
-            offset += 1
-        if offset < length and text[offset] in ("'", '"'):
-            quote = text[offset]
-            cursor = offset + 1
-            while cursor < length:
-                if quote == '"' and text[cursor] == "\\":
-                    cursor += 2
-                    continue
-                if text[cursor] == quote:
-                    break
-                cursor += 1
-            if cursor >= length:
-                raise OpenADKitError(f"unterminated quoted value at {where}")
-            content = text[offset + 1 : cursor]
-            line += content.count("\n")
-            rest_end = text.find("\n", cursor + 1)
-            rest_end = length if rest_end == -1 else rest_end
-            rest = text[cursor + 1 : rest_end].strip()
-            if rest and not rest.startswith("#"):
-                raise OpenADKitError(f"unexpected text after quoted value at {where}")
-            values[name] = _dotenv_unescape(content) if quote == '"' else content
-            index = rest_end + 1
-            continue
-        value = value_start
-        comment = value.find(" #")
-        values[name] = (value if comment == -1 else value[:comment]).strip()
-    return values
+        result = subprocess.run(
+            [*command, "config", "--environment"],
+            input="services: {}\n", capture_output=True, text=True, cwd=cwd, env=environment,
+        )
+    except OSError as error:
+        raise OpenADKitError("Docker is unavailable. Run: openadkit setup") from error
+    if result.returncode != 0:
+        raise OpenADKitError(f"could not read the settings: {result.stderr.strip()}")
+    return dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+
+
+@functools.cache
+def _env_file_settings(files: tuple[Path, ...]) -> dict[str, str]:
+    # The process environment beats an env file in Compose, so only a clean
+    # one shows what the files set. A value built on the shell stays blank
+    # here; compose.resolve_settings resolves those.
+    clean = {
+        name: value for name, value in os.environ.items()
+        if name in ("HOME", "PATH") or name.startswith("DOCKER_")
+    }
+    return {
+        name: value
+        for name, value in compose_environment(files, clean, Path("/")).items()
+        if name not in clean and name not in COMPOSE_OWN_SETTINGS and not name.startswith("DOCKER_CLI_")
+    }
 
 
 def expand_home(value: str) -> str:
@@ -551,10 +504,7 @@ class Deployment:
         MAP_PATH would otherwise install data somewhere other than the mount.
         Host overrides belong in the site configuration, which is loaded last.
         """
-        values: dict[str, str] = {}
-        for path in self.env_files(gpu):
-            values.update(parse_dotenv(path))
-        return values
+        return dict(_env_file_settings(tuple(self.env_files(gpu))))
 
     def compose_files(self, gpu: bool, node: str | None = None) -> list[Path]:
         """Only explicitly selected files; each entrypoint owns its whole graph."""

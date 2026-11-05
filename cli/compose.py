@@ -18,9 +18,9 @@ from manifest import (
     Deployment,
     OpenADKitError,
     Selection,
+    compose_environment,
     load_json,
     output_root,
-    parse_dotenv,
 )
 
 PROJECT_PREFIX = "openadkit-"
@@ -121,9 +121,8 @@ def compose_process_environment(
     CLI injections (distro and component images) still win.
     """
     environment = dict(os.environ)
-    for path in deployment.env_files(selection.gpu):
-        for name in parse_dotenv(path):
-            environment.pop(name, None)
+    for name in deployment.configuration_environment(selection.gpu):
+        environment.pop(name, None)
     environment.update(selection.injections)
     for name in COMPOSE_CONTROL_ENV:
         environment.pop(name, None)
@@ -174,26 +173,8 @@ def compose_capture(
 
 
 def _resolved_settings(deployment: Deployment, selection: Selection) -> dict[str, str]:
-    command = ["docker", "compose", "--project-name", "openadkit-settings", "--file", "-"]
-    for env_file in deployment.env_files(selection.gpu):
-        command.extend(("--env-file", str(env_file)))
-    try:
-        result = subprocess.run(
-            command + ["config", "--environment"],
-            input="services: {}\n",
-            capture_output=True,
-            text=True,
-            cwd=deployment.directory,
-            env=compose_process_environment(deployment, selection),
-        )
-    except OSError as error:
-        raise OpenADKitError(f"could not run Docker Compose: {error}") from error
-    if result.returncode != 0:
-        raise OpenADKitError(
-            f"could not resolve {deployment.name} settings: {result.stderr.strip()}"
-        )
-    resolved = dict(
-        line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
+    resolved = compose_environment(
+        deployment.env_files(selection.gpu), compose_process_environment(deployment, selection), deployment.directory
     )
     return {name: resolved.get(name, value) for name, value in selection.environment.items()}
 
@@ -202,8 +183,7 @@ def resolve_settings(deployment: Deployment, selection: Selection) -> Selection:
     """The selection with its env-file settings resolved as Compose resolves them.
 
     Data paths must match the mounts, so Compose itself interpolates the env
-    files (${VAR:-default}, values built on other settings, quoting). The
-    empty project leaves out the deployment's own required variables. GPU-only
+    files (${VAR:-default}, values built on other settings, quoting). GPU-only
     data resolves with the GPU env files, as a GPU run would.
     """
     require_docker()

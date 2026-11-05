@@ -12,7 +12,6 @@
   },
   "nodes": {
     "autoware": {
-      "backend": "compose",
       "rosDomainId": 1,
       "files": ["compose.autoware.yaml"],
       "requiredFiles": ["config/zenoh.json5"],
@@ -20,7 +19,6 @@
       "requiredEnv": ["ZENOH_LISTEN"]
     },
     "scenario": {
-      "backend": "compose",
       "rosDomainId": 2,
       "files": ["compose.scenario.yaml"],
       "requiredFiles": ["config/zenoh.json5"],

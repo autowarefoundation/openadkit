@@ -13,7 +13,6 @@
   },
   "nodes": {
     "autoware": {
-      "backend": "compose",
       "rosDomainId": 1,
       "files": ["compose.autoware.yaml"],
       "requiredFiles": ["config/zenoh.json5"],
@@ -21,7 +20,6 @@
       "requiredEnv": ["ZENOH_LISTEN"]
     },
     "carla": {
-      "backend": "compose",
       "rosDomainId": 2,
       "files": ["compose.carla.yaml"],
       "requiredFiles": ["config/zenoh.json5"],

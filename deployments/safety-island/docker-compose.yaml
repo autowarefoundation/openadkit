@@ -15,14 +15,14 @@ services:
     init: true
     ipc: host
     env_file:
-      - ${KIT_openadkit}/deployments/shared/runtime.env
+      - ${OPENADKIT_BASE_ROOT}/deployments/shared/runtime.env
     environment:
       # The shared config applies to every domain, so both sides of the bridge
       # stay on one interface; the release's domain-2 setting keeps datagrams
       # within what the Safety Island receives.
       CYCLONEDDS_URI: file:///etc/cyclonedds/cyclonedds.xml,file:///safety-island/cyclonedds-domain2.xml
     volumes:
-      - ${KIT_openadkit}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${OPENADKIT_BASE_ROOT}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${SAFETY_ISLAND_PATH:?set in config.env}:/safety-island:ro
     command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
     restart: on-failure

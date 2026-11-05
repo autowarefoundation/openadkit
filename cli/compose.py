@@ -27,6 +27,11 @@ PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
 # Launch failures show up within seconds; watch this long after `up`.
 SETTLE_SECONDS = 10
+# Workspaces build where the services mount them, so the paths CMake records
+# resolve at runtime too.
+OVERLAY_TARGET = "/openadkit/overlay_ws"
+# What the entrypoint hook layers over Autoware.
+HOOK_MOUNTS = ("/openadkit/config/", OVERLAY_TARGET)
 
 COMPOSE_CONTROL_ENV = {
     "COMPOSE_ENV_FILES",
@@ -573,9 +578,6 @@ def start(
     report_overrides(deployment, selection)
 
 
-OVERLAY_MOUNTS = ("/openadkit/overlay_ws",)
-
-
 def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
     """Warn about config overrides with no counterpart in the started services.
 
@@ -598,7 +600,7 @@ def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
     reports: list[dict[str, Any]] = []
     for container in containers:
         mounts = [mount.get("Destination", "") for mount in container.get("Mounts") or []]
-        if not any(path.startswith("/openadkit/config/") or path in OVERLAY_MOUNTS for path in mounts):
+        if not any(path.startswith(HOOK_MOUNTS) for path in mounts):
             continue
         result = capture_process(
             ["docker", "exec", container["Id"], "cat", "/tmp/openadkit/overlay-report.json"],
@@ -633,11 +635,6 @@ def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
     return warnings
 
 
-# Overlay workspaces build where the services mount them, so CMake paths
-# recorded against the kit's layer resolve in the deployment's layer too.
-# Workspaces build where the services mount them, so the paths CMake records
-# resolve at runtime too.
-OVERLAY_TARGET = "/openadkit/overlay_ws"
 # Written into install/ by build: the image and distro it built with.
 OVERLAY_STAMP = ".openadkit-overlay.json"
 OVERLAY_BUILD = """set -eo pipefail
@@ -713,12 +710,11 @@ ROS_SHELL = 'source "/opt/ros/${ROS_DISTRO}/setup.bash"; source /opt/autoware/se
 SHELL_SETUP = ROS_SHELL + (
     f'[ -f {OVERLAY_TARGET}/install/local_setup.bash ] && source {OVERLAY_TARGET}/install/local_setup.bash; '
 )
-HOOK_MOUNTS = ("/openadkit/config/", "/openadkit/overlay_ws")
 
 
 def autoware_state(project: str) -> dict[str, Any] | None:
     """The AD API state from the running api service, or None without one."""
-    if "api" not in project_capture(project, ["ps", "--services", "--status", "running"]).stdout.split():
+    if "api" not in running_services(project):
         return None
     script = (Path(__file__).parent / "autoware_state.py").read_text(encoding="utf-8")
     result = project_capture(
@@ -793,12 +789,26 @@ def project_capture(project: str, arguments: list[str]) -> subprocess.CompletedP
     )
 
 
+def running_services(project: str) -> list[str]:
+    return project_capture(project, ["ps", "--services", "--status", "running"]).stdout.split()
+
+
+def visualizer_address(tls: bool) -> str:
+    """Plain HTTP unless the site gives noVNC its own certificate."""
+    return f"visualizer: {'https' if tls else 'http'}://localhost:6080/vnc.html"
+
+
 def status(project: str) -> None:
     project_run(project, ["ps"])
     state = autoware_state(project)
     if state is not None:
         print()
         print("\n".join(format_autoware_state(state)))
+    if "visualizer" in running_services(project):
+        certificate = project_capture(project, ["exec", "-T", "visualizer", "printenv", "NOVNC_CERT"])
+        print()
+        print(visualizer_address(bool(certificate.stdout.strip())))
+        print("password: REMOTE_PASSWORD (default openadkit)")
 
 
 def logs(project: str, follow: bool, services: list[str]) -> None:
@@ -830,7 +840,7 @@ def restart(project: str, services: list[str], everything: bool) -> tuple[list[s
     such as CARLA. Everything also reruns the one-shot services, as run did.
     Returns the restarted services and the running ones left alone.
     """
-    running = project_capture(project, ["ps", "--services", "--status", "running"]).stdout.split()
+    running = running_services(project)
     if everything:
         project_run(project, ["restart"])
         return sorted(running), []

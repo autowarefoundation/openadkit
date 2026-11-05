@@ -146,16 +146,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", parser_class=OpenADKitParser)
     subparsers.add_parser(
-        "install", help="downloads and installs a release bundle"
+        "install", help="download and install a release bundle"
     )
     subparsers.add_parser(
-        "upgrade", help="upgrades an installed release to the latest stable version"
+        "upgrade", help="upgrade an installed release to the latest stable version"
     )
     subparsers.add_parser(
-        "setup", help="installs Ubuntu host dependencies"
+        "setup", help="install Ubuntu host dependencies"
     )
     subparsers.add_parser(
-        "uninstall", help="removes the installed release and its launcher"
+        "uninstall", help="remove the installed release and its launcher"
     )
     list_parser = subparsers.add_parser("list", help="list curated deployments")
     list_parser.add_argument(
@@ -470,8 +470,7 @@ def print_run_next_steps(
     target = deployment.name if node is None else f"{deployment.name} --node {node}"
     print(f"running: {target}")
     if "visualizer" in services:
-        # Plain HTTP unless the site gives noVNC its own certificate.
-        print(f"visualizer: {'https' if tls else 'http'}://localhost:6080/vnc.html")
+        print(compose.visualizer_address(tls))
         print(
             "password: REMOTE_PASSWORD (default openadkit; override in "
             f"{deployment.site_config})"

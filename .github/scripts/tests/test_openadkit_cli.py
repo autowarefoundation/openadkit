@@ -924,6 +924,17 @@ def test_operational_commands_act_on_the_running_stack_without_a_name(tmp_path):
     assert result.returncode == 0 and "nothing is running" in result.stdout
 
 
+def test_status_gives_the_visualizer_address_only_when_it_runs(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, projects=["openadkit-example"], services=("map", "visualizer"))
+    result = run_cli(root, "status")
+    assert result.returncode == 0 and "visualizer: http://localhost:6080/vnc.html" in result.stdout
+    assert "password: REMOTE_PASSWORD" in result.stdout
+    fake_docker(tmp_path, projects=["openadkit-example"], services=("map",))
+    result = run_cli(root, "status")
+    assert result.returncode == 0 and "visualizer:" not in result.stdout
+
+
 def test_restart_defaults_to_the_services_with_open_ad_kit_config(tmp_path):
     root, _ = runtime_tree(tmp_path)
     containers = [

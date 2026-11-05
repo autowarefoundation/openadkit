@@ -72,9 +72,10 @@ override and restarting returns to the remaining layers.
 Unknown packages, files or YAML keys are warnings, not startup failures. The
 hook logs them and writes `/tmp/openadkit/overlay-report.json` in each container.
 Once the services are up, `run` collects those reports and warns about every
-override that changed nothing: a package no service has, a file or a parameter
-its package does not have. After a base version change these usually are
-renamed packages, files or parameters. Every service gets the same layers, so a
+override without a counterpart: a package no service has changes nothing, and a
+file or a parameter its package does not have is added. That is intended for a
+new file such as a diagnostics graph; after a base version change it usually
+means a renamed package, file or parameter. Every service gets the same layers, so a
 package installed in only some images is not reported.
 
 #### A New Vehicle
@@ -175,7 +176,7 @@ prove that it honors the entrypoint, launch or parameter interfaces.
 
 `openadkit validate <deployment>` renders the deployment and checks its manifest
 and data. It does not pull images or prove that the runtime works; `run` reports
-overrides that changed nothing (see [Config Differences](#2-config-differences)).
+overrides without a counterpart (see [Config Differences](#2-config-differences)).
 
 The example kit's evidence cell checks its parameters, the fresh `/acme/probe`
 publication of its C++ package and Planning Simulation's golden path. Humble and

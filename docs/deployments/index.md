@@ -10,6 +10,7 @@ start with Planning Simulation.
 | [Logging Simulation](logging-simulation/index.md) | Replay recorded sensor data through sensing, perception, and localization | Recommended |
 | [CARLA Simulation](carla-simulation/index.md) | Drive a CARLA vehicle in closed loop | Required |
 | [Split-host simulation](split-host.md) | Run Autoware on one host and the simulator on another over Zenoh | CARLA only |
+| [Safety Island](https://github.com/autowarefoundation/openadkit/tree/main/deployments/safety-island) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller instead of Autoware's trajectory follower | No |
 
 ## Running a Deployment
 
@@ -20,6 +21,7 @@ Complete the [Quickstart](../getting-started/index.md) setup first.
 ```bash
 openadkit list
 openadkit run planning-simulation
+openadkit run deployments/safety-island   # a kit runs by its directory
 openadkit status
 openadkit logs --follow
 openadkit stop

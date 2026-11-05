@@ -21,8 +21,8 @@ def identities(cells):
 def test_example_evidence_cells_follow_the_base_distros():
     runtime = validation_matrix.load_runtime(ROOT)
     assert identities(validation_matrix.example_kit_cells(runtime, ROOT)) == [
-        {"deployment": "custom-kit", "distro": distro, "kit": "deployments/custom-kit"}
-        for distro in ("humble", "jazzy")
+        {"deployment": kit, "distro": distro, "kit": f"deployments/{kit}"}
+        for kit in ("custom-kit", "safety-island") for distro in ("humble", "jazzy")
     ]
 
 

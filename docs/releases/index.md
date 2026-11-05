@@ -35,7 +35,7 @@ vehicle certification.
 | R-Car X5H board support moves to its own repository; AutoSD planning simulation stays | Done |
 | CLI: `build`, `run --ws`, `restart`, `shell`, deployment paths, and commands that find the running stack from any directory | Done |
 | Split-host: visualizer on the simulator node, Autoware outputs and the vector map bridged, allowlist checked in CI | Done |
-| Safety Island: its DDS domain bridge and configuration become a generic part of the kit | Planned |
+| Safety Island: a kit that drives Planning Simulation with the pinned Safety Island release over `domain_bridge`, with its own evidence cell | Done |
 | AutoSD: Quadlet units for the component images, with Compose as the single source | Done |
 | Release line: `release/2.0` cut from `main` and pinned to Autoware 2.0 | Planned |
 
@@ -49,6 +49,8 @@ vehicle certification.
   can be mirrored offline; fleet rollout stays with the integrator's OTA system.
 - **rmw_zenoh:** evaluate it for split-host on Jazzy (Humble needs a launch patch); if it holds up,
   replace the zenoh-bridge-ros2dds bridge.
+- **Safety Island on CARLA:** a kit on CARLA Simulation with the Safety Island's closed loop over CAN.
+  Hosted CI cannot run CARLA, so it needs its own evidence.
 - **Image SBOMs.**
 - **CES 2027 demo:** hardware integration and partner evidence; not a general
   vehicle-support claim.

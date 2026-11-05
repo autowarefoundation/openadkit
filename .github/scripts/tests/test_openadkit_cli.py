@@ -877,8 +877,9 @@ def test_run_reports_overrides_that_changed_nothing(monkeypatch, capsys):
     selection = cli_manifest.Selection("humble", False, None, {}, {})
     warnings = cli_compose.report_overrides(None, selection)
     # autoware_control_config is installed in the control image, so it is no mistake.
-    assert warnings == ["package autoware_localization_config is in no service", "package typo_pkg is in no service",
-                        "parameter control_validator.param.yaml: nominal_latency is not in its package"]
+    assert warnings == ["override changed nothing: package autoware_localization_config is in no service",
+                        "override changed nothing: package typo_pkg is in no service",
+                        "override adds parameter control_validator.param.yaml: nominal_latency, which its file does not have"]
     assert "renamed packages" in capsys.readouterr().err
     assert not any(command[:3] == ["docker", "exec", "carla"] for command in commands)
     reports["map"] = reports["control"] = {"unknownPackages": [], "unknownFiles": [], "unknownKeys": []}

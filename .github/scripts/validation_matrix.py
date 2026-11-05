@@ -35,9 +35,16 @@ BEHAVIOUR_CHECKS: dict[str, dict[str, Any]] = {
 PLATFORM_CELLS: dict[str, dict[str, str]] = {
     "planning-simulation": {"backend": "quadlet", "distro": "humble", "runner": "ubuntu-24.04"},
 }
-# The example kit's acceptance: fresh publication proves its C++ overlay node
-# survived the ABI boundary, and custom_kit.py checks its parameter overrides.
-EXAMPLE_KIT_CHECKS: dict[str, Any] = {"fresh": ("/acme/probe",), "l1": "custom-kit"}
+# The in-tree kits and their acceptance beyond the base's checks: extra fresh
+# topics, and an L1 script (evidence/<l1 with _>.py, run in the API image).
+# custom-kit: fresh publication proves its C++ overlay node survived the ABI
+# boundary, and custom_kit.py checks its parameter overrides.
+# safety-island: safety_island.py checks that the Safety Island, not Autoware's
+# follower, publishes the control command the golden path then drives with.
+EXAMPLE_KIT_CHECKS: dict[str, dict[str, Any]] = {
+    "custom-kit": {"fresh": ("/acme/probe",), "l1": "custom-kit"},
+    "safety-island": {"fresh": (), "l1": "safety-island"},
+}
 # Host build products of an overlay workspace; never kit content.
 COLCON_PRODUCTS = ("build", "install", "log")
 
@@ -158,22 +165,25 @@ def evidence_cells(
 
 
 def example_kit_roots(runtime: ModuleType, source_root: Path) -> list[Path]:
-    """The one integrator example, deployments/custom-kit."""
-    relative = "deployments/custom-kit"
-    root = source_root / relative
-    if not (root / "openadkit.json").is_file():
-        fail(f"custom-kit example is missing ({relative}); its cells are required evidence")
-    if runtime.load_json(root / "openadkit.json").get("kind") != "kit":
-        fail(f"custom-kit example must declare kind: kit ({relative})")
-    return [root]
+    """The in-tree kits, deployments/<name> for each EXAMPLE_KIT_CHECKS entry."""
+    roots = []
+    for name in EXAMPLE_KIT_CHECKS:
+        relative = f"deployments/{name}"
+        root = source_root / relative
+        if not (root / "openadkit.json").is_file():
+            fail(f"{name} kit is missing ({relative}); its cells are required evidence")
+        if runtime.load_json(root / "openadkit.json").get("kind") != "kit":
+            fail(f"{name} kit must declare kind: kit ({relative})")
+        roots.append(root)
+    return roots
 
 
 def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, str]]:
-    """Exercise the custom-kit example against the same build as the base."""
+    """Exercise the in-tree kits against the same build as the base."""
     return [cell | {
         "kit": root.relative_to(source_root).as_posix(),
-        "fresh": " ".join((cell["fresh"], *EXAMPLE_KIT_CHECKS["fresh"])),
-        "l1": EXAMPLE_KIT_CHECKS["l1"],
+        "fresh": " ".join((cell["fresh"], *EXAMPLE_KIT_CHECKS[root.name]["fresh"])).strip(),
+        "l1": EXAMPLE_KIT_CHECKS[root.name]["l1"],
     } for root in example_kit_roots(runtime, source_root) for cell in evidence_cells(runtime, root)]
 
 

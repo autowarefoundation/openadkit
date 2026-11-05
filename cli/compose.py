@@ -577,7 +577,7 @@ OVERLAY_MOUNTS = ("/openadkit/overlay_ws",)
 
 
 def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
-    """Warn about config overrides that changed nothing in the started services.
+    """Warn about config overrides with no counterpart in the started services.
 
     Each hooked service writes /tmp/openadkit/overlay-report.json on start.
     Every service gets the same layers, so an overridden package is missing
@@ -614,15 +614,16 @@ def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
             reports.append(report)
     if not reports:
         return []
+    # The hook applies nothing for an unknown package; it adds unknown files and keys.
     warnings = [
-        f"package {package} is in no service"
+        f"override changed nothing: package {package} is in no service"
         for package in sorted(set.intersection(*(set(item.get("unknownPackages", [])) for item in reports)))
     ]
-    for kind, label in (("unknownFiles", "file"), ("unknownKeys", "parameter")):
+    for kind, label, owner in (("unknownFiles", "file", "package"), ("unknownKeys", "parameter", "file")):
         found = {entry for item in reports for entry in item.get(kind, [])}
-        warnings += [f"{label} {entry} is not in its package" for entry in sorted(found)]
+        warnings += [f"override adds {label} {entry}, which its {owner} does not have" for entry in sorted(found)]
     for warning in warnings:
-        print(f"warning: override changed nothing: {warning}", file=sys.stderr)
+        print(f"warning: {warning}", file=sys.stderr)
     if warnings:
         print(
             "warning: after a base version change, look for renamed packages, "

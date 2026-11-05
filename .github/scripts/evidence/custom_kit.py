@@ -4,12 +4,12 @@ import subprocess
 
 def main():
     expected = {
-        "nominal_filter.vel_lim": "Double value is: 8.0",
-        "stop_hold_acceleration": "Double value is: -1.5",
+        "update_rate": "Double value is: 20.0",
+        "boundary_departure_checker": "Boolean value is: True",
     }
     for parameter, value in expected.items():
         result = subprocess.run(
-            ["ros2", "param", "get", "/control/control_command_gate", parameter],
+            ["ros2", "param", "get", "/control/trajectory_follower/lane_departure_checker_node", parameter],
             capture_output=True, text=True, timeout=30, check=False,
         )
         print(f"{parameter}: {result.stdout.strip()}", flush=True)

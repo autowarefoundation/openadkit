@@ -3,5 +3,4 @@
 # start, so upstream changes to the other parameters still arrive on upgrade.
 /**:
   ros__parameters:
-    nominal_filter:
-      vel_lim: 8.0
+    update_rate: 20.0

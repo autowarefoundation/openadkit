@@ -50,13 +50,12 @@ component images and artifact references remain pinned.
 
 Store overrides under
 `config/autoware/<package>/<path-relative-to-package-share>`. For example,
-`config/autoware/autoware_control_config/config/control_command_gate/control_command_gate.param.yaml`:
+`config/autoware/autoware_control_config/config/lane_departure_checker/lane_departure_checker.param.yaml`:
 
 ```yaml
 /**:
   ros__parameters:
-    nominal_filter:
-      vel_lim: 8.0
+    update_rate: 20.0
 ```
 
 On each start, the entrypoint hook copies the package share directory into

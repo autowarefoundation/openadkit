@@ -51,6 +51,7 @@ vehicle certification.
   replace the zenoh-bridge-ros2dds bridge.
 - **Safety Island on CARLA:** a kit on CARLA Simulation with the Safety Island's closed loop over CAN.
   Hosted CI cannot run CARLA, so it needs its own evidence.
+- **One build path:** build `main` and release lines from the same lock and digest files, so `main`'s evidence also covers the release path.
 - **Image SBOMs.**
 - **CES 2027 demo:** hardware integration and partner evidence; not a general
   vehicle-support claim.

@@ -8,8 +8,9 @@ the image digests when it runs from a release, and this writes the result:
 
     out/rootfs/etc/containers/systemd/  a Quadlet unit per service
     out/rootfs/usr/share/openadkit/     the bind-mounted files, by mount target
-    out/image.aib.yml                   an Automotive Image Builder manifest; run it
-                                        from the directory this ran in
+    out/image.aib.yml                   an Automotive Image Builder manifest, with
+                                        --root-password-hash; run it from the
+                                        directory this ran in
 
 A field this does not translate stops it, so a change to the Compose files can
 not silently drop behaviour.
@@ -44,10 +45,6 @@ MANIFEST_DEFAULTS: dict[str, Any] = {
         "selinux_booleans": {"domain_can_mmap_files": True},
         "image_size": "40 GiB",
         "partitions": {"boot": {"size": "300 MiB"}},
-    },
-    # The password of the QEMU demo image; replace it for anything else.
-    "auth": {
-        "root_password": "$6$xoLqEUz0cGGJRx01$H3H/bFm0myJPULNMtbSsOFd/2BnHqHkMD92Sfxd.EKM9hXTWSmELG8cf205l6dktomuTcgKGGtGDgtvHVXSWU.",
     },
 }
 
@@ -173,12 +170,13 @@ def added_file(path: Path, rootfs: Path, output: Path) -> dict[str, str]:
     return {"path": target, "url": f"file://{built}"}
 
 
-def manifest(services: dict[str, Any], output: Path) -> dict[str, Any]:
+def manifest(services: dict[str, Any], output: Path, root_password_hash: str) -> dict[str, Any]:
     images = sorted({service["image"] for service in services.values()})
     rootfs = output / "rootfs"
     paths = sorted(rootfs.rglob("*"))
     return {
         **MANIFEST_DEFAULTS,
+        "auth": {"root_password": root_password_hash},
         "content": {
             "rpms": ["podman"],
             "container_images": [container_image(image) for image in images],
@@ -191,7 +189,7 @@ def manifest(services: dict[str, Any], output: Path) -> dict[str, Any]:
     }
 
 
-def write(model: dict[str, Any], output: Path, without: list[str]) -> None:
+def write(model: dict[str, Any], output: Path, without: list[str], root_password_hash: str | None = None) -> None:
     services = {name: service for name, service in model["services"].items() if name not in without}
     missing = sorted(set(without) - set(model["services"]))
     if missing:
@@ -218,17 +216,24 @@ def write(model: dict[str, Any], output: Path, without: list[str]) -> None:
             shutil.copytree(source, destination)
         else:
             shutil.copy2(source, destination)
-    # JSON is YAML, and this keeps the script free of dependencies.
-    (output / "image.aib.yml").write_text(json.dumps(manifest(services, output), indent=2) + "\n", encoding="utf-8")
+    # An image has no default password; the units alone need none.
+    if root_password_hash:
+        # JSON is YAML, and this keeps the script free of dependencies.
+        text = json.dumps(manifest(services, output, root_password_hash), indent=2)
+        (output / "image.aib.yml").write_text(text + "\n", encoding="utf-8")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", type=Path, required=True, help="directory to create")
     parser.add_argument("--without", action="append", default=[], metavar="SERVICE", help="leave a service out; repeatable")
+    parser.add_argument(
+        "--root-password-hash", metavar="HASH",
+        help="the image's root password, from openssl passwd -6; without it no image manifest is written",
+    )
     args = parser.parse_args()
     try:
-        write(json.load(sys.stdin), args.output, args.without)
+        write(json.load(sys.stdin), args.output, args.without, args.root_password_hash)
     except TranslationError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

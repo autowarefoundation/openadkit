@@ -45,6 +45,9 @@ def model(tmp_path):
     }}
 
 
+PASSWORD_HASH = "$6$salt$hash"
+
+
 def unit(output, name):
     return (output / "rootfs/etc/containers/systemd" / f"{name}.container").read_text()
 
@@ -70,7 +73,7 @@ def test_units_keep_the_compose_behaviour(tmp_path, monkeypatch):
 def test_mounts_land_by_target_and_the_manifest_creates_an_empty_one(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     output = tmp_path / "out"
-    quadlet.write(model(tmp_path), output, [])
+    quadlet.write(model(tmp_path), output, [], PASSWORD_HASH)
     root = output / "rootfs/usr/share/openadkit"
     assert (root / "etc/dds.xml").read_text() == "<dds/>"
     assert (root / "openadkit/overlay_ws").is_dir()
@@ -82,7 +85,7 @@ def test_mounts_land_by_target_and_the_manifest_creates_an_empty_one(tmp_path, m
 def test_manifest_embeds_each_image_once_by_tag_or_digest(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     output = tmp_path / "out"
-    quadlet.write(model(tmp_path), output, [])
+    quadlet.write(model(tmp_path), output, [], PASSWORD_HASH)
     content = yaml.safe_load((output / "image.aib.yml").read_text())["content"]
     assert content["container_images"] == [
         {"source": "ghcr.io/x/oak", "tag": "map-humble"},
@@ -91,12 +94,20 @@ def test_manifest_embeds_each_image_once_by_tag_or_digest(tmp_path, monkeypatch)
     assert {"path": "/usr/share/openadkit/etc/dds.xml", "source_path": "rootfs/usr/share/openadkit/etc/dds.xml"} in content["add_files"]
 
 
+def test_an_image_manifest_needs_a_root_password(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    quadlet.write(model(tmp_path), tmp_path / "units", [])
+    assert unit(tmp_path / "units", "autoware-map") and not (tmp_path / "units/image.aib.yml").exists()
+    quadlet.write(model(tmp_path), tmp_path / "image", [], PASSWORD_HASH)
+    assert json.loads((tmp_path / "image/image.aib.yml").read_text())["auth"] == {"root_password": PASSWORD_HASH}
+
+
 def test_an_output_outside_the_working_directory_still_translates(tmp_path, monkeypatch):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
     monkeypatch.chdir(elsewhere)
     monkeypatch.setattr(quadlet, "EMBEDDED_LIMIT", 3)
-    quadlet.write(model(tmp_path), tmp_path / "out", [])
+    quadlet.write(model(tmp_path), tmp_path / "out", [], PASSWORD_HASH)
     assert (tmp_path / "out/image.aib.yml").is_file()
 
 
@@ -104,7 +115,7 @@ def test_a_large_file_reaches_the_image_builder_by_url(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(quadlet, "EMBEDDED_LIMIT", 3)
     output = tmp_path / "out"
-    quadlet.write(model(tmp_path), output, [])
+    quadlet.write(model(tmp_path), output, [], PASSWORD_HASH)
     files = json.loads((output / "image.aib.yml").read_text())["content"]["add_files"]
     assert {"path": "/usr/share/openadkit/etc/dds.xml",
             "url": "file:///host/out/rootfs/usr/share/openadkit/etc/dds.xml"} in files

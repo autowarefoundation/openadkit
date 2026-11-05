@@ -19,7 +19,8 @@ Compose model, and `platforms/autosd/quadlet.py` translates it:
 ```bash
 openadkit fetch planning-simulation
 openadkit config planning-simulation \
-  | python3 platforms/autosd/quadlet.py --output out --without visualizer
+  | python3 platforms/autosd/quadlet.py --output out --without visualizer \
+      --root-password-hash "$(openssl passwd -6 password)"
 ```
 
 Use the `openadkit` of an installed release and `platforms/autosd` from the same
@@ -31,7 +32,7 @@ way, such as `openadkit config ./my-kit`.
 |--------|----------|
 | `out/rootfs/etc/containers/systemd/` | A Quadlet unit per service, named after its container |
 | `out/rootfs/usr/share/openadkit/` | The bind-mounted files and data, by mount target |
-| `out/image.aib.yml` | Automotive Image Builder manifest that embeds the images and `rootfs/` |
+| `out/image.aib.yml` | Automotive Image Builder manifest that embeds the images and `rootfs/`; written only with `--root-password-hash`, since an image has no default password |
 
 A Compose field the script does not translate stops it instead of being dropped.
 It covers what Planning Simulation uses; writable mounts, for example, have no
@@ -123,7 +124,7 @@ Or with QEMU directly:
 
 `-m 16384` (16 GB) is the minimum for the Autoware stack; use `-m 32768` for
 heavier workloads. `-m 2G` is enough only to boot and explore the OS. Log in as
-`root` with the password `password`, which is for this demo image only.
+`root` with the password `password` from the command above, which is for this demo only.
 
 ## Boards
 

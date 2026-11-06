@@ -177,9 +177,21 @@ prove that it honors the entrypoint, launch or parameter interfaces.
 and data. It does not pull images or prove that the runtime works; `run` reports
 overrides without a counterpart (see [Config Differences](#2-config-differences)).
 
-The example kit's evidence cell checks its parameters, the fresh `/acme/probe`
-publication of its C++ package and Planning Simulation's golden path. Humble and
-Jazzy each build the workspace against their matching devel digest.
+Your kit's acceptance checks run where CI runs them:
+
+- **Readiness:** give a service of your own a Compose `healthcheck`. `run`
+  waits until it passes. The example's `acme-probe` service runs
+  `checks/custom_kit.py`, which checks the fresh `/acme/probe` publication of
+  its C++ package and its parameters.
+- **End to end:** the base's `verify` step runs on top of your layer with
+  `openadkit run --verify`. To check something else, name your own in
+  `deployment.json`: `{"verify": {"service": "<service>", "command": [...]}}`
+  runs the command in that running service, and without `command` the step
+  waits for the service to exit and takes its exit code.
+
+The example kit's evidence cell runs both: its healthcheck and Planning
+Simulation's golden path. Humble and Jazzy each build the workspace against
+their matching devel digest.
 
 A base deployment's CI exemption stays with the kit; an exemption is not runtime
 evidence. The [release gate](../releases/evidence.md) requires `PASSED`. See

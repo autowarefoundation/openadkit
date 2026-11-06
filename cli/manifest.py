@@ -44,7 +44,7 @@ ALLOWED_ARTIFACT_KEYS = {"ref", "distros"}
 # An integrator kit: its own deployments on top of one pinned Open AD Kit.
 ALLOWED_INTEGRATOR_KIT_KEYS = {"schemaVersion", "kind", "extends", "deployments", "artifacts"}
 ALLOWED_INTEGRATOR_DEPLOYMENT_KEYS = {
-    "schemaVersion", "name", "description", "base", "compose", "data",
+    "schemaVersion", "name", "description", "base", "compose", "data", "verify",
 }
 ALLOWED_INTEGRATOR_COMPOSE_KEYS = {"files", "resetServices", "waitTimeout"}
 _IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
@@ -64,7 +64,11 @@ ALLOWED_DEPLOYMENT_KEYS = {
     "shared",
     "nodes",
     "evidence",
+    "verify",
 }
+# What `run --verify` runs once the deployment is ready: a command in a running
+# service, or, without one, that service's own exit.
+ALLOWED_VERIFY_KEYS = {"service", "command"}
 ALLOWED_COMPOSE_KEYS = {
     "files",
     "gpuFiles",
@@ -428,6 +432,7 @@ class Deployment:
         self.requirements: dict[str, Any] = manifest["requirements"]
         self.data: list[dict[str, Any]] = manifest["data"]
         self.shared: list[str] = manifest["shared"]
+        self.verify: dict[str, Any] | None = manifest["verify"]
         # Why CI cannot produce evidence for this deployment, if it cannot.
         self.evidence_exemption: str | None = manifest["evidence"].get("exempt")
         self.project = f"openadkit-{self.name}"
@@ -805,6 +810,18 @@ def _load_deployment_manifest(directory: Path, allowed_keys: set[str]) -> dict[s
     return manifest
 
 
+def _validate_verify(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise OpenADKitError("verify must be an object")
+    reject_unknown(value, ALLOWED_VERIFY_KEYS, "verify")
+    verify: dict[str, Any] = {"service": require_string(value.get("service"), "verify.service")}
+    if "command" in value:
+        verify["command"] = require_string_list(value["command"], "verify.command", nonempty=True)
+    return verify
+
+
 def _wait_timeout(value: Any) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         raise OpenADKitError("compose.waitTimeout must be a positive integer")
@@ -927,6 +944,7 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
     if "exempt" in evidence:
         require_string(evidence["exempt"], "evidence.exempt")
     manifest["evidence"] = evidence
+    manifest["verify"] = _validate_verify(manifest.get("verify"))
 
     data = _validate_data(manifest.get("data", []), nodes, directory)
     manifest["data"] = data
@@ -993,6 +1011,8 @@ def validate_kit_deployment(
         "data": base.data + own_data,
         "shared": [],
         "evidence": dict(base.manifest["evidence"]),
+        # The base's verify step runs on top of this layer unless it names its own.
+        "verify": _validate_verify(manifest.get("verify")) or base.verify,
     }
     deployment = Deployment(root, directory, merged, base=base)
     deployment.compose_files(False)

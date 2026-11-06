@@ -1,4 +1,4 @@
-"""Runtime acceptance checks for deployments/safety-island-simulation (inside the API image).
+"""Readiness of the Safety Island: the safety-island-bridge service's healthcheck.
 
 The golden path then proves the vehicle drives; this proves who drives it: the
 control command reaches Autoware only through the Safety Island's bridge, and

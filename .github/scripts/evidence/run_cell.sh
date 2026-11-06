@@ -4,11 +4,10 @@ set -uo pipefail
 
 # Run one evidence cell against a staged kit (run from the kit root):
 #   L0: ./openadkit validate
-#   L1: ./openadkit run + readiness (services, topics, freshness) and the
-#       cell's extra L1 check
-#   L2: the cell's end-to-end check: the planning-simulation golden path, or
-#       the scenario-simulation samples, plus a domain-isolation check when
-#       the cell runs several nodes on one host.
+#   L1: ./openadkit run, which returns once the deployment's healthchecks pass
+#   L2: the deployment's verify step (./openadkit run --verify): the golden
+#       path, or the scenario samples, plus a domain-isolation check when the
+#       cell runs several nodes on one host.
 #
 # The cell is one row of the evidence matrix (validation_matrix.py), which
 # derives what to run and check from the manifests; this runner only executes
@@ -16,7 +15,7 @@ set -uo pipefail
 # and collects container logs plus the scenario output when the cell fails.
 #
 # Usage: run_cell.sh <cell-json> <output-dir>
-# Env:   BUILD_TAG, SOURCE_SHA, API_SERVICES, API_TOPICS,
+# Env:   BUILD_TAG, SOURCE_SHA,
 #        OPENADKIT_CLI (absolute launcher when running inside an integrator kit)
 
 cell=${1:?usage: run_cell.sh <cell-json> <output-dir>}
@@ -31,9 +30,10 @@ node=$(field node)
 kit=$(field kit)
 backend=$(field backend)
 platform=$(field platform)
-fresh_topics=$(field fresh)
-l1_check=$(field l1)
-l2_check=$(field l2)
+verify=$(field verify)
+# A verify step without a command waits for its service: the scenario run.
+scenario=false
+[ -n "${verify}" ] && ! jq -e 'has("command")' <<<"${verify}" >/dev/null && scenario=true
 read -ra nodes <<<"$(field nodes)"
 [ "${#nodes[@]}" -gt 0 ] || nodes=("${node}")
 
@@ -65,7 +65,7 @@ scenario_output="${OPENADKIT_OUTPUT_DIR}/${deployment}/results"
 # and the samples take three times as long as on 16 vCPUs, past the wall-clock
 # timeout. Half speed gives Autoware the CPU a larger host has per simulated
 # second, so the cell checks the scenarios rather than the runner's size.
-if [ "${l2_check}" = scenario ]; then
+if [ "${scenario}" = true ]; then
     printf '%s\n' GLOBAL_REAL_TIME_FACTOR=0.5 GLOBAL_TIMEOUT=400 >"${OPENADKIT_CONFIG_DIR}/${deployment}.env"
 fi
 
@@ -85,8 +85,8 @@ done
 engine=(docker)
 [ "${backend}" = quadlet ] && engine=(sudo podman)
 api_container=autoware-api
-api_services=${API_SERVICES:-/api/localization/initialize /api/routing/set_route_points /api/operation_mode/change_to_autonomous}
-api_topics=${API_TOPICS:-/api/routing/state /api/localization/initialization_state /api/operation_mode/state}
+# The CLI writes the verify step's result here.
+verify_report="${OPENADKIT_OUTPUT_DIR}/${deployment}/results/verify.json"
 # The first node listens on the base port; each later node listens on its own
 # port and peers with the first.
 zenoh_port=7447
@@ -176,49 +176,80 @@ else
     result="FAILED"
 fi
 
-# --- L1: start the stack and check readiness ---------------------------------
+# --- L1: start the stack; run returns once its healthchecks pass ------------
+# --- L2: the deployment's verify step ----------------------------------------
+# One host runs the whole graph with `run --verify`. Split nodes start
+# without it: the bridge allowlist needs the scenario graph while it runs,
+# so the cell waits for the scenario itself. Quadlet units start under
+# systemd and run the same verify command with Podman.
+in_api() {
+    # shellcheck disable=SC2016 # Expanded in the container.
+    "${engine[@]}" exec "${api_container}" bash -c \
+        'source "/opt/ros/${ROS_DISTRO}/setup.bash"; source /opt/autoware/setup.bash; exec "$@"' bash "$@"
+}
+
 if [ "${l0_rc}" -eq 0 ]; then
     run_start=$(date +%s)
-    run_rc=0
     if [ "${backend}" = quadlet ]; then
-        start_quadlet >"${out}/run.log" 2>&1 || run_rc=1
-    else
-      for i in "${!nodes[@]}"; do
-        suffix=""
-        [ "${split}" = true ] && suffix="-${nodes[i]}"
-        # Nothing watches the visualizer here; its software-rendered RViz
-        # would take CPU from Autoware on a 4-vCPU runner.
-        node_cli run "${i}" --ros-distro "${distro}" --no-visualizer >"${out}/run${suffix}.log" 2>&1 || run_rc=1
-      done
-    fi
-
-    if [ "${run_rc}" -eq 0 ] && "${engine[@]}" inspect "${api_container}" >/dev/null 2>&1; then
-        "${engine[@]}" cp "${script_dir}/readiness.py" "${api_container}:/tmp/openadkit-readiness.py" >/dev/null 2>&1 || true
-        # A 4-vCPU runner loads the Autoware containers in about five minutes.
-        read_args=(--timeout 600 --output /tmp/readiness.json)
-        for name in ${api_services}; do read_args+=(--service "${name}"); done
-        for name in ${api_topics}; do read_args+=(--topic "${name}"); done
-        for name in ${fresh_topics}; do read_args+=(--fresh "${name}"); done
-        "${engine[@]}" exec "${api_container}" bash -lc \
-            "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-readiness.py \"\$@\"" \
-            readiness "${read_args[@]}" >"${out}/readiness.log" 2>&1
-        ready_rc=$?
-        "${engine[@]}" cp "${api_container}:/tmp/readiness.json" "${out}/readiness.json" >/dev/null 2>&1 || true
-        ready_s=$(( $(date +%s) - run_start ))
-        if [ "${ready_rc}" -eq 0 ]; then
-            l1_ok=true
-        else
-            result="FAILED"
+        if start_quadlet >"${out}/run.log" 2>&1; then
+            # The api unit's healthcheck is the deployment's readiness.
+            deadline=$(( $(date +%s) + 900 ))
+            until [ "$(sudo podman inspect -f '{{.State.Health.Status}}' "${api_container}" 2>/dev/null)" = healthy ]; do
+                [ "$(date +%s)" -lt "${deadline}" ] || break
+                sleep 5
+            done
+            [ "$(sudo podman inspect -f '{{.State.Health.Status}}' "${api_container}" 2>/dev/null)" = healthy ] && l1_ok=true
         fi
+        ready_s=$(( $(date +%s) - run_start ))
+        if [ "${l1_ok}" = true ] && [ -n "${verify}" ]; then
+            mapfile -t verify_command < <(jq -r '.command[]' <<<"${verify}")
+            verify_start=$(date +%s)
+            in_api "${verify_command[@]}" >"${out}/verify.log" 2>&1
+            verify_rc=$?
+            arrival_s=$(( $(date +%s) - verify_start ))
+            if [ "${verify_rc}" -eq 0 ]; then l2_ok=true; else l2_ok=false; fi
+        fi
+    elif [ "${split}" = true ]; then
+        run_rc=0
+        for i in "${!nodes[@]}"; do
+            # Nothing watches the visualizer here; its software-rendered RViz
+            # would take CPU from Autoware on a 4-vCPU runner.
+            node_cli run "${i}" --ros-distro "${distro}" --no-visualizer >"${out}/run-${nodes[i]}.log" 2>&1 || run_rc=1
+        done
+        ready_s=$(( $(date +%s) - run_start ))
+        [ "${run_rc}" -eq 0 ] && l1_ok=true
     else
-        echo "run failed (rc=${run_rc}) or ${api_container} is missing" >"${out}/readiness.log"
-        result="FAILED"
+        verify_args=()
+        [ -n "${verify}" ] && verify_args=(--verify)
+        node_cli run 0 --ros-distro "${distro}" --no-visualizer "${verify_args[@]}" >"${out}/run.log" 2>&1
+        run_rc=$?
+        # The report is written once the deployment is ready.
+        if [ -f "${verify_report}" ]; then
+            cp "${verify_report}" "${out}/verify.json"
+            l1_ok=true
+            ready_s=$(jq '.ready_s | floor' "${verify_report}")
+            arrival_s=$(jq '.verify_s | floor' "${verify_report}")
+            if [ "$(jq -r .result "${verify_report}")" = PASSED ]; then l2_ok=true; else l2_ok=false; fi
+        elif [ "${run_rc}" -eq 0 ] && [ -z "${verify}" ]; then
+            l1_ok=true
+            ready_s=$(( $(date +%s) - run_start ))
+        fi
     fi
+    [ "${l1_ok}" = true ] || result="FAILED"
+fi
+
+if [ "${l1_ok}" = true ] && [ "${split}" = true ] && [ "${scenario}" = true ]; then
+    # The scenario graph is up once its /clock reaches the Autoware node.
+    deadline=$(( $(date +%s) + 600 ))
+    until in_api python3 /openadkit/checks/readiness.py --fresh /clock >>"${out}/clock.log" 2>&1; do
+        [ "$(date +%s)" -lt "${deadline}" ] || { l1_ok=false; result=FAILED; break; }
+        sleep 5
+    done
 fi
 
 # Every topic the split bridge allows must exist in one of the two graphs: an
 # Autoware rename would otherwise stop it crossing without any error.
-if [ "${l1_ok}" = true ] && [ "${split}" = true ] && [ "${l2_check}" = scenario ]; then
+if [ "${l1_ok}" = true ] && [ "${split}" = true ] && [ "${scenario}" = true ]; then
     list_topics='timeout 60 ros2 topic list --no-daemon --spin-time 5'
     docker exec "${api_container}" bash -lc \
         "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; ${list_topics}" \
@@ -233,92 +264,65 @@ if [ "${l1_ok}" = true ] && [ "${split}" = true ] && [ "${l2_check}" = scenario 
     fi
 fi
 
-# A kit's own acceptance check: evidence/<kit>.py, with - as _.
-if [ "${l1_ok}" = true ] && [ -n "${l1_check}" ]; then
-    docker cp "${script_dir}/${l1_check//-/_}.py" "${api_container}:/tmp/openadkit-${l1_check}.py" >/dev/null 2>&1
-    if ! docker exec "${api_container}" bash -lc \
-        "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; python3 /tmp/openadkit-${l1_check}.py" >"${out}/${l1_check}.log" 2>&1; then
-        l1_ok=false
-        result=FAILED
+# The scenario's own result, its metrics and, across split nodes, isolation.
+if [ "${l1_ok}" = true ] && [ "${scenario}" = true ]; then
+    ss_rc=0
+    if [ "${split}" = true ]; then
+        # Three samples of up to GLOBAL_TIMEOUT each, after readiness.
+        ss_rc=$(timeout 1800 docker wait autoware-scenario-simulator 2>/dev/null || echo timeout)
+    elif [ "${l2_ok}" != true ]; then
+        ss_rc=failed
+    fi
+    docker logs autoware-scenario-simulator >"${out}/scenario.log" 2>&1 || true
+    python3 "${script_dir}/scenario_metrics.py" \
+        --output-dir "${scenario_output}" \
+        --log "${out}/scenario.log" \
+        --json "${out}/scenario.json" >"${out}/scenario-metrics.log" 2>&1
+    metrics_rc=$?
+
+    if [ "${split}" = true ]; then
+        # Isolation: without the scenario node's bridge, domain 2 must
+        # not see the autoware node's /api topics.
+        bridge=$(
+            docker ps -q \
+                --filter "label=com.docker.compose.project=openadkit-${deployment}-scenario" |
+                while read -r id; do
+                    docker inspect -f '{{.Name}}' "${id}"
+                done | grep zenoh-bridge || true
+        )
+        if [ -n "${bridge}" ]; then
+            docker stop "${bridge}" >/dev/null 2>&1 || true
+            sleep 5
+            image=$(docker inspect -f '{{.Config.Image}}' autoware-scenario-simulator 2>/dev/null || true)
+            isolation=$(
+                docker run --rm --network host \
+                    -e ROS_DOMAIN_ID=2 \
+                    -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+                    -e CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml \
+                    -e CYCLONEDDS_NETWORK_INTERFACE=lo \
+                    -e "ROS_DISTRO=${distro}" \
+                    -v "${PWD}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro" \
+                    --entrypoint bash "${image}" -c \
+                    'set -eo pipefail; source "/opt/ros/${ROS_DISTRO}/setup.bash";
+                     topics=$(timeout 20 ros2 topic list);
+                     printf "%s\n" "$topics" | awk '\''/^\/api\// { n++ } END { print n+0 }'\''' 2>/dev/null || echo failed
+            )
+        else
+            isolation=failed
+        fi
+        [[ "${isolation}" =~ ^[0-9]+$ ]] && [ -f "${out}/scenario.json" ] &&
+            jq -c --argjson iso "${isolation}" '. + {isolation_api_topics: $iso}' "${out}/scenario.json" >"${out}/scenario.json.tmp" &&
+            mv "${out}/scenario.json.tmp" "${out}/scenario.json"
+    fi
+
+    [ -f "${out}/scenario.json" ] && scenario_json=$(cat "${out}/scenario.json")
+    if [ "${ss_rc}" = "0" ] && [ "${metrics_rc}" -eq 0 ] && [ "${isolation}" != "failed" ] && { [ "${isolation}" = "null" ] || [ "${isolation}" = "0" ]; }; then
+        l2_ok=true
+    else
+        l2_ok=false
     fi
 fi
-
-# --- L2: end-to-end behaviour -------------------------------------------------
-if [ "${l1_ok}" = true ]; then
-    case "${l2_check}" in
-        golden)
-            "${engine[@]}" cp "${script_dir}/golden.py" "${api_container}:/tmp/openadkit-golden.py" >/dev/null 2>&1 || true
-            golden_start=$(date +%s)
-            "${engine[@]}" exec "${api_container}" bash -lc \
-                "source /opt/ros/${distro}/setup.bash; source /opt/autoware/setup.sh; timeout 900 python3 /tmp/openadkit-golden.py" \
-                >"${out}/golden.log" 2>&1
-            golden_rc=$?
-            arrival_s=$(( $(date +%s) - golden_start ))
-            if [ "${golden_rc}" -eq 0 ]; then
-                l2_ok=true
-            else
-                l2_ok=false
-                result="FAILED"
-            fi
-            ;;
-        scenario)
-            # Three samples of up to GLOBAL_TIMEOUT each, after the readiness wait.
-            ss_rc=$(timeout 1800 docker wait autoware-scenario-simulator 2>/dev/null || echo timeout)
-            docker logs autoware-scenario-simulator >"${out}/scenario.log" 2>&1 || true
-            python3 "${script_dir}/scenario_metrics.py" \
-                --output-dir "${scenario_output}" \
-                --log "${out}/scenario.log" \
-                --json "${out}/scenario.json" >"${out}/scenario-metrics.log" 2>&1
-            metrics_rc=$?
-
-            if [ "${split}" = true ]; then
-                # Isolation: without the scenario node's bridge, domain 2 must
-                # not see the autoware node's /api topics.
-                bridge=$(
-                    docker ps -q \
-                        --filter "label=com.docker.compose.project=openadkit-${deployment}-scenario" |
-                        while read -r id; do
-                            docker inspect -f '{{.Name}}' "${id}"
-                        done | grep zenoh-bridge || true
-                )
-                if [ -n "${bridge}" ]; then
-                    docker stop "${bridge}" >/dev/null 2>&1 || true
-                    sleep 5
-                    image=$(docker inspect -f '{{.Config.Image}}' autoware-scenario-simulator 2>/dev/null || true)
-                    isolation=$(
-                        docker run --rm --network host \
-                            -e ROS_DOMAIN_ID=2 \
-                            -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-                            -e CYCLONEDDS_URI=file:///etc/cyclonedds/cyclonedds.xml \
-                            -e CYCLONEDDS_NETWORK_INTERFACE=lo \
-                            -e "ROS_DISTRO=${distro}" \
-                            -v "${PWD}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro" \
-                            --entrypoint bash "${image}" -c \
-                            'set -eo pipefail; source "/opt/ros/${ROS_DISTRO}/setup.bash";
-                             topics=$(timeout 20 ros2 topic list);
-                             printf "%s\n" "$topics" | awk '\''/^\/api\// { n++ } END { print n+0 }'\''' 2>/dev/null || echo failed
-                    )
-                else
-                    isolation=failed
-                fi
-                [[ "${isolation}" =~ ^[0-9]+$ ]] && [ -f "${out}/scenario.json" ] &&
-                    jq -c --argjson iso "${isolation}" '. + {isolation_api_topics: $iso}' "${out}/scenario.json" >"${out}/scenario.json.tmp" &&
-                    mv "${out}/scenario.json.tmp" "${out}/scenario.json"
-            fi
-
-            [ -f "${out}/scenario.json" ] && scenario_json=$(cat "${out}/scenario.json")
-            if [ "${ss_rc}" = "0" ] && [ "${metrics_rc}" -eq 0 ] && [ "${isolation}" != "failed" ] && { [ "${isolation}" = "null" ] || [ "${isolation}" = "0" ]; }; then
-                l2_ok=true
-            else
-                l2_ok=false
-                result="FAILED"
-            fi
-            ;;
-        *)
-            l2_ok="null"
-            ;;
-    esac
-fi
+[ "${l2_ok}" = false ] && result="FAILED"
 
 # --- artifacts ---------------------------------------------------------------
 # null, like ready_s and arrival_s, when no container was ever sampled.

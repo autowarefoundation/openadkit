@@ -41,9 +41,11 @@ evidence adds only the example kits. The bundle, the release plan and the
 evidence subjects all read one kit inventory.
 
 Each evidence matrix row is the complete cell plan: identity, the node list in
-manifest order and the L1/L2 checks. `run_cell.sh` executes the row with a
-common validate/start/cleanup lifecycle; it does not derive policy from
-deployment names. Scenario isolation and golden-path checks stay distinct.
+manifest order and the deployment's verify step. L1 is `openadkit run`, which
+waits for the deployment's healthchecks; L2 is `run --verify`. `run_cell.sh`
+executes the row with a common validate/start/cleanup lifecycle; it does not
+derive policy from deployment names. Scenario isolation and golden-path checks
+stay distinct.
 Hosted split evidence is two nodes on one runner, not proof of two physical
 hosts.
 

@@ -164,6 +164,8 @@ elif "config --services" in text:
     print({service_lines!r})
 elif "config --quiet" in text:
     sys.exit({config})
+elif args[0] == "compose" and "exec" in args:
+    sys.exit(int(os.environ.get("FAKE_EXEC_EXIT", "0")))
 elif "up --detach" in text:
     project = args[args.index("--project-name") + 1]
     files = ",".join(args[index + 1] for index, arg in enumerate(args) if arg == "--file")
@@ -535,6 +537,78 @@ def test_split_node_run_discovery_and_safe_stop(tmp_path):
     assert result.returncode == 0, result.stderr
     down = next(row["args"] for row in recorded(calls) if "down" in row["args"])
     assert "openadkit-example-secondary" in down and "--volumes" not in down
+
+
+@pytest.mark.parametrize("exit_code", [0, 7])
+def test_run_verify_runs_the_command_in_its_service_once_ready(tmp_path, exit_code):
+    document = manifest() | {"verify": {"service": "app", "command": ["python3", "/openadkit/checks/golden.py"]}}
+    root, _ = runtime_tree(tmp_path, document=document)
+    calls = fake_docker(tmp_path, services=("app",))
+    result = run_cli(root, "run", "example", "--verify", "--pull", "never", FAKE_EXEC_EXIT=str(exit_code))
+    assert result.returncode == exit_code, result.stderr
+    rows = [row["args"] for row in recorded(calls)]
+    up = next(index for index, args in enumerate(rows) if "up" in args)
+    exec_index, exec_args = next((index, args) for index, args in enumerate(rows) if "exec" in args)
+    # Readiness is `up --wait`; the step runs after it, in the service, with ROS sourced.
+    assert up < exec_index and "--wait" in rows[up]
+    assert exec_args[exec_args.index("exec") + 1:exec_args.index("exec") + 3] == ["-T", "app"]
+    assert exec_args[-2:] == ["python3", "/openadkit/checks/golden.py"]
+    report = json.loads((root.parent / "home/openadkit-output/example/results/verify.json").read_text())
+    assert report["service"] == "app" and report["exit_code"] == exit_code
+    assert report["result"] == ("PASSED" if exit_code == 0 else "FAILED")
+
+
+def test_run_verify_needs_a_verify_step(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    calls = fake_docker(tmp_path)
+    result = run_cli(root, "run", "example", "--verify", "--pull", "never")
+    assert result.returncode != 0 and "example declares no verify step" in result.stderr
+    assert not any("up" in row["args"] for row in recorded(calls))
+
+
+def test_verify_waits_for_a_service_without_a_command(tmp_path, monkeypatch):
+    document = manifest() | {"verify": {"service": "scenario"}}
+    root, _ = runtime_tree(tmp_path, document=document)
+    kit = cli_manifest.load_kit(root)
+    deployment = cli_manifest.get_deployment(root, kit, "example")
+    monkeypatch.setenv("OPENADKIT_OUTPUT_DIR", str(tmp_path / "output"))
+    captured = []
+    monkeypatch.setattr(cli_compose, "compose_capture", lambda *args, **kwargs: subprocess.CompletedProcess([], 0, "c1\n", ""))
+    monkeypatch.setattr(cli_compose, "capture_process", lambda command, **kwargs: captured.append(command) or subprocess.CompletedProcess(command, 0, "3\n", ""))
+    selection = cli_manifest.Selection(ros_distro="humble", gpu=False, node=None, injections={}, environment={})
+    assert cli_compose.verify(deployment, selection, {"scenario"}, 0.0) == 3
+    assert captured == [["docker", "wait", "c1"]]
+    # A node without the service has nothing to verify.
+    assert cli_compose.verify(deployment, selection, {"other"}, 0.0) == 0
+
+
+def test_a_kit_inherits_the_verify_step_of_its_base_unless_it_names_one(tmp_path):
+    golden = {"service": "app", "command": ["python3", "golden.py"]}
+    root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": golden})
+    kit_root = integrator_kit(tmp_path, root)
+    kit = cli_manifest.load_kit(kit_root)
+    assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == golden
+    path = kit_root / "deployments/custom/deployment.json"
+    path.write_text(json.dumps(json.loads(path.read_text()) | {"verify": {"service": "acme"}}))
+    assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == {"service": "acme"}
+
+
+@pytest.mark.parametrize(("verify", "message"), [
+    ({"command": ["true"]}, "verify.service must be a nonempty string"),
+    ({"service": "app", "command": []}, "verify.command"),
+    ({"service": "app", "timeout": 5}, "unknown verify field(s): timeout"),
+])
+def test_invalid_verify_steps_are_rejected(tmp_path, verify, message):
+    root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": verify})
+    with pytest.raises(cli_manifest.OpenADKitError, match=re.escape(message)):
+        cli_manifest.get_deployment(root, cli_manifest.load_kit(root), "example")
+
+
+def test_a_verify_service_must_be_in_the_compose_graph(tmp_path):
+    root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": {"service": "missing"}})
+    fake_docker(tmp_path, services=("app",))
+    result = run_cli(root, "validate", "example")
+    assert result.returncode != 0 and "unknown Compose service(s): missing" in result.stderr
 
 
 @pytest.mark.parametrize("headless", [False, True])

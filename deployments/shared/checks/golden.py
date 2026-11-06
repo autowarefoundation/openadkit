@@ -1,7 +1,8 @@
 """Golden path over AD API: initialize, route, engage, wait for ARRIVED.
 
-Runs inside a deployment's api container (see run_cell.sh). Exit 0 on arrival.
-Ported from the 2026-09-27 spike; Humble passed 10/10 there.
+The verify step of planning simulation (deployment.json): `openadkit run
+--verify` runs it in the api service once Autoware is ready. Exit 0 on
+arrival. The start and goal are on the sample planning map.
 """
 import sys
 import time

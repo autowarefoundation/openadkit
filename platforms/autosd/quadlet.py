@@ -29,8 +29,13 @@ from typing import Any
 UNIT_DIRECTORY = Path("etc/containers/systemd")
 MOUNT_ROOT = Path("usr/share/openadkit")
 TRANSLATED = {
-    "command", "container_name", "depends_on", "entrypoint", "environment", "image",
-    "init", "ipc", "network_mode", "pid", "restart", "volumes",
+    "command", "container_name", "depends_on", "entrypoint", "environment", "healthcheck",
+    "image", "init", "ipc", "network_mode", "pid", "restart", "volumes",
+}
+# Compose healthcheck timings and the Quadlet keys that take them as they are.
+HEALTH_KEYS = {
+    "interval": "HealthInterval", "timeout": "HealthTimeout",
+    "retries": "HealthRetries", "start_period": "HealthStartPeriod",
 }
 # The CLI's mapping of the container user to the host user; AutoSD has no such user.
 DROPPED_ENVIRONMENT = {"HOST_UID", "HOST_GID"}
@@ -116,6 +121,7 @@ def translate(name: str, service: dict[str, Any], services: dict[str, Any], ones
             container.append(f"Environment={quote(f'{key}={value}')}")
     for volume in service.get("volumes", []):
         container.append(f"Volume=/{MOUNT_ROOT}{volume['target']}:{volume['target']}:ro")
+    container += healthcheck(name, service.get("healthcheck"))
     if podman_arguments:
         container.append(f"PodmanArgs={' '.join(podman_arguments)}")
     if arguments:
@@ -135,6 +141,31 @@ def translate(name: str, service: dict[str, Any], services: dict[str, Any], ones
         "Install": ["WantedBy=multi-user.target"],
     }
     return "\n\n".join(f"[{title}]\n" + "\n".join(lines) for title, lines in sections.items()) + "\n"
+
+
+def healthcheck(name: str, health: dict[str, Any] | None) -> list[str]:
+    """Quadlet health keys of a Compose healthcheck.
+
+    Podman runs a string command with /bin/sh -c, as Compose runs CMD-SHELL.
+    Its startup check stands in for start_interval: it runs that often until
+    it first passes, and the regular check then runs every interval.
+    """
+    if not health:
+        return []
+    test = health.get("test") or []
+    if health.get("disable") or len(test) != 2 or test[0] != "CMD-SHELL":
+        raise TranslationError(f"{name}: only a CMD-SHELL healthcheck has a translation")
+    command = test[1].replace("%", "%%")
+    keys = [f"HealthCmd={command}"]
+    keys += [f"{key}={health[option]}" for option, key in HEALTH_KEYS.items() if option in health]
+    if "start_interval" in health:
+        keys += [
+            f"HealthStartupCmd={command}",
+            f"HealthStartupInterval={health['start_interval']}",
+            f"HealthStartupTimeout={health.get('timeout', '30s')}",
+            "HealthStartupSuccess=1",
+        ]
+    return keys
 
 
 def mounts(services: dict[str, Any]) -> dict[str, Path]:

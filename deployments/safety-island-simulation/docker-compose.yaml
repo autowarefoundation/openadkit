@@ -24,7 +24,17 @@ services:
     volumes:
       - ${OPENADKIT_BASE_ROOT}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${SAFETY_ISLAND_PATH:?set in config.env}:/safety-island:ro
+      - ./checks:/openadkit/checks:ro
     command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
+    # Healthy once the Safety Island, not Autoware's follower, publishes the
+    # control command, which `openadkit run` waits for.
+    healthcheck:
+      test: ["CMD-SHELL", ". /opt/ros/${ROS_DISTRO}/setup.sh && . /opt/autoware/setup.sh && exec python3 /openadkit/checks/safety_island.py"]
+      start_period: 10m
+      start_interval: 5s
+      interval: 1m
+      timeout: 90s
+      retries: 3
     restart: on-failure
 
   safety-island:

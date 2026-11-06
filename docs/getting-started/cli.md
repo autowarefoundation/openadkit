@@ -63,8 +63,14 @@ One deployment runs at a time, including deployments from other kits, even one
 with the same name. `run` refuses conflicting projects; stop them first with
 `openadkit stop`. Declared
 split nodes of the same deployment can still run together.
-After starting, `run` watches the services for 10 seconds and fails if one
-crashes.
+`run` returns once the deployment is ready: its services' healthchecks pass,
+for example once the AD API is up (`READINESS_CHECKS` in the deployment's
+`config.env`). It then watches the services for 10 seconds and fails if one
+crashes. `openadkit run <deployment> --verify` then runs the deployment's
+verify step, the check CI runs on it: Planning Simulation drives the ego from
+its start to its goal, Scenario Simulation waits for the scenarios' result.
+`run --verify` exits with the step's result and writes it to the deployment's
+`results/verify.json`; the deployment keeps running.
 `openadkit run <deployment> --pull always` refreshes images before starting,
 and `openadkit version` prints the installed version. `--no-visualizer`
 starts everything except the visualizer, for a host nobody watches; its

@@ -36,9 +36,11 @@ coverage includes the inventory's other architectures; this must not be
 presented as arm64 runtime, two-machine LAN, GPU, HIL or vehicle evidence.
 
 - **L0:** manifests and Compose configuration validate.
-- **L1:** required processes and ROS interfaces are present; topics are fresh.
-- **L2:** the planning golden path arrives, or the scenario and split-node
-  checks pass. Each run starts a fresh stack.
+- **L1:** `openadkit run` returns: the deployment's healthchecks pass, so its
+  ROS interfaces are present and its topics publish.
+- **L2:** the deployment's verify step passes (`openadkit run --verify`): the
+  planning golden path arrives, or the scenarios pass, plus the split-node
+  checks. Each run starts a fresh stack.
 
 The workflow retries a failed runtime cell once. A cell that still fails fails
 the run and blocks a release. The cells start deployments with

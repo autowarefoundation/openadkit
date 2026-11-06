@@ -54,7 +54,7 @@ _openadkit() {
         validate) options="--ros-distro --gpu --node --ws --data --json --help" ;;
         config) options="--ros-distro --gpu --node --ws --help" ;;
         fetch) options="--ros-distro --force --help" ;;
-        run) options="--ros-distro --gpu --node --ws --pull --no-visualizer --help" ;;
+        run) options="--ros-distro --gpu --node --ws --pull --no-visualizer --verify --help" ;;
         build) options="--ros-distro --help" ;;
         clean) options="--help" ;;
         status | stop | shell) options="--node --help" ;;

@@ -8,7 +8,11 @@
     "gpuFiles": [],
     "profiles": [],
     "resetServices": ["map-check"],
-    "waitTimeout": 300
+    "waitTimeout": 600
+  },
+  "verify": {
+    "service": "api",
+    "command": ["python3", "/openadkit/checks/golden.py"]
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],

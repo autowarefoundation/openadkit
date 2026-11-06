@@ -229,7 +229,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="once ready, run the deployment's verify step (the CI end-to-end check) and exit with its result",
     )
     build = subparsers.add_parser(
-        "build", help="build an overlay workspace in the pinned devel image"
+        "build", help="build an overlay workspace in the pinned devel image",
+        usage="openadkit build [-h] [--ros-distro DISTRO] [PATH] [-- COLCON_ARGS ...]",
+        epilog=(
+            "arguments after -- go to colcon build, for example:\n"
+            "  openadkit build -- --packages-select my_pkg\n"
+            "  openadkit build -- --cmake-args -DCMAKE_BUILD_TYPE=Debug"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     build.add_argument(
         "workspace", nargs="?", metavar="PATH",
@@ -528,7 +535,14 @@ def operate(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    arguments = sys.argv[1:]
+    # `build ... -- ARGS` hands ARGS to colcon build as they are.
+    colcon: list[str] = []
+    if arguments[:1] == ["build"] and "--" in arguments:
+        split = arguments.index("--")
+        arguments, colcon = arguments[:split], arguments[split + 1:]
+    args = parser.parse_args(arguments)
+    args.colcon = colcon
     if not args.command:
         parser.print_help()
         return 2
@@ -576,7 +590,7 @@ def main() -> int:
                 f"this Open AD Kit pins no {ros_distro} devel image; set DEVEL_IMAGE to the "
                 "universe-common-devel image of the build your runtime images come from"
             )
-        compose.build_overlay(workspace, image, ros_distro)
+        compose.build_overlay(workspace, image, ros_distro, args.colcon)
         return 0
 
     if not args.deployment:

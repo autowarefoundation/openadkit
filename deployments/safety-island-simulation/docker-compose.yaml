@@ -24,15 +24,7 @@ services:
     volumes:
       - ${OPENADKIT_BASE_ROOT}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${SAFETY_ISLAND_PATH:?set in config.env}:/safety-island:ro
-    # Autoware 2.0 has no trajectory gate: its follower reads /planning/trajectory,
-    # bridged with the remap the Safety Island's bridge-config.yaml documents.
-    command:
-      - bash
-      - -c
-      - >-
-        sed 's|^  control/trajectory:|  planning/trajectory:\n    remap: control/trajectory|'
-        /safety-island/bridge-config.yaml > /tmp/bridge-config.yaml &&
-        exec ros2 run domain_bridge domain_bridge /tmp/bridge-config.yaml
+    command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
     restart: on-failure
 
   safety-island:

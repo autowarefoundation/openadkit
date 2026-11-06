@@ -61,8 +61,6 @@ jobs:
 
       - name: Resolve shared build inputs
         id: prepare
-        env:
-          REUSE_IMAGE: ${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-amd64-${{ inputs.ros-distro }}
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
 
@@ -72,25 +70,12 @@ jobs:
 
       - name: Export Autoware dependency lockfile
         id: lock
-        env:
-          AUTOWARE_OVERLAY: ${{ steps.prepare.outputs.autoware_overlay }}
-          AUTOWARE_LOCK_FILE: ${{ steps.prepare.outputs.autoware_lock_file }}
-          LOCK_BUILD_TAG: ${{ steps.prepare.outputs.lock_build_tag }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p autoware-lock
-          # A commit pin builds the dependency lock committed with it; a branch
-          # reuses the lock of the build whose Autoware revision this check uses.
-          if [ -n "${AUTOWARE_LOCK_FILE}" ]; then
-            cp "${AUTOWARE_LOCK_FILE}" autoware-lock/autoware-lock.repos
-          elif [ -z "${LOCK_BUILD_TAG}" ] || ! gh run download "${LOCK_BUILD_TAG%%-*}" --repo "${GITHUB_REPOSITORY}" \
-            --name "autoware-lock-${LOCK_BUILD_TAG}" --dir autoware-lock; then
-            python3 .github/scripts/export_autoware_lock.py \
-              autoware-metadata/repositories/autoware.repos \
-              autoware-lock/autoware-lock.repos \
-              "${AUTOWARE_OVERLAY}"
-          fi
+          python3 .github/scripts/export_autoware_lock.py \
+            autoware-metadata/repositories/autoware.repos \
+            autoware-lock/autoware-lock.repos
           autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
           echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "${GITHUB_OUTPUT}"
         shell: bash
@@ -158,7 +143,6 @@ jobs:
         id: upstream
         env:
           UPSTREAM_TAG: ${{ steps.prepare.outputs.upstream_tag }}
-          UPSTREAM_PINS: ${{ steps.prepare.outputs.upstream_pins }}
           TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
           UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro }}
           USE_LOCAL_COMMON: ${{ steps.contexts.outputs.use_local_common }}
@@ -191,8 +175,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
-    # Development builds also compile Autoware core.
-    timeout-minutes: ${{ needs.prepare.outputs.upstream_tag == '' && 240 || 120 }}
+    timeout-minutes: 120
     permissions:
       actions: read
       contents: read
@@ -235,7 +218,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
     # planning-control can take nearly two hours before the bounded Trivy scan;
     # fork PRs may also compile development core and universe-common first.
-    timeout-minutes: ${{ needs.prepare.outputs.upstream_tag == '' && 300 || 180 }}
+    timeout-minutes: 180
     permissions:
       actions: read
       contents: read

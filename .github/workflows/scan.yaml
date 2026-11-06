@@ -1,19 +1,21 @@
 permissions:
   contents: read
 
-# Full image scan workflow for an existing build-all-images run.
-# It runs automatically only when the build requested scanning, or manually for
-# any build_tag. A successful scan metadata artifact makes a build promotable.
+# Full image scan of a build-all-images run: after every successful build of
+# main, by dispatch from a maintenance branch's build on that branch, weekly for
+# main's latest build so new vulnerabilities surface without a rebuild, or by
+# dispatch for any build_tag.
+# A successful scan metadata artifact makes a build promotable.
 
 name: scan-images
 
 on:
-  # Builds of main only: a release line scans and verifies its builds by
-  # dispatch on its own branch, where the release gate expects them.
   workflow_run:
     workflows: [build-all-images]
     types: [completed]
     branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       build_tag:
@@ -21,7 +23,7 @@ on:
         required: true
 
 concurrency:
-  group: scan-images-${{ github.event_name == 'workflow_dispatch' && inputs.build_tag || format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) }}
+  group: scan-images-${{ github.event_name == 'workflow_dispatch' && inputs.build_tag || github.event_name == 'workflow_run' && format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) || github.run_id }}
   cancel-in-progress: false
 
 env:
@@ -39,7 +41,6 @@ jobs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       policy_sha: ${{ steps.prepare.outputs.policy_sha }}
       matrix: ${{ steps.prepare.outputs.matrix }}
-      should_scan: ${{ steps.prepare.outputs.should_scan }}
     steps:
       - name: Check out trusted metadata policy
         uses: actions/checkout@v7
@@ -56,8 +57,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
-            run_id="${{ github.event.workflow_run.id }}"
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            run_id=$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow build-all-images.yaml --branch main \
+              --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "${run_id}" ] || { echo "main has no successful build to scan" >&2; exit 1; }
+          fi
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+            run_id="${run_id:-${{ github.event.workflow_run.id }}}"
             # "Re-run failed jobs" keeps the first attempt's tag; read it from
             # the newest metadata artifact instead of this attempt's number.
             build_tag=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
@@ -79,11 +85,6 @@ jobs:
             --name "build-metadata-${build_tag}" \
             --dir build-metadata
 
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
-            should_scan=$(jq -r '.scan_requested' build-metadata/build-metadata.json)
-          else
-            should_scan=true
-          fi
           policy_sha=$(jq -r '.openadkit_sha' build-metadata/build-metadata.json)
           if ! printf '%s\n' "${policy_sha}" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "Invalid OpenADKit SHA in build metadata: ${policy_sha}" >&2
@@ -95,14 +96,12 @@ jobs:
           {
             echo "build_tag=${build_tag}"
             echo "policy_sha=${policy_sha}"
-            echo "should_scan=${should_scan}"
             echo "matrix=${matrix}"
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
   scan:
     needs: prepare
-    if: needs.prepare.outputs.should_scan == 'true'
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
     timeout-minutes: 60
     permissions:
@@ -178,7 +177,7 @@ jobs:
 
   publish-metadata:
     needs: [prepare, scan]
-    if: always() && needs.prepare.outputs.should_scan == 'true'
+    if: always() && needs.prepare.result == 'success'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
@@ -210,3 +209,26 @@ jobs:
       - name: Fail if full scan failed
         if: needs.scan.result != 'success'
         run: exit 1
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, scan, publish-metadata]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Weekly image scan failed (${new Date().toISOString().split('T')[0]})`,
+              body: [
+                '**The weekly scan of main\'s latest build failed.**',
+                '',
+                `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n'),
+            })

@@ -14,10 +14,8 @@ variable "ROS_DISTRO" {
   default = "humble"
 }
 
-// Upstream Autoware release the images build on (e.g. "2.0.0"); CI sets it
-// from .github/autoware.ref. Empty builds for upstream development: core
-// compiles from the imported sources on the plain upstream base image, and ROS
-// installs from the live repository.
+// Upstream Autoware release the images build on, the tag in
+// .github/autoware.ref (e.g. "2.0.0"); required.
 variable "UPSTREAM_TAG" {
   default = ""
 }
@@ -32,7 +30,7 @@ variable "ROS_SNAPSHOT_JAZZY" {
 }
 function "ros_snapshot" {
   params = []
-  result = UPSTREAM_TAG == "" ? "" : ROS_DISTRO == "jazzy" ? ROS_SNAPSHOT_JAZZY : ROS_SNAPSHOT_HUMBLE
+  result = ROS_DISTRO == "jazzy" ? ROS_SNAPSHOT_JAZZY : ROS_SNAPSHOT_HUMBLE
 }
 variable "UPSTREAM_REPO" {
   default = "ghcr.io/autowarefoundation/autoware"
@@ -53,11 +51,10 @@ function "ctx" {
   result = "target:${name}"
 }
 
-// Resolves an upstream Autoware image reference. UPSTREAM_TAG="" yields the
-// plain development <name>-<distro> tag; non-empty yields <name>-<distro>-<tag>.
+// The upstream Autoware release image <name>-<distro>-<UPSTREAM_TAG>.
 function "upstream" {
   params = [name]
-  result = "docker-image://${UPSTREAM_REPO}:${name}-${ROS_DISTRO}${UPSTREAM_TAG == "" ? "" : "-${UPSTREAM_TAG}"}"
+  result = "docker-image://${UPSTREAM_REPO}:${name}-${ROS_DISTRO}-${UPSTREAM_TAG}"
 }
 
 // Architecture segment for local tags, taken from the bake host platform so a
@@ -142,21 +139,6 @@ target "docker-metadata-action-visualizer" { tags = local_tags("visualizer") }
 target "docker-metadata-action-simulator" { tags = local_tags("simulator") }
 target "docker-metadata-action-carla-interface" { tags = local_tags("carla-interface") }
 
-// Upstream development has no core image built from the same sources, so it
-// compiles core with upstream's own Dockerfile from the imported tree.
-target "autoware-core-devel" {
-  context    = "autoware"
-  dockerfile = "docker/core.Dockerfile"
-  target     = "core-devel"
-  contexts = {
-    autoware-base = upstream("base")
-  }
-  args = {
-    BASE_IMAGE = "autoware-base"
-    ROS_DISTRO = ROS_DISTRO
-  }
-}
-
 // Common base for the universe-common stages. The Dockerfile has FROM lines
 // for both ${CORE_DEVEL_IMAGE} (build stage) and ${BASE_IMAGE} (runtime
 // stage), so BuildKit needs both ARGs and both contexts resolved at parse
@@ -167,7 +149,7 @@ target "autoware-core-devel" {
 target "_universe-common-base" {
   dockerfile = "components/universe-common/Dockerfile"
   contexts = {
-    autoware-core-devel = UPSTREAM_TAG == "" ? ctx("autoware-core-devel") : upstream("core-devel")
+    autoware-core-devel = upstream("core-devel")
     autoware-base       = upstream("base")
   }
   args = {

@@ -11,7 +11,7 @@ Replace the example version with the release you intend to use:
 ```bash
 set -euo pipefail
 VERSION=v2.0.0
-LINE=$(echo "${VERSION#v}" | cut -d. -f1-2)  # the release/X.Y branch that released it
+BRANCH=main  # or the release/X.Y branch that released it
 REPO=autowarefoundation/openadkit
 gh release download "$VERSION" --repo "$REPO" \
   --pattern openadkit --pattern "openadkit-$VERSION.tar.gz" \
@@ -20,7 +20,7 @@ gh release download "$VERSION" --repo "$REPO" \
 for asset in openadkit "openadkit-$VERSION.tar.gz" release-plan.json release-metadata.json; do
   gh attestation verify "$asset" --repo "$REPO" \
     --signer-workflow "$REPO/.github/workflows/release.yaml" \
-    --source-ref "refs/heads/release/$LINE" --deny-self-hosted-runners
+    --source-ref "refs/heads/$BRANCH" --deny-self-hosted-runners
 done
 ```
 

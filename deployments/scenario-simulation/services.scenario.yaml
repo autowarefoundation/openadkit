@@ -98,13 +98,6 @@ services:
         # The interfaces scenario_test_runner engages Autoware through.
         wait_for_service /api/external/set/engage
         wait_for_service /api/operation_mode/change_to_autonomous
-        # Each scenario starts by switching Autoware to STOP, which the driving
-        # mode manager refuses until it has reached these gates; on a small
-        # host the control container loads them minutes after the API is up.
-        # A split scenario host sees them through the Zenoh bridge.
-        wait_for_service /control/trajectory_gate/source/change
-        wait_for_service /control/control_command_gate/source/change
-        wait_for_service /control/control_command_gate/filter/change
 
         set -- "$$SCENARIO"
         if [ -z "$1" ]; then

@@ -2,8 +2,8 @@
 
 The reusable `.github/workflows/evidence.yaml` verifies a specific Open AD Kit
 build and publishes the run's summary. It runs automatically after a
-successful `build-all-images` run on `main`. For a release, dispatch it with
-`build_tag` on the `release/X.Y` branch that built it.
+successful `build-all-images` run on `main` or a `release/X.Y` branch, which is
+the run a release of that build needs.
 
 ## Reuse it in the build-owning repository
 
@@ -36,8 +36,8 @@ jobs:
 {% endraw %}
 
 This runs containers on the caller's runners. A fork's evidence runs belong to
-that fork; only runs on a `release/X.Y` branch of the releasing repository can
-be release evidence.
+that fork; only runs on the branch that built the release, in the releasing
+repository, can be release evidence.
 
 The current reusable interface takes **only `build_tag`**. Metadata and source
 come from the caller's build-owning repository. It stages that exact source's

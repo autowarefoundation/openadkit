@@ -21,9 +21,6 @@ a snapshot from before or after that build cannot build. The images carry the
 date as the `org.opencontainers.image.ros-snapshot` label, and the release notes
 and BOM name it per distro.
 
-Development builds (empty `UPSTREAM_TAG`) compile core themselves from the live
-repository, so they pass no snapshot and keep the live source.
-
 The snapshot is signed by the vendored `ros-snapshots.asc` (ROS Snapshot
 builder, `4B63CF8FDE49746E98FA01DDAD19BAB3CBF125EA`). Ubuntu sources stay
 live: Ubuntu updates keep the ABI of a release stable, and security fixes keep

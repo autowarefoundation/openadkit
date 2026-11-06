@@ -112,8 +112,8 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
             # These shape every image's sources, context and dependency graph.
             # Autoware patches change the sources every image compiles, as a new
             # Autoware revision does.
-            if changed_file in ("components/docker-bake.hcl", ".dockerignore", ".github/autoware.ref", ".github/autoware-lock.repos",
-                                ".github/autoware-base-images.json", ".github/scripts/autoware_patches.py") or fnmatch.fnmatchcase(
+            if changed_file in ("components/docker-bake.hcl", ".dockerignore", ".github/autoware.ref",
+                                ".github/scripts/autoware_patches.py") or fnmatch.fnmatchcase(
                 changed_file, ".github/autoware-patches/*"
             ):
                 targets.update(all_targets)
@@ -197,21 +197,15 @@ def format_outputs(matrices):
     return "\n".join(lines) + "\n"
 
 
-# Image creation time of the compile bases (the development core and
-# universe-common-build). Images built on a base are cached against its
+# Image creation time of the compile base, universe-common-build. Images built on a base are cached against its
 # config digest, and that digest records when each layer was built: with
 # identical layers, a rebuild at another time still recompiled every jazzy
 # component. These images are internal, so a fixed time costs nothing.
 COMPILE_BASE_EPOCH = "0"
 
 
-def bake_recipe(inventory, prepared, target, distro, platform, *, publish, shared_common, common_cached, owner, source_sha, run_id,
-                core_devel=None):
-    """Overlay the local HCL graph, preserving local dependency builds in PRs.
-
-    core_devel is the pushed development core (ref@digest, see core_recipe)
-    that universe-common builds on instead of compiling it in the same Bake.
-    """
+def bake_recipe(inventory, prepared, target, distro, platform, *, publish, shared_common, common_cached, owner, source_sha, run_id):
+    """Overlay the local HCL graph, preserving local dependency builds in PRs."""
     images = {image["target"]: image for image in inventory["images"]}
     if target not in images or distro not in image_distros(images[target], inventory["ros_distros"]) or platform not in images[target]["platforms"]:
         raise ValueError(f"Unsupported build cell: {target}/{distro}/{platform}")
@@ -220,10 +214,10 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
     def cache_ref(name):
         return f"ghcr.io/{owner}/openadkit-buildcache:{name}-{arch}-{distro}-{prepared['cache_scope']}"
     cache = cache_ref(target)
-    # universe-common's build and runtime stages, and the core development
-    # builds compile, export separate caches so none overwrites another; the
-    # devel image adds only its per-build refresh, which nothing reuses.
-    common_stages = ("autoware-core-devel", "universe-common-build", "universe-common")
+    # universe-common's build and runtime stages export separate caches so
+    # neither overwrites the other; the devel image adds only its per-build
+    # refresh, which nothing reuses.
+    common_stages = ("universe-common-build", "universe-common")
     common_cache_from = [f"type=registry,ref={cache_ref(name)}" for name in common_stages]
     # Internal compile base for components (the devel image without its
     # per-build refresh). Without per-build labels or provenance its digest
@@ -236,11 +230,8 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
     cuda_contexts = {}
     if publish:
         if target == "universe-common":
-            # Development builds have no upstream core image; HCL compiles it.
             upstream = json.loads(prepared["upstream_images"])[distro]
-            contexts.update({f"autoware-{name}": upstream[name]["uri"] for name in ("core-devel", "base") if name in upstream})
-            if core_devel:
-                contexts["autoware-core-devel"] = f"docker-image://{core_devel}"
+            contexts.update({f"autoware-{name}": upstream[name]["uri"] for name in ("core-devel", "base")})
             args["SECURITY_REFRESH"] = build_tag
         else:
             contexts["universe-common-devel"] = f"docker-image://{common_build}"
@@ -279,20 +270,16 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
     # Apply the same settings to dependency targets too, as the previous *.set
     # overrides did. HCL remains the owner of Dockerfiles and local graph edges.
     overrides = {}
-    for name in [*images, "universe-common-build", "autoware-core-devel"]:
+    for name in [*images, "universe-common-build"]:
         overrides[name] = {"platforms": [platform], "args": args.copy(), "labels": labels.copy(),
                            "contexts": contexts.copy(), "cache-from": cache_from.copy()}
         if publish:
             overrides[name]["cache-to"] = [f"type=registry,ref={cache},mode=max"]
-    # Development core is the compile base's FROM: per-build labels would reach
-    # universe-common-build through it.
-    overrides["autoware-core-devel"]["labels"] = {}
     if publish and target == "universe-common":
         overrides["universe-common-build"].update(
             tags=[common_build], labels={}, attest=["type=provenance,disabled=true"],
             args={**args, "SOURCE_DATE_EPOCH": COMPILE_BASE_EPOCH},
             **{"cache-to": [f"type=registry,ref={cache_ref('universe-common-build')},mode=max"]})
-        overrides["autoware-core-devel"]["cache-to"] = [f"type=registry,ref={cache_ref('autoware-core-devel')},mode=max"]
         del overrides["universe-common-devel"]["cache-to"]
     overrides["sensing-perception-cuda"]["contexts"].update(cuda_contexts)
     if publish and target not in ("universe-common", "carla-interface"):
@@ -305,35 +292,6 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
     return {"target": overrides}, targets
 
 
-def core_recipe(prepared, distro, platform, *, owner):
-    """The development core image, pushed before universe-common builds on it.
-
-    Development builds have no upstream core-devel image, so they compile it.
-    Built in the same Bake as universe-common (a target: context), every
-    stage on top of it missed the registry cache on each new build, while
-    release builds, which start from the upstream image's digest, stayed
-    cached. Pushing core first lets universe-common start from a digest too.
-    Returns None when the upstream image exists.
-    """
-    upstream = json.loads(prepared["upstream_images"])[distro]
-    if "core-devel" in upstream:
-        return None
-    arch = platform_label(platform)
-    def cache_ref(name):
-        return f"ghcr.io/{owner}/openadkit-buildcache:{name}-{arch}-{distro}-{prepared['cache_scope']}"
-    image = f"ghcr.io/{owner}/openadkit-buildcache:autoware-core-devel-{arch}-{distro}-{prepared['build_tag']}"
-    # No per-build labels, arguments, timestamps or provenance: they would
-    # change the digest universe-common starts from.
-    recipe = {"target": {"autoware-core-devel": {
-        "platforms": [platform], "args": {"ROS_DISTRO": distro, "SOURCE_DATE_EPOCH": COMPILE_BASE_EPOCH}, "labels": {},
-        "contexts": {"autoware-base": upstream["base"]["uri"]},
-        "cache-from": [f"type=registry,ref={cache_ref(name)}" for name in ("autoware-core-devel", "universe-common-build", "universe-common")],
-        "cache-to": [f"type=registry,ref={cache_ref('autoware-core-devel')},mode=max"],
-        "tags": [image], "attest": ["type=provenance,disabled=true"],
-    }}}
-    return recipe, image
-
-
 def write_recipe():
     inventory = json.loads(pathlib.Path(DEFAULT_INVENTORY).read_text())
     target = os.environ["BUILD_TARGET"]
@@ -342,22 +300,16 @@ def write_recipe():
     prepared = json.loads(os.environ["BUILD_INPUTS"])
     publish = os.environ["PUBLISH"] == "true"
     owner = os.environ["GITHUB_REPOSITORY"].split("/")[0]
-    # Set on the second run, after the core image was pushed (build-image).
-    core_devel = os.environ.get("CORE_DEVEL_IMAGE") or None
-    core = core_recipe(prepared, distro, platform, owner=owner) if publish and target == "universe-common" else None
     recipe, targets = bake_recipe(
         inventory, prepared, target, distro, platform,
         publish=publish, shared_common=os.environ["SHARED_COMMON"] == "true",
         common_cached=os.environ["COMMON_CACHED"] == "true", owner=owner,
-        source_sha=os.environ["GITHUB_SHA"], run_id=os.environ["GITHUB_RUN_ID"], core_devel=core_devel,
+        source_sha=os.environ["GITHUB_SHA"], run_id=os.environ["GITHUB_RUN_ID"],
     )
     pathlib.Path(".build-recipe.json").write_text(json.dumps(recipe))
-    if core:
-        pathlib.Path(".core-recipe.json").write_text(json.dumps(core[0]))
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
         output.write(f"cache_prefix=buildkit-mounts-{target}-{distro}-{platform_label(platform)}-\n")
         output.write("targets<<BUILD_TARGETS\n" + "\n".join(targets) + "\nBUILD_TARGETS\n")
-        output.write(f"core_image={core[1] if core else ''}\n")
 
 
 def main(argv):

@@ -107,39 +107,6 @@ runs:
         # Extract only what the post step saves; an exact hit is already stored.
         skip-extraction: ${{ inputs.save-ccache != 'true' || steps.cache.outputs.cache-hit == 'true' }}
 
-    # Development builds compile core themselves: push it first, so that
-    # universe-common starts from its digest like a release build does
-    # (core_recipe in .github/scripts/build.py).
-    - name: Build development core
-      if: steps.recipe.outputs.core_image != ''
-      id: core
-      uses: docker/bake-action@v7
-      env:
-        ROS_DISTRO: ${{ inputs.ros-distro }}
-        UPSTREAM_TAG: ${{ fromJSON(inputs.prepared).upstream_tag }}
-        LOCAL_IMAGE: ""
-      with:
-        source: .
-        files: |
-          components/docker-bake.hcl
-          .core-recipe.json
-        targets: autoware-core-devel
-        push: true
-
-    - name: Start universe-common from the development core
-      if: steps.recipe.outputs.core_image != ''
-      env:
-        BUILD_TARGET: ${{ inputs.target }}
-        ROS_DISTRO: ${{ inputs.ros-distro }}
-        BUILD_PLATFORM: ${{ inputs.platform }}
-        BUILD_INPUTS: ${{ inputs.prepared }}
-        PUBLISH: ${{ inputs.publish }}
-        SHARED_COMMON: ${{ inputs.shared-common }}
-        COMMON_CACHED: ${{ inputs.common-cached }}
-        CORE_DEVEL_IMAGE: ${{ steps.recipe.outputs.core_image }}@${{ fromJSON(steps.core.outputs.metadata || '{}')['autoware-core-devel']['containerimage.digest'] }}
-      run: python3 .github/scripts/build.py recipe
-      shell: bash
-
     - name: Build image
       uses: docker/bake-action@v7
       env:

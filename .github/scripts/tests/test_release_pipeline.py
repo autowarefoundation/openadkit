@@ -26,42 +26,43 @@ from release_fixtures import (
 )
 
 
-@pytest.mark.parametrize(("version", "branch", "ref_type", "input_ref", "accepted"), [
-    ("v2.0.0", "release/2.0", "tag", "1.9.0", True),
-    ("v2.0.0-rc.4", "release/2.0", "tag", "1.9.0", True),
-    ("v2.0.1", "release/2.0", "tag", "1.9.0", True),
-    ("v2.0.0", "main", "tag", "1.9.0", False),
-    ("v2.1.0", "release/2.0", "tag", "1.9.0", False),
-    ("v2.0.0-rc.4", "release/2.0", "sha", "a" * 40, False),
-    ("v2.0.0-rc.4", "release/2.0", "branch", "main", False),
+@pytest.mark.parametrize(("dispatch", "branch", "ref_type", "input_ref", "accepted"), [
+    ("main", "main", "tag", "2.0.0", True),
+    ("release/2.0", "release/2.0", "tag", "2.0.0", True),
+    ("main", "release/2.0", "tag", "2.0.0", False),
+    ("main", "main", "branch", "main", False),
+    ("main", "main", "tag", "v2.0.0", False),
 ])
-def test_release_ref_policy(tmp_path, version, branch, ref_type, input_ref, accepted):
+def test_a_release_is_a_build_of_its_branch_on_an_autoware_release(tmp_path, dispatch, branch, ref_type, input_ref, accepted):
     build = tmp_path / "release-input/build"
     build.mkdir(parents=True)
     (build / "build-metadata.json").write_text(json.dumps({
         "openadkit_sha": RELEASE_SHA, "autoware_input_ref": input_ref,
-        "autoware_ref_type": ref_type, "autoware_base_version": "1.9.0",
+        "autoware_ref_type": ref_type, "autoware_base_version": "2.0.0",
     }))
-    result = run_validator(tmp_path, f"source_branch={branch}; validate_release_rules", VERSION=version)
+    result = run_validator(tmp_path, f"source_branch={branch}; validate_release_rules", GITHUB_REF=f"refs/heads/{dispatch}")
     assert (result.returncode == 0) is accepted, result.stderr
 
 
-@pytest.mark.parametrize("version, autoware, accepted", [
-    ("v2.0.0", "2.0.0", True),
-    ("v2.0.3", "2.0.1", True),
-    ("v2.1.0-rc.1", "2.1.0", True),
-    ("v2.0.1", "1.9.0", False),
-    ("v2.1.0", "2.0.0", False),
+@pytest.mark.parametrize("version", ["v2.0.0", "v2.1.0", "v3.0.0-rc.1"])
+def test_a_version_is_open_ad_kits_own(tmp_path, version):
+    build = tmp_path / "release-input/build"
+    build.mkdir(parents=True)
+    (build / "build-metadata.json").write_text(json.dumps({
+        "openadkit_sha": RELEASE_SHA, "autoware_input_ref": "2.0.0",
+        "autoware_ref_type": "tag", "autoware_base_version": "2.0.0",
+    }))
+    result = run_validator(tmp_path, "validate_inputs; source_branch=main; validate_release_rules",
+                           VERSION=version, GITHUB_REF="refs/heads/main")
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(("ref", "accepted"), [
+    ("refs/heads/main", True), ("refs/heads/release/2.0", True), ("refs/heads/feature", False), ("refs/tags/v2.0.0", False),
 ])
-def test_a_version_names_its_autoware(tmp_path, version, autoware, accepted):
-    metadata = tmp_path / "release-input/build/build-metadata.json"
-    metadata.parent.mkdir(parents=True)
-    metadata.write_text(json.dumps({"autoware_base_version": autoware}))
-    result = run_validator(tmp_path, "validate_autoware_line", VERSION=version)
+def test_releases_are_dispatched_from_main_or_a_maintenance_branch(tmp_path, ref, accepted):
+    result = run_validator(tmp_path, "validate_inputs", GITHUB_REF=ref)
     assert (result.returncode == 0) is accepted, result.stderr
-    if not accepted:
-        assert f"must build on Autoware {version[1:].rsplit('.', 1)[0]}.x" in result.stderr
-
 
 
 @pytest.mark.parametrize("problem", [None, "missing", "duplicate"])

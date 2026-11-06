@@ -33,19 +33,17 @@ fail() {
   exit 1
 }
 
-# The X.Y release line of VERSION.
-release_line() {
-  printf '%s\n' "${VERSION#v}" | cut -d. -f1-2
-}
-
 validate_inputs() {
   printf '%s\n' "${VERSION}" | grep -Eq "${openadkit_semver_re}" \
     || fail "Invalid version format '${VERSION}': must be strict SemVer vX.Y.Z or vX.Y.Z-prerelease"
   printf '%s\n' "${BUILD_TAG}" | grep -Eq '^[0-9]+-[0-9]+$' \
     || fail "Invalid build_tag format '${BUILD_TAG}': must be RUN_ID-RUN_ATTEMPT"
-  # A release line releases from its own branch, with its own scripts.
-  [ "${GITHUB_REF}" = "refs/heads/release/$(release_line)" ] \
-    || fail "Release ${VERSION} must be triggered from release/$(release_line) (got ${GITHUB_REF})"
+  # Releases come from main, or from a release/X.Y branch that maintains an
+  # older line, each with its own scripts.
+  case "${GITHUB_REF}" in
+    refs/heads/main|refs/heads/release/*) ;;
+    *) fail "Release ${VERSION} must be triggered from main or a release/X.Y branch (got ${GITHUB_REF})" ;;
+  esac
   case "${DEFAULT_ROS_DISTRO:-humble}" in
     humble|jazzy) ;;
     *) fail "Invalid default_ros_distro '${DEFAULT_ROS_DISTRO}': must be one of humble, jazzy" ;;
@@ -213,8 +211,8 @@ validate_metadata() {
   python3 "${script_dir}/images.py" validate release-input/build release-input/scan/scan-metadata.json
 }
 
-# Releases come from release/X.Y branches, whose .github/autoware.ref pins the
-# Autoware release their builds use; main builds for upstream development.
+# A release is a build of the branch it is released from, on an Autoware
+# release tag (.github/autoware.ref).
 validate_release_rules() {
   local metadata_sha autoware_input_ref autoware_ref_type autoware_base_version
 
@@ -222,8 +220,8 @@ validate_release_rules() {
   [ "${metadata_sha}" = "${release_sha}" ] \
     || fail "Build metadata SHA ${metadata_sha} does not match workflow SHA ${release_sha}"
 
-  [ "${source_branch}" = "release/$(release_line)" ] \
-    || fail "${VERSION} must be built from release/$(release_line) (got '${source_branch}')"
+  [ "refs/heads/${source_branch}" = "${GITHUB_REF}" ] \
+    || fail "${VERSION} must be a build of ${GITHUB_REF#refs/heads/} (got '${source_branch}')"
 
   autoware_input_ref=$(jq -r '.autoware_input_ref' release-input/build/build-metadata.json)
   autoware_ref_type=$(jq -r '.autoware_ref_type' release-input/build/build-metadata.json)
@@ -233,15 +231,6 @@ validate_release_rules() {
   fi
   [ "${autoware_base_version}" = "${autoware_input_ref}" ] \
     || fail "Autoware base version ${autoware_base_version} does not match release tag ${autoware_input_ref}"
-}
-
-# A release's X.Y is its Autoware's X.Y: v2.0.1 builds on Autoware 2.0.x.
-validate_autoware_line() {
-  local autoware_base_version
-
-  autoware_base_version=$(jq -r '.autoware_base_version' release-input/build/build-metadata.json)
-  [ "${autoware_base_version%.*}" = "$(release_line)" ] \
-    || fail "${VERSION} must build on Autoware $(release_line).x (got ${autoware_base_version})"
 }
 
 # Publishing creates the tag; one that already exists must be on this commit.
@@ -282,7 +271,6 @@ main() {
     scan-metadata.json scan_is_full scan_passed release-input/scan
   validate_metadata
   validate_release_rules
-  validate_autoware_line
   select_latest_artifact "evidence-summary-${BUILD_TAG}" .github/workflows/evidence.yaml \
     evidence-summary.json evidence_is_release evidence_passed release-input/evidence
   validate_git_tag

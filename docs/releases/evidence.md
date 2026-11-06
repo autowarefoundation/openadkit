@@ -10,7 +10,7 @@ Before creating a tag, the release validation job looks for an
 `evidence-summary-<build_tag>` artifact and accepts it only when:
 
 1. **The run succeeded:** it is a completed, successful run of
-   `.github/workflows/evidence.yaml` on the same `release/X.Y` branch.
+   `.github/workflows/evidence.yaml` on the branch that built the release.
 2. **It tested this build:** the summary names the promoted build tag, and it
    tested the build's own commit, not another commit against its images.
 3. **Every cell passed:** the summary result is `PASSED`. A cell passes only
@@ -44,7 +44,7 @@ The workflow retries a failed runtime cell once. A cell that still fails fails
 the run and blocks a release. The cells start deployments with
 `openadkit run --no-visualizer`.
 
-A 4-vCPU GitHub-hosted runner cannot run Autoware main in real time: the ego
+A 4-vCPU GitHub-hosted runner cannot run Autoware in real time: the ego
 drives late and the bundled samples take about three times as long as on a
 16-vCPU host. The scenario-simulation cells therefore run the simulation at
 half speed (`GLOBAL_REAL_TIME_FACTOR=0.5`, with `GLOBAL_TIMEOUT=400` wall-clock
@@ -83,32 +83,31 @@ Pin the latest stable Autoware release at the release cut. If it has a blocking
 issue, keep the previous verified stable pin and explain the exception, date
 and follow-up in the release notes.
 
-Every release, stable or candidate, is built on its `release/X.Y` branch from
-the Autoware release tag in `.github/autoware.ref`. The release gate refuses a
-version whose `X.Y` is not its Autoware's: v2.0.x builds on Autoware 2.0.x. Builds of `main` use a
-weekly snapshot of upstream development and are never released. The build's
+Every release, stable or candidate, is a build of `main` (or of a
+`release/X.Y` branch that fixes an older line) on the Autoware release tag in
+`.github/autoware.ref`. The release records that Autoware version; the build's
 `autoware-lock.repos`, resolved SHA and upstream image digests record the input.
 
 ### Backporting an Autoware fix
 
-Autoware releases come months apart. A fix that blocks a release line and is
+Autoware releases come months apart. A fix that blocks a release and is
 upstream, merged on Autoware's `main` or in an open pull request, can ride on
-the line as a patch instead of waiting for the next Autoware release:
+the pinned release as a patch instead of waiting for the next Autoware release:
 
 1. In the upstream repository, `git format-patch -1 <commit>`, and add a line
    `Upstream: <URL of the commit or pull request>` to its message.
-2. Open a pull request into `release/X.Y` that adds it as
+2. Open a pull request into `main` (or the `release/X.Y` branch) that adds it as
    `.github/autoware-patches/<repository>/<NNNN>-<subject>.patch`, where
    `<repository>` is its path under `autoware/src` (a key of
    `autoware-lock.repos`, such as `universe/autoware_universe`). The review is
    the fix's own diff.
-3. Every build of the line applies the patches in order right after
+3. Every build applies the patches in order right after
    `vcs import`; one that does not apply, or has no `Upstream:` line, fails the
    build. The release lists them under **Backported Autoware fixes**, its
    bundle carries them as `autoware.backports`, and `openadkit version` counts
-   them. The Autoware version and the release line stay those of the tag.
-4. When the line moves to an Autoware release that contains the fix, delete
-   the patch. `main`, which builds upstream development, needs none.
+   them. The Autoware version stays that of the tag.
+4. When the branch moves to an Autoware release that contains the fix, delete
+   the patch.
 
 `defaultRosDistro` in the promoted `openadkit.json` explicitly selects the ROS
 distro. The release input must agree, and its required runtime cells must pass.

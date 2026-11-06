@@ -1,5 +1,5 @@
-# Include the pinned Planning Simulation and add services (extension point 4).
-# The resolver selects this directory from deployment.json's base field.
+# The CI fixture's services on top of what `openadkit new custom-kit` made:
+# Planning Simulation and the kit's own services (extension point 4).
 include:
   - ${OPENADKIT_BASE_DEPLOYMENT}/docker-compose.yaml
 
@@ -13,7 +13,7 @@ services:
 
   acme-probe:
     # The kit's own C++ node from overlay_ws (extension point 3), built by
-    # overlay_ws/build.sh. It runs in an Open AD Kit runtime image, whose
+    # openadkit build. It runs in an Open AD Kit runtime image, whose
     # entrypoint hook sources the overlay workspace mounted below.
     image: ${PLANNING_CONTROL_IMAGE:?set by the openadkit CLI}
     network_mode: host

@@ -19,7 +19,7 @@ except (ValueError, KeyError, TypeError):
 _openadkit() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]}
     local command=${COMP_WORDS[1]:-}
-    local commands="install upgrade setup uninstall list version validate config fetch run build clean status logs restart shell record stop"
+    local commands="install upgrade setup uninstall list version new validate config fetch run build clean status logs restart shell record stop"
     COMPREPLY=()
 
     if ((COMP_CWORD == 1)); then
@@ -56,6 +56,7 @@ _openadkit() {
         fetch) options="--ros-distro --force --help" ;;
         run) options="--ros-distro --gpu --node --ws --pull --no-visualizer --verify --help" ;;
         build) options="--ros-distro --help" ;;
+        new) options="--base --help" ;;
         clean) options="--help" ;;
         status | stop | shell) options="--node --help" ;;
         restart) options="--node --all --help" ;;

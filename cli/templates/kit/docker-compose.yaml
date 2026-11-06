@@ -1,0 +1,21 @@
+# {{base}} and this kit's own services.
+include:
+  - ${OPENADKIT_BASE_DEPLOYMENT}/docker-compose.yaml
+
+# Add services here. One that runs your overlay packages uses an Open AD Kit
+# image and mounts the workspace:
+#
+#   my-node:
+#     image: ${PLANNING_CONTROL_IMAGE:?set by the openadkit CLI}
+#     network_mode: host
+#     ipc: host
+#     env_file:
+#       - ${OPENADKIT_BASE_ROOT}/deployments/shared/runtime.env
+#     volumes:
+#       - ${OPENADKIT_BASE_ROOT}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+#       - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
+#     command: ros2 run my_package my_node
+#     restart: on-failure
+#
+# A healthcheck on a service makes `openadkit run` wait for it to pass.
+services: {}

@@ -1,8 +1,8 @@
 # Integrator Guide
 
 An integrator kit owns its differences, while Open AD Kit owns the base CLI,
-images and deployments. Start with [Custom Deployment](custom-deployment.md)
-and the [custom-kit example](https://github.com/autowarefoundation/openadkit/tree/main/deployments/custom-kit).
+images and deployments. Start one with `openadkit new` ([Custom Deployment](custom-deployment.md));
+the kit CI exercises is that output with the [example fixture](https://github.com/autowarefoundation/openadkit/tree/main/.github/scripts/evidence/kit) on top.
 This interface requires manifest schema version 2; older manifests are rejected.
 
 ## Pin the Base
@@ -22,9 +22,9 @@ can add downloads with distinct destination variables and extra reset services.
 Kit deployments currently use the single-host Compose view, not inherited
 split-host nodes.
 
-The example has just one deployment, also named `custom-kit`. Its
-`openadkit.json`, `deployment.json`, Compose and differences live in one
-directory; `deployments.custom-kit.path` is `"."`. No nested `deployments/`
+A kit made by `openadkit new my-kit` has just one deployment, also named
+`my-kit`. Its `openadkit.json`, `deployment.json`, Compose and differences live
+in one directory; `deployments.my-kit.path` is `"."`. No nested `deployments/`
 directory is needed. Run commands from that directory, not the base repository.
 
 ## Extension Points
@@ -120,7 +120,7 @@ what starts it:
 - A changed copy of an Autoware package shadows the image's own. It runs where
   Autoware already launches that package, with nothing more to configure.
 - A new node runs only where something starts it: an extra service (as the
-  example's `acme-probe`), a launch file you override under `config/autoware`,
+  example fixture's `acme-probe`), a launch file you override under `config/autoware`,
   or by hand with `openadkit shell <service> ros2 run <package> <node>`.
 
 To try a workspace with a reference deployment, without writing a kit, mount it
@@ -138,7 +138,7 @@ The devel and runtime images install ROS packages from the same
 [ROS snapshot](../getting-started/container-images.md#ros-package-snapshot), so
 an overlay built in the devel image links the ROS versions the runtime image
 ships. A dependency you add must also exist in the runtime image; the overlay
-cannot install packages. The example's C++ node links `diagnostic_updater`
+cannot install packages. The example fixture's C++ node links `diagnostic_updater`
 deliberately to test the devel/runtime ABI boundary, then publishes
 `/acme/probe`.
 
@@ -148,7 +148,7 @@ Include the base's Compose file using `OPENADKIT_BASE_DEPLOYMENT`, then define y
 under `services:`. Keep communicating ROS services on the base ROS domain and
 middleware. An extra Open AD Kit runtime service loads the kit workspace by
 mounting `${OPENADKIT_OVERLAY_WS}` at `/openadkit/overlay_ws:ro`, as the
-example's `acme-probe` does. It needs no image of its own: a runtime image and
+example fixture's `acme-probe` does. It needs no image of its own: a runtime image and
 the workspace are enough. Build your own image only for what the runtime images
 lack, such as a system package or a non-ROS application, and declare it as an
 artifact (point 5).
@@ -180,7 +180,7 @@ overrides without a counterpart (see [Config Differences](#2-config-differences)
 Your kit's acceptance checks run where CI runs them:
 
 - **Readiness:** give a service of your own a Compose `healthcheck`. `run`
-  waits until it passes. The example's `acme-probe` service runs
+  waits until it passes. The example fixture's `acme-probe` service runs
   `checks/custom_kit.py`, which checks the fresh `/acme/probe` publication of
   its C++ package and its parameters.
 - **End to end:** the base's `verify` step runs on top of your layer with

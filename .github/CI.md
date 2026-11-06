@@ -49,9 +49,10 @@ stay distinct.
 Hosted split evidence is two nodes on one runner, not proof of two physical
 hosts.
 
-The one integrator example lives at `deployments/custom-kit/`, with its kit
-manifest and deployment files side by side. CI stages it without host-built
-workspace products and verifies its source checksum.
+The integrator example is made in CI, not kept in `deployments/`: the staged
+CLI's `openadkit new custom-kit` makes it under `kits/`, and the fixture in
+`.github/scripts/evidence/kit/` adds every extension point on top. Lint
+validates the same kit made from the checkout.
 
 After changing a shared build owner, update both workflow path triggers and the
 changed-input patterns in `build.py`. Python helpers needed by release and scan

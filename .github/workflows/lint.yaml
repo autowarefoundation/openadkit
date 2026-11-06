@@ -10,7 +10,7 @@ on:
       - 'openadkit'
       - 'cli/**'
       - 'pyproject.toml'
-      - 'deployments/custom-kit/**'
+      - '.github/scripts/evidence/kit/**'
       - 'deployments/safety-island-simulation/**'
       - '**/*.sh'
       - '**/*.json'
@@ -133,14 +133,15 @@ jobs:
             "${validate_args[@]}"
           done <<< "${matrix}"
 
-      - name: Validate the in-tree kits
+      - name: Validate the example kits made by openadkit new
         env:
           REMOTE_PASSWORD: ci-validate
         run: |
           set -euo pipefail
-          for kit in custom-kit; do
-            (cd "deployments/${kit}" && ../../openadkit validate "${kit}")
-          done
+          python3 .github/scripts/validation_matrix.py --source-root . --make-example-kits "$RUNNER_TEMP/kits" |
+            while read -r kit; do
+              (cd "${kit}" && "$GITHUB_WORKSPACE/openadkit" validate "$(basename "${kit}")")
+            done
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4

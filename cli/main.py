@@ -16,16 +16,22 @@ from typing import Any, NoReturn
 import compose
 import data
 from manifest import (
+    NAME_RE,
     OpenADKitError,
     RuntimeContext,
+    available_deployments,
+    declares_base,
     deployment_integrity,
     get_deployment,
+    install_root,
     load_json,
     load_kit,
     require_string,
     resolve_extends,
     root_path,
 )
+
+KIT_TEMPLATE = Path(__file__).resolve().parent / "templates/kit"
 
 
 def find_kit(start: Path) -> Path | None:
@@ -50,6 +56,45 @@ def find_kit(start: Path) -> Path | None:
 
 def read_extends(kit_root: Path) -> str:
     return require_string(load_json(kit_root / "openadkit.json").get("extends"), "extends")
+
+
+def create_kit(root: Path, kit: RuntimeContext, name: str, base: str, destination: Path) -> Path:
+    """A kit named name in destination, on top of base, from cli/templates/kit.
+
+    An installed release is extended by its version, so the kit follows that
+    install; anything else by its path, relative when the kit is inside it.
+    """
+    if kit.kind == "kit":
+        raise OpenADKitError("run openadkit new outside a kit: a kit extends an Open AD Kit, not another kit")
+    if not NAME_RE.fullmatch(name):
+        raise OpenADKitError(f"invalid kit name {name}: use lowercase letters, digits and -")
+    if base not in kit.deployments:
+        raise OpenADKitError(f"{base} is not a deployment of this Open AD Kit; available: {available_deployments(kit)}")
+    if declares_base(root, kit, base):
+        raise OpenADKitError(f"{base} builds on another deployment; a kit builds on one without a base")
+    target = destination.resolve() / name
+    if target.exists() or target.is_symlink():
+        raise OpenADKitError(f"{target} already exists")
+    if kit.kind == "release" and (install_root() / f"openadkit-{kit.version}").resolve() == root.resolve():
+        extends = str(kit.version)
+    elif target.is_relative_to(root.resolve()):
+        extends = os.path.relpath(root.resolve(), target)
+    else:
+        extends = str(root.resolve())
+    values = {"name": name, "base": base, "extends": extends, "version": kit.version or "(a source checkout)"}
+    for source in sorted(KIT_TEMPLATE.rglob("*")):
+        output = target / source.relative_to(KIT_TEMPLATE)
+        if source.is_dir():
+            output.mkdir(parents=True, exist_ok=True)
+            continue
+        text = source.read_text(encoding="utf-8")
+        for key, value in values.items():
+            text = text.replace("{{" + key + "}}", value)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+    # The deployment's config layer, which every service mounts.
+    (target / "config/autoware").mkdir(parents=True)
+    return target
 
 
 def load_context(start: Path) -> tuple[Path, RuntimeContext]:
@@ -236,6 +281,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="workspace with a src/ directory (default: the kit's overlay_ws)",
     )
     build.add_argument("--ros-distro", metavar="DISTRO", help="ROS distro (default: bundle default)")
+
+    new = subparsers.add_parser("new", help="create a kit on top of one of these deployments")
+    new.add_argument("name", metavar="NAME", help="the kit's name and directory, created here")
+    new.add_argument(
+        "--base", default="planning-simulation", metavar="DEPLOYMENT",
+        help="the deployment the kit builds on (default: planning-simulation)",
+    )
 
     clean = subparsers.add_parser("clean", help="delete a deployment's downloaded data")
     clean.add_argument(
@@ -554,6 +606,11 @@ def main() -> int:
         return list_deployments(root, kit, json_output=args.json_output)
     if args.command == "version":
         return show_version(root, kit, json_output=args.json_output)
+    if args.command == "new":
+        target = create_kit(root, kit, args.name, args.base, Path.cwd())
+        print(f"created: {target}")
+        print(f"next: cd {args.name} && openadkit validate {args.name} && openadkit run {args.name}")
+        return 0
 
     if args.command == "build":
         if os.geteuid() == 0 and os.environ.get("SUDO_USER"):

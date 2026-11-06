@@ -98,6 +98,12 @@ instead of its name, such as `openadkit run ./my-kit`: an argument with a `/` or
 a leading `.` is a directory, and the kit around it is used wherever you run the
 command.
 
+## Your Own Kit
+
+`openadkit new my-kit [--base DEPLOYMENT]` makes `./my-kit`, a kit on top of a
+deployment of this Open AD Kit (Planning Simulation by default) that holds
+only your differences. See [Custom Deployment](../deployments/custom-deployment.md).
+
 ## Configuration
 
 Each deployment reads its settings from environment files, in this order

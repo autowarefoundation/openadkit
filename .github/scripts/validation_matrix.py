@@ -14,6 +14,9 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -29,8 +32,13 @@ EVIDENCE_PLATFORM = "linux/amd64"
 PLATFORM_CELLS: dict[str, dict[str, str]] = {
     "planning-simulation": {"backend": "quadlet", "runner": "ubuntu-24.04"},
 }
-# The in-tree kits, exercised against the same build as the base.
-EXAMPLE_KITS = ("custom-kit",)
+# The example kits and their bases, exercised against the same build as the
+# base: made by the staged kit's own `openadkit new` into kits/, with the CI
+# fixture on top (an overlay C++ package, a parameter override, a healthcheck
+# and a pinned artifact).
+EXAMPLE_KITS = {"custom-kit": "planning-simulation"}
+EXAMPLE_KIT_DIRECTORY = "kits"
+EXAMPLE_KIT_FIXTURE = Path(__file__).resolve().parent / "evidence/kit"
 # Host build products of an overlay workspace; never kit content.
 COLCON_PRODUCTS = ("build", "install", "log")
 
@@ -142,24 +150,41 @@ def evidence_cells(
     return cells
 
 
-def example_kit_roots(runtime: ModuleType, source_root: Path) -> list[Path]:
-    """The in-tree kits, deployments/<name> for each EXAMPLE_KITS entry."""
-    roots = []
-    for name in EXAMPLE_KITS:
-        relative = f"deployments/{name}"
-        root = source_root / relative
-        if not (root / "openadkit.json").is_file():
-            fail(f"{name} kit is missing ({relative}); its cells are required evidence")
-        if runtime.load_json(root / "openadkit.json").get("kind") != "kit":
-            fail(f"{name} kit must declare kind: kit ({relative})")
-        roots.append(root)
-    return roots
+def make_example_kits(launcher_root: Path, parent: Path) -> list[Path]:
+    """Make the example kits in parent with launcher_root's `openadkit new`, the CI fixture on top."""
+    parent.mkdir(parents=True, exist_ok=True)
+    environment = {name: value for name, value in os.environ.items() if name not in ("OPENADKIT_KIT", "OPENADKIT_DELEGATED")}
+    kits = []
+    for name, base in EXAMPLE_KITS.items():
+        result = subprocess.run(
+            [str(launcher_root / "openadkit"), "new", name, "--base", base],
+            cwd=parent, env=environment, capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0:
+            fail(f"openadkit new {name} failed: {result.stderr.strip()}")
+        kit = parent / name
+        shutil.copytree(
+            EXAMPLE_KIT_FIXTURE, kit, dirs_exist_ok=True,
+            # The fixture's README describes the fixture; the kit keeps the one new wrote.
+            ignore=shutil.ignore_patterns("artifacts.json", "README.md", "__pycache__", *COLCON_PRODUCTS),
+        )
+        manifest = json.loads((kit / "openadkit.json").read_text(encoding="utf-8"))
+        manifest["artifacts"] = json.loads((EXAMPLE_KIT_FIXTURE / "artifacts.json").read_text(encoding="utf-8"))
+        (kit / "openadkit.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        kits.append(kit)
+    return kits
 
 
 def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, str]]:
-    """Exercise the in-tree kits against the same build as the base."""
-    return [cell | {"kit": root.relative_to(source_root).as_posix()}
-            for root in example_kit_roots(runtime, source_root) for cell in evidence_cells(runtime, root)]
+    """Each example kit runs its base's single-host cells, from its directory in kits/."""
+    base_cells = evidence_cells(runtime, source_root)
+    cells = []
+    for name, base in EXAMPLE_KITS.items():
+        for cell in base_cells:
+            if cell["deployment"] == base and not cell.get("node") and not cell.get("backend"):
+                kit_cell = cell | {"deployment": name, "kit": f"{EXAMPLE_KIT_DIRECTORY}/{name}"}
+                cells.append(kit_cell | {"name": evidence_cell_name(kit_cell)})
+    return cells
 
 
 def evidence_cell_name(cell: dict[str, Any]) -> str:
@@ -222,9 +247,17 @@ def main() -> int:
         help="print the evidence cells as a GitHub matrix instead",
     )
     parser.add_argument("--include-example-kits", action="store_true")
+    parser.add_argument(
+        "--make-example-kits", type=Path, metavar="DIRECTORY",
+        help="make the example kits in DIRECTORY with this checkout's openadkit new instead",
+    )
     args = parser.parse_args()
     source_root = args.source_root.resolve()
     try:
+        if args.make_example_kits:
+            for kit in make_example_kits(source_root, args.make_example_kits.resolve()):
+                print(kit)
+            return 0
         runtime = load_runtime(source_root)
         if args.evidence_cells:
             cells = evidence_cells(runtime, source_root)

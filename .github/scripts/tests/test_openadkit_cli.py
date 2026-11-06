@@ -1377,6 +1377,60 @@ def test_kit_may_leave_out_the_base_side_its_inherited_oneshots_belong_to(tmp_pa
     assert result.returncode != 0 and "unknown Compose service(s): probe" in result.stderr
 
 
+@pytest.mark.parametrize("installed", [False, True])
+def test_new_makes_a_kit_that_extends_this_open_ad_kit(tmp_path, installed):
+    root, _ = runtime_tree(tmp_path, release=True)
+    install = tmp_path / "install"
+    if installed:
+        install.mkdir()
+        (install / "openadkit-v1.2.3").symlink_to(root)
+    work = tmp_path / "work"
+    work.mkdir()
+    result = run_cli(root, "new", "my-kit", "--base", "example", directory=work, OPENADKIT_INSTALL_DIR=str(install))
+    assert result.returncode == 0, result.stderr
+    kit = work / "my-kit"
+    manifest = json.loads((kit / "openadkit.json").read_text())
+    # An installed release is followed by its version; anything else by its path.
+    assert manifest["extends"] == ("v1.2.3" if installed else str(root.resolve()))
+    assert manifest["deployments"] == {"my-kit": {"path": "."}} and manifest["artifacts"] == {}
+    deployment = json.loads((kit / "deployment.json").read_text())
+    assert deployment["name"] == "my-kit" and deployment["base"] == "example"
+    assert (kit / "config/autoware").is_dir() and (kit / "overlay_ws/src").is_dir()
+    assert "{{" not in "".join(path.read_text() for path in kit.rglob("*") if path.is_file())
+    if not installed:
+        loaded = cli_manifest.load_kit(kit)
+        assert loaded.kind == "kit" and set(loaded.deployments) == {"my-kit"}
+        assert cli_manifest.get_deployment(kit, loaded, "my-kit").base.name == "example"
+
+
+def test_new_makes_a_kit_inside_a_checkout_relative_to_it(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    (root / "kits").mkdir()
+    result = run_cli(root, "new", "inner", "--base", "example", directory=root / "kits")
+    assert result.returncode == 0, result.stderr
+    assert json.loads((root / "kits/inner/openadkit.json").read_text())["extends"] == "../.."
+
+
+@pytest.mark.parametrize(("name", "base", "message"), [
+    ("Bad_Name", "example", "invalid kit name"),
+    ("my-kit", "missing", "missing is not a deployment"),
+    ("taken", "example", "already exists"),
+])
+def test_new_refuses_what_cannot_be_a_kit(tmp_path, name, base, message):
+    root, _ = runtime_tree(tmp_path)
+    work = tmp_path / "work"
+    (work / "taken").mkdir(parents=True)
+    result = run_cli(root, "new", name, "--base", base, directory=work)
+    assert result.returncode != 0 and message in result.stderr
+
+
+def test_new_refuses_inside_a_kit(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    kit = integrator_kit(tmp_path, root)
+    result = run_cli(root, "new", "nested", "--base", "example", directory=kit)
+    assert result.returncode != 0 and "outside a kit" in result.stderr
+
+
 def test_build_builds_one_workspace_in_the_pinned_devel_image(tmp_path):
     root, _ = runtime_tree(tmp_path, release=True)
     kit = integrator_kit(tmp_path, root)

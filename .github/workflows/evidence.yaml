@@ -229,26 +229,15 @@ jobs:
         if: ${{ matrix.backend == 'quadlet' }}
         run: sudo apt-get update && sudo apt-get install -y podman catatonit
 
-      - name: Download build metadata for the overlay build
-        if: ${{ matrix.kit != '' && hashFiles(format('{0}/overlay_ws/build.sh', matrix.kit)) != '' }}
-        uses: actions/download-artifact@v8
-        with:
-          name: evidence-build-metadata-${{ needs.prepare.outputs.build_tag }}
-          path: build-metadata
-
-      - name: Build the kit's overlay workspace in the pinned devel image
-        if: ${{ matrix.kit != '' && hashFiles(format('{0}/overlay_ws/build.sh', matrix.kit)) != '' }}
+      - name: Build the kit's overlay workspace
+        # As an integrator would: the staged kit pins its devel image.
+        if: ${{ matrix.kit != '' }}
+        working-directory: evidence-kit/${{ matrix.kit }}
         env:
-          KIT_PATH: ${{ matrix.kit }}
           DISTRO: ${{ matrix.distro }}
         run: |
           set -euo pipefail
-          DEVEL_IMAGE=$(jq -er --arg distro "$DISTRO" '
-            .images[] | select(.target == "universe-common-devel" and .ros_distro == $distro)
-            | .repo + "@" + .digest
-          ' build-metadata/build-metadata.json)
-          export DEVEL_IMAGE
-          bash "evidence-kit/$KIT_PATH/overlay_ws/build.sh" "$DISTRO"
+          "$GITHUB_WORKSPACE/evidence-kit/openadkit" build --ros-distro "$DISTRO"
 
       - name: Run evidence cell
         id: cell

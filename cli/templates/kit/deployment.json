@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "name": "{{name}}",
+  "description": "{{base}} with this kit's layer on top",
+  "base": "{{base}}",
+  "compose": {
+    "files": ["docker-compose.yaml"]
+  }
+}

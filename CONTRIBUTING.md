@@ -113,7 +113,7 @@ For split-host (`--node`) topology testing, follow the [documentation](https://a
 
 ### Releasing
 
-Every build of `main` (or of a `release/X.Y` branch) is scanned and runs the evidence cells. Run `release.yaml` (GitHub Actions) on the same branch with a version and the `build_tag` of a build whose scan and evidence passed to promote it to a `vX.Y.Z` release or pre-release. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
+Every build of `main` (or of a `release/X.Y` branch) is scanned and runs the evidence cells. Run `release.yaml` (GitHub Actions) on the same branch with a version and the `build_tag` of a build whose scan and evidence passed to promote it to a `vX.Y.Z` release or pre-release. See the workflow input descriptions for details. The release takes its default ROS distro from `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
 
 Both release candidates and stable releases require a successful evidence run
 that passed every cell for the promoted build; reviewed manifest exemptions

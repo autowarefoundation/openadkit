@@ -38,7 +38,6 @@ python3 "${planner}" \
     --version "v0.0.0-evidence.${build_tag}" \
     --release-sha "${sha}" \
     --packager-sha "${packager_sha}" \
-    --default-ros-distro "$(jq -er '.defaultRosDistro' "${source_root}/openadkit.json")" \
     --stable-release false \
     --publish-latest-aliases false
 

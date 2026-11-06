@@ -2,7 +2,7 @@
 # images and reserve the GPU. Model flags come from config.gpu.env.
 services:
   sensing:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:?set by the openadkit CLI}
     deploy:
       resources:
         reservations:
@@ -11,7 +11,7 @@ services:
               count: all
               capabilities: [gpu]
   perception:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:?set by the openadkit CLI}
     # The CLI installs the CenterPoint models here; mount the same path.
     volumes:
       - ${CENTERPOINT_DATA_PATH}:/autoware_data/lidar_centerpoint:rw

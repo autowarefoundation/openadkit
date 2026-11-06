@@ -1,7 +1,7 @@
 # Localization — determines the vehicle's position on the map.
 services:
   localization:
-    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
+    image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
     container_name: autoware-localization
     network_mode: host
     init: true

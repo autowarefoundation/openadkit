@@ -1,7 +1,7 @@
 # Simulator — the built-in dummy simulator behind the planning stack.
 services:
   simulator:
-    image: ${SIMULATOR_IMAGE:-ghcr.io/autowarefoundation/openadkit:simulator}
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
     container_name: autoware-simulator
     network_mode: host
     init: true

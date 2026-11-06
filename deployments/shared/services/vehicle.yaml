@@ -1,7 +1,7 @@
 # Vehicle — bridges vehicle commands to the vehicle or simulator.
 services:
   vehicle:
-    image: ${VEHICLE_SYSTEM_IMAGE:-ghcr.io/autowarefoundation/openadkit:vehicle-system}
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
     container_name: autoware-vehicle
     network_mode: host
     init: true

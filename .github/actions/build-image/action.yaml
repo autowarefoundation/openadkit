@@ -21,7 +21,7 @@ inputs:
     description: Push images (false for PR and local validation)
     default: "false"
   stable-tags:
-    description: Also publish unversioned tags (main pushes only)
+    description: Also publish the moving <target>-<arch>-<distro> tag that PR builds start from (main pushes only)
     default: "false"
   ccache:
     description: Restore and inject ccache mounts

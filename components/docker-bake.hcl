@@ -8,8 +8,8 @@
 // cross-group references resolve to already-pushed GHCR tags. CI also sets
 // LOCAL_IMAGE="" so only docker-metadata-action tags are published.
 
-// Default ROS distro for local builds. Matches the published short-tag alias
-// and release DEFAULT_ROS_DISTRO. CI sets ROS_DISTRO per matrix entry.
+// Default ROS distro for local builds, openadkit.json defaultRosDistro. CI sets
+// ROS_DISTRO per matrix entry.
 variable "ROS_DISTRO" {
   default = "humble"
 }
@@ -37,9 +37,7 @@ variable "UPSTREAM_REPO" {
 }
 
 // Local tag prefix. Empty string disables local tags so CI metadata-action is
-// the sole tag source. Local tags cover the compose defaults
-// (`${COMPONENT_IMAGE:-ghcr.io/.../openadkit:<target>}`), the published
-// :<target>-<ros_distro> alias, and the CLI repository-mode lookup tag.
+// the sole tag source.
 variable "LOCAL_IMAGE" {
   default = "ghcr.io/autowarefoundation/openadkit"
 }
@@ -65,17 +63,11 @@ function "local_arch" {
   result = BAKE_LOCAL_PLATFORM == "linux/arm64" ? "arm64" : "amd64"
 }
 
-// Local tags: short :<target> (Humble-only, used by the compose defaults),
-// :<target>-<ros_distro>, and the CLI-compatible :<target>-<arch>-<ros_distro>.
+// Local tag: :<target>-<arch>-<ros_distro>, the one the CLI runs from a source
+// checkout.
 function "local_tags" {
   params = [name]
-  result = LOCAL_IMAGE == "" ? [] : concat(
-    ROS_DISTRO == "humble" ? ["${LOCAL_IMAGE}:${name}"] : [],
-    [
-      "${LOCAL_IMAGE}:${name}-${ROS_DISTRO}",
-      "${LOCAL_IMAGE}:${name}-${local_arch()}-${ROS_DISTRO}",
-    ],
-  )
+  result = LOCAL_IMAGE == "" ? [] : ["${LOCAL_IMAGE}:${name}-${local_arch()}-${ROS_DISTRO}"]
 }
 
 // Single source of truth for the sensing-perception `--base-paths` package

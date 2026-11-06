@@ -1,4 +1,4 @@
-ARG SIMULATOR_IMAGE=ghcr.io/autowarefoundation/openadkit:simulator
+ARG SIMULATOR_IMAGE=ghcr.io/autowarefoundation/openadkit:simulator-humble
 FROM ${SIMULATOR_IMAGE} AS carla-interface
 
 ARG ROS_DISTRO=humble

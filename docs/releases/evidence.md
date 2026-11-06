@@ -110,7 +110,7 @@ the pinned release as a patch instead of waiting for the next Autoware release:
    the patch.
 
 `defaultRosDistro` in the promoted `openadkit.json` explicitly selects the ROS
-distro. The release input must agree, and its required runtime cells must pass.
+distro, and its required runtime cells must pass.
 The gate does not automatically switch from Humble to Jazzy or remove a failing
 distro. To change supported distros, update the manifests in a reviewed source
 change and build/test that revision. Humble remains the initial default.

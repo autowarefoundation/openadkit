@@ -2,7 +2,7 @@
 # A oneshot (restart: "no"): deployments list it in deployment.json resetServices.
 services:
   map-check:
-    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
+    image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
     container_name: autoware-map-check
     network_mode: host
     init: true

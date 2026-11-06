@@ -1,7 +1,7 @@
 # API — the Autoware API and default ADAPI surface.
 services:
   api:
-    image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
+    image: ${API_IMAGE:?set by the openadkit CLI}
     container_name: autoware-api
     network_mode: host
     init: true

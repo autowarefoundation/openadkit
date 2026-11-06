@@ -13,15 +13,13 @@ image digest.
 |-----|---------|---------|--------|
 | **Release** | `planning-control-humble-v2.0.0` | Every release | No |
 | **Latest per distro** | `planning-control-humble` | Stable releases | Yes |
-| **Default distro** | `planning-control` | Stable releases, default distro only | Yes |
 | **Pre-release** | `planning-control-humble-v2.0.0-rc.1` | Pre-releases | No |
 | **CI build** | `planning-control-humble-123456789-1` | Every CI build (`<run_id>-<run_attempt>`) | No |
 
 Releases promote a CI build of `main` (see [Versioning](#versioning)).
 
-The moving aliases also exist with a `-latest` suffix
-(`planning-control-humble-latest`, `planning-control-latest`). Pre-releases
-never update them.
+Pre-releases never move the latest-per-distro aliases. No alias leaves out the
+distro, so an image never switches ROS distro under the same tag.
 
 Examples use **{{ default_distro_title }}**, the default distro. Jazzy images use
 the same patterns with `-jazzy` (for example `planning-control-jazzy`).
@@ -31,9 +29,8 @@ the same patterns with `-jazzy` (for example `planning-control-jazzy`).
 
 - **Reproducible deployments**: use a release tag (`vX.Y.Z`) or a digest.
 - **Latest stable for a distro**: use `<target>-<ros_distro>`.
-- **Quick experiments**: use the default alias `<target>`.
-- **Never** pin per-platform CI tags such as `planning-control-amd64-humble`;
-  they move with every build.
+- **Never** pin per-platform CI tags such as `universe-common-amd64-humble`;
+  they move with every build of `main`.
 
 ## Versioning
 

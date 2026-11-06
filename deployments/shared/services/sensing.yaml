@@ -3,7 +3,7 @@
 # its ${DATA_PATH} bind in its own override.
 services:
   sensing:
-    image: ${SENSING_PERCEPTION_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception}
+    image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
     container_name: autoware-sensing
     network_mode: host
     init: true

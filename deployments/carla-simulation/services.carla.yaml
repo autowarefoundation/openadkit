@@ -49,7 +49,7 @@ services:
     restart: on-failure
 
   carla-interface:
-    image: ${CARLA_INTERFACE_IMAGE:-ghcr.io/autowarefoundation/openadkit:carla-interface}
+    image: ${CARLA_INTERFACE_IMAGE:?set by the openadkit CLI}
     container_name: ${CARLA_INTERFACE_CONTAINER}
     network_mode: host
     init: true
@@ -77,7 +77,7 @@ services:
     restart: on-failure
 
   carla-map-loader:
-    image: ${CARLA_INTERFACE_IMAGE:-ghcr.io/autowarefoundation/openadkit:carla-interface}
+    image: ${CARLA_INTERFACE_IMAGE:?set by the openadkit CLI}
     container_name: ${CARLA_MAP_LOADER_CONTAINER}
     network_mode: host
     init: true

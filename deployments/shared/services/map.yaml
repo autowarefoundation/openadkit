@@ -10,7 +10,7 @@
 # is killed and restarts with it.
 services:
   map:
-    image: ${LOCALIZATION_MAPPING_IMAGE:-ghcr.io/autowarefoundation/openadkit:localization-mapping}
+    image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
     container_name: autoware-map
     network_mode: host
     init: true

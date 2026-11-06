@@ -387,6 +387,9 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
     # but may leave their side of the base out (one service layer of it).
     inherited = set(deployment.base.reset_services()) if deployment.base else set()
     unknown = sorted(set(deployment.reset_services(selection.node)) - configured - inherited)
+    # A node may leave the verify service to another node; the whole graph must have it.
+    if deployment.verify and selection.node is None and deployment.verify["service"] not in configured:
+        unknown.append(deployment.verify["service"])
     if unknown:
         raise OpenADKitError(
             "manifest references unknown Compose service(s): " + ", ".join(unknown)
@@ -495,8 +498,9 @@ def check_services_stay_up(
 ) -> None:
     """Fail when a service crashes shortly after `up`.
 
-    Without healthchecks `up --wait` only waits for the containers to start, so
-    a service that fails during launch and restarts would still look running.
+    `up --wait` waits for the services with a healthcheck to be healthy and
+    only for the others to start, so one of those that fails during launch and
+    restarts would still look running.
     """
     ids = compose_capture(deployment, selection, ["ps", "--all", "--quiet"]).stdout.split()
     if not ids:
@@ -556,6 +560,51 @@ def start(
     )
     check_services_stay_up(deployment, selection, baseline)
     report_overrides(deployment, selection)
+
+
+def verify(deployment: Deployment, selection: Selection, services: set[str], started: float) -> int:
+    """Run the deployment's verify step on the ready stack and return its exit code.
+
+    A command runs in its service with ROS, Autoware and the overlays sourced;
+    without one, the step is the service's own exit, as a scenario run's. The
+    result is written to the deployment's results directory.
+    """
+    spec = deployment.verify
+    assert spec is not None
+    service = spec["service"]
+    if service not in services:
+        print(f"verify: {service} does not run on this node; nothing to verify here")
+        return 0
+    report: dict[str, Any] = {
+        "schemaVersion": 1,
+        "deployment": deployment.name,
+        "node": selection.node,
+        "service": service,
+        "ready_s": round(time.monotonic() - started, 1),
+    }
+    # The step's own output follows on the same terminal.
+    print(f"verify: {' '.join(spec['command']) if 'command' in spec else f'waiting for {service} to finish'}", flush=True)
+    begin = time.monotonic()
+    if "command" in spec:
+        command = compose_command(deployment, selection) + [
+            "exec", "-T", service, "bash", "-c", SHELL_SETUP + 'exec "$@"', "bash", *spec["command"],
+        ]
+        print_command(command)
+        code = subprocess.run(
+            command, cwd=deployment.directory, env=compose_process_environment(deployment, selection), check=False,
+        ).returncode
+    else:
+        ids = compose_capture(deployment, selection, ["ps", "--all", "--quiet", service]).stdout.split()
+        if not ids:
+            raise OpenADKitError(f"{service} has no container to wait for")
+        code = int(capture_process(["docker", "wait", ids[0]], env=process_environment(selection)).stdout.strip())
+    report.update(verify_s=round(time.monotonic() - begin, 1), exit_code=code, result="PASSED" if code == 0 else "FAILED")
+    results = deployment.output_directory / "results"
+    results.mkdir(parents=True, exist_ok=True)
+    path = results / "verify.json"
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(f"verify: {'passed' if code == 0 else f'failed (exit {code})'}; report: {path}")
+    return code
 
 
 def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:

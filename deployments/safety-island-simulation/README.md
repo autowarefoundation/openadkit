@@ -40,9 +40,10 @@ container does not start there.
 
 ## Evidence
 
-The evidence cell checks that the control command's only publisher is the
-Safety Island's bridge and that Autoware's follower is not running, then runs
-Planning Simulation's golden path.
+`run` waits for the bridge's healthcheck (`checks/safety_island.py`): the
+control command's only publisher is the Safety Island's bridge, and Autoware's
+follower is not running. `run --verify` then runs Planning Simulation's golden
+path, as the evidence cell does.
 
 ## Upgrade
 

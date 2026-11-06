@@ -23,5 +23,14 @@ services:
     volumes:
       - ${OPENADKIT_BASE_ROOT}/deployments/shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
+      - ./checks:/openadkit/checks:ro
     command: ros2 run acme_probe probe
+    # This kit's readiness, which `openadkit run` waits for (checks/custom_kit.py).
+    healthcheck:
+      test: ["CMD-SHELL", ". /opt/ros/${ROS_DISTRO}/setup.sh && . /opt/autoware/setup.sh && exec python3 /openadkit/checks/custom_kit.py"]
+      start_period: 10m
+      start_interval: 5s
+      interval: 1m
+      timeout: 90s
+      retries: 3
     restart: on-failure

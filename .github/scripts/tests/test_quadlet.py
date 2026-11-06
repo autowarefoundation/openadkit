@@ -139,6 +139,7 @@ def test_image_references(reference, expected):
     (lambda m: m["services"]["map"]["volumes"][0].update(read_only=False), "writable"),
     (lambda m: m["services"]["map"]["volumes"][0].update(source="/no/such/file"), "does not exist"),
     (lambda m: m["services"]["map"]["depends_on"]["map-check"].update(condition="service_healthy"), "service_healthy"),
+    (lambda m: m["services"]["map"].update(healthcheck={"test": ["CMD", "true"]}), "CMD-SHELL healthcheck"),
 ])
 def test_what_has_no_translation_stops_and_writes_nothing(tmp_path, change, message):
     data = model(tmp_path)
@@ -147,6 +148,24 @@ def test_what_has_no_translation_stops_and_writes_nothing(tmp_path, change, mess
     with pytest.raises(quadlet.TranslationError, match=message):
         quadlet.write(data, output, [])
     assert not output.exists()
+
+
+def test_a_healthcheck_keeps_its_timings_and_startup_interval(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    data = model(tmp_path)
+    data["services"]["map"]["healthcheck"] = {
+        "test": ["CMD-SHELL", ". /opt/ros/humble/setup.sh && exec python3 check.py 100%"],
+        "interval": "1m0s", "timeout": "1m30s", "retries": 3, "start_period": "10m0s", "start_interval": "5s",
+    }
+    output = tmp_path / "out"
+    quadlet.write(data, output, [])
+    lines = unit(output, "autoware-map").splitlines()
+    command = ". /opt/ros/humble/setup.sh && exec python3 check.py 100%%"
+    for line in (f"HealthCmd={command}", "HealthInterval=1m0s", "HealthTimeout=1m30s", "HealthRetries=3",
+                 "HealthStartPeriod=10m0s", f"HealthStartupCmd={command}", "HealthStartupInterval=5s",
+                 "HealthStartupTimeout=1m30s", "HealthStartupSuccess=1"):
+        assert line in lines
+    assert not any(line.startswith("Health") for line in unit(output, "autoware-control").splitlines())
 
 
 def test_a_mount_target_has_one_source(tmp_path):

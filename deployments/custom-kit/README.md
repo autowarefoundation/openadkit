@@ -43,8 +43,10 @@ both Humble and Jazzy. Add `--ros-distro jazzy` to `validate` and `run` after
 building the Jazzy workspace. `validate` only
 renders/checks the model; it does not prove that the runtime or overlay works.
 
-The evidence cell checks fresh `/acme/probe` publication, this kit's velocity
-limit and an untouched base parameter, then runs the Planning Simulation golden path.
+`run` waits for the `acme-probe` healthcheck (`checks/custom_kit.py`): fresh
+`/acme/probe` publication, this kit's velocity limit and an untouched base
+parameter. `run --verify` then runs the Planning Simulation golden path, as the
+evidence cell does.
 
 See the [Integrator Guide](../../docs/deployments/integrator-guide.md) for the
 interface and upgrade procedure.

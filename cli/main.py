@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, NoReturn
@@ -221,6 +222,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-visualizer",
         action="store_true",
         help="start without the visualizer, for hosts nobody watches",
+    )
+    run.add_argument(
+        "--verify",
+        action="store_true",
+        help="once ready, run the deployment's verify step (the CI end-to-end check) and exit with its result",
     )
     build = subparsers.add_parser(
         "build", help="build an overlay workspace in the pinned devel image"
@@ -668,6 +674,8 @@ def main() -> int:
                 return 1
             return 0
 
+        if getattr(args, "verify", False) and deployment.verify is None:
+            raise OpenADKitError(f"{deployment.name} declares no verify step")
         compose.check_daemon(selection)
         # Deployments share host networking, fixed container names and the
         # default DDS domain, so only one runs at a time. Rerunning the same
@@ -684,11 +692,14 @@ def main() -> int:
         data.install_data(deployment, selection, force=False)
         compose.create_writable_mounts(deployment, selection)
         skipped = configured_services & ({"visualizer"} if args.no_visualizer else set())
+        started = time.monotonic()
         compose.start(deployment, selection, args.pull, configured_services, skipped)
         print_run_next_steps(
             deployment, configured_services - skipped, selection.node, output_path(selection),
             tls=bool(selection.environment.get("NOVNC_CERT")),
         )
+        if args.verify:
+            return compose.verify(deployment, selection, configured_services - skipped, started)
         return 0
 
     raise AssertionError(args.command)

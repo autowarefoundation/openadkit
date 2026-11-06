@@ -8,7 +8,10 @@
     "gpuFiles": [],
     "profiles": [],
     "resetServices": ["map-check", "scenario_simulator"],
-    "waitTimeout": 420
+    "waitTimeout": 600
+  },
+  "verify": {
+    "service": "scenario_simulator"
   },
   "nodes": {
     "autoware": {

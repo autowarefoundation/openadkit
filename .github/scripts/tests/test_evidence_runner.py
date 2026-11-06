@@ -21,17 +21,20 @@ def matrix_cell(deployment, node=""):
                 and cell.get("node", "") == node)
 
 
+def manifest(deployment):
+    return json.loads((ROOT / f"deployments/{deployment}/deployment.json").read_text())
+
+
 def test_evidence_cells_carry_the_manifest_plan():
     split = matrix_cell("scenario-simulation", "split")
-    nodes = json.loads((ROOT / "deployments/scenario-simulation/deployment.json").read_text())["nodes"]
-    assert split["nodes"].split() == list(nodes) and split["l2"] == "scenario" and "/clock" in split["fresh"].split()
-    kit = matrix_cell("custom-kit")
-    assert kit["l2"] == "golden" and kit["l1"] == "custom-kit" and "/acme/probe" in kit["fresh"].split()
-    island = matrix_cell("safety-island-simulation")
-    assert island["l2"] == "golden" and island["l1"] == "safety-island"
-    assert island["fresh"] == matrix_cell("planning-simulation")["fresh"]
+    scenario = manifest("scenario-simulation")
+    assert split["nodes"].split() == list(scenario["nodes"]) and json.loads(split["verify"]) == scenario["verify"]
+    golden = manifest("planning-simulation")["verify"]
+    # A deployment with a base runs the base's verify step on top of its own layer.
+    for name in ("custom-kit", "safety-island-simulation", "planning-simulation"):
+        assert json.loads(matrix_cell(name)["verify"]) == golden
     assert matrix_cell("planning-simulation")["nodes"] == ""
-    for cell in (split, kit, island):
+    for cell in (split, matrix_cell("custom-kit"), matrix_cell("safety-island-simulation")):
         assert cell["name"] == validation_matrix.evidence_cell_name(cell)
 
 
@@ -43,17 +46,27 @@ def test_quadlet_cell_runs_the_golden_path_on_a_runner_with_quadlet():
     ]
     for cell in cells:
         assert cell["backend"] == "quadlet" and cell["runner"] == "ubuntu-24.04"
-        assert cell["l2"] == "golden" and cell["nodes"] == ""
+        assert json.loads(cell["verify"]) == manifest("planning-simulation")["verify"] and cell["nodes"] == ""
         assert cell["name"] == validation_matrix.evidence_cell_name(cell)
 
 
-def test_unexempt_deployment_without_an_l2_check_fails_enumeration(monkeypatch):
-    monkeypatch.delitem(validation_matrix.BEHAVIOUR_CHECKS, "scenario-simulation")
-    with pytest.raises(ValueError, match="scenario-simulation has no L2 evidence check"):
-        validation_matrix.evidence_cells(validation_matrix.load_runtime(ROOT), ROOT)
+def test_unexempt_deployment_without_a_verify_step_fails_enumeration(monkeypatch):
+    runtime = validation_matrix.load_runtime(ROOT)
+    real = runtime.get_deployment
+
+    def without_verify(root, kit, name):
+        deployment = real(root, kit, name)
+        if name == "scenario-simulation":
+            deployment.verify = None
+        return deployment
+    monkeypatch.setattr(runtime, "get_deployment", without_verify)
+    with pytest.raises(ValueError, match="scenario-simulation declares no verify step"):
+        validation_matrix.evidence_cells(runtime, ROOT)
 
 
-@pytest.mark.parametrize(("node", "failure"), [("", ""), ("autoware", "validate"), ("split", "validate"), ("split", "run")])
+@pytest.mark.parametrize(("node", "failure"), [
+    ("", ""), ("", "verify"), ("", "run"), ("autoware", "validate"), ("split", "validate"), ("split", "run"),
+])
 def test_cell_lifecycle_keeps_node_order_failures_and_cleanup(tmp_path, node, failure):
     cli = tmp_path / "bin/openadkit"
     executable(cli, '''#!/usr/bin/env python3
@@ -63,7 +76,12 @@ args = sys.argv[1:]
 with Path(os.environ['CALLS']).open('a') as log:
     log.write(json.dumps([args, os.getenv('ZENOH_LISTEN'), os.getenv('ZENOH_PEER')]) + '\\n')
 if args[0] == 'validate': print(json.dumps({'deployment': args[1]}))
-sys.exit(1 if args[0] == os.environ['FAILURE'] else 0)
+if args[0] == 'run' and '--verify' in args and os.environ['FAILURE'] != 'run':
+    report = Path(os.environ['OPENADKIT_OUTPUT_DIR'], args[1], 'results/verify.json')
+    report.parent.mkdir(parents=True)
+    passed = os.environ['FAILURE'] != 'verify'
+    report.write_text(json.dumps({'ready_s': 1.5, 'verify_s': 2.5, 'result': 'PASSED' if passed else 'FAILED'}))
+sys.exit(1 if args[0] == os.environ['FAILURE'] or (args[0] == 'run' and os.environ['FAILURE'] == 'verify') else 0)
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
     calls = tmp_path / "calls"
@@ -77,6 +95,12 @@ sys.exit(1 if args[0] == os.environ['FAILURE'] else 0)
     assert (result.returncode == 0) is (not failure), result.stderr
     report = json.loads((out / "cell.json").read_text())
     assert report["result"] == ("FAILED" if failure else "PASSED")
+    if not node:
+        # One host runs the verify step with the stack; its report sets L1 and L2.
+        levels = report["levels"]
+        assert (levels["L1"]["ok"], levels["L2"]["ok"]) == {"": (True, True), "verify": (True, False), "run": (False, None)}[failure]
+        if failure != "run":
+            assert (report["metrics"]["ready_s"], report["metrics"]["arrival_s"]) == (1, 2)
     assert report["build_tag"] == "123-1" and report["node"] == node and report["name"] == cell["name"]
     recorded = [json.loads(line) for line in calls.read_text().splitlines()]
     def target(args):
@@ -112,6 +136,10 @@ with Path(os.environ["CALLS"]).open("a") as log:
     log.write(json.dumps(report) + "\\n")
 if args[0] == "validate":
     print(json.dumps({"deployment": args[1]}))
+if args[0] == "run" and "--verify" in args:
+    report = Path(os.environ["OPENADKIT_OUTPUT_DIR"], args[1], "results/verify.json")
+    report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({"ready_s": 1, "verify_s": 1, "result": "PASSED"}))
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
     home = tmp_path / "home"
@@ -170,7 +198,7 @@ sys.exit(subprocess.run(['bash', '-c', command]).returncode)
 ''')
     executable(tmp_path / "bin/ros2", f"#!/usr/bin/env bash\nprintf '%s\\n' {topics!r}\nexit {rc}\n")
     text = RUNNER.read_text()
-    probe = text[text.index('isolation=$(\n'):text.index('\n                else', text.index('isolation=$(\n'))]
+    probe = text[text.index('isolation=$(\n'):text.index('\n        else', text.index('isolation=$(\n'))]
     env = os.environ | {"PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}", "ROS_DISTRO": "humble"}
     result = subprocess.run(["bash", "-c", 'distro=humble; image=test; ' + probe + '\nprintf "%s" "$isolation"'],
                             env=env, capture_output=True, text=True, timeout=30)
@@ -228,46 +256,32 @@ def test_scenario_metrics_pass_only_complete_runs(tmp_path, cases, log, ok):
 
 
 FAKE_ROS2 = """#!/usr/bin/env bash
-# Lists every name. /flaky exits at once until its FLAKY_AFTER-th echo, like
-# an echo before discovery; /late and /soon publish 3 s and 1 s after the
-# subscriber starts; /never stays silent.
+# Lists /api/a and /quiet; /api/a publishes and /quiet does not.
 case "$1 $2" in
-  "service list"|"topic list") printf '%s\\n' /api/a /flaky /late /soon /never ;;
+  "service list"|"topic list") printf '%s\\n' /api/a /quiet ;;
   "topic echo")
     echo "$4" >> "${ECHO_LOG}"
-    case "$4" in
-      /flaky) [ "$(grep -c /flaky "${ECHO_LOG}")" -ge "${FLAKY_AFTER}" ] || exit 1 ;;
-      /late) sleep 3 ;;
-      /soon) sleep 1 ;;
-      /never) sleep 1000 ;;
-    esac
+    [ "$4" = /api/a ] || exit 1
     echo "data: 1" ;;
 esac
 """
 
 
-@pytest.mark.parametrize(("fresh", "timeout", "ok", "echoes"), [
-    # Echo exits at once while the topic is unknown: retried until it arrives.
-    (["/flaky"], "60", [True], ["/flaky", "/flaky"]),
-    # A publisher later than the 2 s window reaches the one subscriber that
-    # keeps waiting until the deadline.
-    (["/late"], "60", [True], ["/late"]),
-    # A silent topic waits out the deadline; the next topic still gets its
-    # own full window.
-    (["/never", "/soon"], "2", [False, True], ["/never", "/soon"]),
+@pytest.mark.parametrize(("arguments", "ok", "echoes"), [
+    ([], True, []),
+    (["--service", "/api/a", "--topic", "/api/a", "--fresh", "/api/a"], True, ["/api/a"]),
+    # Nothing is echoed until every name is listed.
+    (["--service", "/api/missing", "--fresh", "/api/a"], False, []),
+    (["--topic", "/api/a", "--fresh", "/quiet"], False, ["/quiet"]),
 ])
-def test_readiness_waits_for_late_publishers_until_the_deadline(tmp_path, fresh, timeout, ok, echoes):
+def test_readiness_checks_once_and_fails_until_ready(tmp_path, arguments, ok, echoes):
+    # Docker reruns the healthcheck until it passes; the check itself never waits.
     executable(tmp_path / "ros2", FAKE_ROS2)
-    env = os.environ | {"PATH": f"{tmp_path}:{os.environ['PATH']}", "ECHO_LOG": str(tmp_path / "echoes"),
-                        "FLAKY_AFTER": "2"}
-    command = [sys.executable, str(ROOT / ".github/scripts/evidence/readiness.py"), "--service", "/api/a",
-               "--timeout", timeout, "--fresh-timeout", "2", "--output", str(tmp_path / "readiness.json")]
-    for name in fresh:
-        command += ["--fresh", name]
-    result = subprocess.run(command, env=env, capture_output=True, text=True)
-    assert (result.returncode == 0) is all(ok), result.stdout + result.stderr
-    items = json.loads((tmp_path / "readiness.json").read_text())["items"][1:]
-    assert [item["ok"] for item in items] == ok
+    (tmp_path / "echoes").touch()
+    env = os.environ | {"PATH": f"{tmp_path}:{os.environ['PATH']}", "ECHO_LOG": str(tmp_path / "echoes")}
+    result = subprocess.run([sys.executable, str(ROOT / "deployments/shared/checks/readiness.py"), *arguments],
+                            env=env, capture_output=True, text=True, timeout=30)
+    assert (result.returncode == 0) is ok, result.stdout + result.stderr
     assert (tmp_path / "echoes").read_text().split() == echoes
 
 
@@ -318,7 +332,15 @@ def test_a_commit_tested_against_other_images_is_not_release_evidence(tmp_path, 
     ("x86_64", "linux/arm64", False),
 ])
 def test_a_cell_only_runs_on_the_machine_it_is_planned_for(tmp_path, machine, platform, ok):
-    executable(tmp_path / "bin/openadkit", "#!/usr/bin/env bash\nexit 0\n")
+    executable(tmp_path / "bin/openadkit", '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+args = sys.argv[1:]
+if args[0] == "run" and "--verify" in args:
+    report = Path(os.environ["OPENADKIT_OUTPUT_DIR"], args[1], "results/verify.json")
+    report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({"ready_s": 1, "verify_s": 1, "result": "PASSED"}))
+''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
     executable(tmp_path / "bin/uname", f"#!/usr/bin/env bash\necho {machine}\n")
     out = tmp_path / "out"

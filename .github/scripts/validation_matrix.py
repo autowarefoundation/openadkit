@@ -20,33 +20,17 @@ from types import ModuleType
 from typing import Any, NoReturn
 
 EVIDENCE_PLATFORM = "linux/amd64"
-# Topics that flow without a route or an initial pose, in every deployment.
-FRESH_TOPICS = ("/system/operation_mode/availability",)
-# What each curated behaviour proves beyond readiness: extra fresh topics (L1)
-# and the end-to-end check run_cell.sh runs (L2). A cell passes only with L2,
-# so every deployment that is not exempt needs an entry. Scenario simulation
-# runs on sim time; planning simulation runs on wall time and has no /clock.
-BEHAVIOUR_CHECKS: dict[str, dict[str, Any]] = {
-    "planning-simulation": {"fresh": (), "l2": "golden"},
-    "scenario-simulation": {"fresh": ("/clock",), "l2": "scenario"},
-}
+# Readiness (L1) is each deployment's healthchecks, which `openadkit run` waits
+# for, and the end-to-end check (L2) its manifest's verify step. A cell passes
+# only with L2, so every deployment that is not exempt declares one.
 # Cells beyond Compose on Docker, for each distro: the backend run_cell.sh starts
 # the stack with, on the runner it needs. quadlet runs platforms/autosd under
 # Podman and systemd.
 PLATFORM_CELLS: dict[str, dict[str, str]] = {
     "planning-simulation": {"backend": "quadlet", "runner": "ubuntu-24.04"},
 }
-# A deployment's L1 script beyond readiness (evidence/<l1 with _>.py, run in the
-# API image). safety_island.py checks that the Safety Island, not Autoware's
-# follower, publishes the control command the golden path then drives with.
-L1_CHECKS = {"safety-island-simulation": "safety-island"}
-# The in-tree kits and their acceptance beyond the base's checks: extra fresh
-# topics, and an L1 script. custom-kit: fresh publication proves its C++
-# overlay node survived the ABI boundary, and custom_kit.py checks its
-# parameter overrides.
-EXAMPLE_KIT_CHECKS: dict[str, dict[str, Any]] = {
-    "custom-kit": {"fresh": ("/acme/probe",), "l1": "custom-kit"},
-}
+# The in-tree kits, exercised against the same build as the base.
+EXAMPLE_KITS = ("custom-kit",)
 # Host build products of an overlay workspace; never kit content.
 COLCON_PRODUCTS = ("build", "install", "log")
 
@@ -137,14 +121,8 @@ def evidence_cells(
         deployment = runtime.get_deployment(source_root, kit, name)
         if deployment.evidence_exemption:
             continue
-        # A kit runs its base deployment's behaviour on top of its own layer.
-        behaviour = deployment.base.name if deployment.base else name
-        checks = BEHAVIOUR_CHECKS.get(behaviour)
-        if checks is None:
-            fail(
-                f"{name} has no L2 evidence check for {behaviour}; "
-                "add one to BEHAVIOUR_CHECKS or declare evidence.exempt"
-            )
+        if deployment.verify is None:
+            fail(f"{name} declares no verify step; add one to its deployment.json or declare evidence.exempt")
         for distro in deployment.requirements["rosDistros"]:
             identities = [{"deployment": name, "distro": distro}]
             if deployment.nodes:
@@ -155,9 +133,7 @@ def evidence_cells(
                     "platform": EVIDENCE_PLATFORM,
                     # Started in manifest order and stopped in reverse.
                     "nodes": " ".join(deployment.nodes) if "node" in identity else "",
-                    "fresh": " ".join((*FRESH_TOPICS, *checks["fresh"])),
-                    "l1": L1_CHECKS.get(name, ""),
-                    "l2": checks["l2"],
+                    "verify": json.dumps(deployment.verify),
                 })
         if name in PLATFORM_CELLS:
             for row in [row for row in cells if row["deployment"] == name and "node" not in row]:
@@ -167,9 +143,9 @@ def evidence_cells(
 
 
 def example_kit_roots(runtime: ModuleType, source_root: Path) -> list[Path]:
-    """The in-tree kits, deployments/<name> for each EXAMPLE_KIT_CHECKS entry."""
+    """The in-tree kits, deployments/<name> for each EXAMPLE_KITS entry."""
     roots = []
-    for name in EXAMPLE_KIT_CHECKS:
+    for name in EXAMPLE_KITS:
         relative = f"deployments/{name}"
         root = source_root / relative
         if not (root / "openadkit.json").is_file():
@@ -182,11 +158,8 @@ def example_kit_roots(runtime: ModuleType, source_root: Path) -> list[Path]:
 
 def example_kit_cells(runtime: ModuleType, source_root: Path) -> list[dict[str, str]]:
     """Exercise the in-tree kits against the same build as the base."""
-    return [cell | {
-        "kit": root.relative_to(source_root).as_posix(),
-        "fresh": " ".join((cell["fresh"], *EXAMPLE_KIT_CHECKS[root.name]["fresh"])).strip(),
-        "l1": EXAMPLE_KIT_CHECKS[root.name]["l1"],
-    } for root in example_kit_roots(runtime, source_root) for cell in evidence_cells(runtime, root)]
+    return [cell | {"kit": root.relative_to(source_root).as_posix()}
+            for root in example_kit_roots(runtime, source_root) for cell in evidence_cells(runtime, root)]
 
 
 def evidence_cell_name(cell: dict[str, Any]) -> str:

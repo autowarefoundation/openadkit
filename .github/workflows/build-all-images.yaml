@@ -14,10 +14,17 @@ on:
       - '.github/actions/build-image/**'
       - '.github/actions/setup-build-env/**'
       - '.github/image-inventory.json'
-      - '.github/scripts/**'
-      # Test-only and README-only pushes change no image or evidence input.
-      - '!.github/scripts/tests/**'
+      # Only the scripts the build runs (test_build_trigger.py keeps this list
+      # complete); release, scan and evidence scripts rebuild no image.
+      - '.github/scripts/autoware_patches.py'
+      - '.github/scripts/build.py'
+      - '.github/scripts/export_autoware_lock.py'
+      - '.github/scripts/images.py'
+      - '.github/scripts/registry_lookup.sh'
+      - '.github/scripts/resolve_build_inputs.sh'
+      - '.github/scripts/resolve_upstream_images.sh'
       - '.github/workflows/build-all-images.yaml'
+      # README-only pushes change no image.
       - 'components/**'
       - '!components/README.md'
       - '!components/*/README.md'

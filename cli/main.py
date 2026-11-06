@@ -690,16 +690,18 @@ def main() -> int:
         if conflict:
             raise OpenADKitError(conflict)
         data.install_data(deployment, selection, force=False)
-        compose.create_writable_mounts(deployment, selection)
+        model = compose.create_writable_mounts(deployment, selection)
         skipped = configured_services & ({"visualizer"} if args.no_visualizer else set())
         started = time.monotonic()
         compose.start(deployment, selection, args.pull, configured_services, skipped)
+        record = compose.run_record(deployment, selection, kit, model, started)
+        compose.write_run_record(deployment, record)
         print_run_next_steps(
             deployment, configured_services - skipped, selection.node, output_path(selection),
             tls=bool(selection.environment.get("NOVNC_CERT")),
         )
         if args.verify:
-            return compose.verify(deployment, selection, configured_services - skipped, started)
+            return compose.verify(deployment, selection, configured_services - skipped, record)
         return 0
 
     raise AssertionError(args.command)

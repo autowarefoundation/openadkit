@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 import shlex
@@ -17,6 +18,7 @@ from typing import Any
 from manifest import (
     Deployment,
     OpenADKitError,
+    RuntimeContext,
     Selection,
     compose_environment,
     load_json,
@@ -397,8 +399,8 @@ def render(deployment: Deployment, selection: Selection) -> set[str]:
     return configured
 
 
-def create_writable_mounts(deployment: Deployment, selection: Selection) -> None:
-    """Create missing writable bind sources as the user.
+def create_writable_mounts(deployment: Deployment, selection: Selection) -> str:
+    """Create missing writable bind sources as the user; return the resolved model.
 
     Docker creates a missing bind source as root, which the services, running
     as the user, then cannot write to (for example ~/autoware_data).
@@ -415,6 +417,38 @@ def create_writable_mounts(deployment: Deployment, selection: Selection) -> None
             source = Path(volume["source"])
             if not source.exists():
                 source.mkdir(parents=True)
+    return result.stdout
+
+
+def run_record(
+    deployment: Deployment, selection: Selection, kit: RuntimeContext, model: str, started: float,
+) -> dict[str, Any]:
+    """What this run started: the version, the images, and the resolved model's digest.
+
+    The model holds every image, setting and mount, so its digest tells two
+    runs apart; written to the deployment's results as run.json.
+    """
+    services = json.loads(model).get("services") or {}
+    return {
+        "schemaVersion": 1,
+        "deployment": deployment.name,
+        "node": selection.node,
+        "rosDistro": selection.ros_distro,
+        "gpu": selection.gpu,
+        "version": kit.version or (kit.base.version if kit.base else None),
+        "extends": kit.extends,
+        "images": {name: service.get("image") for name, service in sorted(services.items())},
+        "modelSha256": hashlib.sha256(model.encode("utf-8")).hexdigest(),
+        "readySeconds": round(time.monotonic() - started, 1),
+    }
+
+
+def write_run_record(deployment: Deployment, record: dict[str, Any]) -> Path:
+    results = deployment.output_directory / "results"
+    results.mkdir(parents=True, exist_ok=True)
+    path = results / "run.json"
+    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def check_daemon(selection: Selection) -> None:
@@ -562,12 +596,12 @@ def start(
     report_overrides(deployment, selection)
 
 
-def verify(deployment: Deployment, selection: Selection, services: set[str], started: float) -> int:
+def verify(deployment: Deployment, selection: Selection, services: set[str], record: dict[str, Any]) -> int:
     """Run the deployment's verify step on the ready stack and return its exit code.
 
     A command runs in its service with ROS, Autoware and the overlays sourced;
     without one, the step is the service's own exit, as a scenario run's. The
-    result is written to the deployment's results directory.
+    result joins the run's record.
     """
     spec = deployment.verify
     assert spec is not None
@@ -575,13 +609,6 @@ def verify(deployment: Deployment, selection: Selection, services: set[str], sta
     if service not in services:
         print(f"verify: {service} does not run on this node; nothing to verify here")
         return 0
-    report: dict[str, Any] = {
-        "schemaVersion": 1,
-        "deployment": deployment.name,
-        "node": selection.node,
-        "service": service,
-        "ready_s": round(time.monotonic() - started, 1),
-    }
     # The step's own output follows on the same terminal.
     print(f"verify: {' '.join(spec['command']) if 'command' in spec else f'waiting for {service} to finish'}", flush=True)
     begin = time.monotonic()
@@ -598,12 +625,14 @@ def verify(deployment: Deployment, selection: Selection, services: set[str], sta
         if not ids:
             raise OpenADKitError(f"{service} has no container to wait for")
         code = int(capture_process(["docker", "wait", ids[0]], env=process_environment(selection)).stdout.strip())
-    report.update(verify_s=round(time.monotonic() - begin, 1), exit_code=code, result="PASSED" if code == 0 else "FAILED")
-    results = deployment.output_directory / "results"
-    results.mkdir(parents=True, exist_ok=True)
-    path = results / "verify.json"
-    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"verify: {'passed' if code == 0 else f'failed (exit {code})'}; report: {path}")
+    record["verify"] = {
+        "service": service,
+        "seconds": round(time.monotonic() - begin, 1),
+        "exitCode": code,
+        "result": "PASSED" if code == 0 else "FAILED",
+    }
+    path = write_run_record(deployment, record)
+    print(f"verify: {'passed' if code == 0 else f'failed (exit {code})'}; record: {path}")
     return code
 
 

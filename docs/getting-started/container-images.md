@@ -29,8 +29,8 @@ the same patterns with `-jazzy` (for example `planning-control-jazzy`).
 
 - **Reproducible deployments**: use a release tag (`vX.Y.Z`) or a digest.
 - **Latest stable for a distro**: use `<target>-<ros_distro>`.
-- **Never** pin per-platform CI tags such as `planning-control-amd64-humble`;
-  they move with every build.
+- **Never** pin per-platform CI tags such as `universe-common-amd64-humble`;
+  they move with every build of `main`.
 
 ## Versioning
 

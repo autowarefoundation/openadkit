@@ -173,6 +173,7 @@ jobs:
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: ${{ needs.prepare.outputs.build_tag }}
           publish: true
+          # PR builds (resolve_registry_contexts.sh) and overlay_ws/build.sh start from these.
           stable-tags: ${{ env.IS_MAIN_PUSH }}
           save-ccache: ${{ env.SAVE_CCACHE }}
 
@@ -221,7 +222,8 @@ jobs:
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: ${{ needs.prepare.outputs.build_tag }}
           publish: true
-          stable-tags: ${{ env.IS_MAIN_PUSH }}
+          # PR builds of carla-interface start from the simulator (resolve_registry_contexts.sh).
+          stable-tags: ${{ env.IS_MAIN_PUSH == 'true' && matrix.platform == 'linux/amd64' && matrix.target == 'simulator' }}
           save-ccache: ${{ env.SAVE_CCACHE }}
 
   build-carla-interface:
@@ -262,7 +264,6 @@ jobs:
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: ${{ needs.prepare.outputs.build_tag }}
           publish: true
-          stable-tags: ${{ env.IS_MAIN_PUSH }}
           ccache: false
 
   # =============================================================================

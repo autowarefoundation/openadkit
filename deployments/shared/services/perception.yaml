@@ -2,7 +2,7 @@
 # Variant flags (GPU models, CARLA extras) come from config.env / config.gpu.env.
 services:
   perception:
-    image: ${SENSING_PERCEPTION_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception}
+    image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
     container_name: autoware-perception
     network_mode: host
     init: true

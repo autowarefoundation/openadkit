@@ -3,7 +3,7 @@
 # (autoware-main.yaml by default, autoware-carla.yaml for carla-simulation).
 services:
   system:
-    image: ${VEHICLE_SYSTEM_IMAGE:-ghcr.io/autowarefoundation/openadkit:vehicle-system}
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
     container_name: autoware-system
     network_mode: host
     init: true

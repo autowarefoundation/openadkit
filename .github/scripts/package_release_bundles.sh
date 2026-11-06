@@ -6,7 +6,6 @@ export PYTHONDONTWRITEBYTECODE=1
 : "${VERSION:?VERSION is required}"
 : "${RELEASE_SHA:?RELEASE_SHA is required}"
 : "${PACKAGER_SHA:?PACKAGER_SHA is required}"
-: "${DEFAULT_ROS_DISTRO:?DEFAULT_ROS_DISTRO is required}"
 : "${STABLE_RELEASE:?STABLE_RELEASE is required}"
 : "${PUBLISH_LATEST_ALIASES:?PUBLISH_LATEST_ALIASES is required}"
 
@@ -30,7 +29,6 @@ python3 "${planner}" \
   --version "${VERSION}" \
   --release-sha "${RELEASE_SHA}" \
   --packager-sha "${PACKAGER_SHA}" \
-  --default-ros-distro "${DEFAULT_ROS_DISTRO}" \
   --stable-release "${STABLE_RELEASE}" \
   --publish-latest-aliases "${PUBLISH_LATEST_ALIASES}" \
   --output "${plan_file}"

@@ -15,7 +15,7 @@ services:
     # The kit's own C++ node from overlay_ws (extension point 3), built by
     # overlay_ws/build.sh. It runs in an Open AD Kit runtime image, whose
     # entrypoint hook sources the overlay workspace mounted below.
-    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
+    image: ${PLANNING_CONTROL_IMAGE:?set by the openadkit CLI}
     network_mode: host
     ipc: host
     env_file:

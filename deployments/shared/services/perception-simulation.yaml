@@ -3,7 +3,7 @@
 # plus the occupancy grid map. Upstream launches it next to the simulator.
 services:
   perception-simulation:
-    image: ${SIMULATOR_IMAGE:-ghcr.io/autowarefoundation/openadkit:simulator}
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
     container_name: autoware-perception-simulation
     network_mode: host
     init: true

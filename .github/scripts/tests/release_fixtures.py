@@ -73,7 +73,7 @@ def write_plan(tmp_path, *, images=None, summary=None):
     result = subprocess.run([
         "python3", str(PLANNER), "--source-root", str(ROOT), "--build-metadata", str(metadata),
         "--version", VERSION, "--release-sha", RELEASE_SHA, "--packager-sha", "c" * 40,
-        "--default-ros-distro", "humble", "--stable-release", "true",
+        "--stable-release", "true",
         "--publish-latest-aliases", "true", "--output", str(output), *evidence,
     ], text=True, capture_output=True, timeout=30)
     return result, output
@@ -87,7 +87,7 @@ def run_validator(tmp_path, function, **env):
         "BUILD_TAG": BUILD_TAG, "VERSION": VERSION, "GH_TOKEN": "test", "GITHUB_REF": "refs/heads/release/9.8",
         "GITHUB_REPOSITORY": "example/repo", "GITHUB_OUTPUT": str(tmp_path / "output"),
         "IMAGE_PREFIX_COMMON": "ghcr.io/example/openadkit-common",
-        "IMAGE_PREFIX_COMPONENT": kit["imagePrefixComponent"], "DEFAULT_ROS_DISTRO": kit["defaultRosDistro"],
+        "IMAGE_PREFIX_COMPONENT": kit["imagePrefixComponent"],
         **env,
     })
 
@@ -111,7 +111,7 @@ def packager_env(tmp_path):
     (tmp_path / "release-input/evidence/evidence-summary.json").write_text(json.dumps(passing_summary(metadata)))
     return os.environ | {
         "PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}", "SOURCE_DIR": str(ROOT), "VERSION": VERSION,
-        "RELEASE_SHA": RELEASE_SHA, "PACKAGER_SHA": "c" * 40, "DEFAULT_ROS_DISTRO": "humble",
+        "RELEASE_SHA": RELEASE_SHA, "PACKAGER_SHA": "c" * 40,
         "PUBLISH_LATEST_ALIASES": "true", "STABLE_RELEASE": "true", "GITHUB_REPOSITORY": "example/repo",
     }, calls
 

@@ -1,7 +1,7 @@
 # Planning — computes a safe, feasible trajectory to the goal.
 services:
   planning:
-    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
+    image: ${PLANNING_CONTROL_IMAGE:?set by the openadkit CLI}
     container_name: autoware-planning
     network_mode: host
     init: true

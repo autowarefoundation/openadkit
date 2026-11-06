@@ -6,7 +6,7 @@
 # NOVNC_CERT and NOVNC_KEY name its files, mounted into this service.
 services:
   visualizer:
-    image: ${VISUALIZER_IMAGE:-ghcr.io/autowarefoundation/openadkit:visualizer}
+    image: ${VISUALIZER_IMAGE:?set by the openadkit CLI}
     container_name: autoware-visualizer
     network_mode: host
     init: true

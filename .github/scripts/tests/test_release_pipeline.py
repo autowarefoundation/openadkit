@@ -112,6 +112,15 @@ def test_plan_takes_only_this_release_passing_evidence(tmp_path, problem):
         assert evidence["cells"] == summary["cells"] and "exempt" in evidence
 
 
+def test_a_stable_release_moves_one_alias_per_image_and_distro(tmp_path):
+    result, output = write_plan(tmp_path, summary=passing_summary(build_metadata()))
+    assert result.returncode == 0, result.stderr
+    plan = json.loads(output.read_text())
+    assert plan["release"]["defaultRosDistro"] == json.loads((ROOT / "openadkit.json").read_text())["defaultRosDistro"]
+    for image in plan["images"]:
+        assert image["aliases"] == [f'{image["repo"]}:{image["target"]}-{image["rosDistro"]}']
+
+
 def select_latest(tmp_path, name, workflow, file, runs, eligible, passed, directory):
     """Run the gate's artifact selection against stubbed runs, newest first:
     (run conclusion, branch, artifact content)."""

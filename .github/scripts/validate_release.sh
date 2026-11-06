@@ -44,26 +44,15 @@ validate_inputs() {
     refs/heads/main|refs/heads/release/*) ;;
     *) fail "Release ${VERSION} must be triggered from main or a release/X.Y branch (got ${GITHUB_REF})" ;;
   esac
-  case "${DEFAULT_ROS_DISTRO:-humble}" in
-    humble|jazzy) ;;
-    *) fail "Invalid default_ros_distro '${DEFAULT_ROS_DISTRO}': must be one of humble, jazzy" ;;
-  esac
 }
 
-# Docs and the CLI are generated from openadkit.json, so the release must agree
-# with it. A mismatched default would publish bare tag aliases the docs call
-# the wrong distro, and a mismatched prefix would push images the manifest
+# A prefix that differs from openadkit.json would push images the manifest
 # does not name.
 validate_manifest_consistency() {
-  local manifest manifest_distro manifest_registry
+  local manifest manifest_registry
 
   manifest="${RELEASE_SOURCE_ROOT:-${script_dir}/../..}/openadkit.json"
   [ -f "${manifest}" ] || fail "Product manifest not found at ${manifest}"
-  manifest_distro=$(jq -r '.defaultRosDistro // empty' "${manifest}")
-  [ -n "${manifest_distro}" ] \
-    || fail "Product manifest ${manifest} does not declare defaultRosDistro"
-  [ "${DEFAULT_ROS_DISTRO:-humble}" = "${manifest_distro}" ] \
-    || fail "default_ros_distro '${DEFAULT_ROS_DISTRO:-humble}' must match openadkit.json defaultRosDistro '${manifest_distro}'; update the manifest before releasing"
   manifest_registry=$(jq -r '.imagePrefixComponent // empty' "${manifest}")
   [ -n "${manifest_registry}" ] \
     || fail "Product manifest ${manifest} does not declare imagePrefixComponent"

@@ -1,7 +1,7 @@
 # Control — turns a trajectory into throttle, brake, and steering commands.
 services:
   control:
-    image: ${PLANNING_CONTROL_IMAGE:-ghcr.io/autowarefoundation/openadkit:planning-control}
+    image: ${PLANNING_CONTROL_IMAGE:?set by the openadkit CLI}
     container_name: autoware-control
     network_mode: host
     init: true

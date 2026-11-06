@@ -185,8 +185,9 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         fail("release SHA must be 40 lowercase hexadecimal characters")
     if not SHA_RE.fullmatch(args.packager_sha):
         fail("packager SHA must be 40 lowercase hexadecimal characters")
-    if args.default_ros_distro not in product["distros"]:
-        fail(f"unsupported default ROS distro: {args.default_ros_distro}")
+    default_ros_distro = product["kit"].default_ros_distro
+    if default_ros_distro not in product["distros"]:
+        fail(f"unsupported default ROS distro: {default_ros_distro}")
     if args.publish_latest_aliases and not args.stable_release:
         fail("prereleases cannot publish stable aliases")
     if metadata.get("openadkit_sha") != args.release_sha:
@@ -199,11 +200,11 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         repo, target, distro = raw["repo"], raw["target"], raw["ros_distro"]
         digest = raw["digest"]
         release_ref = image_ref(raw, args.version)
+        # One moving alias per image and distro; no distro-less alias, which
+        # would switch ROS distro when the default changes.
         aliases: list[str] = []
         if args.stable_release and args.publish_latest_aliases:
-            aliases.extend((f"{repo}:{target}-{distro}", f"{repo}:{target}-{distro}-latest"))
-            if distro == args.default_ros_distro:
-                aliases.extend((f"{repo}:{target}", f"{repo}:{target}-latest"))
+            aliases.append(f"{repo}:{target}-{distro}")
         row: dict[str, Any] = {
             "aliases": aliases,
             "digest": digest,
@@ -253,7 +254,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         "artifacts": kit.artifacts,
         "autoware": autoware,
         "componentImages": component_images,
-        "defaultRosDistro": args.default_ros_distro,
+        "defaultRosDistro": default_ros_distro,
         "deployments": product["deployments"],
         "images": context_images,
         "kind": "release",
@@ -293,7 +294,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "release": {
             "buildTag": build_tag,
-            "defaultRosDistro": args.default_ros_distro,
+            "defaultRosDistro": default_ros_distro,
             "packagerSha": args.packager_sha,
             "publishLatestAliases": args.publish_latest_aliases,
             "releaseSha": args.release_sha,
@@ -339,7 +340,6 @@ def main() -> int:
     parser.add_argument("--version")
     parser.add_argument("--release-sha")
     parser.add_argument("--packager-sha")
-    parser.add_argument("--default-ros-distro")
     parser.add_argument("--stable-release", type=parse_bool)
     parser.add_argument("--publish-latest-aliases", type=parse_bool)
     args = parser.parse_args()
@@ -359,7 +359,6 @@ def main() -> int:
             "--version": args.version,
             "--release-sha": args.release_sha,
             "--packager-sha": args.packager_sha,
-            "--default-ros-distro": args.default_ros_distro,
             "--stable-release": args.stable_release,
             "--publish-latest-aliases": args.publish_latest_aliases,
         }

@@ -14,14 +14,6 @@ on:
       build_tag:
         description: 'Build tag of a build of this branch to promote (e.g. 123456789-1)'
         required: true
-      default_ros_distro:
-        description: 'ROS distro for bare tag aliases; must match openadkit.json defaultRosDistro'
-        required: false
-        type: choice
-        options:
-          - humble
-          - jazzy
-        default: humble
 
 concurrency:
   group: release
@@ -71,7 +63,6 @@ jobs:
         env:
           BUILD_TAG: ${{ inputs.build_tag }}
           VERSION: ${{ inputs.version }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/validate_release.sh
         shell: bash
@@ -156,7 +147,6 @@ jobs:
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
           PACKAGER_SHA: ${{ steps.packager.outputs.packager_sha }}
           INSTALLER_SOURCE_DIR: ${{ github.workspace }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
         run: bash .github/scripts/package_release_bundles.sh

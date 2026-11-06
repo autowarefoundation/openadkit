@@ -31,7 +31,7 @@ services:
       - map
 
   sensing:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:?set by the openadkit CLI}
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
@@ -41,7 +41,7 @@ services:
       - system
 
   perception:
-    image: ${SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda}
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:?set by the openadkit CLI}
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all

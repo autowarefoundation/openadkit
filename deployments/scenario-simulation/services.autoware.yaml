@@ -65,7 +65,7 @@ services:
   # receives NORMAL and cannot succeed. Relay the 10 Hz source to the ADAPI
   # topic until Scenario Simulator V2 subscribes transient-local.
   mrm-state-relay:
-    image: ${SIMULATOR_IMAGE:-ghcr.io/autowarefoundation/openadkit:simulator}
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
     container_name: autoware-mrm-state-relay
     network_mode: host
     init: true

@@ -14,7 +14,6 @@ plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
 jq -e '.schemaVersion == 1' "${plan_file}" >/dev/null
 VERSION=$(jq -r '.release.version' "${plan_file}")
 export VERSION
-DEFAULT_ROS_DISTRO=$(jq -r '.release.defaultRosDistro' "${plan_file}")
 PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
 STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")
 
@@ -23,16 +22,6 @@ stable_release="${STABLE_RELEASE}"
 # Record converged refs for the summary. Immutable version tags abort immediately.
 # Alias updates continue after a single failure so a rerun can finish leftovers.
 PROMOTED_REFS=()
-
-available_distros=$(jq -r '.images | unique_by(.rosDistro) | map(.rosDistro) | join(" ")' "${plan_file}")
-echo "Available ROS distros in build: ${available_distros}"
-
-if ! echo "${available_distros}" | grep -qw "${DEFAULT_ROS_DISTRO}"; then
-  echo "ERROR: default_ros_distro '${DEFAULT_ROS_DISTRO}' is not in the build metadata." >&2
-  echo "Available distros: ${available_distros}" >&2
-  echo "Update the 'default_ros_distro' input or trigger a new build for '${DEFAULT_ROS_DISTRO}'." >&2
-  exit 1
-fi
 
 promote_tag() {
   local ref="$1"

@@ -9,7 +9,7 @@ include:
 
 services:
   safety-island-bridge:
-    image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
+    image: ${API_IMAGE:?set by the openadkit CLI}
     container_name: safety-island-bridge
     network_mode: host
     init: true
@@ -30,7 +30,7 @@ services:
   safety-island:
     # The FreeRTOS POSIX build needs only glibc and libstdc++, which every
     # runtime image ships. Downloaded data has no executable bit.
-    image: ${API_IMAGE:-ghcr.io/autowarefoundation/openadkit:api}
+    image: ${API_IMAGE:?set by the openadkit CLI}
     container_name: safety-island
     network_mode: host
     init: true

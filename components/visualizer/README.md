@@ -7,7 +7,7 @@ and networking details are maintained in the
 ```bash
 docker run --rm --name visualizer --network host \
   -e REMOTE_PASSWORD=yourpassword \
-  ghcr.io/autowarefoundation/openadkit:visualizer
+  ghcr.io/autowarefoundation/openadkit:visualizer-humble
 ```
 
 Open `http://localhost:6080/vnc.html`. noVNC is served over plain HTTP on

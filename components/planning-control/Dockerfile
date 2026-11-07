@@ -38,8 +38,8 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/autoware_universe/planning \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_cuda_utils \
-        /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_common \
+        /tmp/autoware/src/*/*/*/autoware_cuda_utils \
+        /tmp/autoware/src/*/*/*/autoware_tensorrt_common \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_plugins \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_external_cmd_converter \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \

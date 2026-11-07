@@ -52,10 +52,10 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_selector \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_traffic_light_visualization \
-        /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_common \
+        /tmp/autoware/src/*/*/*/autoware_tensorrt_common \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_probabilistic_occupancy_grid_map \
         /tmp/autoware/src/universe/autoware_universe/perception/autoware_map_based_prediction \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_cuda_utils \
+        /tmp/autoware/src/*/*/*/autoware_cuda_utils \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \

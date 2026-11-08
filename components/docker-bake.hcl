@@ -67,8 +67,11 @@ function "sensing_base_paths" {
     "/tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch",
     "/tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description",
     "/tmp/autoware/src/universe/external/bevdet_vendor",
-    "/tmp/autoware/src/universe/external/cuda_blackboard",
-    "/tmp/autoware/src/universe/external/negotiated",
+    // Globs match the CUDA packages both in universe and in core/cuda.
+    "/tmp/autoware/src/*/*/cuda_blackboard",
+    "/tmp/autoware/src/*/*/negotiated",
+    "/tmp/autoware/src/*/*/*/autoware_cuda_utils",
+    "/tmp/autoware/src/*/*/*/autoware_tensorrt_common",
     "/tmp/autoware/src/universe/autoware_universe/perception",
     "/tmp/autoware/src/universe/autoware_universe/sensing",
     "/tmp/autoware/src/sensor_component",

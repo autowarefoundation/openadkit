@@ -31,7 +31,7 @@ RUN --mount=type=bind,source=components/shared/ros-snapshot,target=/tmp/ros-snap
 # rosdep install for the universe-common slice (build/test deps).
 # Broad glob so rosdep sees all universe packages as local via --ignore-src,
 # preventing cross-component exec_depend failures (e.g. simulator referencing
-# planning-control packages). colcon build is still scoped by --base-paths below.
+# planning packages). colcon build is still scoped by --base-paths below.
 COPY --parents --chown=${USERNAME}:${USERNAME} \
     autoware/src/**/package.xml \
     /tmp/

@@ -104,13 +104,13 @@ group "universe-common" {
 group "component" {
   targets = [
     "sensing-perception", "sensing-perception-cuda", "localization-mapping",
-    "planning-control", "vehicle-system", "api", "visualizer", "simulator",
+    "planning", "control", "vehicle-system", "api", "visualizer", "simulator",
   ]
 }
 
-group "planning" {
+group "planning-simulation" {
   targets = [
-    "universe-common", "localization-mapping", "planning-control",
+    "universe-common", "localization-mapping", "planning", "control",
     "vehicle-system", "api", "visualizer", "simulator",
   ]
 }
@@ -123,7 +123,8 @@ target "docker-metadata-action-universe-common" { tags = local_tags("universe-co
 target "docker-metadata-action-sensing-perception" { tags = local_tags("sensing-perception") }
 target "docker-metadata-action-sensing-perception-cuda" { tags = local_tags("sensing-perception-cuda") }
 target "docker-metadata-action-localization-mapping" { tags = local_tags("localization-mapping") }
-target "docker-metadata-action-planning-control" { tags = local_tags("planning-control") }
+target "docker-metadata-action-planning" { tags = local_tags("planning") }
+target "docker-metadata-action-control" { tags = local_tags("control") }
 target "docker-metadata-action-vehicle-system" { tags = local_tags("vehicle-system") }
 target "docker-metadata-action-api" { tags = local_tags("api") }
 target "docker-metadata-action-visualizer" { tags = local_tags("visualizer") }
@@ -202,10 +203,16 @@ target "localization-mapping" {
   target     = "localization-mapping"
 }
 
-target "planning-control" {
-  inherits   = ["_component-base", "docker-metadata-action-planning-control"]
-  dockerfile = "components/planning-control/Dockerfile"
-  target     = "planning-control"
+target "planning" {
+  inherits   = ["_component-base", "docker-metadata-action-planning"]
+  dockerfile = "components/planning/Dockerfile"
+  target     = "planning"
+}
+
+target "control" {
+  inherits   = ["_component-base", "docker-metadata-action-control"]
+  dockerfile = "components/control/Dockerfile"
+  target     = "control"
 }
 
 target "vehicle-system" {

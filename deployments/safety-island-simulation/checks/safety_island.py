@@ -1,6 +1,6 @@
 """Readiness of the Safety Island: the safety-island-bridge service's healthcheck.
 
-The golden path then proves the vehicle drives; this proves who drives it: the
+The drive-to-goal check then proves the vehicle drives; this proves who drives it: the
 control command reaches Autoware only through the Safety Island's bridge, and
 Autoware's own trajectory follower is not running.
 """

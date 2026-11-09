@@ -60,7 +60,7 @@ A source checkout pins no devel image: set `DEVEL_IMAGE` to the matching
 validation renders the Compose model; it is not runtime or ABI evidence. CI
 makes a kit with `openadkit new` and exercises every extension point on Humble
 and Jazzy: a value, a parameter override, a C++ package, a pinned image and a
-service with a healthcheck, then the Planning Simulation golden path.
+service with a healthcheck, then Planning Simulation's drive-to-goal check.
 
 Keep parameter and package changes in `config/` and `overlay_ws/` rather than
 mounting over `/opt/autoware` or replacing base service commands. See the

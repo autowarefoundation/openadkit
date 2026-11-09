@@ -91,16 +91,16 @@ run_sut() { if env "$@" bash "${SUT}" >"${work}/out.txt" 2>&1; then rc=0; else r
 
 # Case 1: both arches present with attestations -> create from linux image digests only
 printf '%s\n' \
-  "ghcr.io/x/openadkit:planning-control-amd64-humble-T" \
-  "ghcr.io/x/openadkit:planning-control-arm64-humble-T" > "${PRESENT_REFS}"
+  "ghcr.io/x/openadkit:planning-amd64-humble-T" \
+  "ghcr.io/x/openadkit:planning-arm64-humble-T" > "${PRESENT_REFS}"
 : > "${CREATE_LOG}"
-run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64 arm64" BUILD_TAG=T
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning ROS_DISTRO=humble ARCHES="amd64 arm64" BUILD_TAG=T
 check "[ ${rc} -eq 0 ]"
-check "grep -q -- '-t ghcr.io/x/openadkit:planning-control-humble-T' '${CREATE_LOG}'"
+check "grep -q -- '-t ghcr.io/x/openadkit:planning-humble-T' '${CREATE_LOG}'"
 check "grep -q 'ghcr.io/x/openadkit@${AMD64_IMAGE}' '${CREATE_LOG}'"
 check "grep -q 'ghcr.io/x/openadkit@${ARM64_IMAGE}' '${CREATE_LOG}'"
 check "! grep -q '${ATTESTATION}' '${CREATE_LOG}'"
-check "! grep -q 'planning-control-amd64-humble-T' '${CREATE_LOG}'"
+check "! grep -q 'planning-amd64-humble-T' '${CREATE_LOG}'"
 
 # Case 2: arm64 missing -> exit 1, no create, error names the arch
 printf '%s\n' "ghcr.io/x/openadkit:visualizer-amd64-humble-T" > "${PRESENT_REFS}"
@@ -120,39 +120,39 @@ check "grep -q 'ghcr.io/x/openadkit@${AMD64_IMAGE}' '${CREATE_LOG}'"
 check "! grep -q '${ATTESTATION}' '${CREATE_LOG}'"
 
 # Case 4: tag exists but has no linux image manifest -> fail closed, no create
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${PRESENT_REFS}"
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${ATTESTATION_ONLY}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${ATTESTATION_ONLY}"
 : > "${CREATE_LOG}"
-run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
 check "[ ${rc} -eq 1 ]"
 check "[ ! -s '${CREATE_LOG}' ]"
 check "grep -q 'no linux/amd64 image manifest' '${work}/out.txt'"
 : > "${ATTESTATION_ONLY}"
 
 # Case 5: raw linux/amd64 manifest -> create from that image digest
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${PRESENT_REFS}"
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${SINGLE_MANIFEST}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${SINGLE_MANIFEST}"
 : > "${CREATE_LOG}"
-run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
 check "[ ${rc} -eq 0 ]"
 check "grep -q 'ghcr.io/x/openadkit@${RAW_IMAGE}' '${CREATE_LOG}'"
 : > "${SINGLE_MANIFEST}"
 
 # Case 6: raw manifest of the other architecture -> fail closed, no create
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${PRESENT_REFS}"
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${WRONG_PLATFORM}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${WRONG_PLATFORM}"
 : > "${CREATE_LOG}"
-run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
 check "[ ${rc} -eq 1 ]"
 check "[ ! -s '${CREATE_LOG}' ]"
 check "grep -q 'no linux/amd64 image manifest' '${work}/out.txt'"
 : > "${WRONG_PLATFORM}"
 
 # Case 7: a failed lookup is not a missing architecture -> fail, no create
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${PRESENT_REFS}"
-printf '%s\n' "ghcr.io/x/openadkit:planning-control-amd64-humble-T" > "${AUTH_FAILURE}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:planning-amd64-humble-T" > "${AUTH_FAILURE}"
 : > "${CREATE_LOG}"
-run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning-control ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=planning ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
 check "[ ${rc} -eq 1 ]"
 check "[ ! -s '${CREATE_LOG}' ]"
 check "grep -q 'registry lookup of' '${work}/out.txt'"

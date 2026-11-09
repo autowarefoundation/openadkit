@@ -144,12 +144,19 @@ jobs:
           skip=false
           if [ "${release_evidence}" = false ]; then
             echo "Testing ${source_sha} against the images of ${BUILD_SHA}; not release evidence" >&2
-            # Images of the tested commit that would differ from the build's.
-            targets=$(git diff --name-only "${BUILD_SHA}...${source_sha}" \
-              | python3 .github/scripts/build.py single-image humble "" | sed -n 's/^targets_json=//p')
-            if [ "${targets}" != "[]" ]; then
-              echo "::warning title=evidence images differ::${source_sha} changes the inputs of ${targets}; its images are not built yet"
+            if ! git merge-base "${BUILD_SHA}" "${source_sha}" > /dev/null 2>&1; then
+              # The build is outside this history, for example after the branch
+              # was rewritten: any of its images may differ.
+              echo "::warning title=evidence images differ::the build commit ${BUILD_SHA} is not in the history of ${source_sha}; its images are not built yet"
               [ "${GITHUB_EVENT_NAME}" != pull_request ] || skip=true
+            else
+              # Images of the tested commit that would differ from the build's.
+              targets=$(git diff --name-only "${BUILD_SHA}...${source_sha}" \
+                | python3 .github/scripts/build.py single-image humble "" | sed -n 's/^targets_json=//p')
+              if [ "${targets}" != "[]" ]; then
+                echo "::warning title=evidence images differ::${source_sha} changes the inputs of ${targets}; its images are not built yet"
+                [ "${GITHUB_EVENT_NAME}" != pull_request ] || skip=true
+              fi
             fi
           fi
           {

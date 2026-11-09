@@ -44,7 +44,7 @@ Each evidence matrix row is the complete cell plan: identity, the node list in
 manifest order and the deployment's verify step. L1 is `openadkit run`, which
 waits for the deployment's healthchecks; L2 is `run --verify`. `run_cell.sh`
 executes the row with a common validate/start/cleanup lifecycle; it does not
-derive policy from deployment names. Scenario isolation and golden-path checks
+derive policy from deployment names. Scenario isolation and drive-to-goal checks
 stay distinct.
 Hosted split evidence is two nodes on one runner, not proof of two physical
 hosts.

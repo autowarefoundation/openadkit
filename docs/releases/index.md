@@ -41,6 +41,8 @@ vehicle certification.
 | Images: one moving alias per image and distro; the default distro comes from `openadkit.json` | Done |
 | Readiness: `run` and `restart` wait for the deployments' healthchecks; `run --verify` runs the end-to-end check CI runs | Done |
 | Dev loop: `build -- <colcon args>`, a `run.json` record of every run, `openadkit new` for kits | Done |
+| Images: planning and control as separate images (`PLANNING_IMAGE`, `CONTROL_IMAGE`), so a planner can change while control stays the same | Done |
+| Planner choice: a `planning-cuda` image and a Diffusion Planner deployment (`planning_setting:=diffusion_planner`) with its model and diagnostics graph; control unchanged | Planned |
 
 ### After v2.0
 
@@ -54,7 +56,10 @@ vehicle certification.
 - **Dev loop in CI:** an edit, build, restart and changed-behaviour check, and a
   devcontainer and debugging guide.
 - **Settings resolution:** resolve deployment settings in one place in the CLI.
-- **Visualizer:** Foxglove as an alternative to the noVNC desktop.
+- **Visualizer:** RViz stays the first-class view, with Autoware's own panels
+  and tools. Evaluate KasmVNC in place of TigerVNC, noVNC and Openbox for the
+  browser view, and add Lichtblick with `foxglove_bridge` as an extra view for
+  analysis, plots and bag playback.
 - **Validation ladder:** SIL, virtual vehicle network, bench HIL, small-scale and
   then full-scale vehicle, replacing the vehicle node rather than the application.
 - **Vehicle delivery:** an OCI package of the digest-pinned system and its BOM that

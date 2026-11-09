@@ -44,9 +44,9 @@ done yet.
 
 !!! warning "Evidence scope"
     Evidence runs these units under Podman and systemd on Ubuntu 24.04 and drives
-    the golden path. CI does not build or boot the image below. An image built from
+    the ego to its goal. CI does not build or boot the image below. An image built from
     these units was driven once by hand: it booted in QEMU with SELinux enforcing
-    and no outside network, and the golden path arrived.
+    and no outside network, and the ego arrived at its goal.
 
 ## Run on a Podman Host
 

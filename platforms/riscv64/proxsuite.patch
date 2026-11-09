@@ -1,0 +1,15 @@
+diff --git a/include/proxsuite/linalg/dense/core.hpp b/include/proxsuite/linalg/dense/core.hpp
+index 5c43d50..ef020e4 100644
+--- a/include/proxsuite/linalg/dense/core.hpp
++++ b/include/proxsuite/linalg/dense/core.hpp
+@@ -9,8 +9,8 @@
+ #include <proxsuite/linalg/veg/util/assert.hpp>
+ #include <proxsuite/linalg/veg/memory/dynamic_stack.hpp>
+ 
+-#if !(defined(__aarch64__) || defined(__PPC64__) || defined(__ppc64__) ||      \
+-      defined(_ARCH_PPC64))
++#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) ||            \
++  defined(_M_IX86)
+ #include <immintrin.h>
+ #endif
+ 

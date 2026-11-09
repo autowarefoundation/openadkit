@@ -99,12 +99,16 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     case "${arch}" in \
       amd64) virtualgl_sha256=b0e989ac4c59b82b2198dea90856a8fb6c41bedff4c792b37fcd259dce958bc8 ;; \
       arm64) virtualgl_sha256=f189dcfaf64816e092b4d8560df17dbdfdc6ae7d598963f9c4b2d6b8bd363905 ;; \
-      *) echo "Unsupported architecture for VirtualGL: ${arch}" >&2; exit 1 ;; \
+      *) virtualgl_sha256="" ;; \
     esac && \
-    curl -fsSL -o /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/${VIRTUALGL_VERSION}/virtualgl_${VIRTUALGL_VERSION}_${arch}.deb" && \
-    echo "${virtualgl_sha256}  /tmp/virtualgl.deb" | sha256sum -c - && \
-    apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
-    rm -f /tmp/virtualgl.deb
+    if [ -n "${virtualgl_sha256}" ]; then \
+      curl -fsSL -o /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/${VIRTUALGL_VERSION}/virtualgl_${VIRTUALGL_VERSION}_${arch}.deb" && \
+      echo "${virtualgl_sha256}  /tmp/virtualgl.deb" | sha256sum -c - && \
+      apt-get install -y --no-install-recommends /tmp/virtualgl.deb && \
+      rm -f /tmp/virtualgl.deb; \
+    else \
+      echo "No VirtualGL release for ${arch}: RViz will use software rendering"; \
+    fi
 
 # Need to expose the NoVNC port when running the container.
 # Port 5999 (TigerVNC) is intentionally loopback-only and not published.

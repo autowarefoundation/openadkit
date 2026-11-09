@@ -77,7 +77,7 @@ touch autoware/src/middleware/external/.keep
 docker buildx bake -f components/docker-bake.hcl universe-common
 
 # 6. Build the Planning Simulation images (~2 hours)
-docker buildx bake -f components/docker-bake.hcl --load planning
+docker buildx bake -f components/docker-bake.hcl --load planning-simulation
 
 # 7. Run with the local images
 ./openadkit run planning-simulation
@@ -86,7 +86,7 @@ docker buildx bake -f components/docker-bake.hcl --load planning
 - `--load` puts the images in the local Docker store; without it, Bake only
   fills the build cache.
 - Local builds are tagged `<target>-<arch>-<ros-distro>` (for example
-  `planning-control-amd64-humble`), which is the tag `./openadkit` looks up in a
+  `planning-amd64-humble`), which is the tag `./openadkit` looks up in a
   source checkout. The arch follows the build host; when cross-building, set tags
   with `--set <target>.tags=...`. To use other images, set the `*_IMAGE`
   variables in `~/.config/openadkit/<deployment>.env`.

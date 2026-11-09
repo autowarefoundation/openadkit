@@ -30,7 +30,8 @@ def test_inventory_bake_and_runtime_catalog_agree():
     assert set(kit["componentImages"].values()) == {image["target"] for image in INVENTORY["images"] if image["stage"] == "component"}
     resolved = matrices.build_matrices(INVENTORY)
     index = {(row["target"], row["ros-distro"]): row["arches"] for row in resolved["manifest_matrix"]["include"]}
-    assert index[("planning-control", "humble")] == "amd64 arm64"
+    assert index[("planning", "humble")] == "amd64 arm64"
+    assert index[("control", "humble")] == "amd64 arm64"
     assert index[("sensing-perception-cuda", "jazzy")] == "amd64"
     assert {row["target"] for row in resolved["carla_matrix"]["include"]} == {"carla-interface"}
     assert "simulator" in {row["target"] for row in resolved["component_matrix"]["include"]}

@@ -6,7 +6,7 @@ include:
 # image and mounts the workspace:
 #
 #   my-node:
-#     image: ${PLANNING_CONTROL_IMAGE:?set by the openadkit CLI}
+#     image: ${PLANNING_IMAGE:?set by the openadkit CLI}
 #     network_mode: host
 #     ipc: host
 #     env_file:

@@ -5,7 +5,8 @@ flowchart TB
 
     UC --> SP["sensing-perception"]
     UC --> LM["localization-mapping"]
-    UC --> PC["planning-control"]
+    UC --> PLN["planning"]
+    UC --> CTL["control"]
     UC --> VS["vehicle-system"]
     UC --> API["api"]
     UC --> VIZ["visualizer"]

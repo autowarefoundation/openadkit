@@ -6,7 +6,7 @@ inputs:
     description: Full image prefix, e.g. ghcr.io/<owner>/openadkit
     required: true
   target:
-    description: Image target name, e.g. planning-control
+    description: Image target name, e.g. planning
     required: true
   ros-distro:
     description: ROS distribution name

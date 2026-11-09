@@ -88,9 +88,9 @@ plugins:
         components/localization.md: components/index.md#localization-mapping
         components/mapping.md: components/index.md#localization-mapping
         components/localization-mapping.md: components/index.md#localization-mapping
-        components/planning.md: components/index.md#planning-control
-        components/control.md: components/index.md#planning-control
-        components/planning-control.md: components/index.md#planning-control
+        components/planning.md: components/index.md#planning
+        components/control.md: components/index.md#control
+        components/planning-control.md: components/index.md#planning
         components/vehicle-system.md: components/index.md#vehicle-and-system
         components/api.md: components/index.md#api
         components/simulator.md: components/index.md#simulator
@@ -111,7 +111,7 @@ plugins:
         Services/index.md: components/index.md
         Services/API/index.md: components/index.md#api
         Services/Localization-Mapping/index.md: components/index.md#localization-mapping
-        Services/Planning-Control/index.md: components/index.md#planning-control
+        Services/Planning-Control/index.md: components/index.md#planning
         Services/Sensing-Perception/index.md: components/index.md#sensing-perception
         Services/Vehicle-System/index.md: components/index.md#vehicle-and-system
         services/index.md: components/index.md

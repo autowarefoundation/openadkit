@@ -11,10 +11,10 @@ image digest.
 
 | Tag | Example | Created | Moves? |
 |-----|---------|---------|--------|
-| **Release** | `planning-control-humble-v2.0.0` | Every release | No |
-| **Latest per distro** | `planning-control-humble` | Stable releases | Yes |
-| **Pre-release** | `planning-control-humble-v2.0.0-rc.1` | Pre-releases | No |
-| **CI build** | `planning-control-humble-123456789-1` | Every CI build (`<run_id>-<run_attempt>`) | No |
+| **Release** | `planning-humble-v2.0.0` | Every release | No |
+| **Latest per distro** | `planning-humble` | Stable releases | Yes |
+| **Pre-release** | `planning-humble-v2.0.0-rc.1` | Pre-releases | No |
+| **CI build** | `planning-humble-123456789-1` | Every CI build (`<run_id>-<run_attempt>`) | No |
 
 Releases promote a CI build of `main` (see [Versioning](#versioning)).
 
@@ -22,7 +22,7 @@ Pre-releases never move the latest-per-distro aliases. No alias leaves out the
 distro, so an image never switches ROS distro under the same tag.
 
 Examples use **{{ default_distro_title }}**, the default distro. Jazzy images use
-the same patterns with `-jazzy` (for example `planning-control-jazzy`).
+the same patterns with `-jazzy` (for example `planning-jazzy`).
 `sensing-perception-cuda` and `carla-interface` are amd64-only.
 
 ## Choosing a Tag
@@ -76,7 +76,7 @@ the release BOM name the snapshot per distro; an image carries it as a label:
 
 ```bash
 docker inspect --format '{{ "{{" }} index .Config.Labels "org.opencontainers.image.ros-snapshot" {{ "}}" }}' \
-  {{ registry }}:planning-control-humble
+  {{ registry }}:planning-humble
 ```
 
 The snapshot changes only with the upstream Autoware release. Ubuntu packages

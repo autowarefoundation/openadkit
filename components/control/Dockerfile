@@ -4,9 +4,9 @@ ARG UNIVERSE_COMMON_DEVEL_IMAGE
 ARG UNIVERSE_COMMON_IMAGE
 
 # =============================================================================
-# Build stage: planning-control-devel
+# Build stage: control-devel
 # =============================================================================
-FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS planning-control-devel
+FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS control-devel
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
@@ -29,16 +29,8 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
     mkdir -p /opt/openadkit && \
     printf '%s\n' \
-        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_control_launch \
-        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch \
         /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/universe/autoware_universe/control \
-        /tmp/autoware/src/universe/autoware_universe/planning \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_cuda_utils \
-        /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_common \
-        /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_plugins \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_external_cmd_converter \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \
         /tmp/autoware/src/universe/autoware_universe/system/autoware_command_mode_types \
@@ -56,7 +48,7 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
 # compile (components/shared/launch-packages.sh).
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=bind,source=components/shared/launch-packages.sh,target=/tmp/launch-packages.sh \
-    bash /tmp/launch-packages.sh autoware_control_launch autoware_control_config autoware_planning_launch autoware_planning_config
+    bash /tmp/launch-packages.sh autoware_control_launch autoware_control_config
 
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
@@ -68,14 +60,14 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     rm -rf /tmp/autoware
 
 # =============================================================================
-# Runtime stage: planning-control
+# Runtime stage: control
 # =============================================================================
-FROM ${UNIVERSE_COMMON_IMAGE} AS planning-control
+FROM ${UNIVERSE_COMMON_IMAGE} AS control
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-RUN --mount=from=planning-control-devel,source=/opt/autoware,target=/mnt/autoware \
+RUN --mount=from=control-devel,source=/opt/autoware,target=/mnt/autoware \
     --mount=type=bind,source=components/shared/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
     cp -a /mnt/autoware/. /opt/autoware/ && \
     find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \

@@ -5,7 +5,8 @@
   "imagePrefixComponent": "ghcr.io/autowarefoundation/openadkit",
   "componentImages": {
     "LOCALIZATION_MAPPING_IMAGE": "localization-mapping",
-    "PLANNING_CONTROL_IMAGE": "planning-control",
+    "PLANNING_IMAGE": "planning",
+    "CONTROL_IMAGE": "control",
     "VEHICLE_SYSTEM_IMAGE": "vehicle-system",
     "API_IMAGE": "api",
     "VISUALIZER_IMAGE": "visualizer",

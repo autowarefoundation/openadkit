@@ -216,7 +216,7 @@ jobs:
       (needs.build-local-common.result == 'success' ||
       needs.build-local-common.result == 'skipped')
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
-    # planning-control can take nearly two hours before the bounded Trivy scan;
+    # planning can take nearly two hours before the bounded Trivy scan;
     # fork PRs may also compile development core and universe-common first.
     timeout-minutes: 180
     permissions:

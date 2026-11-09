@@ -38,7 +38,7 @@ compiles and only refreshes and reassembles the runtime images.
 |-------|---------|--------------|
 | `universe-common` | `universe-common-devel`, `universe-common` | `ghcr.io/autowarefoundation/openadkit-common` |
 | `component` | all component images, including the amd64-only `sensing-perception-cuda` and `carla-interface` | `ghcr.io/autowarefoundation/openadkit` |
-| `planning` | `universe-common` plus the images Planning Simulation needs | — (local builds) |
+| `planning-simulation` | `universe-common` plus the images Planning Simulation needs | — (local builds) |
 | `default` | `universe-common` + `component` | — |
 
 ## Build and Run Locally

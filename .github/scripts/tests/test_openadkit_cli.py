@@ -541,7 +541,7 @@ def test_split_node_run_discovery_and_safe_stop(tmp_path):
 
 @pytest.mark.parametrize("exit_code", [0, 7])
 def test_run_verify_runs_the_command_in_its_service_once_ready(tmp_path, exit_code):
-    document = manifest() | {"verify": {"service": "app", "command": ["python3", "/openadkit/checks/golden.py"]}}
+    document = manifest() | {"verify": {"service": "app", "command": ["python3", "/openadkit/checks/drive_to_goal.py"]}}
     root, _ = runtime_tree(tmp_path, document=document)
     calls = fake_docker(tmp_path, services=("app",))
     result = run_cli(root, "run", "example", "--verify", "--pull", "never", FAKE_EXEC_EXIT=str(exit_code))
@@ -552,7 +552,7 @@ def test_run_verify_runs_the_command_in_its_service_once_ready(tmp_path, exit_co
     # Readiness is `up --wait`; the step runs after it, in the service, with ROS sourced.
     assert up < exec_index and "--wait" in rows[up]
     assert exec_args[exec_args.index("exec") + 1:exec_args.index("exec") + 3] == ["-T", "app"]
-    assert exec_args[-2:] == ["python3", "/openadkit/checks/golden.py"]
+    assert exec_args[-2:] == ["python3", "/openadkit/checks/drive_to_goal.py"]
     record = json.loads((root.parent / "home/openadkit-output/example/results/run.json").read_text())
     assert record["deployment"] == "example" and record["rosDistro"] == "humble"
     assert record["verify"]["service"] == "app" and record["verify"]["exitCode"] == exit_code
@@ -607,11 +607,11 @@ def test_verify_waits_for_a_service_without_a_command(tmp_path, monkeypatch):
 
 
 def test_a_kit_inherits_the_verify_step_of_its_base_unless_it_names_one(tmp_path):
-    golden = {"service": "app", "command": ["python3", "golden.py"]}
-    root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": golden})
+    verify = {"service": "app", "command": ["python3", "drive_to_goal.py"]}
+    root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": verify})
     kit_root = integrator_kit(tmp_path, root)
     kit = cli_manifest.load_kit(kit_root)
-    assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == golden
+    assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == verify
     path = kit_root / "deployments/custom/deployment.json"
     path.write_text(json.dumps(json.loads(path.read_text()) | {"verify": {"service": "acme"}}))
     assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == {"service": "acme"}

@@ -5,8 +5,8 @@ set -uo pipefail
 # Run one evidence cell against a staged kit (run from the kit root):
 #   L0: ./openadkit validate
 #   L1: ./openadkit run, which returns once the deployment's healthchecks pass
-#   L2: the deployment's verify step (./openadkit run --verify): the golden
-#       path, or the scenario samples, plus a domain-isolation check when the
+#   L2: the deployment's verify step (./openadkit run --verify): the drive to
+#       the goal, or the scenario samples, plus a domain-isolation check when the
 #       cell runs several nodes on one host.
 #
 # The cell is one row of the evidence matrix (validation_matrix.py), which

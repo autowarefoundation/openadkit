@@ -1,4 +1,4 @@
-"""Golden path over AD API: initialize, route, engage, wait for ARRIVED.
+"""Drive to the goal over AD API: initialize, route, engage, wait for ARRIVED.
 
 The verify step of planning simulation (deployment.json): `openadkit run
 --verify` runs it in the api service once Autoware is ready. Exit 0 on
@@ -35,9 +35,9 @@ def pose(p):
     return m
 
 
-class Golden(Node):
+class DriveToGoal(Node):
     def __init__(self):
-        super().__init__("openadkit_golden_path")
+        super().__init__("openadkit_drive_to_goal")
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
         self.route = self.loc = self.op = None
         self.create_subscription(RouteState, "/api/routing/state", lambda m: setattr(self, "route", m.state), latched)
@@ -78,7 +78,7 @@ class Golden(Node):
         return st.success
 
     def mark(self, what):
-        print(f"[golden] {time.monotonic() - self.t0:6.1f}s {what}", flush=True)
+        print(f"[verify] {time.monotonic() - self.t0:6.1f}s {what}", flush=True)
 
     def run(self):
         for cli in (self.init_cli, self.route_cli, self.auto_cli):
@@ -145,7 +145,7 @@ class Golden(Node):
 
 
 rclpy.init()
-node = Golden()
+node = DriveToGoal()
 rc = node.run()
 node.destroy_node()
 rclpy.shutdown()

@@ -54,7 +54,10 @@ vehicle certification.
 - **Dev loop in CI:** an edit, build, restart and changed-behaviour check, and a
   devcontainer and debugging guide.
 - **Settings resolution:** resolve deployment settings in one place in the CLI.
-- **Visualizer:** Foxglove as an alternative to the noVNC desktop.
+- **Visualizer:** RViz stays the first-class view, with Autoware's own panels
+  and tools. Evaluate KasmVNC in place of TigerVNC, noVNC and Openbox for the
+  browser view, and add Lichtblick with `foxglove_bridge` as an extra view for
+  analysis, plots and bag playback.
 - **Validation ladder:** SIL, virtual vehicle network, bench HIL, small-scale and
   then full-scale vehicle, replacing the vehicle node rather than the application.
 - **Vehicle delivery:** an OCI package of the digest-pinned system and its BOM that

@@ -68,6 +68,11 @@ vehicle certification.
   replace the zenoh-bridge-ros2dds bridge.
 - **Safety Island on CARLA:** a kit on CARLA Simulation with the Safety Island's closed loop over CAN.
   Hosted CI cannot run CARLA, so it needs its own evidence.
+- **Autoware System Designer:** define how Open AD Kit relates to
+  [Autoware System Designer](https://github.com/autowarefoundation/autoware_system_designer),
+  whose deployments choose launch and parameters while Open AD Kit's choose
+  images and Compose services, so the two do not offer two meanings of a
+  deployment.
 - **Autoware version moves on standard runners:** measure how long the common
   images take to compile from scratch on a 4-vCPU runner, which a new Autoware
   version needs, and size the job limits or the runner for it before the next one.

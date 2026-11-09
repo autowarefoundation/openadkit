@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -666,11 +666,15 @@ def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
 
 # Written into install/ by build: the image and distro it built with.
 OVERLAY_STAMP = ".openadkit-overlay.json"
+# The arguments after `openadkit build ... --` follow; CMAKE_BUILD_TYPE in the
+# environment is CMake's default, so --cmake-args of their own keep Release.
 OVERLAY_BUILD = """set -eo pipefail
 source "/opt/ros/${ROS_DISTRO}/setup.bash"
 source /opt/autoware/setup.bash
-colcon build --install-base install --cmake-args -DCMAKE_BUILD_TYPE=Release
+colcon build --install-base install "$@"
 """
+# The services mount the workspace and source install/ at fixed paths.
+FIXED_COLCON_OPTIONS = ("--install-base", "--build-base")
 
 
 def read_overlay_stamp(workspace: Path) -> dict[str, Any] | None:
@@ -681,14 +685,18 @@ def read_overlay_stamp(workspace: Path) -> dict[str, Any] | None:
     return stamp if isinstance(stamp, dict) else None
 
 
-def build_overlay(workspace: Path, image: str, ros_distro: str) -> None:
-    """Build a workspace in the devel image.
+def build_overlay(workspace: Path, image: str, ros_distro: str, colcon: Sequence[str] = ()) -> None:
+    """Build a workspace in the devel image, passing `colcon` on to colcon build.
 
     It builds incrementally only on its own last build in this image and
     distro. Anything else (another image or distro, a build by hand at another
     path) starts from a clean build and install: CMake caches record the
     image's paths and the path they were configured at.
     """
+    fixed = sorted({option for option in FIXED_COLCON_OPTIONS for argument in colcon
+                    if argument == option or argument.startswith(f"{option}=")})
+    if fixed:
+        raise OpenADKitError(f"{', '.join(fixed)} cannot change: the services use {OVERLAY_TARGET}/install")
     require_docker()
     if read_overlay_stamp(workspace) != {"image": image, "rosDistro": ros_distro}:
         for products in (workspace / "build", workspace / "install"):
@@ -702,10 +710,11 @@ def build_overlay(workspace: Path, image: str, ros_distro: str) -> None:
             "--user", f"{os.getuid()}:{os.getgid()}",
             "--env", "HOME=/tmp",
             "--env", "CCACHE_DIR=/tmp/ccache",
+            "--env", "CMAKE_BUILD_TYPE=Release",
             "--volume", f"{workspace}:{OVERLAY_TARGET}",
             "--workdir", OVERLAY_TARGET,
             "--entrypoint", "bash",
-            image, "-c", OVERLAY_BUILD,
+            image, "-c", OVERLAY_BUILD, "build", *colcon,
         ],
         env=_compose_ls_environment(),
     )

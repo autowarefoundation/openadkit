@@ -1429,6 +1429,27 @@ def test_build_builds_one_workspace_in_the_pinned_devel_image(tmp_path):
     assert result.returncode != 0 and "has no src/" in result.stderr
 
 
+def test_build_hands_the_arguments_after_dashes_to_colcon(tmp_path):
+    root, _ = runtime_tree(tmp_path, release=True)
+    devel = "ghcr.io/example/openadkit-common:universe-common-devel-humble@sha256:" + "d" * 64
+    edit_kit(root, lambda doc: doc["images"]["humble"].update({"universe-common-devel": devel}))
+    kit = integrator_kit(tmp_path, root)
+    (kit / "overlay_ws/src").mkdir(parents=True)
+    calls = fake_docker(tmp_path)
+    colcon = ["--packages-select", "my_pkg", "--cmake-args", "-DCMAKE_BUILD_TYPE=Debug"]
+    result = run_cli(root, "build", "--ros-distro", "humble", "--", *colcon, directory=kit)
+    assert result.returncode == 0, result.stderr
+    build = next(row["args"] for row in recorded(calls) if row["args"][:1] == ["run"])
+    # The script gets them as its arguments; Release is only CMake's default.
+    assert build[build.index(devel) + 3:] == ["build", *colcon]
+    assert 'colcon build --install-base install "$@"' in build[build.index(devel) + 2]
+    assert "CMAKE_BUILD_TYPE=Release" in build and "-DCMAKE_BUILD_TYPE=Release" not in " ".join(build)
+    # The services source install/ where they mount the workspace.
+    for option in ("--install-base", "--build-base=other"):
+        result = run_cli(root, "build", "--", option, "x", directory=kit)
+        assert result.returncode != 0 and "cannot change" in result.stderr
+
+
 def overlay_workspace(root, name, monkeypatch, tmp_path, workspace=None):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     for variable in ISOLATED_ENV:

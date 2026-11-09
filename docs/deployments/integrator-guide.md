@@ -101,7 +101,15 @@ the right one:
 ```bash
 openadkit build [--ros-distro humble]   # in the kit: its overlay_ws
 openadkit build PATH                    # any workspace, with the pins of the kit around it
+openadkit build -- --packages-select my_pkg                # arguments after -- go to colcon build
+openadkit build -- --cmake-args -DCMAKE_BUILD_TYPE=Debug   # Release unless you set another
 ```
+
+Packages build incrementally: a second build compiles only what changed. The
+hook sources the workspace on top of Autoware, so a package with the name of
+an Autoware package comes first; Autoware packages that link against its
+library keep the copy they were built with. `--install-base` and `--build-base`
+stay fixed: the services source `install/` where they mount the workspace.
 
 The CLI records the image and distro in `install/.openadkit-overlay.json`, and
 `validate` and `run` warn after a base upgrade or a distro change until you

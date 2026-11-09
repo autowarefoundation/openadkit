@@ -41,7 +41,8 @@ repository, can be release evidence.
 
 The current reusable interface takes **only `build_tag`**. Metadata and source
 come from the caller's build-owning repository. It stages that exact source's
-reference deployments and the in-tree kit, `deployments/custom-kit`.
+reference deployments and the example kit, which the staged CLI's `openadkit new`
+makes with the fixture in `.github/scripts/evidence/kit` on top.
 It does **not** take an arbitrary external kit repository, revision or scenario
 as input. Do not copy this example into an unrelated integrator repository and
 claim it verifies that kit; external kit intake needs a dedicated, pinned,

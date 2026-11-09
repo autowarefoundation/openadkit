@@ -72,7 +72,7 @@ def stage_bundle(
 
     Release packaging and evidence staging both stage through here, so the
     evidence cells run the tree the release ships; evidence adds only the
-    example kits, without their host colcon products.
+    example kits, made by the staged CLI's own `openadkit new`.
     """
     if bundle_root.exists():
         fail(f"bundle root already exists: {bundle_root}")
@@ -82,19 +82,11 @@ def stage_bundle(
         *(f"deployments/{name}" for name in plan["bundle"]["shared"]),
     ]
     scrubbed = ["__pycache__", "*.pyc"]
-    examples: list[str] = []
-    if include_example_kits:
-        runtime = load_runtime(source_root)
-        examples = [
-            root.relative_to(source_root).as_posix()
-            for root in validation_matrix.example_kit_roots(runtime, source_root)
-        ]
-    for item in [*items, *examples]:
+    for item in items:
         source, target = source_root / item, bundle_root / item
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir() and not source.is_symlink():
-            patterns = scrubbed + (list(validation_matrix.COLCON_PRODUCTS) if item in examples else [])
-            shutil.copytree(source, target, symlinks=True, ignore=shutil.ignore_patterns(*patterns))
+            shutil.copytree(source, target, symlinks=True, ignore=shutil.ignore_patterns(*scrubbed))
         else:
             shutil.copy2(source, target, follow_symlinks=False)
     for directory, names, files in os.walk(bundle_root):
@@ -105,6 +97,8 @@ def stage_bundle(
     verify_staged_bundle(bundle_root, plan)
     write_json(bundle_root / "openadkit.json", plan["releaseContext"])
     verify_release_integrity(bundle_root, plan)
+    if include_example_kits:
+        validation_matrix.make_example_kits(bundle_root, bundle_root / validation_matrix.EXAMPLE_KIT_DIRECTORY)
 
 
 def verify_staged_bundle(bundle_root: Path, plan: dict[str, Any]) -> None:

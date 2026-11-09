@@ -183,12 +183,9 @@ def test_real_compose_preserves_single_and_split_graphs(compose_context, name, n
 
 
 def test_real_integrator_kit_validates_against_its_source_base(tmp_path, compose_context):
-    kit = tmp_path / "custom-kit"
-    shutil.copytree(ROOT / "deployments/custom-kit", kit, ignore=shutil.ignore_patterns("build", "install", "log"))
-    path = kit / "openadkit.json"
-    document = json.loads(path.read_text())
-    document["extends"] = str(ROOT)
-    path.write_text(json.dumps(document))
+    import validation_matrix
+    [kit] = validation_matrix.make_example_kits(ROOT, tmp_path)
+    assert json.loads((kit / "openadkit.json").read_text())["extends"] == str(ROOT)
     directory = kit
     # Documented site settings, used by the shared services and runtime.env.
     (directory / "config.env").write_text(

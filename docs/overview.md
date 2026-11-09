@@ -58,8 +58,8 @@ Open AD Kit runs Autoware as a pipeline of containerized components. Each contai
 2. [**Perception**](components/index.md#sensing-perception) detects and tracks objects, traffic lights, and drivable space.
 3. [**Mapping**](components/index.md#localization-mapping) serves high-definition map data that the rest of the stack consumes.
 4. [**Localization**](components/index.md#localization-mapping) determines the vehicle's exact position on the map.
-5. [**Planning**](components/index.md#planning-control) computes a safe, feasible trajectory to the goal.
-6. [**Control**](components/index.md#planning-control) converts that trajectory into throttle, brake, and steering commands.
+5. [**Planning**](components/index.md#planning) computes a safe, feasible trajectory to the goal.
+6. [**Control**](components/index.md#control) converts that trajectory into throttle, brake, and steering commands.
 7. [**Vehicle System**](components/index.md#vehicle-and-system) bridges those commands to the actual vehicle or simulator.
 
 A [deployment](deployments/index.md) runs the subset of these stages a task needs. Autoware Safety Island joins the same pipeline over DDS, adding a safety-critical actuation path alongside the containerized services.
@@ -68,7 +68,7 @@ A [deployment](deployments/index.md) runs the subset of these stages a task need
 
 | Term | Meaning |
 |------|---------|
-| **Component image** | A published container image holding one or more Autoware functions, for example `planning-control`. |
+| **Component image** | A published container image holding one or more Autoware functions, for example `planning`. |
 | **Deployment** | A named, ready-to-run stack: a manifest, environment files, and Compose configuration for a task such as planning simulation. |
 | **Manifest** | The `deployment.json` file that tells the CLI how to run a deployment: requirements, data downloads, and one-shot services. |
 | **Kit** | An `openadkit.json` and its deployments: the reference kit or an integrator's differences over a pinned base release. |
@@ -79,6 +79,6 @@ A [deployment](deployments/index.md) runs the subset of these stages a task need
 | **Evidence** | The runtime test cells run against one build; the release gate requires a successful run that passed every cell. |
 | **CI exemption** | A reasoned manifest entry for a deployment without hosted runtime evidence, not a passing-test claim. |
 | **BOM** | The release's pinned Autoware input, runtime images and upstream artifacts. |
-| **Tag alias** | A moving image tag such as `planning-control-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |
+| **Tag alias** | A moving image tag such as `planning-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |
 | **Digest pin** | An image reference by content hash (`@sha256:…`) instead of a tag, so the same image bits are always used. |
 | **Mixed criticality** | Running safety-critical and non-critical workloads on separately qualified execution environments. Here, the Safety Island's real-time hardware beside the containerized stack; the containers on one host share its network and are not isolated by criticality. |

@@ -43,19 +43,20 @@ Planning and Scenario Simulation run only the `map` service; the simulator
 supplies map-to-odometry transforms. Logging and CARLA Simulation also run
 localization.
 
-### Planning & Control {: #planning-control }
+### Planning {: #planning }
 
-Trajectory generation and vehicle control. Deployments run them as separate
-containers from the same image.
+Trajectory generation: route planning on Lanelet2 road networks; behavior
+planning for lanes, intersections, and obstacles; kinematically feasible motion
+planning; goal and parking maneuvers; the planning validator that publishes
+`/planning/trajectory`. Launch: `component_planning.launch.xml`
 
-- **Planning** — route planning on Lanelet2 road networks; behavior planning for
-  lanes, intersections, and obstacles; kinematically feasible motion planning;
-  goal and parking maneuvers; emergency fallback trajectories. Launch:
-  `component_planning.launch.xml`
-- **Control** — lateral steering and longitudinal velocity control; PID and
-  Model Predictive Control modes; vehicle-specific command conversion;
-  emergency stop and heartbeat monitoring. Launch:
-  `component_control.launch.xml`
+### Control {: #control }
+
+Vehicle control from `/planning/trajectory`: lateral steering and longitudinal
+velocity control; PID and Model Predictive Control modes; vehicle-specific
+command conversion; emergency stop and heartbeat monitoring. Control reads only
+that trajectory, so it stays the same whichever planner produces it. Launch:
+`component_control.launch.xml`
 
 ### Vehicle and System {: #vehicle-and-system }
 

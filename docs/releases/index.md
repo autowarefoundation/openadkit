@@ -41,6 +41,8 @@ vehicle certification.
 | Images: one moving alias per image and distro; the default distro comes from `openadkit.json` | Done |
 | Readiness: `run` and `restart` wait for the deployments' healthchecks; `run --verify` runs the end-to-end check CI runs | Done |
 | Dev loop: `build -- <colcon args>`, a `run.json` record of every run, `openadkit new` for kits | Done |
+| Images: planning and control as separate images (`PLANNING_IMAGE`, `CONTROL_IMAGE`), so a planner can change while control stays the same | Done |
+| Planner choice: a `planning-cuda` image and a Diffusion Planner deployment (`planning_setting:=diffusion_planner`) with its model and diagnostics graph; control unchanged | Planned |
 
 ### After v2.0
 

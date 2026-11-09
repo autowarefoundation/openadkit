@@ -573,6 +573,7 @@ def operate(args: argparse.Namespace) -> int:
         compose.logs(project, args.follow, args.services)
     elif args.command == "restart":
         restarted, kept = compose.restart(project, args.services, args.all_services)
+        compose.wait_after_restart(project, restarted)
         print(f"restarted: {', '.join(restarted)}")
         if kept:
             print(f"kept running: {', '.join(kept)} (restart --all includes them)")

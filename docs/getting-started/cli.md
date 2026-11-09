@@ -37,7 +37,9 @@ host, pick one with `--node`; `status` and `stop` act on all of them.
 or an overlay workspace, so a changed parameter file or a rebuilt workspace
 applies without restarting a simulator such as CARLA; it names the services it
 left running. `restart --all` restarts the whole deployment in place, one-shot
-services included, as a fresh start with the same settings. Changes to Compose
+services included, as a fresh start with the same settings. Like `run`, it
+returns once the restarted services are ready, fails if one crashes, and warns
+about overrides that changed nothing. Changes to Compose
 files or `.env` values need `stop` and `run` again. `shell` sources ROS, Autoware and the overlay
 workspaces like the services' entrypoint; give it a service and a command to run
 one command instead.
@@ -72,7 +74,8 @@ its start to its goal, Scenario Simulation waits for the scenarios' result.
 `run --verify` exits with the step's result; the deployment keeps running.
 Every run writes `results/run.json` in the deployment's output directory: the
 version, distro and images it started, the digest of the resolved Compose
-model, how long it took to be ready and, with `--verify`, the step's result.
+model, content digests of the config layers and overlay workspace it mounts,
+how long it took to be ready and, with `--verify`, the step's result.
 `openadkit run <deployment> --pull always` refreshes images before starting,
 and `openadkit version` prints the installed version. `--no-visualizer`
 starts everything except the visualizer, for a host nobody watches; its
@@ -183,9 +186,6 @@ The CLI marks the data it installs with a `.openadkit-resource.json` file.
 `clean` and `--force` only delete or replace marked data. Data that was
 already there, such as a map you copied yourself, is still used when it is
 complete, but the CLI never deletes or replaces it; move or remove it yourself.
-If a target changes during `fetch --force`, publication fails instead of deleting
-the changed directory. A conflict during the atomic swap preserves staging;
-the error names its path for inspection rather than automatically removing it.
 
 ## Split-host nodes
 

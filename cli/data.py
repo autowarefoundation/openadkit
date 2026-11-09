@@ -1,12 +1,10 @@
-"""Validated download, extraction, and atomic data publication."""
+"""Validated download, extraction, and data publication."""
 
 from __future__ import annotations
 
-import ctypes
 import hashlib
 import http.client
 import json
-import os
 import shutil
 import stat
 import tempfile
@@ -33,22 +31,14 @@ from manifest import (
 MARKER = ".openadkit-resource.json"
 
 
-class PublicationConflict(OpenADKitError):
-    """The exchanged directory must not be removed by staging cleanup."""
-
-
 @contextmanager
 def resource_stage(parent: Path, name: str) -> Iterator[Path]:
+    """A staging directory next to the target, removed with what it holds."""
     stage = Path(tempfile.mkdtemp(prefix=f".{name}.stage.", dir=parent))
-    cleanup = True
     try:
         yield stage
-    except PublicationConflict as error:
-        cleanup = False
-        raise OpenADKitError(f"{error}; staging preserved at {stage}") from error
     finally:
-        if cleanup:
-            shutil.rmtree(stage)
+        shutil.rmtree(stage)
 
 
 def is_managed(target: Path) -> bool:
@@ -174,55 +164,17 @@ def validate_dataset(path: Path, required: list[str]) -> bool:
     return True
 
 
-def rename_atomic(candidate: Path, target: Path, flags: int) -> None:
-    libc = ctypes.CDLL(None, use_errno=True)
-    try:
-        renameat2 = libc.renameat2
-    except AttributeError as error:
-        raise OpenADKitError("atomic data publication is unsupported on this host") from error
-    renameat2.argtypes = [
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    ]
-    renameat2.restype = ctypes.c_int
-    if renameat2(-100, os.fsencode(candidate), -100, os.fsencode(target), flags) != 0:
-        errno = ctypes.get_errno()
-        raise OpenADKitError(
-            f"atomic data publication failed for {target}: {os.strerror(errno)}"
-        )
+def publish(candidate: Path, target: Path, stage: Path) -> None:
+    """Move verified data into place.
 
-
-def target_identity(path: Path) -> tuple[int, int, int] | None:
-    try:
-        info = path.lstat()
-    except FileNotFoundError:
-        return None
-    return info.st_dev, info.st_ino, info.st_ctime_ns
-
-
-def atomic_publish(candidate: Path, target: Path, expected: tuple[int, int, int] | None) -> None:
-    # Absence at download start always means NOREPLACE, even for fetch --force.
-    if expected is None:
-        rename_atomic(candidate, target, 1)
-        return
-    if target_identity(target) != expected or not is_managed(target):
-        raise OpenADKitError(f"data target changed during download: {target}")
-    published = candidate.stat()
-    rename_atomic(candidate, target, 2)
-    try:
-        displaced = candidate.lstat()
-        # rename changes ctime itself: compare device/inode after the exchange.
-        if (displaced.st_dev, displaced.st_ino) == expected[:2] and is_managed(candidate):
-            return
-        current = target.lstat()
-        if (current.st_dev, current.st_ino) == (published.st_dev, published.st_ino):
-            rename_atomic(candidate, target, 2)
-    except (OSError, OpenADKitError) as error:
-        raise PublicationConflict(f"could not verify/restore data publication: {target}") from error
-    raise PublicationConflict(f"data target changed during publication: {target}")
+    The download can take minutes, so a target there now must still be data
+    the CLI installed; it moves into the stage and goes with it.
+    """
+    if target.exists() or target.is_symlink():
+        if target.is_symlink() or not is_managed(target):
+            raise OpenADKitError(f"data target changed during download: {target}")
+        target.rename(stage / "previous")
+    candidate.rename(target)
 
 
 def validate_zip(archive: Path, expected_root: str) -> list[zipfile.ZipInfo]:
@@ -452,7 +404,6 @@ def install_resource(
     force: bool,
 ) -> None:
     target = resource_destination(resource, selection)
-    expected = target_identity(target)
     required = resource["requiredFiles"]
     if target.exists() or target.is_symlink():
         if not force:
@@ -498,7 +449,7 @@ def install_resource(
             json.dumps({"resource": resource["name"], "source": source_digest(resource)}) + "\n",
             encoding="utf-8",
         )
-        atomic_publish(candidate, target, expected)
+        publish(candidate, target, stage)
         print(f"installed data: {target}")
 
 

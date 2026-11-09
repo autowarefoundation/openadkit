@@ -94,6 +94,9 @@ or `outdated` and fails on any gap. It follows the same GPU selection as `run`:
 use `openadkit validate logging-simulation --gpu --data` to include the
 CenterPoint models.
 
+Commands print what they do in plain terms; add `--verbose` (or set
+`OPENADKIT_VERBOSE=1`) to also see each `docker compose` command they run.
+
 `list`, `version`, and `validate` accept `--json` for scripting. `config` prints
 the resolved Compose model of a deployment as JSON, with the same options as
 `validate`; [AutoSD](../platforms/autosd/index.md) builds on it.

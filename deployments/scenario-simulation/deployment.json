@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "name": "scenario-simulation",
-  "description": "Execute a Scenario Simulator V2 scenario against Autoware",
+  "description": "Autoware driving test scenarios in Scenario Simulator",
   "shared": ["shared"],
   "compose": {
     "files": ["docker-compose.yaml"],

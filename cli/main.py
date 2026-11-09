@@ -340,6 +340,13 @@ def build_parser() -> argparse.ArgumentParser:
     stop = subparsers.add_parser("stop", help="stop and remove the running deployment")
     for operational in (status, logs, restart, shell, record, stop):
         add_node_argument(operational, LIVE_NODE_HELP)
+    # The launcher handles the install commands itself.
+    for name, command in subparsers.choices.items():
+        if name not in ("install", "upgrade", "setup", "uninstall"):
+            command.add_argument(
+                "--verbose", action="store_true",
+                help="print the docker commands the CLI runs (or set OPENADKIT_VERBOSE=1)",
+            )
     return parser
 
 
@@ -396,16 +403,20 @@ def list_deployments(
     if json_output:
         print(json.dumps({"schemaVersion": 1, "deployments": entries}))
         return 0
+    gpu = {"none": "no", "optional": "optional", "required": "required"}
     rows = [
         (
             str(entry["name"]),
-            str(entry["kind"]),
-            "" if entry["gpu"] is None else str(entry["gpu"]),
+            "" if entry["gpu"] is None else gpu.get(str(entry["gpu"]), str(entry["gpu"])),
             str(entry.get("error") or entry.get("description") or ""),
         )
         for entry in entries
     ]
-    _print_table(("NAME", "KIND", "GPU", "DESCRIPTION"), rows)
+    _print_table(("NAME", "GPU", "DESCRIPTION"), rows)
+    # A release's deployments are checked against it; a source checkout's are what is there.
+    for entry in entries:
+        if entry["kind"] == "modified":
+            print(f"note: {entry['name']} differs from the release it came with")
     return 0
 
 
@@ -596,6 +607,8 @@ def main() -> int:
         arguments, colcon = arguments[:split], arguments[split + 1:]
     args = parser.parse_args(arguments)
     args.colcon = colcon
+    if getattr(args, "verbose", False):
+        os.environ["OPENADKIT_VERBOSE"] = "1"
     if not args.command:
         parser.print_help()
         return 2
@@ -703,7 +716,6 @@ def main() -> int:
         configured_services = compose.render(deployment, selection)
         compose.check_overlay_build(deployment, selection, kit.devel_image(selection.ros_distro))
         if args.command == "validate":
-            mode = "gpu" if selection.gpu else "cpu"
             results: list[dict[str, Any]] | None = (
                 data.check_installed_data(deployment, selection)
                 if args.data
@@ -733,12 +745,11 @@ def main() -> int:
                     )
                 )
             else:
-                print(f"valid: {deployment.name} ({selection.ros_distro}, {mode})")
+                view = f", node {selection.node}" if selection.node else ""
+                gpu = "with GPU" if selection.gpu else "without GPU"
+                print(f"{deployment.name} is valid (ROS 2 {selection.ros_distro.capitalize()}, {gpu}{view})")
                 for item in results or []:
-                    print(
-                        f"data: {item['name']} {item['status']} "
-                        f"({item['destination']})"
-                    )
+                    print(f"  data {item['name']}: {item['status']} ({item['destination']})")
             if results is not None and any(
                 item["status"] != "ok" for item in results
             ):

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "name": "logging-simulation",
-  "description": "Replay recorded sensor data through sensing and perception",
+  "description": "Recorded sensor data replayed through sensing and perception",
   "evidence": {"exempt": "Replays a sample rosbag through the full sensing and perception stack, which the hosted CI runners do not run yet."},
   "shared": ["shared"],
   "compose": {

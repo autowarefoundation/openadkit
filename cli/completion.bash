@@ -50,18 +50,18 @@ _openadkit() {
         upgrade) options="--check --help" ;;
         setup) options="--gpu --verify --help" ;;
         uninstall) options="--all --help" ;;
-        list | version) options="--json --help" ;;
-        validate) options="--ros-distro --gpu --node --ws --data --json --help" ;;
-        config) options="--ros-distro --gpu --node --ws --help" ;;
-        fetch) options="--ros-distro --force --help" ;;
-        run) options="--ros-distro --gpu --node --ws --pull --no-visualizer --verify --help" ;;
-        build) options="--ros-distro --help" ;;
-        new) options="--base --help" ;;
-        clean) options="--help" ;;
-        status | stop | shell) options="--node --help" ;;
-        restart) options="--node --all --help" ;;
-        logs) options="--node --follow --help" ;;
-        record) options="--node --all --output --help" ;;
+        list | version) options="--json --verbose --help" ;;
+        validate) options="--ros-distro --gpu --node --ws --data --json --verbose --help" ;;
+        config) options="--ros-distro --gpu --node --ws --verbose --help" ;;
+        fetch) options="--ros-distro --force --verbose --help" ;;
+        run) options="--ros-distro --gpu --node --ws --pull --no-visualizer --verify --verbose --help" ;;
+        build) options="--ros-distro --verbose --help" ;;
+        new) options="--base --verbose --help" ;;
+        clean) options="--verbose --help" ;;
+        status | stop | shell) options="--node --verbose --help" ;;
+        restart) options="--node --all --verbose --help" ;;
+        logs) options="--node --follow --verbose --help" ;;
+        record) options="--node --all --output --verbose --help" ;;
     esac
     if [[ ${cur} == -* ]]; then
         mapfile -t COMPREPLY < <(compgen -W "${options}" -- "${cur}")

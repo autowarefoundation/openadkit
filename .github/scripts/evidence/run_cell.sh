@@ -54,6 +54,8 @@ mkdir -p "${out}"
 # Keep run results and the CLI's own files with this cell's evidence instead
 # of the runner's home.
 export OPENADKIT_OUTPUT_DIR="${out}/output"
+# Cell logs show every docker command the CLI runs.
+export OPENADKIT_VERBOSE=1
 export OPENADKIT_STATE_DIR="${out}/state"
 # Read no host settings either: a site file, or an inherited kit selection,
 # would change the deployment, its data, or its DDS settings under the cell.

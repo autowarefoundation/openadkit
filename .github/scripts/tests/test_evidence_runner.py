@@ -324,6 +324,22 @@ def test_a_commit_tested_against_other_images_is_not_release_evidence(tmp_path, 
     assert (values["source_sha"] == build_sha) is (change is None)
 
 
+@pytest.mark.parametrize(("event", "skip"), [("pull_request", "true"), ("workflow_dispatch", "false")])
+def test_a_build_outside_the_tested_history_counts_as_other_images(tmp_path, event, skip):
+    # The latest build of a branch that was rewritten since: its commit is not
+    # in the checkout, so no diff can tell which images differ.
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(git[:3] + ["init", "-q"], check=True)
+    subprocess.run(git + ["commit", "-q", "--allow-empty", "-m", "rewritten"], check=True)
+    output = tmp_path / "outputs"
+    env = os.environ | {"GITHUB_EVENT_NAME": event, "BUILD_SHA": "f" * 40, "GITHUB_OUTPUT": str(output)}
+    result = subprocess.run(["bash", "-c", resolve_tested_commit_step()], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert "is not in the history" in result.stdout
+    values = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    assert (values["release_evidence"], values["skip"]) == ("false", skip)
+
+
 @pytest.mark.parametrize(("machine", "platform", "ok"), [
     ("x86_64", "linux/amd64", True),
     ("aarch64", "linux/arm64", True),

@@ -21,6 +21,7 @@ from manifest import (
     RuntimeContext,
     Selection,
     compose_environment,
+    deployment_checksum,
     load_json,
     output_root,
 )
@@ -423,12 +424,15 @@ def create_writable_mounts(deployment: Deployment, selection: Selection) -> str:
 def run_record(
     deployment: Deployment, selection: Selection, kit: RuntimeContext, model: str, started: float,
 ) -> dict[str, Any]:
-    """What this run started: the version, the images, and the resolved model's digest.
+    """What this run started: the version, the images, the resolved model's
+    digest, and the content digests of what the services mount from the host.
 
-    The model holds every image, setting and mount, so its digest tells two
-    runs apart; written to the deployment's results as run.json.
+    The model holds every image, setting and mount path; the config layers and
+    the overlay workspace are hashed for their content, so two runs with the
+    same digests started the same thing. Written to the results as run.json.
     """
     services = json.loads(model).get("services") or {}
+    mounted = selection.injections
     return {
         "schemaVersion": 1,
         "deployment": deployment.name,
@@ -439,6 +443,12 @@ def run_record(
         "extends": kit.extends,
         "images": {name: service.get("image") for name, service in sorted(services.items())},
         "modelSha256": hashlib.sha256(model.encode("utf-8")).hexdigest(),
+        "configSha256": {
+            layer: deployment_checksum(Path(mounted[f"OPENADKIT_CONFIG_{layer.upper()}"]))
+            for layer in ("shared", "base", "deployment")
+        },
+        # What the services source; build products and logs are not.
+        "overlaySha256": deployment_checksum(Path(mounted["OPENADKIT_OVERLAY_WS"]), exclude_dirs=("build", "log")),
         "readySeconds": round(time.monotonic() - started, 1),
     }
 
@@ -645,9 +655,13 @@ def report_overrides(deployment: Deployment, selection: Selection) -> list[str]:
     base version change these usually are renamed packages, files or keys.
     """
     ids = compose_capture(deployment, selection, ["ps", "--quiet"], check=False).stdout.split()
+    return report_container_overrides(ids, process_environment(selection))
+
+
+def report_container_overrides(ids: list[str], environment: dict[str, str]) -> list[str]:
+    """report_overrides for these containers."""
     if not ids:
         return []
-    environment = process_environment(selection)
     inspected = capture_process(
         ["docker", "inspect", *ids], env=environment, check=False, trace=False
     )
@@ -916,6 +930,38 @@ def restart(project: str, services: list[str], everything: bool) -> tuple[list[s
         raise OpenADKitError(f"{view_name(project)} has no service with Open AD Kit config to restart")
     project_run(project, ["restart", *services])
     return services, sorted(set(running) - set(services))
+
+
+def wait_after_restart(project: str, services: list[str]) -> None:
+    """Return once the restarted services are ready, as run does: their
+    healthchecks pass, and none crashed. A restart starts each healthcheck's
+    start period over, so Docker bounds the wait."""
+    ids = project_capture(project, ["ps", "--all", "--quiet", *services]).stdout.split()
+    if not ids:
+        return
+    print("waiting for the restarted services to be ready...", file=sys.stderr, flush=True)
+    while True:
+        result = capture_process(
+            [
+                "docker", "inspect", "--format",
+                '{{index .Config.Labels "com.docker.compose.service"}} {{.State.Status}} {{.State.ExitCode}} '
+                "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+                *ids,
+            ],
+            env=_compose_ls_environment(), check=False, trace=False,
+        )
+        rows = [row for row in (line.split() for line in result.stdout.splitlines()) if len(row) == 4]
+        # A one-shot service may finish, as map-check does, but not fail.
+        failed = sorted({
+            service for service, state, code, health in rows
+            if state in ("restarting", "dead") or (state == "exited" and code != "0") or health == "unhealthy"
+        })
+        if failed:
+            raise OpenADKitError(f"{', '.join(failed)} failed after restart; see: openadkit logs {' '.join(failed)}")
+        if not any(health == "starting" for *_, health in rows):
+            report_container_overrides(project_capture(project, ["ps", "--quiet"]).stdout.split(), _compose_ls_environment())
+            return
+        time.sleep(2)
 
 
 def shell(project: str, service: str, command: list[str]) -> None:

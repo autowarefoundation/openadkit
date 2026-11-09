@@ -568,6 +568,16 @@ def test_every_run_records_what_it_started(tmp_path):
     # The fake model has no services; its digest still identifies it.
     assert record["images"] == {} and record["modelSha256"] == hashlib.sha256(b'{"services": {}}\n').hexdigest()
     assert record["node"] is None and record["gpu"] is False and "verify" not in record
+    # What the services mount from the host is identified by its content.
+    assert set(record["configSha256"]) == {"shared", "base", "deployment"}
+    override = root / "deployments/example/config/autoware/pkg/params.yaml"
+    override.parent.mkdir(parents=True)
+    override.write_text("rate: 1\n")
+    assert run_cli(root, "run", "example", "--pull", "never").returncode == 0
+    changed = json.loads((root.parent / "home/openadkit-output/example/results/run.json").read_text())
+    assert changed["configSha256"]["deployment"] != record["configSha256"]["deployment"]
+    assert changed["configSha256"]["shared"] == record["configSha256"]["shared"]
+    assert changed["overlaySha256"] == record["overlaySha256"]
 
 
 def test_run_verify_needs_a_verify_step(tmp_path):
@@ -1021,7 +1031,7 @@ def test_operational_commands_act_on_the_running_stack_without_a_name(tmp_path):
     assert run_cli(root, "logs", "map", "planning", directory=tmp_path).returncode == 0
     assert recorded(calls)[-1]["args"] == ["compose", "--project-name", "openadkit-example", "logs", "map", "planning"]
     assert run_cli(root, "restart", "planning").returncode == 0
-    assert recorded(calls)[-1]["args"][-2:] == ["restart", "planning"]
+    assert next(row["args"] for row in reversed(recorded(calls)) if "restart" in row["args"])[-2:] == ["restart", "planning"]
     assert run_cli(root, "shell", "planning", "ros2", "topic", "list", "--include-hidden-topics").returncode == 0
     shell = recorded(calls)[-1]["args"]
     assert shell[3:6] == ["exec", "-T", "planning"] and shell[-4:] == ["ros2", "topic", "list", "--include-hidden-topics"]
@@ -1058,15 +1068,40 @@ def test_restart_defaults_to_the_services_with_open_ad_kit_config(tmp_path):
     ]
     calls = fake_docker(tmp_path, projects=["openadkit-example"], containers=containers,
                         services=("acme", "carla", "planning"))
+    def restart_args():
+        return next(row["args"] for row in reversed(recorded(calls)) if "restart" in row["args"])
     result = run_cli(root, "restart")
     assert result.returncode == 0, result.stderr
-    assert recorded(calls)[-1]["args"][-3:] == ["restart", "acme", "planning"]
+    assert restart_args()[-3:] == ["restart", "acme", "planning"]
     assert "restarted: acme, planning" in result.stdout and "kept running: carla" in result.stdout
     result = run_cli(root, "restart", "--all")
     assert result.returncode == 0, result.stderr
-    assert recorded(calls)[-1]["args"][-1] == "restart" and "kept running" not in result.stdout
+    assert restart_args()[-1] == "restart" and "kept running" not in result.stdout
     result = run_cli(root, "restart", "planning", "--all")
     assert result.returncode != 0 and "or pass --all" in result.stderr
+
+
+@pytest.mark.parametrize(("states", "failed"), [
+    # A healthcheck still starting is waited for; a one-shot may finish.
+    ([["planning running 0 starting", "map-check exited 0 none"], ["planning running 0 healthy", "map-check exited 0 none"]], None),
+    ([["planning running 0 starting"], ["planning running 0 unhealthy"]], "planning"),
+    ([["acme restarting 1 none"]], "acme"),
+])
+def test_restart_waits_for_readiness_and_reports_a_failure(monkeypatch, states, failed):
+    polls = iter(states)
+    reported = []
+    monkeypatch.setattr(cli_compose, "project_capture", lambda project, args: subprocess.CompletedProcess(args, 0, "c1\n", ""))
+    monkeypatch.setattr(cli_compose, "capture_process", lambda command, **kwargs: subprocess.CompletedProcess(command, 0, "\n".join(next(polls)), ""))
+    monkeypatch.setattr(cli_compose, "report_container_overrides", lambda ids, environment: reported.append(ids) or [])
+    monkeypatch.setattr(cli_compose.time, "sleep", lambda _: None)
+    if failed:
+        with pytest.raises(cli_manifest.OpenADKitError, match=f"{failed} failed after restart"):
+            cli_compose.wait_after_restart("openadkit-example", ["planning"])
+        assert reported == []
+    else:
+        cli_compose.wait_after_restart("openadkit-example", ["planning"])
+        # Once ready, the overrides without a counterpart are reported, as after run.
+        assert reported == [["c1"]]
 
 
 def test_download_retries_cut_off_bodies_but_not_wrong_content(tmp_path, monkeypatch):
@@ -1097,7 +1132,7 @@ def test_download_retries_cut_off_bodies_but_not_wrong_content(tmp_path, monkeyp
     assert len(bodies) == 1 and not destination.exists()
 
 
-@pytest.mark.parametrize("race", ["appeared", "replaced", "unmarked", "exchange"])
+@pytest.mark.parametrize("race", ["appeared", "replaced", "unmarked"])
 def test_forced_fetch_preserves_targets_changed_during_publication(tmp_path, monkeypatch, race):
     resource = files_resource(tmp_path)
     resource["generatedFiles"] = {}
@@ -1114,42 +1149,29 @@ def test_forced_fetch_preserves_targets_changed_during_publication(tmp_path, mon
                 target.rename(tmp_path / "original")
             target.mkdir()
             (target / "user-file").write_text("new user data")
-    download, rename = cli_data.download, cli_data.rename_atomic
+    download = cli_data.download
     def download_with_race(*args):
         download(*args)
-        if race != "exchange":
-            change_target()
-    def rename_with_race(candidate, destination, flags):
-        if race == "exchange" and flags == 2 and destination == target and not (tmp_path / "original").exists():
-            change_target()
-        rename(candidate, destination, flags)
+        change_target()
     monkeypatch.setattr(cli_data, "download", download_with_race)
-    monkeypatch.setattr(cli_data, "rename_atomic", rename_with_race)
     selection = cli_manifest.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
-    with pytest.raises(cli_manifest.OpenADKitError, match="changed|publication failed"):
+    with pytest.raises(cli_manifest.OpenADKitError, match="changed during download"):
         cli_data.install_resource(resource, selection, True)
     assert (target / "user-file").read_text() == ("original" if race == "unmarked" else "new user data")
-    assert bool(list(tmp_path.glob(".dataset.stage.*"))) is (race == "exchange")
+    assert not list(tmp_path.glob(".dataset.stage.*"))
 
 
-def test_failed_post_exchange_verification_never_cleans_displaced_data(tmp_path, monkeypatch):
+def test_forced_fetch_replaces_managed_data_and_removes_the_old(tmp_path):
     resource = files_resource(tmp_path)
     resource["generatedFiles"] = {}
     target = tmp_path / "installed"
     target.mkdir()
     (target / cli_data.MARKER).write_text("{}")
-    (target / "user-file").write_text("keep")
-    managed = cli_data.is_managed
-    def unreadable_displaced(path):
-        if path.name == "dataset":
-            raise OSError("inspection failed")
-        return managed(path)
-    monkeypatch.setattr(cli_data, "is_managed", unreadable_displaced)
+    (target / "old-file").write_text("old")
     selection = cli_manifest.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
-    with pytest.raises(cli_manifest.OpenADKitError, match="staging preserved"):
-        cli_data.install_resource(resource, selection, True)
-    staged = next(tmp_path.glob(".dataset.stage.*"))
-    assert (staged / "dataset/user-file").read_text() == "keep"
+    cli_data.install_resource(resource, selection, True)
+    assert cli_data.is_managed(target) and not (target / "old-file").exists()
+    assert not list(tmp_path.glob(".dataset.stage.*"))
 
 
 class SettingsDeployment:

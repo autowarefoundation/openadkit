@@ -49,10 +49,8 @@ jobs:
       setup_autoware: ${{ steps.detect.outputs.setup_autoware }}
       with_middleware: ${{ steps.detect.outputs.with_middleware }}
       use_local_common: ${{ steps.contexts.outputs.use_local_common }}
-      use_local_simulator: ${{ steps.contexts.outputs.use_local_simulator }}
       devel_context: ${{ steps.contexts.outputs.devel_context }}
       runtime_context: ${{ steps.contexts.outputs.runtime_context }}
-      simulator_context: ${{ steps.contexts.outputs.simulator_context }}
     steps:
       - name: Checkout OpenADKit repository
         uses: actions/checkout@v7
@@ -129,7 +127,6 @@ jobs:
           ROS_DISTRO: ${{ inputs.ros-distro }}
           TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
           USE_LOCAL_COMMON: ${{ steps.detect.outputs.use_local_common }}
-          USE_LOCAL_SIMULATOR: ${{ steps.detect.outputs.use_local_simulator }}
           AUTOWARE_INPUT_REF: ${{ steps.prepare.outputs.autoware_input_ref }}
           AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
           AUTOWARE_REF: ${{ steps.prepare.outputs.autoware_ref }}
@@ -239,8 +236,8 @@ jobs:
           registry: ${{ env.REGISTRY }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' || needs.prepare.outputs.use_local_simulator == 'true' }}
-          setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' || needs.prepare.outputs.use_local_simulator == 'true' }}
+          free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
+          setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
           with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
 
       - name: Build ${{ matrix.target }}

@@ -105,7 +105,6 @@ group "component" {
   targets = [
     "sensing-perception", "sensing-perception-cuda", "localization-mapping",
     "planning", "control", "vehicle-system", "api", "visualizer", "simulator",
-    "carla-interface",
   ]
 }
 
@@ -130,7 +129,6 @@ target "docker-metadata-action-vehicle-system" { tags = local_tags("vehicle-syst
 target "docker-metadata-action-api" { tags = local_tags("api") }
 target "docker-metadata-action-visualizer" { tags = local_tags("visualizer") }
 target "docker-metadata-action-simulator" { tags = local_tags("simulator") }
-target "docker-metadata-action-carla-interface" { tags = local_tags("carla-interface") }
 
 // Common base for the universe-common stages. The Dockerfile has FROM lines
 // for both ${CORE_DEVEL_IMAGE} (build stage) and ${BASE_IMAGE} (runtime
@@ -254,18 +252,5 @@ target "sensing-perception-cuda" {
     BASE_CUDA_DEVEL_IMAGE   = "autoware-base-cuda-devel"
     COLCON_BASE_PATHS       = sensing_base_paths()
     ROS_SNAPSHOT            = ros_snapshot()
-  }
-}
-
-target "carla-interface" {
-  inherits   = ["docker-metadata-action-carla-interface"]
-  dockerfile = "components/carla-interface/Dockerfile"
-  target     = "carla-interface"
-  contexts = {
-    simulator = ctx("simulator")
-  }
-  args = {
-    SIMULATOR_IMAGE = "simulator"
-    ROS_DISTRO      = ROS_DISTRO
   }
 }

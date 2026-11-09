@@ -100,8 +100,9 @@ hardware:
 Launch: `tier4_simulator_component.launch.xml`, with the perception simulation
 (dummy objects, tracking, prediction and the occupancy grid map) in its own
 `perception-simulation` service from `planning_simulator/perception_simulation.launch.xml`.
-`carla-interface` builds on this image for CARLA-specific sensor and control
-translation.
+On amd64 it also carries the CARLA bridge and the CARLA Python client that the
+[CARLA Simulation](../deployments/carla-simulation/index.md) deployment runs in
+its `carla-interface` service.
 
 ### Visualizer {: #visualizer }
 
@@ -128,8 +129,8 @@ For access and remote use, see the
 
 ### CARLA Interface {: #carla-interface }
 
-Packages `autoware_carla_interface`, translating Autoware control commands to
-CARLA and CARLA sensor data to ROS 2 messages:
+The simulator image's `autoware_carla_interface` translates Autoware control
+commands to CARLA and CARLA sensor data to ROS 2 messages:
 
 - CARLA world initialization and synchronous simulation
 - ego vehicle spawning and sensor-kit configuration
@@ -137,8 +138,9 @@ CARLA and CARLA sensor data to ROS 2 messages:
 - vehicle command calibration and traffic light state publication
 - lightweight sensor mappings for constrained hosts
 
-Launch: `autoware_carla_interface.launch.xml`. The image is amd64-only (Humble
-and Jazzy); the [CARLA Simulation](../deployments/carla-simulation/index.md)
+Launch: `autoware_carla_interface.launch.xml`. CARLA publishes its Python
+client for x86_64 only, so only the amd64 simulator image has it (Humble and
+Jazzy); the [CARLA Simulation](../deployments/carla-simulation/index.md)
 deployment is Humble-only and needs an NVIDIA GPU.
 
 ## Image Reference

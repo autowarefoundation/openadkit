@@ -61,7 +61,6 @@ jobs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
-      carla_matrix: ${{ steps.inventory.outputs.carla_matrix }}
       manifest_matrix: ${{ steps.inventory.outputs.manifest_matrix }}
     steps:
       - name: Checkout OpenADKit repository
@@ -173,8 +172,8 @@ jobs:
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: ${{ needs.prepare.outputs.build_tag }}
           publish: true
-          # PR builds (resolve_registry_contexts.sh) and overlay_ws/build.sh start from these.
-          stable-tags: ${{ env.IS_MAIN_PUSH }}
+          # PR builds, which run on amd64, start from these (resolve_registry_contexts.sh).
+          stable-tags: ${{ env.IS_MAIN_PUSH == 'true' && matrix.platform == 'linux/amd64' }}
           save-ccache: ${{ env.SAVE_CCACHE }}
 
   # =============================================================================
@@ -222,49 +221,7 @@ jobs:
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: ${{ needs.prepare.outputs.build_tag }}
           publish: true
-          # PR builds of carla-interface start from the simulator (resolve_registry_contexts.sh).
-          stable-tags: ${{ env.IS_MAIN_PUSH == 'true' && matrix.platform == 'linux/amd64' && matrix.target == 'simulator' }}
           save-ccache: ${{ env.SAVE_CCACHE }}
-
-  build-carla-interface:
-    runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
-    timeout-minutes: 60
-    needs: [prepare, build-common, build-components]
-    # build-components remains an ordering dependency, but unrelated matrix
-    # failures must not suppress CARLA when its simulator image was published.
-    if: >-
-      !cancelled() &&
-      needs.prepare.result == 'success' &&
-      needs.build-common.result == 'success'
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare.outputs.carla_matrix) }}
-    steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@v7
-
-      - name: Set up build environment
-        uses: ./.github/actions/setup-build-env
-        with:
-          registry: ${{ env.REGISTRY }}
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          free-disk: true
-          setup-autoware: false
-
-      - name: Build and push ${{ matrix.target }}
-        uses: ./.github/actions/build-image
-        with:
-          target: ${{ matrix.target }}
-          ros-distro: ${{ matrix.ros-distro }}
-          platform: ${{ matrix.platform }}
-          prepared: ${{ toJSON(needs.prepare.outputs) }}
-          tag-suffix: ${{ needs.prepare.outputs.build_tag }}
-          publish: true
-          ccache: false
 
   # =============================================================================
   # Stage 3: Create multi-arch manifests
@@ -272,7 +229,7 @@ jobs:
   create-manifests:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    needs: [prepare, build-common, build-components, build-carla-interface]
+    needs: [prepare, build-common, build-components]
     # Run even if one build leg failed so multi-arch manifests for the legs
     # that did complete are still published, instead of suppressing the whole
     # image set on a single flaky platform build. Prepare must have succeeded

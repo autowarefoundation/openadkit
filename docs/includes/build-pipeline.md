@@ -12,5 +12,4 @@ flowchart TB
     UC --> VIZ["visualizer"]
     UC --> SIM["simulator"]
     UC -.-> SPC
-    SIM --> CARLA["carla-interface"]
 ```

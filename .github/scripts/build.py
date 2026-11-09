@@ -12,6 +12,7 @@ import pathlib
 import sys
 
 DEFAULT_INVENTORY = ".github/image-inventory.json"
+REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
 
 
 def platform_label(platform):
@@ -30,15 +31,10 @@ def build_matrices(inventory):
     distros = inventory["ros_distros"]
     images = inventory["images"]
 
-    def matrix_for(stage, include_target=None, exclude_targets=None):
-        exclude_targets = set(exclude_targets or [])
+    def matrix_for(stage):
         include = []
         for image in images:
             if image["stage"] != stage:
-                continue
-            if include_target is not None and image["target"] != include_target:
-                continue
-            if image["target"] in exclude_targets:
                 continue
             for distro in image_distros(image, distros):
                 for platform in image["platforms"]:
@@ -75,8 +71,7 @@ def build_matrices(inventory):
 
     return {
         "common_matrix": common_matrix,
-        "component_matrix": matrix_for("component", exclude_targets={"carla-interface"}),
-        "carla_matrix": matrix_for("component", include_target="carla-interface"),
+        "component_matrix": matrix_for("component"),
         "manifest_matrix": manifest_matrix,
     }
 
@@ -103,7 +98,6 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
     )
     targets = set(target_input.split())
     use_local_common = False
-    use_local_simulator = False
 
     if not target_input:
         for changed_file in changed_files:
@@ -118,7 +112,6 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
             ):
                 targets.update(all_targets)
                 use_local_common = True
-                use_local_simulator = True
             # A component's own README documents it; a README deeper down may be
             # copied into the image (fnmatch's "*" would also match "/").
             elif changed_file == "components/README.md" or (
@@ -146,10 +139,11 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
                         }
                 elif component == "universe-common" and separator:
                     mapped_targets = all_targets
-                elif component == "simulator" and separator:
-                    mapped_targets = {"simulator", "carla-interface"}
                 elif component in images_by_target and separator:
                     mapped_targets = {component}
+                elif separator and not (REPOSITORY / "components" / component).exists():
+                    # A removed component builds nothing; a new one must be mapped.
+                    mapped_targets = set()
                 else:
                     mapped_targets = None
 
@@ -157,10 +151,6 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
                     raise ValueError(f"Unmapped component build input: {changed_file}")
                 targets.update(mapped_targets)
                 use_local_common |= component == "universe-common"
-                use_local_simulator |= component == "simulator"
-
-    if use_local_simulator and "carla-interface" in targets:
-        targets.discard("simulator")
 
     unknown_targets = targets - all_targets
     if unknown_targets:
@@ -183,12 +173,11 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
 
     return {
         "targets_json": sorted(targets),
-        "setup_autoware": any(target != "carla-interface" for target in targets),
+        "setup_autoware": bool(targets),
         "with_middleware": bool(
             targets & {"universe-common-devel", "universe-common"}
         ),
         "use_local_common": use_local_common,
-        "use_local_simulator": use_local_simulator,
     }
 
 
@@ -236,11 +225,8 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, commo
         else:
             contexts["universe-common-devel"] = f"docker-image://{common_build}"
             contexts["universe-common"] = f"docker-image://ghcr.io/{owner}/openadkit-common:universe-common-{arch}-{distro}-{build_tag}"
-            if target != "carla-interface":
-                upstream = json.loads(prepared["upstream_images"])[distro]
-                cuda_contexts = {f"autoware-{name}": upstream[name]["uri"] for name in ("base-cuda-runtime", "base-cuda-devel")}
-        if target == "carla-interface":
-            contexts["simulator"] = f"docker-image://ghcr.io/{owner}/openadkit:simulator-amd64-{distro}-{build_tag}"
+            upstream = json.loads(prepared["upstream_images"])[distro]
+            cuda_contexts = {f"autoware-{name}": upstream[name]["uri"] for name in ("base-cuda-runtime", "base-cuda-devel")}
         labels = {f"org.opencontainers.image.{key.replace('_', '-')}": prepared[key] for key in (
             "autoware_input_ref", "autoware_ref_type", "autoware_ref", "autoware_base_version", "autoware_lock_sha256",
         )}
@@ -257,14 +243,10 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, commo
         for key, name in (("upstream_cuda_runtime", "autoware-base-cuda-runtime"), ("upstream_cuda_devel", "autoware-base-cuda-devel")):
             if prepared.get(key) and not common_check:
                 cuda_contexts[name] = prepared[key]
-        if target == "carla-interface" and prepared.get("use_local_simulator") != "true":
-            contexts["simulator"] = prepared["simulator_context"]
         # A pull request that rebuilds the common images builds them in each
         # job from main's registry cache, as its common check job does.
         if not common_check and prepared.get("use_local_common") == "true":
             cache_from.extend(common_cache_from)
-            if prepared.get("use_local_simulator") == "true":
-                cache_from.append(f"type=registry,ref={cache_ref('simulator')}")
 
     # Apply the same settings to dependency targets too, as the previous *.set
     # overrides did. HCL remains the owner of Dockerfiles and local graph edges.
@@ -281,7 +263,7 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, commo
             **{"cache-to": [f"type=registry,ref={cache_ref('universe-common-build')},mode=max"]})
         del overrides["universe-common-devel"]["cache-to"]
     overrides["sensing-perception-cuda"]["contexts"].update(cuda_contexts)
-    if publish and target not in ("universe-common", "carla-interface"):
+    if publish and target != "universe-common":
         overrides["sensing-perception-cuda"]["args"]["SECURITY_REFRESH"] = build_tag
     targets = (["universe-common-build", "universe-common-devel", "universe-common"]
                if publish and target == "universe-common" else [target])

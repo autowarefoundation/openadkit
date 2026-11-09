@@ -112,9 +112,9 @@ check "grep -q 'missing architecture' '${work}/out.txt'"
 check "grep -q 'arm64' '${work}/out.txt'"
 
 # Case 3: single arch present -> create with that linux digest
-printf '%s\n' "ghcr.io/x/openadkit:carla-interface-amd64-humble-T" > "${PRESENT_REFS}"
+printf '%s\n' "ghcr.io/x/openadkit:sensing-perception-cuda-amd64-humble-T" > "${PRESENT_REFS}"
 : > "${CREATE_LOG}"
-run_sut IMAGE=ghcr.io/x/openadkit TARGET=carla-interface ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
+run_sut IMAGE=ghcr.io/x/openadkit TARGET=sensing-perception-cuda ROS_DISTRO=humble ARCHES="amd64" BUILD_TAG=T
 check "[ ${rc} -eq 0 ]"
 check "grep -q 'ghcr.io/x/openadkit@${AMD64_IMAGE}' '${CREATE_LOG}'"
 check "! grep -q '${ATTESTATION}' '${CREATE_LOG}'"

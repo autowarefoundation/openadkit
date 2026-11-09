@@ -553,9 +553,21 @@ def test_run_verify_runs_the_command_in_its_service_once_ready(tmp_path, exit_co
     assert up < exec_index and "--wait" in rows[up]
     assert exec_args[exec_args.index("exec") + 1:exec_args.index("exec") + 3] == ["-T", "app"]
     assert exec_args[-2:] == ["python3", "/openadkit/checks/golden.py"]
-    report = json.loads((root.parent / "home/openadkit-output/example/results/verify.json").read_text())
-    assert report["service"] == "app" and report["exit_code"] == exit_code
-    assert report["result"] == ("PASSED" if exit_code == 0 else "FAILED")
+    record = json.loads((root.parent / "home/openadkit-output/example/results/run.json").read_text())
+    assert record["deployment"] == "example" and record["rosDistro"] == "humble"
+    assert record["verify"]["service"] == "app" and record["verify"]["exitCode"] == exit_code
+    assert record["verify"]["result"] == ("PASSED" if exit_code == 0 else "FAILED")
+
+
+def test_every_run_records_what_it_started(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, services=("app",))
+    result = run_cli(root, "run", "example", "--pull", "never")
+    assert result.returncode == 0, result.stderr
+    record = json.loads((root.parent / "home/openadkit-output/example/results/run.json").read_text())
+    # The fake model has no services; its digest still identifies it.
+    assert record["images"] == {} and record["modelSha256"] == hashlib.sha256(b'{"services": {}}\n').hexdigest()
+    assert record["node"] is None and record["gpu"] is False and "verify" not in record
 
 
 def test_run_verify_needs_a_verify_step(tmp_path):
@@ -576,10 +588,12 @@ def test_verify_waits_for_a_service_without_a_command(tmp_path, monkeypatch):
     monkeypatch.setattr(cli_compose, "compose_capture", lambda *args, **kwargs: subprocess.CompletedProcess([], 0, "c1\n", ""))
     monkeypatch.setattr(cli_compose, "capture_process", lambda command, **kwargs: captured.append(command) or subprocess.CompletedProcess(command, 0, "3\n", ""))
     selection = cli_manifest.Selection(ros_distro="humble", gpu=False, node=None, injections={}, environment={})
-    assert cli_compose.verify(deployment, selection, {"scenario"}, 0.0) == 3
+    record = {"deployment": "example"}
+    assert cli_compose.verify(deployment, selection, {"scenario"}, record) == 3
     assert captured == [["docker", "wait", "c1"]]
+    assert record["verify"]["exitCode"] == 3 and record["verify"]["result"] == "FAILED"
     # A node without the service has nothing to verify.
-    assert cli_compose.verify(deployment, selection, {"other"}, 0.0) == 0
+    assert cli_compose.verify(deployment, selection, {"other"}, {}) == 0
 
 
 def test_a_kit_inherits_the_verify_step_of_its_base_unless_it_names_one(tmp_path):

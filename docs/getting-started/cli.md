@@ -69,8 +69,10 @@ for example once the AD API is up (`READINESS_CHECKS` in the deployment's
 crashes. `openadkit run <deployment> --verify` then runs the deployment's
 verify step, the check CI runs on it: Planning Simulation drives the ego from
 its start to its goal, Scenario Simulation waits for the scenarios' result.
-`run --verify` exits with the step's result and writes it to the deployment's
-`results/verify.json`; the deployment keeps running.
+`run --verify` exits with the step's result; the deployment keeps running.
+Every run writes `results/run.json` in the deployment's output directory: the
+version, distro and images it started, the digest of the resolved Compose
+model, how long it took to be ready and, with `--verify`, the step's result.
 `openadkit run <deployment> --pull always` refreshes images before starting,
 and `openadkit version` prints the installed version. `--no-visualizer`
 starts everything except the visualizer, for a host nobody watches; its

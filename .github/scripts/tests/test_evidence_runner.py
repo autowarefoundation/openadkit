@@ -77,10 +77,10 @@ with Path(os.environ['CALLS']).open('a') as log:
     log.write(json.dumps([args, os.getenv('ZENOH_LISTEN'), os.getenv('ZENOH_PEER')]) + '\\n')
 if args[0] == 'validate': print(json.dumps({'deployment': args[1]}))
 if args[0] == 'run' and '--verify' in args and os.environ['FAILURE'] != 'run':
-    report = Path(os.environ['OPENADKIT_OUTPUT_DIR'], args[1], 'results/verify.json')
+    report = Path(os.environ['OPENADKIT_OUTPUT_DIR'], args[1], 'results/run.json')
     report.parent.mkdir(parents=True)
     passed = os.environ['FAILURE'] != 'verify'
-    report.write_text(json.dumps({'ready_s': 1.5, 'verify_s': 2.5, 'result': 'PASSED' if passed else 'FAILED'}))
+    report.write_text(json.dumps({'readySeconds': 1.5, 'verify': {'seconds': 2.5, 'result': 'PASSED' if passed else 'FAILED'}}))
 sys.exit(1 if args[0] == os.environ['FAILURE'] or (args[0] == 'run' and os.environ['FAILURE'] == 'verify') else 0)
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
@@ -137,9 +137,9 @@ with Path(os.environ["CALLS"]).open("a") as log:
 if args[0] == "validate":
     print(json.dumps({"deployment": args[1]}))
 if args[0] == "run" and "--verify" in args:
-    report = Path(os.environ["OPENADKIT_OUTPUT_DIR"], args[1], "results/verify.json")
+    report = Path(os.environ["OPENADKIT_OUTPUT_DIR"], args[1], "results/run.json")
     report.parent.mkdir(parents=True)
-    report.write_text(json.dumps({"ready_s": 1, "verify_s": 1, "result": "PASSED"}))
+    report.write_text(json.dumps({"readySeconds": 1, "verify": {"seconds": 1, "result": "PASSED"}}))
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
     home = tmp_path / "home"
@@ -337,9 +337,9 @@ import json, os, sys
 from pathlib import Path
 args = sys.argv[1:]
 if args[0] == "run" and "--verify" in args:
-    report = Path(os.environ["OPENADKIT_OUTPUT_DIR"], args[1], "results/verify.json")
+    report = Path(os.environ["OPENADKIT_OUTPUT_DIR"], args[1], "results/run.json")
     report.parent.mkdir(parents=True)
-    report.write_text(json.dumps({"ready_s": 1, "verify_s": 1, "result": "PASSED"}))
+    report.write_text(json.dumps({"readySeconds": 1, "verify": {"seconds": 1, "result": "PASSED"}}))
 ''')
     executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 0\n")
     executable(tmp_path / "bin/uname", f"#!/usr/bin/env bash\necho {machine}\n")

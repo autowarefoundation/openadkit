@@ -91,7 +91,7 @@ def test_shared_build_recipe_keeps_pins_provenance_and_local_graphs(target, publ
     if not local:
         prepared.update(devel_context=uri, runtime_context=uri)
     recipe, targets = matrices.bake_recipe(INVENTORY, prepared, target, "humble", "linux/amd64", publish=publish,
-                                           shared_common=False, common_cached=local, owner="example", source_sha="b" * 40, run_id="123")
+                                           common_check=False, owner="example", source_sha="b" * 40, run_id="123")
     row = recipe["target"][target]
     assert targets == (["universe-common-build", "universe-common-devel", "universe-common"]
                        if publish and target == "universe-common" else [target])
@@ -123,6 +123,18 @@ def test_shared_build_recipe_keeps_pins_provenance_and_local_graphs(target, publ
         assert not row["labels"] and "cache-to" not in row
         assert ("universe-common" in row["contexts"]) is (not local)
         assert "simulator" not in row["contexts"]
+
+
+@pytest.mark.parametrize(("target", "common_check"), [("universe-common", True), ("api", False)])
+def test_pull_requests_rebuild_common_from_the_registry_cache_only(target, common_check):
+    # A multi-GB hand-over through the Actions cache stalled; each job builds
+    # the common images again from main's registry cache instead.
+    prepared = {"build_tag": "123-1", "cache_scope": "main", "use_local_common": "true"}
+    recipe, _ = matrices.bake_recipe(INVENTORY, prepared, target, "humble", "linux/amd64", publish=False,
+                                     common_check=common_check, owner="example", source_sha="b" * 40, run_id="123")
+    assert "type=gha" not in json.dumps(recipe) and "cache-to" not in json.dumps(recipe)
+    cache = "type=registry,ref=ghcr.io/example/openadkit-buildcache:universe-common-amd64-humble-main"
+    assert cache in recipe["target"][target]["cache-from"]
 
 
 @pytest.mark.parametrize("path", ["components/universe-common/Dockerfile", "components/sensing-perception/Dockerfile.cuda"])

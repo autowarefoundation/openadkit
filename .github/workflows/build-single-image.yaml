@@ -56,32 +56,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Both distributions' shared common caches belong to this run's PR ref, so
-  # stale ones are removed once, before either distribution writes its own.
-  remove-stale-caches:
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    permissions:
-      actions: write
-    steps:
-      - name: Remove stale caches for this pull request
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
-        run: gh cache delete --all --ref "${PR_REF}" --succeed-on-no-caches
-        shell: bash
-
   build:
-    needs: remove-stale-caches
-    if: >-
-      always() &&
-      !cancelled() &&
-      (needs.remove-stale-caches.result == 'success' ||
-      needs.remove-stale-caches.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -94,34 +69,3 @@ jobs:
     with:
       ros-distro: ${{ matrix.ros-distro }}
       target: ${{ inputs.target || '' }}
-
-  cleanup-pr-caches:
-    needs: build
-    # Skip on cancel so a replacement run's pr-common-* caches are not deleted.
-    # The next run already clears leftovers in remove-stale-caches.
-    if: >-
-      always() &&
-      !cancelled() &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    permissions:
-      actions: write
-    steps:
-      - name: Remove temporary pull request caches
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          gh cache list --ref "${PR_REF}" --json id,key --limit 100 \
-            | jq -r --arg run "${RUN_ID}" \
-              '.[] | select(.key | test("pr-common-(devel|runtime)-[a-z]+-" + $run)) | .id' \
-            | while read -r id; do
-                [ -n "${id}" ] || continue
-                gh cache delete "${id}" || true
-              done
-        shell: bash

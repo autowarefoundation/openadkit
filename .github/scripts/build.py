@@ -193,7 +193,7 @@ def format_outputs(matrices):
 COMPILE_BASE_EPOCH = "0"
 
 
-def bake_recipe(inventory, prepared, target, distro, platform, *, publish, shared_common, common_cached, owner, source_sha, run_id):
+def bake_recipe(inventory, prepared, target, distro, platform, *, publish, common_check, owner, source_sha, run_id):
     """Overlay the local HCL graph, preserving local dependency builds in PRs."""
     images = {image["target"]: image for image in inventory["images"]}
     if target not in images or distro not in image_distros(images[target], inventory["ros_distros"]) or platform not in images[target]["platforms"]:
@@ -238,16 +238,15 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
     else:
         for key, name in (("upstream_core_devel", "autoware-core-devel"), ("upstream_base", "autoware-base"),
                           ("devel_context", "universe-common-devel"), ("runtime_context", "universe-common")):
-            if prepared.get(key) and not (shared_common and name.startswith("universe-common")):
+            if prepared.get(key) and not (common_check and name.startswith("universe-common")):
                 contexts[name] = prepared[key]
         for key, name in (("upstream_cuda_runtime", "autoware-base-cuda-runtime"), ("upstream_cuda_devel", "autoware-base-cuda-devel")):
-            if prepared.get(key) and not shared_common:
+            if prepared.get(key) and not common_check:
                 cuda_contexts[name] = prepared[key]
-        if not shared_common:
-            if prepared.get("use_local_common") == "true":
-                cache_from.extend(common_cache_from)
-            if common_cached:
-                cache_from.extend(f"type=gha,scope=pr-common-{stage}-{distro}-{run_id}" for stage in ("devel", "runtime"))
+        # A pull request that rebuilds the common images builds them in each
+        # job from main's registry cache, as its common check job does.
+        if not common_check and prepared.get("use_local_common") == "true":
+            cache_from.extend(common_cache_from)
 
     # Apply the same settings to dependency targets too, as the previous *.set
     # overrides did. HCL remains the owner of Dockerfiles and local graph edges.
@@ -266,9 +265,6 @@ def bake_recipe(inventory, prepared, target, distro, platform, *, publish, share
     overrides["sensing-perception-cuda"]["contexts"].update(cuda_contexts)
     if publish and target != "universe-common":
         overrides["sensing-perception-cuda"]["args"]["SECURITY_REFRESH"] = build_tag
-    if shared_common:
-        for name, stage in (("universe-common-build", "devel"), ("universe-common", "runtime")):
-            overrides[name]["cache-to"] = [f"type=gha,scope=pr-common-{stage}-{distro}-{run_id},mode=min"]
     targets = (["universe-common-build", "universe-common-devel", "universe-common"]
                if publish and target == "universe-common" else [target])
     return {"target": overrides}, targets
@@ -284,8 +280,7 @@ def write_recipe():
     owner = os.environ["GITHUB_REPOSITORY"].split("/")[0]
     recipe, targets = bake_recipe(
         inventory, prepared, target, distro, platform,
-        publish=publish, shared_common=os.environ["SHARED_COMMON"] == "true",
-        common_cached=os.environ["COMMON_CACHED"] == "true", owner=owner,
+        publish=publish, common_check=os.environ["COMMON_CHECK"] == "true", owner=owner,
         source_sha=os.environ["GITHUB_SHA"], run_id=os.environ["GITHUB_RUN_ID"],
     )
     pathlib.Path(".build-recipe.json").write_text(json.dumps(recipe))

@@ -9,9 +9,9 @@
 
 </div>
 
-> The deployment layer for the [Autoware](https://github.com/autowarefoundation/autoware) ecosystem: packaging its software into reproducible deployments, from simulation to in-vehicle systems.
+> The deployment layer for the [Autoware](https://github.com/autowarefoundation/autoware) ecosystem: packaging its software into reproducible deployments, built for the path from simulation to in-vehicle systems.
 
-Open AD Kit packages Autoware into focused component images and ready-to-run containerized deployments, and integrates [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) with the deployed stack. It includes a CLI, deployment assets, and build and release automation for running autonomous driving and ADAS systems consistently across development and vehicle-edge hosts.
+Open AD Kit packages Autoware into focused component images and ready-to-run containerized deployments, and integrates [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) with the deployed stack. It includes a CLI, deployment assets, and build and release automation for running autonomous driving and ADAS systems consistently across hosts. Today it ships simulation deployments; vehicle integration is on the [roadmap](https://autowarefoundation.github.io/openadkit/releases/#roadmap).
 
 Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle.
 

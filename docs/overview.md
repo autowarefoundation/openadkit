@@ -8,7 +8,7 @@
 
 Open AD Kit packages the [Autoware](https://github.com/autowarefoundation/autoware) autonomous driving stack as focused, independently deployable container images. Instead of one monolithic image, it splits the stack along the AD pipeline — sensing, perception, localization, mapping, planning, control, vehicle system, API, simulation, visualization, and the CARLA bridge — so you run only what a workload needs.
 
-Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packages upstream software into composable images, defines deployment configurations, integrates target platforms and vehicle systems, and maintains the build, test, and release tooling that keeps simulation and in-vehicle deployments consistent.
+Autoware provides the autonomy stack; Open AD Kit makes it deployable. It packages upstream software into composable images, defines deployment configurations, integrates target platforms, and maintains the build, test, and release tooling that keeps deployments consistent from one host to the next. It ships simulation deployments today; a supported path to a real vehicle interface is on the [roadmap](releases/index.md#roadmap).
 
 It also integrates [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/), which runs on real-time operating systems and automotive hardware rather than in a container. Open AD Kit is the first [SOAFEE](https://www.soafee.io/) blueprint for the software-defined vehicle; [Supported Platforms](platforms/index.md) covers the derived blueprints and the platform tiers.
 
@@ -29,7 +29,7 @@ It also integrates [Autoware Safety Island](https://autowarefoundation.github.io
 :material-shield-half-full:{ .oak-card-icon }
 
 <p class="oak-card-title" role="heading" aria-level="3">Mixed Criticality</p>
-<p>Separate workloads by criticality assumption across safety-qualified and standard hardware.</p>
+<p>Keep safety-critical control on the Safety Island's real-time hardware, beside the containerized stack.</p>
 </div>
 
 <div class="oak-card" markdown="1">
@@ -81,4 +81,4 @@ A [deployment](deployments/index.md) runs the subset of these stages a task need
 | **BOM** | The release's pinned Autoware input, runtime images and upstream artifacts. |
 | **Tag alias** | A moving image tag such as `planning-control-humble` that follows the newest stable release. Release tags (`-vX.Y.Z`) and digests stay immutable. |
 | **Digest pin** | An image reference by content hash (`@sha256:…`) instead of a tag, so the same image bits are always used. |
-| **Mixed criticality** | Running safety-critical and non-critical workloads in separate containers or partitions on the same hardware. |
+| **Mixed criticality** | Running safety-critical and non-critical workloads on separately qualified execution environments. Here, the Safety Island's real-time hardware beside the containerized stack; the containers on one host share its network and are not isolated by criticality. |

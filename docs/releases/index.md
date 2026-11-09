@@ -38,11 +38,23 @@ vehicle certification.
 | Safety Island: `safety-island-simulation`, Planning Simulation driven by the pinned Safety Island release over `domain_bridge`, with its own evidence cell | Done |
 | AutoSD: Quadlet units for the component images, with Compose as the single source | Done |
 | Releases from `main`, pinned to Autoware 2.0.0; Open AD Kit's own SemVer from v2.0.0 | Done |
+| Images: one moving alias per image and distro; the default distro comes from `openadkit.json` | Done |
+| Readiness: `run` and `restart` wait for the deployments' healthchecks; `run --verify` runs the end-to-end check CI runs | Done |
+| Dev loop: `build -- <colcon args>`, a `run.json` record of every run, `openadkit new` for kits | Done |
 
 ### After v2.0
 
-- **Performance visibility:** latency and resource use per component in runs and evidence.
-- **Vehicle integration:** a supported path from simulation to a real vehicle interface.
+- **Performance and regression:** latency and resource use per component, and a
+  scenario set, recorded in `run.json` and compared with a baseline.
+- **Vehicle integration:** a supported path from simulation to a real vehicle
+  interface: a reference hardware deployment where real sensing and vehicle
+  services replace the simulator, and a vehicle-interface contract.
+- **Platform evidence:** native arm64 runtime cells on hosted arm64 runners, and
+  GPU logging simulation, so the supported platforms are backed by evidence.
+- **Dev loop in CI:** an edit, build, restart and changed-behaviour check, and a
+  devcontainer and debugging guide.
+- **Settings resolution:** resolve deployment settings in one place in the CLI.
+- **Visualizer:** Foxglove as an alternative to the noVNC desktop.
 - **Validation ladder:** SIL, virtual vehicle network, bench HIL, small-scale and
   then full-scale vehicle, replacing the vehicle node rather than the application.
 - **Vehicle delivery:** an OCI package of the digest-pinned system and its BOM that

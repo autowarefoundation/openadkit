@@ -114,13 +114,17 @@ services, and waits until they are ready.
 
 ## 4. Open the Visualizer {: #open-the-visualizer }
 
-Wait about 10 seconds for the containers to initialize, then open:
+Once `run` returns, Autoware is ready. Open:
 
 ```text
 http://localhost:6080/vnc.html
 ```
 
 Use the default password **`openadkit`**.
+
+To open RViz on your own desktop instead of the browser, set
+`REMOTE_DISPLAY=false` in `~/.config/openadkit/<deployment>.env`; the
+visualizer then uses your session's `DISPLAY` and `XAUTHORITY`.
 
 For a remote host, keep noVNC loopback-only and forward it over SSH:
 

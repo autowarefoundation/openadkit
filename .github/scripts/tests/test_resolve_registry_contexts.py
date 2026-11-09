@@ -78,7 +78,6 @@ def source_repository(tmp_path, changed_source=None):
         "components/docker-bake.hcl",
         "components/shared/runtime-cleanup.sh",
         "components/universe-common/input",
-        "components/simulator/input",
     ):
         path = repo / source_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,9 +95,9 @@ def source_repository(tmp_path, changed_source=None):
 
 
 def run_resolver(
-    tmp_path, targets, *, common_matches=True, simulator_matches=True,
+    tmp_path, targets, *, common_matches=True,
     changed_source=None, plain_labels=False, common_lock_sha256=LOCK_SHA256,
-    simulator_lock_sha256=LOCK_SHA256, fail_ref="", fail_mode="notfound",
+    fail_ref="", fail_mode="notfound",
 ):
     """Run the resolver against a fake registry; return result, outputs, lookups."""
     docker_log = tmp_path / "docker.log"
@@ -115,11 +114,7 @@ if [ -n "${DOCKER_FAIL_REF}" ] && [[ "$4" == *"${DOCKER_FAIL_REF}"* ]]; then
   fi
   exit 1
 fi
-if [[ "$4" == *":simulator-"* ]]; then
-  printf '%s\\n' "${SIMULATOR_METADATA}"
-else
-  printf '%s\\n' "${COMMON_METADATA}"
-fi
+printf '%s\\n' "${COMMON_METADATA}"
 """
     )
     fake_docker.chmod(0o755)
@@ -134,10 +129,6 @@ fi
             openadkit_sha, matches=common_matches, plain_labels=plain_labels,
             lock_sha256=common_lock_sha256,
         ),
-        "SIMULATOR_METADATA": registry_metadata(
-            openadkit_sha, matches=simulator_matches, plain_labels=plain_labels,
-            lock_sha256=simulator_lock_sha256,
-        ),
         "GITHUB_OUTPUT": str(output),
         "TARGETS_JSON": json.dumps(targets),
         "IMAGE_PREFIX_COMMON": "registry.example/common",
@@ -148,7 +139,6 @@ fi
         "AUTOWARE_BASE_VERSION": "1.8.0",
         "AUTOWARE_LOCK_SHA256": LOCK_SHA256,
         "USE_LOCAL_COMMON": "false",
-        "USE_LOCAL_SIMULATOR": "false",
         "ROS_DISTRO": "humble",
         "REGISTRY_LOOKUP_RETRY_DELAY_SECONDS": "0",
     }
@@ -166,7 +156,7 @@ fi
 def test_empty_target_plan_does_not_inspect_registry(tmp_path):
     result, outputs, lookups = run_resolver(tmp_path, [])
     assert result.returncode == 0, result.stderr
-    assert outputs == {"use_local_common": "false", "use_local_simulator": "false"}
+    assert outputs == {"use_local_common": "false"}
     assert lookups == []
 
 
@@ -184,26 +174,23 @@ CHECKOUT_SOURCES = (
 
 
 @pytest.mark.parametrize(
-    ("targets", "options", "common", "simulator", "lookups"),
+    ("targets", "options", "common", "lookups"),
     [
-        # common/simulator: "registry" reuses the pinned image, "local" builds it.
-        (["api"], {}, "registry", None, 2),
-        (["api"], {"common_matches": "same-commit-branch"}, "registry", None, 2),
-        (["api"], {"plain_labels": True}, "registry", None, 2),
-        (["api"], {"common_matches": False}, "local", None, 1),
-        (["api"], {"common_lock_sha256": ""}, "local", None, 1),
-        (["api"], {"common_lock_sha256": "c" * 64}, "local", None, 1),
-        (["api"], {"changed_source": "components/universe-common/input"}, "local", None, None),
-        (["carla-interface"], {}, None, "registry", 1),
-        (["carla-interface"], {"simulator_lock_sha256": "c" * 64}, "registry", "local", 3),
-        (["carla-interface"], {"simulator_matches": False}, "registry", "local", 3),
-        (["carla-interface"], {"changed_source": "components/simulator/input"}, "registry", "local", 3),
-        *((["carla-interface"], {"changed_source": path}, "local", "local", 2) for path in SHARED_SOURCES),
-        *((["api"], {"changed_source": path}, "local", None, None) for path in CHECKOUT_SOURCES),
+        # "registry" reuses the pinned common images, "local" builds them.
+        (["api"], {}, "registry", 2),
+        (["api"], {"common_matches": "same-commit-branch"}, "registry", 2),
+        (["api"], {"plain_labels": True}, "registry", 2),
+        (["api"], {"common_matches": False}, "local", 1),
+        (["api"], {"common_lock_sha256": ""}, "local", 1),
+        (["api"], {"common_lock_sha256": "c" * 64}, "local", 1),
+        (["api"], {"changed_source": "components/universe-common/input"}, "local", None),
+        (["simulator"], {}, "registry", 2),
+        *((["simulator"], {"changed_source": path}, "local", None) for path in SHARED_SOURCES),
+        *((["api"], {"changed_source": path}, "local", None) for path in CHECKOUT_SOURCES),
     ],
 )
 def test_resolver_reuses_registry_images_only_when_they_match(
-    tmp_path, targets, options, common, simulator, lookups
+    tmp_path, targets, options, common, lookups
 ):
     result, outputs, inspected = run_resolver(tmp_path, targets, **options)
     assert result.returncode == 0, result.stderr
@@ -215,16 +202,11 @@ def test_resolver_reuses_registry_images_only_when_they_match(
         assert not {"devel_context", "runtime_context"} & outputs.keys()
         if common == "local":
             assert outputs["use_local_common"] == "true"
-    if simulator == "registry":
-        assert outputs["use_local_simulator"] == "false"
-        assert outputs["simulator_context"].endswith(f"@{DIGEST}")
-    else:
-        assert "simulator_context" not in outputs
-        assert outputs["use_local_simulator"] == ("true" if simulator == "local" else "false")
+    assert "simulator_context" not in outputs and "use_local_simulator" not in outputs
     if lookups is not None:
         assert len(inspected) == lookups
-    if targets == ["api"]:
-        assert all(":universe-common" in ref for ref in inspected)
+    # Only the common images are ever read from the registry.
+    assert all(":universe-common" in ref for ref in inspected)
 
 
 def test_not_found_context_falls_back_with_diagnostic(tmp_path):

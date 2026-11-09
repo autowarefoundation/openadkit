@@ -6,7 +6,7 @@
 // When `allow` is set, an omitted/empty type list means none.
 //
 // This is the documented starting inventory derived from the pinned
-// carla-interface image and sensor_mapping.yaml. It covers the interface
+// CARLA bridge in the simulator image and sensor_mapping.yaml. It covers the interface
 // inputs that only exist on the Autoware host (localization odometry and the
 // RViz initial pose), the enabled lidar/IMU/GNSS sensors, clock, control,
 // vehicle status, and transforms. Cameras are disabled. The topics the

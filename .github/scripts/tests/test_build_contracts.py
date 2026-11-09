@@ -32,26 +32,21 @@ def test_inventory_bake_and_runtime_catalog_agree():
     index = {(row["target"], row["ros-distro"]): row["arches"] for row in resolved["manifest_matrix"]["include"]}
     assert index[("planning-control", "humble")] == "amd64 arm64"
     assert index[("sensing-perception-cuda", "jazzy")] == "amd64"
-    assert {row["target"] for row in resolved["carla_matrix"]["include"]} == {"carla-interface"}
     assert "simulator" in {row["target"] for row in resolved["component_matrix"]["include"]}
+    assert set(resolved) == {"common_matrix", "component_matrix", "manifest_matrix"}
 
 
 @pytest.mark.parametrize(("path", "expected", "flags"), [
     ("components/universe-common/Dockerfile", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
-    # carla-interface builds the simulator locally, so it is not a separate target.
-    (".dockerignore", {image["target"] for image in INVENTORY["images"]} - {"simulator"},
-     {"use_local_common": True, "use_local_simulator": True}),
-    (".github/autoware.ref", {image["target"] for image in INVENTORY["images"]} - {"simulator"},
-     {"use_local_common": True, "use_local_simulator": True}),
+    (".dockerignore", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    (".github/autoware.ref", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
     ("components/sensing-perception/Dockerfile.cuda", {"sensing-perception-cuda"}, {}),
     ("components/sensing-perception/scripts/build.sh", {"sensing-perception", "sensing-perception-cuda"}, {}),
-    ("components/simulator/Dockerfile", {"carla-interface"}, {"use_local_simulator": True}),
+    ("components/simulator/Dockerfile", {"simulator"}, {}),
     ("docs/index.md", set(), {}),
     (".github/autoware-patches/universe/autoware_universe/0001-fix.patch",
-     {image["target"] for image in INVENTORY["images"]} - {"simulator"},
-     {"use_local_common": True, "use_local_simulator": True}),
-    (".github/scripts/autoware_patches.py", {image["target"] for image in INVENTORY["images"]} - {"simulator"},
-     {"use_local_common": True, "use_local_simulator": True}),
+     {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    (".github/scripts/autoware_patches.py", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
     ("components/visualizer/README.md", set(), {}),
     # Copied into the image, unlike the component's own README.
     ("components/visualizer/novnc/README.md", {"visualizer"}, {}),
@@ -74,14 +69,14 @@ def test_invalid_build_inputs_fail_closed():
 
 @pytest.mark.parametrize(("target", "publish", "local"), [
     ("universe-common", True, False), ("sensing-perception-cuda", True, False),
-    ("carla-interface", True, False), ("api", False, False), ("carla-interface", False, True),
+    ("simulator", True, False), ("api", False, False), ("simulator", False, True),
 ])
 def test_shared_build_recipe_keeps_pins_provenance_and_local_graphs(target, publish, local):
     uri = "docker-image://example/base@sha256:" + "c" * 64
     prepared = {"build_tag": "123-1", "cache_scope": "main", "autoware_input_ref": "1.8.0", "autoware_ref_type": "tag",
                 "autoware_ref": "a" * 40, "autoware_base_version": "1.8.0", "autoware_lock_sha256": "e" * 64,
                 "upstream_images": json.dumps({"humble": {name: {"uri": uri} for name in ("core-devel", "base", "base-cuda-runtime", "base-cuda-devel")}}),
-                "use_local_common": str(local).lower(), "use_local_simulator": str(local).lower(), "simulator_context": uri}
+                "use_local_common": str(local).lower()}
     if not local:
         prepared.update(devel_context=uri, runtime_context=uri)
     recipe, targets = matrices.bake_recipe(INVENTORY, prepared, target, "humble", "linux/amd64", publish=publish,
@@ -116,7 +111,7 @@ def test_shared_build_recipe_keeps_pins_provenance_and_local_graphs(target, publ
     else:
         assert not row["labels"] and "cache-to" not in row
         assert ("universe-common" in row["contexts"]) is (not local)
-        assert ("simulator" in row["contexts"]) is (target == "carla-interface" and not local)
+        assert "simulator" not in row["contexts"]
 
 
 @pytest.mark.parametrize("path", ["components/universe-common/Dockerfile", "components/sensing-perception/Dockerfile.cuda"])

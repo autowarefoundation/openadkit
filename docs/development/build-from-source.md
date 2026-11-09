@@ -37,7 +37,7 @@ compiles and only refreshes and reassembles the runtime images.
 | Group | Targets | Published to |
 |-------|---------|--------------|
 | `universe-common` | `universe-common-devel`, `universe-common` | `ghcr.io/autowarefoundation/openadkit-common` |
-| `component` | all component images, including the amd64-only `sensing-perception-cuda` and `carla-interface` | `ghcr.io/autowarefoundation/openadkit` |
+| `component` | all component images, including the amd64-only `sensing-perception-cuda` | `ghcr.io/autowarefoundation/openadkit` |
 | `planning` | `universe-common` plus the images Planning Simulation needs | — (local builds) |
 | `default` | `universe-common` + `component` | — |
 
@@ -117,7 +117,7 @@ builds every target with the same Bake file. The build matrix comes from
 the source of truth for which images are built and for which architectures.
 
 Jobs run in dependency order: `prepare`, then `build-common`, then
-`build-components`, then `build-carla-interface`. Most images build for Humble and
+`build-components`. Most images build for Humble and
 Jazzy on amd64 and arm64. `create-manifests` then combines the per-arch images
 into multi-arch tags. CI disables the local tags (`LOCAL_IMAGE=""`) and tags
 images through `docker/metadata-action`.

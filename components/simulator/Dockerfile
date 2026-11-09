@@ -110,6 +110,23 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
       --skip-keys "${internal_packages}" && \
     bash /tmp/runtime-cleanup.sh
 
+# The CARLA bridge (autoware_carla_interface, built above) needs the CARLA
+# Python client and two ROS tools. CARLA publishes its client for x86_64 only,
+# and carla-simulation runs only on amd64, so arm64 images go without it.
+ARG TARGETARCH
+ARG CARLA_PYTHON_VERSION=0.9.16
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    if [ "${TARGETARCH}" = amd64 ]; then \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        python3-pip \
+        "ros-${ROS_DISTRO}-compressed-image-transport" \
+        "ros-${ROS_DISTRO}-topic-tools" && \
+      PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install --no-cache-dir \
+        "carla==${CARLA_PYTHON_VERSION}" transforms3d; \
+    fi
+
 # Fail when a compiled binary cannot load its libraries in this image
 # (components/shared/check-linked-libs.sh).
 RUN --mount=type=bind,source=components/shared/check-linked-libs.sh,target=/tmp/check-linked-libs.sh \

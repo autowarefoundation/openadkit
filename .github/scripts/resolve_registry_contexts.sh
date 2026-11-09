@@ -79,31 +79,8 @@ base_inputs=(
   .github/scripts/autoware_patches.py .github/autoware-patches
 )
 use_local_common="${USE_LOCAL_COMMON:-false}"
-use_local_simulator="${USE_LOCAL_SIMULATOR:-false}"
 
-if jq -e 'index("carla-interface") != null' <<<"${TARGETS_JSON}" >/dev/null \
-  && [ "${use_local_simulator}" != true ]; then
-  simulator_ref="${IMAGE_PREFIX_COMPONENT}:simulator-amd64-${distro}"
-  if simulator_context=$(resolve_registry_context "${simulator_ref}" \
-    "${base_inputs[@]}" components/simulator); then
-    echo "simulator_context=${simulator_context}" >> "${GITHUB_OUTPUT}"
-  else
-    rc=$?
-    if [ "${rc}" -eq 2 ]; then
-      echo "::error::Registry context ${simulator_ref} unavailable; aborting" >&2
-      exit 1
-    fi
-    echo "Falling back to a local simulator build" >&2
-    use_local_simulator=true
-  fi
-fi
-
-common_required=false
-if [ "${use_local_simulator}" = true ] \
-  || jq -e 'map(select(. != "carla-interface")) | length > 0' <<<"${TARGETS_JSON}" >/dev/null; then
-  common_required=true
-fi
-if [ "${common_required}" = true ] && [ "${use_local_common}" != true ]; then
+if jq -e 'length > 0' <<<"${TARGETS_JSON}" >/dev/null && [ "${use_local_common}" != true ]; then
   devel_ref="${IMAGE_PREFIX_COMMON}:universe-common-devel-amd64-${distro}"
   runtime_ref="${IMAGE_PREFIX_COMMON}:universe-common-amd64-${distro}"
   if devel_context=$(resolve_registry_context "${devel_ref}" "${base_inputs[@]}") \
@@ -122,4 +99,3 @@ if [ "${common_required}" = true ] && [ "${use_local_common}" != true ]; then
 fi
 
 echo "use_local_common=${use_local_common}" >> "${GITHUB_OUTPUT}"
-echo "use_local_simulator=${use_local_simulator}" >> "${GITHUB_OUTPUT}"

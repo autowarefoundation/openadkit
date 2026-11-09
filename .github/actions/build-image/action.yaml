@@ -29,11 +29,8 @@ inputs:
   save-ccache:
     description: Save and prune ccache mounts (main and release branch pushes and schedules only)
     default: "false"
-  shared-common:
-    description: Export temporary common caches for same-repository PR consumers
-    default: "false"
-  common-cached:
-    description: Consume temporary common caches from the shared PR build
+  common-check:
+    description: Build only the universe-common images, as a pull request's check of them; nothing is loaded or exported
     default: "false"
 
 outputs:
@@ -52,13 +49,12 @@ runs:
         BUILD_PLATFORM: ${{ inputs.platform }}
         BUILD_INPUTS: ${{ inputs.prepared }}
         PUBLISH: ${{ inputs.publish }}
-        SHARED_COMMON: ${{ inputs.shared-common }}
-        COMMON_CACHED: ${{ inputs.common-cached }}
+        COMMON_CHECK: ${{ inputs.common-check }}
       run: python3 .github/scripts/build.py recipe
       shell: bash
 
     - name: Image metadata
-      if: inputs.shared-common != 'true'
+      if: inputs.common-check != 'true'
       id: meta
       uses: docker/metadata-action@v6
       with:
@@ -124,7 +120,7 @@ runs:
           ${{ steps.meta-devel.outputs.bake-file }}
         targets: ${{ steps.recipe.outputs.targets }}
         push: ${{ inputs.publish == 'true' }}
-        load: ${{ inputs.publish != 'true' && inputs.shared-common != 'true' }}
+        load: ${{ inputs.publish != 'true' && inputs.common-check != 'true' }}
 
     - name: Prune prior ccache lineage
       if: inputs.save-ccache == 'true'

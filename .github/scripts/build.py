@@ -12,6 +12,7 @@ import pathlib
 import sys
 
 DEFAULT_INVENTORY = ".github/image-inventory.json"
+REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
 
 
 def platform_label(platform):
@@ -140,6 +141,9 @@ def build_single_image_plan(inventory, changed_files=(), target_input="", distro
                     mapped_targets = all_targets
                 elif component in images_by_target and separator:
                     mapped_targets = {component}
+                elif separator and not (REPOSITORY / "components" / component).exists():
+                    # A removed component builds nothing; a new one must be mapped.
+                    mapped_targets = set()
                 else:
                     mapped_targets = None
 

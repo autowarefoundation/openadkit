@@ -57,7 +57,17 @@ def test_changed_inputs_select_required_builds(path, expected, flags):
     assert all(plan[name] is value for name, value in flags.items())
 
 
-def test_invalid_build_inputs_fail_closed():
+def test_a_removed_component_builds_nothing(tmp_path, monkeypatch):
+    # A deleted component's files are in the diff of the change that removes it.
+    monkeypatch.setattr(matrices, "REPOSITORY", tmp_path)
+    plan = matrices.build_single_image_plan(INVENTORY, ["components/carla-interface/Dockerfile"])
+    assert plan["targets_json"] == []
+
+
+def test_invalid_build_inputs_fail_closed(tmp_path, monkeypatch):
+    # A component in the checkout but not in the inventory must be mapped.
+    monkeypatch.setattr(matrices, "REPOSITORY", tmp_path)
+    (tmp_path / "components/new-component").mkdir(parents=True)
     for options, message in [
         ({"target_input": "missing"}, "Unknown Bake target"),
         ({"distro": "rolling"}, "Unsupported ROS distro"),

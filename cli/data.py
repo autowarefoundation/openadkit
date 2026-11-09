@@ -17,14 +17,9 @@ from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from manifest import (
-    Deployment,
-    OpenADKitError,
-    Selection,
-    expand_home,
-    safe_relative,
-    sha256_file,
-)
+from catalog import Deployment, expand_home
+from manifest import OpenADKitError, safe_relative, sha256_file
+from settings import Selection
 
 # Marks a directory the CLI installed. Only marked data is replaced or deleted,
 # so a data variable pointing at, say, $HOME can never lose user files.
@@ -251,7 +246,7 @@ def selected_resources(
 
 
 def resolve_destination(resource: dict[str, Any], selection: Selection) -> Path:
-    """Where a resource goes, from settings compose.resolve_settings resolved."""
+    """Where a resource goes, from settings settings.resolve_settings resolved."""
     variable = resource["destinationEnv"]
     environment = selection.environment
     if resource.get("gpu") and selection.gpu_environment is not None:

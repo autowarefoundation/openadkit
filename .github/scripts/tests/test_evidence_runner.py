@@ -169,11 +169,11 @@ def test_split_l0_uses_real_manifest_endpoint_requirements(tmp_path):
 import json, sys
 from pathlib import Path
 sys.path.insert(0, {str(ROOT / 'cli')!r})
-import manifest
+import catalog, settings
 args = sys.argv[1:]
 if args[0] == 'validate':
-    root = Path({str(ROOT)!r}); kit = manifest.load_kit(root)
-    manifest.get_deployment(root, kit, args[1]).select(kit, 'humble', False, node=args[args.index('--node') + 1])
+    root = Path({str(ROOT)!r}); kit = catalog.load_kit(root)
+    settings.select(catalog.get_deployment(root, kit, args[1]), kit, 'humble', False, node=args[args.index('--node') + 1])
     print(json.dumps({{'deployment': args[1]}}))
 sys.exit(1 if args[0] == 'run' else 0)
 ''')

@@ -232,7 +232,7 @@ EOF
 }
 
 install_openadkit() {
-  # Kits find the release they extend under the same root (cli/manifest.py).
+  # Kits find the release they extend under the same root (cli/catalog.py).
   local version=latest destination="${OPENADKIT_INSTALL_DIR:-${HOME}/.local/share/openadkit}" force=false
   local resolve_only=false announce_next=true
 

@@ -12,7 +12,7 @@ everywhere without editing a hardcoded list.
 from __future__ import annotations
 
 import argparse
-import importlib.util
+import importlib
 import json
 import os
 import shutil
@@ -47,20 +47,26 @@ def fail(message: str) -> NoReturn:
     raise ValueError(message)
 
 
+# The CLI modules the catalog needs; each source root loads its own copy.
+RUNTIME_MODULES = ("manifest", "catalog")
+
+
 def load_runtime(source_root: Path) -> ModuleType:
-    module_path = source_root / "cli/manifest.py"
-    if not module_path.is_file():
-        fail(f"could not load runtime manifest module: {module_path}")
-    spec = importlib.util.spec_from_file_location("openadkit_matrix_manifest", module_path)
-    if spec is None or spec.loader is None:
-        fail(f"could not load runtime manifest module: {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
+    """The catalog module of the CLI in source_root, without touching other loads."""
+    directory = source_root / "cli"
+    if not (directory / "catalog.py").is_file():
+        fail(f"could not load the runtime catalog module: {directory / 'catalog.py'}")
+    saved = {name: sys.modules.pop(name) for name in RUNTIME_MODULES if name in sys.modules}
+    sys.path.insert(0, str(directory))
     try:
-        spec.loader.exec_module(module)
+        return importlib.import_module("catalog")
     except (OSError, ImportError) as error:
-        fail(f"could not load runtime manifest module: {module_path}: {error}")
-    return module
+        fail(f"could not load the runtime catalog module: {directory}: {error}")
+    finally:
+        sys.path.remove(str(directory))
+        for name in RUNTIME_MODULES:
+            sys.modules.pop(name, None)
+        sys.modules.update(saved)
 
 
 def validation_cells(

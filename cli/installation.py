@@ -20,7 +20,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import compose
-from manifest import VERSION_RE, OpenADKitError, expand_home, root_path
+from catalog import expand_home, root_path
+from manifest import VERSION_RE, OpenADKitError
 
 KEPT_RELEASE_RE = re.compile(r"^openadkit-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$")
 

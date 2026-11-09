@@ -15,21 +15,20 @@ from typing import Any, NoReturn
 
 import compose
 import data
-from manifest import (
-    NAME_RE,
-    OpenADKitError,
+import live
+import settings
+from catalog import (
     RuntimeContext,
     available_deployments,
     declares_base,
     deployment_integrity,
     get_deployment,
     install_root,
-    load_json,
     load_kit,
-    require_string,
     resolve_extends,
     root_path,
 )
+from manifest import NAME_RE, OpenADKitError, load_json, require_string
 
 KIT_TEMPLATE = Path(__file__).resolve().parent / "templates/kit"
 
@@ -508,7 +507,7 @@ def warn_if_modified(root, deployment, kit) -> None:
 
 
 def output_path(selection) -> str | None:
-    """Where the deployment writes results (resolved by compose.resolve_settings)."""
+    """Where the deployment writes results (resolved by settings.resolve_settings)."""
     return selection.environment.get("OUTPUT_HOST_PATH") or None
 
 
@@ -546,7 +545,7 @@ def print_run_next_steps(
     target = deployment.name if node is None else f"{deployment.name} --node {node}"
     print(f"running: {target}")
     if "visualizer" in services:
-        print(compose.visualizer_address(tls))
+        print(live.visualizer_address(tls))
         print(
             "password: REMOTE_PASSWORD (default openadkit; override in "
             f"{deployment.site_config})"
@@ -567,32 +566,32 @@ def operate(args: argparse.Namespace) -> int:
     if args.command == "restart" and args.services and args.all_services:
         raise OpenADKitError("name the services to restart, or pass --all")
     if args.command in ("status", "stop"):
-        projects = compose.live_views(args.node)
+        projects = live.live_views(args.node)
         if not projects:
             print("nothing is running" if args.node is None else f"node {args.node} is not running here")
             return 0
         for project in projects:
             if len(projects) > 1:
-                print(f"== {compose.view_name(project)}")
+                print(f"== {live.view_name(project)}")
             if args.command == "status":
-                compose.status(project)
+                live.status(project)
             else:
-                compose.stop(project)
+                live.stop(project)
         return 0
-    project = compose.live_view(args.node)
+    project = live.live_view(args.node)
     if args.command == "logs":
-        compose.logs(project, args.follow, args.services)
+        live.logs(project, args.follow, args.services)
     elif args.command == "restart":
-        restarted, kept = compose.restart(project, args.services, args.all_services)
-        compose.wait_after_restart(project, restarted)
+        restarted, kept = live.restart(project, args.services, args.all_services)
+        live.wait_after_restart(project, restarted)
         print(f"restarted: {', '.join(restarted)}")
         if kept:
             print(f"kept running: {', '.join(kept)} (restart --all includes them)")
     elif args.command == "shell":
-        compose.shell(project, args.service, args.command_args)
+        live.shell(project, args.service, args.command_args)
     else:
         output = Path(args.output).expanduser().resolve() if args.output else None
-        bag = compose.record(project, args.topics, output)
+        bag = live.record(project, args.topics, output)
         print(f"recorded: {bag}")
     return 0
 
@@ -674,7 +673,7 @@ def main() -> int:
         if not deployment.data:
             print("no data resources declared")
             return 0
-        selection = compose.resolve_settings(deployment, deployment.select(kit, None, False, operational=True))
+        selection = settings.resolve_settings(deployment, settings.select(deployment, kit, None, False, operational=True))
         installed = data.check_installed_data(deployment, selection, include_gpu=True)
         if not installed:
             print("no data resources declared")
@@ -689,14 +688,15 @@ def main() -> int:
         if getattr(args, "ws", None):
             deployment.use_workspace(Path(args.ws).expanduser().resolve())
         compose.ensure_runtime_user()
-        selection = deployment.select(
+        selection = settings.select(
+            deployment,
             kit,
             args.ros_distro,
             getattr(args, "gpu", False),
             node=getattr(args, "node", None),
             require_gpu=args.command != "fetch",
         )
-        selection = compose.resolve_settings(deployment, selection)
+        selection = settings.resolve_settings(deployment, selection)
         if args.command == "fetch":
             if args.force:
                 # Replacing data a live container mounts deletes it under that container.

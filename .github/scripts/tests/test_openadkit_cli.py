@@ -19,9 +19,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "cli"))
 
+import catalog as cli_catalog  # noqa: E402
 import compose as cli_compose  # noqa: E402
 import data as cli_data  # noqa: E402
+import live as cli_live  # noqa: E402
 import manifest as cli_manifest  # noqa: E402
+import settings as cli_settings  # noqa: E402
 
 ENTRYPOINT = ROOT / "openadkit"
 COMPONENT_IMAGES = json.loads((ROOT / "openadkit.json").read_text())["componentImages"]
@@ -99,7 +102,7 @@ def runtime_tree(tmp_path, *, release=False, document=None, config="MAP_PATH=$HO
                        autoware={"version": "1.8.0", "ref": "a" * 40, "lockSha256": "b" * 64},
                        images={distro: dict.fromkeys(COMPONENT_IMAGES.values(), PIN)
                                for distro in ("humble", "jazzy")})
-        context["deployments"]["example"]["checksum"] = cli_manifest.deployment_checksum(directory)
+        context["deployments"]["example"]["checksum"] = cli_catalog.deployment_checksum(directory)
     else:
         context["imagePrefixComponent"] = "registry.example/openadkit"
     (root / "openadkit.json").write_text(json.dumps(context))
@@ -215,7 +218,7 @@ def release_bin(tmp_path, version="v1.2.3", *, bad_checksum=False, member=None):
     bundle = release / f"{root_name}.tar.gz"
     files = {"openadkit": ENTRYPOINT.read_bytes(), "cli/main.py": b'print("ok")\n',
              "openadkit.json": json.dumps({"schemaVersion": 2, "kind": "release", "version": version}).encode()}
-    files.update({f"cli/{name}.py": (ROOT / f"cli/{name}.py").read_bytes() for name in ("compose", "manifest", "installation")})
+    files.update({f"cli/{name}.py": (ROOT / f"cli/{name}.py").read_bytes() for name in ("catalog", "compose", "manifest", "installation", "settings")})
     files["cli/completion.bash"] = (ROOT / "cli/completion.bash").read_bytes()
     if member:
         files[member] = "/etc/passwd" if member == "link" else b"escape"
@@ -608,13 +611,13 @@ def test_run_verify_needs_a_verify_step(tmp_path):
 def test_verify_waits_for_a_service_without_a_command(tmp_path, monkeypatch):
     document = manifest() | {"verify": {"service": "scenario"}}
     root, _ = runtime_tree(tmp_path, document=document)
-    kit = cli_manifest.load_kit(root)
-    deployment = cli_manifest.get_deployment(root, kit, "example")
+    kit = cli_catalog.load_kit(root)
+    deployment = cli_catalog.get_deployment(root, kit, "example")
     monkeypatch.setenv("OPENADKIT_OUTPUT_DIR", str(tmp_path / "output"))
     captured = []
     monkeypatch.setattr(cli_compose, "compose_capture", lambda *args, **kwargs: subprocess.CompletedProcess([], 0, "c1\n", ""))
     monkeypatch.setattr(cli_compose, "capture_process", lambda command, **kwargs: captured.append(command) or subprocess.CompletedProcess(command, 0, "3\n", ""))
-    selection = cli_manifest.Selection(ros_distro="humble", gpu=False, node=None, injections={}, environment={})
+    selection = cli_settings.Selection(ros_distro="humble", gpu=False, node=None, injections={}, environment={})
     record = {"deployment": "example"}
     assert cli_compose.verify(deployment, selection, {"scenario"}, record) == 3
     assert captured == [["docker", "wait", "c1"]]
@@ -627,11 +630,11 @@ def test_a_kit_inherits_the_verify_step_of_its_base_unless_it_names_one(tmp_path
     verify = {"service": "app", "command": ["python3", "drive_to_goal.py"]}
     root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": verify})
     kit_root = integrator_kit(tmp_path, root)
-    kit = cli_manifest.load_kit(kit_root)
-    assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == verify
+    kit = cli_catalog.load_kit(kit_root)
+    assert cli_catalog.get_deployment(kit_root, kit, "custom").verify == verify
     path = kit_root / "deployments/custom/deployment.json"
     path.write_text(json.dumps(json.loads(path.read_text()) | {"verify": {"service": "acme"}}))
-    assert cli_manifest.get_deployment(kit_root, kit, "custom").verify == {"service": "acme"}
+    assert cli_catalog.get_deployment(kit_root, kit, "custom").verify == {"service": "acme"}
 
 
 @pytest.mark.parametrize(("verify", "message"), [
@@ -642,7 +645,7 @@ def test_a_kit_inherits_the_verify_step_of_its_base_unless_it_names_one(tmp_path
 def test_invalid_verify_steps_are_rejected(tmp_path, verify, message):
     root, _ = runtime_tree(tmp_path, document=manifest() | {"verify": verify})
     with pytest.raises(cli_manifest.OpenADKitError, match=re.escape(message)):
-        cli_manifest.get_deployment(root, cli_manifest.load_kit(root), "example")
+        cli_catalog.get_deployment(root, cli_catalog.load_kit(root), "example")
 
 
 def test_a_verify_service_must_be_in_the_compose_graph(tmp_path):
@@ -707,8 +710,8 @@ def test_run_rejects_live_projects_from_the_other_kit_catalog(tmp_path, target):
                                                 ("openadkit-example-foreign", False)])
 def test_exclusivity_only_allows_declared_nodes_of_the_selected_deployment(tmp_path, monkeypatch, project, allowed):
     root, _ = runtime_tree(tmp_path, document=manifest(nodes=True))
-    kit = cli_manifest.load_kit(root)
-    deployment = cli_manifest.get_deployment(root, kit, "example")
+    kit = cli_catalog.load_kit(root)
+    deployment = cli_catalog.get_deployment(root, kit, "example")
     monkeypatch.setattr(cli_compose, "live_project_files", lambda: {project: []})
     assert cli_compose.other_projects(deployment) == ([] if allowed else [project])
 
@@ -716,8 +719,8 @@ def test_exclusivity_only_allows_declared_nodes_of_the_selected_deployment(tmp_p
 @pytest.mark.parametrize("started_from", ["own", "elsewhere", "other-node"])
 def test_run_treats_a_same_named_project_from_another_directory_as_foreign(tmp_path, monkeypatch, started_from):
     root, directory = runtime_tree(tmp_path, document=manifest(nodes=True))
-    kit = cli_manifest.load_kit(root)
-    deployment = cli_manifest.get_deployment(root, kit, "example")
+    kit = cli_catalog.load_kit(root)
+    deployment = cli_catalog.get_deployment(root, kit, "example")
     # Another kit's "example", or a deployment named "example-primary", has the
     # same project name as this one's single-host or primary view.
     entry = {"own": directory / "docker-compose.yaml", "elsewhere": tmp_path / "other-kit/docker-compose.yaml",
@@ -773,7 +776,7 @@ def files_resource(tmp_path, *, env="MAP_PATH", name="dataset", **extra):
 def test_data_resource_names_must_be_safe_path_names(tmp_path, name):
     resource = files_resource(tmp_path) | {"name": name}
     with pytest.raises(cli_manifest.OpenADKitError, match="name"):
-        cli_manifest._validate_data([resource], {}, tmp_path)
+        cli_manifest.validate_data([resource], {}, tmp_path)
 
 
 
@@ -801,7 +804,7 @@ def test_data_file_takes_exactly_one_of_url_and_source(tmp_path):
     resource = files_resource(tmp_path)
     resource["files"][0]["source"] = "data/map.txt"
     with pytest.raises(cli_manifest.OpenADKitError, match="exactly one of url and source"):
-        cli_manifest._validate_data([resource], {}, tmp_path)
+        cli_manifest.validate_data([resource], {}, tmp_path)
 
 
 @pytest.mark.parametrize("url", ["foo", "ftp://example.com/map.txt", "https:///map.txt"])
@@ -809,14 +812,14 @@ def test_data_url_must_be_fetchable(tmp_path, url):
     resource = files_resource(tmp_path)
     resource["files"][0]["url"] = url
     with pytest.raises(cli_manifest.OpenADKitError, match="must be an http, https or file URL"):
-        cli_manifest._validate_data([resource], {}, tmp_path)
+        cli_manifest.validate_data([resource], {}, tmp_path)
 
 
 def test_zip_expected_root_is_one_directory(tmp_path):
     resource = {"name": "dataset", "kind": "zip", "destinationEnv": "MAP_PATH", "expectedRoot": "dataset/inner",
                 "url": "https://example.com/data.zip", "sha256": "0" * 64, "requiredFiles": ["required.txt"]}
     with pytest.raises(cli_manifest.OpenADKitError, match="expectedRoot must be one directory name"):
-        cli_manifest._validate_data([resource], {}, tmp_path)
+        cli_manifest.validate_data([resource], {}, tmp_path)
 
 
 def test_env_file_settings_are_what_the_files_set_as_compose_reads_them(tmp_path, monkeypatch):
@@ -824,7 +827,7 @@ def test_env_file_settings_are_what_the_files_set_as_compose_reads_them(tmp_path
     monkeypatch.setenv("SET_IN_FILE", "shell")
     path = tmp_path / "config.env"
     path.write_text('SET_IN_FILE=file\nQUOTED="a b" # note\nHOME_PATH=$HOME/data\nFROM_SHELL\n')
-    assert cli_manifest._env_file_settings((path,)) == {
+    assert cli_settings._env_file_settings((path,)) == {
         "SET_IN_FILE": "file", "QUOTED": "a b", "HOME_PATH": f"{os.environ['HOME']}/data",
     }
 
@@ -833,7 +836,7 @@ def test_env_file_compose_refuses_is_a_cli_error(tmp_path):
     path = tmp_path / "config.env"
     path.write_text('NAME="unterminated\n')
     with pytest.raises(cli_manifest.OpenADKitError, match="could not read the settings"):
-        cli_manifest._env_file_settings((path,))
+        cli_settings._env_file_settings((path,))
 
 def test_only_explicit_fetch_force_replaces_managed_data(tmp_path):
     root, _ = runtime_tree(tmp_path, document=manifest(data=[files_resource(tmp_path)]))
@@ -938,7 +941,7 @@ def test_checksum_failure_preserves_managed_data_and_cleans_staging(tmp_path, mo
     (target / cli_data.MARKER).write_text("{}")
     (target / "required.txt").write_text("original")
     monkeypatch.setattr(cli_data.time, "sleep", lambda _: None)
-    selection = cli_manifest.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
+    selection = cli_settings.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
     with pytest.raises(cli_manifest.OpenADKitError, match="checksum mismatch"):
         cli_data.install_resource(resource, selection, True)
     assert (target / "required.txt").read_text() == "original"
@@ -954,15 +957,15 @@ def test_rerun_counts_only_restarts_since_up(monkeypatch):
     monkeypatch.setattr(cli_compose, "capture_process",
                         lambda *_, **__: subprocess.CompletedProcess([], 0, stdout=inspect))
     deployment = type("Deployment", (), {"reset_services": staticmethod(lambda node: {"init", "rosbag"})})()
-    selection = cli_manifest.Selection("humble", False, None, {}, {})
+    selection = cli_settings.Selection("humble", False, None, {}, {})
     assert cli_compose.failed_services(deployment, selection, [], {"kept": 1}) == ["planning", "rosbag", "system"]
 
 
 @pytest.mark.parametrize(("interrupt", "failed"), [(True, False), (False, True)])
 def test_record_keeps_an_interrupted_bag_but_reports_a_recorder_failure(monkeypatch, tmp_path, interrupt, failed):
-    monkeypatch.setattr(cli_compose, "project_capture",
+    monkeypatch.setattr(cli_live, "project_capture",
                         lambda *_, **__: subprocess.CompletedProcess([], 0, stdout="api\n"))
-    monkeypatch.setattr(cli_compose, "capture_process", lambda *_, **__: subprocess.CompletedProcess(
+    monkeypatch.setattr(cli_live, "capture_process", lambda *_, **__: subprocess.CompletedProcess(
         [], 0, stdout=json.dumps([{"Config": {"Image": "api-image", "Env": ["ROS_DOMAIN_ID=7"], "User": "1000"}}])))
     runs = []
 
@@ -978,12 +981,12 @@ def test_record_keeps_an_interrupted_bag_but_reports_a_recorder_failure(monkeypa
                 raise KeyboardInterrupt
             return 2
 
-    monkeypatch.setattr(cli_compose.subprocess, "Popen", Recorder)
+    monkeypatch.setattr(cli_live.subprocess, "Popen", Recorder)
     if failed:
         with pytest.raises(cli_manifest.OpenADKitError, match="exit status 2; partial bag"):
-            cli_compose.record("openadkit-example", ["/clock"], tmp_path / "bags")
+            cli_live.record("openadkit-example", ["/clock"], tmp_path / "bags")
     else:
-        bag = cli_compose.record("openadkit-example", ["/clock"], tmp_path / "bags")
+        bag = cli_live.record("openadkit-example", ["/clock"], tmp_path / "bags")
         assert bag.parent == tmp_path / "bags" and bag.name.startswith("example-")
     command = runs[0]
     assert command[:4] == ["docker", "run", "--rm", "--init"]
@@ -1013,7 +1016,7 @@ def test_run_reports_overrides_that_changed_nothing(monkeypatch, capsys):
     monkeypatch.setattr(cli_compose, "compose_capture",
                         lambda *_, **__: subprocess.CompletedProcess([], 0, stdout="map\ncontrol\ncarla\n"))
     monkeypatch.setattr(cli_compose, "capture_process", capture)
-    selection = cli_manifest.Selection("humble", False, None, {}, {})
+    selection = cli_settings.Selection("humble", False, None, {}, {})
     warnings = cli_compose.report_overrides(None, selection)
     # autoware_control_config is installed in the control image, so it is no mistake.
     assert warnings == ["override changed nothing: package autoware_localization_config is in no service",
@@ -1033,13 +1036,13 @@ def test_status_shows_the_ad_api_state_in_one_line_each():
         "mode": {"state": "stop", "autowareControl": False, "autonomousAvailable": True},
         "mrm": {"state": "operating", "behavior": "emergency stop"},
     }
-    assert cli_compose.format_autoware_state(state) == [
+    assert cli_live.format_autoware_state(state) == [
         "localization initialized",
         "routing      set",
         "mode         stop (manual control, autonomous available)",
         "mrm          operating: emergency stop",
     ]
-    assert cli_compose.format_autoware_state(dict.fromkeys(state))[1] == "routing      no data"
+    assert cli_live.format_autoware_state(dict.fromkeys(state))[1] == "routing      no data"
 
 
 def test_operational_commands_act_on_the_running_stack_without_a_name(tmp_path):
@@ -1107,16 +1110,16 @@ def test_restart_defaults_to_the_services_with_open_ad_kit_config(tmp_path):
 def test_restart_waits_for_readiness_and_reports_a_failure(monkeypatch, states, failed):
     polls = iter(states)
     reported = []
-    monkeypatch.setattr(cli_compose, "project_capture", lambda project, args: subprocess.CompletedProcess(args, 0, "c1\n", ""))
-    monkeypatch.setattr(cli_compose, "capture_process", lambda command, **kwargs: subprocess.CompletedProcess(command, 0, "\n".join(next(polls)), ""))
-    monkeypatch.setattr(cli_compose, "report_container_overrides", lambda ids, environment: reported.append(ids) or [])
-    monkeypatch.setattr(cli_compose.time, "sleep", lambda _: None)
+    monkeypatch.setattr(cli_live, "project_capture", lambda project, args: subprocess.CompletedProcess(args, 0, "c1\n", ""))
+    monkeypatch.setattr(cli_live, "capture_process", lambda command, **kwargs: subprocess.CompletedProcess(command, 0, "\n".join(next(polls)), ""))
+    monkeypatch.setattr(cli_live, "report_container_overrides", lambda ids, environment: reported.append(ids) or [])
+    monkeypatch.setattr(cli_live.time, "sleep", lambda _: None)
     if failed:
         with pytest.raises(cli_manifest.OpenADKitError, match=f"{failed} failed after restart"):
-            cli_compose.wait_after_restart("openadkit-example", ["planning"])
+            cli_live.wait_after_restart("openadkit-example", ["planning"])
         assert reported == []
     else:
-        cli_compose.wait_after_restart("openadkit-example", ["planning"])
+        cli_live.wait_after_restart("openadkit-example", ["planning"])
         # Once ready, the overrides without a counterpart are reported, as after run.
         assert reported == [["c1"]]
 
@@ -1171,7 +1174,7 @@ def test_forced_fetch_preserves_targets_changed_during_publication(tmp_path, mon
         download(*args)
         change_target()
     monkeypatch.setattr(cli_data, "download", download_with_race)
-    selection = cli_manifest.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
+    selection = cli_settings.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
     with pytest.raises(cli_manifest.OpenADKitError, match="changed during download"):
         cli_data.install_resource(resource, selection, True)
     assert (target / "user-file").read_text() == ("original" if race == "unmarked" else "new user data")
@@ -1185,7 +1188,7 @@ def test_forced_fetch_replaces_managed_data_and_removes_the_old(tmp_path):
     target.mkdir()
     (target / cli_data.MARKER).write_text("{}")
     (target / "old-file").write_text("old")
-    selection = cli_manifest.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
+    selection = cli_settings.Selection("humble", False, None, {}, {"MAP_PATH": str(target)})
     cli_data.install_resource(resource, selection, True)
     assert cli_data.is_managed(target) and not (target / "old-file").exists()
     assert not list(tmp_path.glob(".dataset.stage.*"))
@@ -1202,7 +1205,7 @@ class SettingsDeployment:
         return self.files + (self.gpu_files if gpu else [])
 
     def configuration_environment(self, gpu=False):
-        return dict(cli_manifest._env_file_settings(tuple(self.env_files(gpu))))
+        return dict(cli_settings._env_file_settings(tuple(self.env_files(gpu))))
 
 
 @pytest.mark.skipif(
@@ -1218,8 +1221,8 @@ def test_data_destinations_resolve_as_compose_resolves_them(tmp_path, monkeypatc
         "MAP_PATH=${MAP_ROOT:-/tmp/openadkit-map}\nROSBAG_PATH=${ROSBAG_ROOT:-/tmp/rosbag}\n")
     (tmp_path / "config.gpu.env").write_text("ROSBAG_PATH=/srv/gpu-rosbag\n")
     deployment = SettingsDeployment(tmp_path, [tmp_path / "config.env"], [tmp_path / "config.gpu.env"])
-    selection = cli_manifest.Selection("humble", False, None, {}, deployment.configuration_environment())
-    resolved = cli_compose.resolve_settings(deployment, selection)
+    selection = cli_settings.Selection("humble", False, None, {}, deployment.configuration_environment())
+    resolved = cli_settings.resolve_settings(deployment, selection)
     destination = lambda name, gpu=False: cli_data.resolve_destination(  # noqa: E731
         {"name": name, "destinationEnv": name, "gpu": gpu}, resolved)
     assert destination("MODEL_PATH") == tmp_path / "data/models"
@@ -1355,15 +1358,15 @@ def test_kit_artifact_fallback_and_wildcard_override(tmp_path, base_refs):
     root, _ = runtime_tree(tmp_path)
     edit_kit(root, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {**base_refs}}))
     kit = integrator_kit(tmp_path, root, artifacts={"EXTERNAL_IMAGE": {"distros": {"humble": OTHER_PIN}}})
-    context = cli_manifest.load_kit(kit)
+    context = cli_catalog.load_kit(kit)
     assert context.artifact_environment("humble")["EXTERNAL_IMAGE"] == OTHER_PIN
     assert context.artifact_environment("jazzy")["EXTERNAL_IMAGE"] == PIN
     edit_kit(kit, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"ref": OTHER_PIN}}))
-    assert cli_manifest.load_kit(kit).artifact_environment("jazzy")["EXTERNAL_IMAGE"] == OTHER_PIN
+    assert cli_catalog.load_kit(kit).artifact_environment("jazzy")["EXTERNAL_IMAGE"] == OTHER_PIN
     # Every distro is `ref`, never a "*" distro.
     edit_kit(kit, lambda doc: doc.update(artifacts={"EXTERNAL_IMAGE": {"distros": {"*": OTHER_PIN}}}))
     with pytest.raises(cli_manifest.OpenADKitError, match="invalid ROS distro"):
-        cli_manifest.load_kit(kit)
+        cli_catalog.load_kit(kit)
 
 
 @pytest.mark.parametrize("text", ["[]", "{"])
@@ -1389,10 +1392,10 @@ def test_kit_inherits_pins_gpu_env_and_layers(tmp_path, monkeypatch, release):
     for path in (base / "config", directory / "config", kit / "overlay_ws"):
         path.mkdir()
     site_config(root, "VALUE=site\n", name="custom")
-    context = cli_manifest.load_kit(kit)
-    deployment = cli_manifest.get_deployment(kit, context, "custom")
+    context = cli_catalog.load_kit(kit)
+    deployment = cli_catalog.get_deployment(kit, context, "custom")
     assert deployment.requirements["gpu"] == "optional" and deployment.data[0]["name"] == "dataset"
-    selection = deployment.select(context, "humble", True)
+    selection = cli_settings.select(deployment, context, "humble", True)
     assert deployment.compose_files(True) == [directory / "docker-compose.yaml", base / "gpu.yaml"]
     assert selection.environment["VALUE"] == "site" and selection.environment["BASE_GPU"] == "1"
     assert selection.injections["API_IMAGE"] == OTHER_PIN
@@ -1451,9 +1454,9 @@ def test_new_makes_a_kit_that_extends_this_open_ad_kit(tmp_path, installed):
     assert (kit / "config/autoware").is_dir() and (kit / "overlay_ws/src").is_dir()
     assert "{{" not in "".join(path.read_text() for path in kit.rglob("*") if path.is_file())
     if not installed:
-        loaded = cli_manifest.load_kit(kit)
+        loaded = cli_catalog.load_kit(kit)
         assert loaded.kind == "kit" and set(loaded.deployments) == {"my-kit"}
-        assert cli_manifest.get_deployment(kit, loaded, "my-kit").base.name == "example"
+        assert cli_catalog.get_deployment(kit, loaded, "my-kit").base.name == "example"
 
 
 def test_new_makes_a_kit_inside_a_checkout_relative_to_it(tmp_path):
@@ -1561,11 +1564,11 @@ def overlay_workspace(root, name, monkeypatch, tmp_path, workspace=None):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     for variable in ISOLATED_ENV:
         monkeypatch.delenv(variable, raising=False)
-    context = cli_manifest.load_kit(root)
-    deployment = cli_manifest.get_deployment(root, context, name)
+    context = cli_catalog.load_kit(root)
+    deployment = cli_catalog.get_deployment(root, context, name)
     if workspace is not None:
         deployment.use_workspace(workspace)
-    return deployment.select(context, "humble", False).injections["OPENADKIT_OVERLAY_WS"]
+    return cli_settings.select(deployment, context, "humble", False).injections["OPENADKIT_OVERLAY_WS"]
 
 
 def test_a_kit_has_one_workspace_at_its_root(tmp_path, monkeypatch):
@@ -1607,30 +1610,30 @@ def on_top(root, name="on-top", base="example"):
 def test_a_catalog_deployment_can_build_on_another(tmp_path):
     root, base = runtime_tree(tmp_path)
     directory = on_top(root)
-    kit = cli_manifest.load_kit(root)
-    deployment = cli_manifest.get_deployment(root, kit, "on-top")
+    kit = cli_catalog.load_kit(root)
+    deployment = cli_catalog.get_deployment(root, kit, "on-top")
     assert deployment.base.directory == base and deployment.requirements == deployment.base.requirements
     assert deployment.overlay_paths["OPENADKIT_OVERLAY_WS"] == directory / "overlay_ws"
     on_top(root, "on-on-top", base="on-top")
     with pytest.raises(cli_manifest.OpenADKitError, match="base deployment on-top has a base of its own"):
-        cli_manifest.get_deployment(root, cli_manifest.load_kit(root), "on-on-top")
+        cli_catalog.get_deployment(root, cli_catalog.load_kit(root), "on-on-top")
 
 
 def test_a_released_deployment_is_intact_only_with_its_base(tmp_path):
     root, base = runtime_tree(tmp_path, release=True)
     directory = on_top(root)
     edit_kit(root, lambda document: document["deployments"]["on-top"].update(
-        checksum=cli_manifest.deployment_checksum(directory)))
-    kit = cli_manifest.load_kit(root)
-    deployment = cli_manifest.get_deployment(root, kit, "on-top")
-    assert cli_manifest.deployment_integrity(root, deployment, kit) == "intact"
+        checksum=cli_catalog.deployment_checksum(directory)))
+    kit = cli_catalog.load_kit(root)
+    deployment = cli_catalog.get_deployment(root, kit, "on-top")
+    assert cli_catalog.deployment_integrity(root, deployment, kit) == "intact"
     (base / "config.env").write_text("MAP_PATH=/elsewhere\n")
-    assert cli_manifest.deployment_integrity(root, deployment, kit) == "modified"
+    assert cli_catalog.deployment_integrity(root, deployment, kit) == "modified"
 
 
 def test_base_deployment_keeps_its_own_overlay(tmp_path, monkeypatch):
     root, directory = runtime_tree(tmp_path)
-    assert overlay_workspace(root, "example", monkeypatch, tmp_path) == str(cli_manifest.state_root() / "empty")
+    assert overlay_workspace(root, "example", monkeypatch, tmp_path) == str(cli_catalog.state_root() / "empty")
     (directory / "overlay_ws").mkdir()
     assert overlay_workspace(root, "example", monkeypatch, tmp_path) == str(directory / "overlay_ws")
 

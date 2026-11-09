@@ -14,8 +14,9 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(ROOT / "cli"), str(ROOT / ".github/scripts")]
 
 import build as matrices  # noqa: E402
+import catalog  # noqa: E402
 import compose  # noqa: E402
-import manifest  # noqa: E402
+import settings  # noqa: E402
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
 
@@ -162,7 +163,7 @@ def compose_context(tmp_path, monkeypatch):
     monkeypatch.setenv("REMOTE_PASSWORD", "ci-validate")
     monkeypatch.delenv("OPENADKIT_KIT", raising=False)
     monkeypatch.delenv("OPENADKIT_DELEGATED", raising=False)
-    return manifest.load_kit(ROOT)
+    return catalog.load_kit(ROOT)
 
 
 @pytest.mark.parametrize(("name", "node", "present", "absent"), [
@@ -176,8 +177,8 @@ def compose_context(tmp_path, monkeypatch):
      {"map", "vehicle"}),
 ])
 def test_real_compose_preserves_single_and_split_graphs(compose_context, name, node, present, absent):
-    deployment = manifest.get_deployment(ROOT, compose_context, name)
-    selection = deployment.select(compose_context, "humble", False, node=node)
+    deployment = catalog.get_deployment(ROOT, compose_context, name)
+    selection = settings.select(deployment, compose_context, "humble", False, node=node)
     result = compose.compose_capture(deployment, selection, ["config", "--format", "json"])
     services = json.loads(result.stdout)["services"]
     assert present <= services.keys() and not absent & services.keys()
@@ -272,9 +273,9 @@ def test_centerpoint_models_mount_where_the_cli_installs_them(compose_context, t
     import data
     (tmp_path / "config").mkdir()
     (tmp_path / "config/logging-simulation.env").write_text("DATA_PATH=/srv/autoware_data\n")
-    deployment = manifest.get_deployment(ROOT, compose_context, "logging-simulation")
-    selection = compose.resolve_settings(
-        deployment, deployment.select(compose_context, "humble", True, require_gpu=False))
+    deployment = catalog.get_deployment(ROOT, compose_context, "logging-simulation")
+    selection = settings.resolve_settings(
+        deployment, settings.select(deployment, compose_context, "humble", True, require_gpu=False))
     resource = next(item for item in deployment.data if item["destinationEnv"] == "CENTERPOINT_DATA_PATH")
     result = compose.compose_capture(deployment, selection, ["config", "--format", "json"])
     mounts = {item["target"]: item["source"] for item in json.loads(result.stdout)["services"]["perception"]["volumes"]}

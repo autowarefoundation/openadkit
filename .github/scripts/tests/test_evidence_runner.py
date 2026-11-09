@@ -29,16 +29,16 @@ def test_evidence_cells_carry_the_manifest_plan():
     split = matrix_cell("scenario-simulation", "split")
     scenario = manifest("scenario-simulation")
     assert split["nodes"].split() == list(scenario["nodes"]) and json.loads(split["verify"]) == scenario["verify"]
-    golden = manifest("planning-simulation")["verify"]
+    drive = manifest("planning-simulation")["verify"]
     # A deployment with a base runs the base's verify step on top of its own layer.
     for name in ("custom-kit", "safety-island-simulation", "planning-simulation"):
-        assert json.loads(matrix_cell(name)["verify"]) == golden
+        assert json.loads(matrix_cell(name)["verify"]) == drive
     assert matrix_cell("planning-simulation")["nodes"] == ""
     for cell in (split, matrix_cell("custom-kit"), matrix_cell("safety-island-simulation")):
         assert cell["name"] == validation_matrix.evidence_cell_name(cell)
 
 
-def test_quadlet_cell_runs_the_golden_path_on_a_runner_with_quadlet():
+def test_quadlet_cell_runs_the_drive_to_goal_check_on_a_runner_with_quadlet():
     runtime = validation_matrix.load_runtime(ROOT)
     cells = [cell for cell in validation_matrix.evidence_cells(runtime, ROOT) if cell.get("backend")]
     assert [cell["name"] for cell in cells] == [

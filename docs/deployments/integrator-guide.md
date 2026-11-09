@@ -198,7 +198,7 @@ Your kit's acceptance checks run where CI runs them:
   waits for the service to exit and takes its exit code.
 
 The example kit's evidence cell runs both: its healthcheck and Planning
-Simulation's golden path. Humble and Jazzy each build the workspace against
+Simulation's drive-to-goal check. Humble and Jazzy each build the workspace against
 their matching devel digest.
 
 A base deployment's CI exemption stays with the kit; an exemption is not runtime

@@ -168,12 +168,11 @@ jobs:
 
   build-local-common:
     needs: prepare
-    # The shared cache is about 4 GB. Limit it to PRs where build-single-image
-    # can remove the cache after the matrix completes; forks keep the old fallback.
-    if: >-
-      needs.prepare.outputs.use_local_common == 'true' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+    # When a change rebuilds the common images, check them on their own first,
+    # so a failure there shows as itself. They build from main's registry
+    # cache; each image job below builds them again the same way, since a
+    # multi-GB hand-over through the Actions cache stalled.
+    if: needs.prepare.outputs.use_local_common == 'true'
     runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
     timeout-minutes: 120
     permissions:
@@ -196,7 +195,7 @@ jobs:
           setup-autoware: true
           with-middleware: true
 
-      - name: Build shared universe-common images
+      - name: Build the universe-common images
         uses: ./.github/actions/build-image
         with:
           target: universe-common
@@ -204,7 +203,7 @@ jobs:
           platform: linux/amd64
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: pr${{ github.event.pull_request.number || github.run_id }}
-          shared-common: true
+          common-check: true
 
   build:
     needs: [prepare, build-local-common]
@@ -253,7 +252,6 @@ jobs:
           platform: linux/amd64
           prepared: ${{ toJSON(needs.prepare.outputs) }}
           tag-suffix: pr${{ github.event.pull_request.number || github.run_id }}
-          common-cached: ${{ needs.build-local-common.result == 'success' }}
 
       - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
         # Reporting-only: findings are surfaced in the step log, but the hard

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "name": "safety-island-simulation",
-  "description": "Planning Simulation driven by the Safety Island controller on its own DDS domain",
+  "description": "Planning Simulation controlled by the Safety Island",
   "base": "planning-simulation",
   "compose": {
     "files": [

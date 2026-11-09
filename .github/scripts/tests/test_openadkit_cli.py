@@ -357,6 +357,23 @@ def test_version_pairs_the_release_with_its_autoware_also_in_a_kit(tmp_path):
     assert f"autoware: 1.8.0 ({'a' * 40}, 1 backported fix)" in run_cli(root, "version").stdout.splitlines()
 
 
+@pytest.mark.parametrize("verbose", [[], ["--verbose"]])
+def test_docker_commands_show_only_when_verbose(tmp_path, verbose):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, services=("app",))
+    result = run_cli(root, "validate", "example", *verbose)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "example is valid (ROS 2 Humble, without GPU)\n"
+    assert ("+ docker compose" in result.stderr) is bool(verbose)
+
+
+def test_list_shows_name_gpu_and_description(tmp_path):
+    root, _ = runtime_tree(tmp_path, document=manifest(gpu=True))
+    lines = run_cli(root, "list").stdout.splitlines()
+    assert lines[0].split() == ["NAME", "GPU", "DESCRIPTION"]
+    assert lines[1].split()[:2] == ["example", "optional"]
+
+
 def test_completion_lists_every_command_and_option():
     import argparse
 
@@ -864,7 +881,7 @@ def test_data_installed_from_an_older_declaration_needs_fetch_force(tmp_path):
     resource["files"][0] |= {"url": fixed.as_uri(), "sha256": hashlib.sha256(fixed.read_bytes()).hexdigest()}
     (directory / "deployment.json").write_text(json.dumps(manifest(data=[resource])))
     result = run_cli(root, "validate", "example", "--data")
-    assert result.returncode == 1 and "data: dataset outdated" in result.stdout
+    assert result.returncode == 1 and "data dataset: outdated" in result.stdout
     assert "openadkit fetch example --force" in result.stderr
     for command in (("run", "example", "--pull", "never"), ("fetch", "example")):
         result = run_cli(root, *command)
@@ -1646,9 +1663,9 @@ def test_a_deployment_can_be_named_by_its_directory(tmp_path):
     fake_docker(tmp_path)
     # The kit around the directory is the one used, wherever the command runs.
     result = run_cli(root, "validate", str(kit / "deployments/custom"), directory=elsewhere)
-    assert result.returncode == 0 and "valid: custom" in result.stdout, result.stderr
+    assert result.returncode == 0 and "custom is valid" in result.stdout, result.stderr
     result = run_cli(root, "validate", "./deployments/example", directory=root)
-    assert result.returncode == 0 and "valid: example" in result.stdout, result.stderr
+    assert result.returncode == 0 and "example is valid" in result.stdout, result.stderr
     result = run_cli(root, "validate", str(kit), directory=elsewhere)
     assert result.returncode != 0 and "is not a deployment of" in result.stderr
 

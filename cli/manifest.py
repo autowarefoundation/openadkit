@@ -1,60 +1,86 @@
-"""Open AD Kit bundle and deployment manifest handling."""
+"""Open AD Kit manifest files: reading and validating them."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
-import os
-import platform
 import re
 import stat
+import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
-
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_REFERENCE_RE = re.compile(r"^\S+@sha256:[0-9a-f]{64}$")
-GPU_COMPONENT_IMAGE = "SENSING_PERCEPTION_GPU_IMAGE"
+# Component images only a GPU run uses (amd64-only CUDA builds), by name.
+GPU_COMPONENT_IMAGE_SUFFIX = "_GPU_IMAGE"
+# The image a kit builds its overlay workspace in, pinned with the runtime images.
+DEVEL_IMAGE_TARGET = "universe-common-devel"
+# Manifests from before v2.0.0 never shipped in a stable release; they are
+# rejected rather than translated.
+SCHEMA_VERSION = 2
 
-ALLOWED_KIT_KEYS = {
+# Open AD Kit's own manifest (kind "source" or "release"): the base a kit extends.
+ALLOWED_BASE_KEYS = {
     "schemaVersion",
     "kind",
     "version",
     "defaultRosDistro",
-    "imagePrefixComponent",
+    "imageRepository",
     "componentImages",
     "images",
     "deployments",
     "shared",
+    "externalImages",
+    "autoware",
 }
+ALLOWED_EXTERNAL_IMAGE_KEYS = {"ref", "distros"}
+# A kit (kind "kit"): its own deployments on top of one pinned Open AD Kit.
+# openadkit.json is its one manifest: each entry of deployments names a base
+# deployment of that Open AD Kit and says what differs from it.
+ALLOWED_KIT_KEYS = {"schemaVersion", "kind", "extends", "deployments", "externalImages"}
+ALLOWED_KIT_DEPLOYMENT_KEYS = {"description", "base", "waitTimeout", "requirements", "data", "verify"}
+# Where a kit keeps the files of one deployment: deployments/<name>/. What is
+# at the kit root applies to every deployment.
+KIT_DEPLOYMENTS_DIRECTORY = "deployments"
+_IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+# Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
+VERSION_RE = re.compile(
+    r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    rf"(?:-({_IDENTIFIER}(?:\.{_IDENTIFIER})*))?$"
+)
 ALLOWED_DEPLOYMENT_REF_KEYS = {"path", "checksum"}
-ALLOWED_DEPLOYMENT_KEYS = {
-    "schemaVersion",
-    "name",
+ALLOWED_BASE_DEPLOYMENT_KEYS = {
     "description",
-    "compose",
-    "requirements",
-    "distroEnvironment",
-    "data",
-    "shared",
-}
-ALLOWED_COMPOSE_KEYS = {
-    "files",
-    "gpuFiles",
-    "profiles",
-    "services",
-    "resetServices",
     "waitTimeout",
+    "requirements",
+    "data",
+    "roles",
+    "evidence",
+    "verify",
 }
+# What `run --verify` runs once the deployment is ready: a command in a running
+# service, or, without one, that service's own exit.
+ALLOWED_VERIFY_KEYS = {"service", "command"}
+# A split-host role lists the Compose files it starts: the CLI derives none of
+# them from a name, and does not know what links one role to another.
+ALLOWED_ROLE_KEYS = {"files", "requiredEnv", "rosDomainId"}
+# A deployment's own Compose files go by name: its entry file and its GPU
+# mode's overlay.
+ENTRY_COMPOSE_FILE = "compose.yaml"
+GPU_COMPOSE_FILE = "compose.gpu.yaml"
+# The one directory of shared services, settings and checks.
+SHARED_DIRECTORY = "shared"
+# Linux keeps DDS ports for domains 0-101 clear of the ephemeral port range.
+MAX_ROS_DOMAIN_ID = 101
 ALLOWED_REQUIREMENT_KEYS = {
     "architectures",
     "rosDistros",
     "gpu",
     "gpuArchitectures",
-    "requiredEnv",
 }
 ALLOWED_DATA_KEYS = {
     "name",
@@ -64,15 +90,19 @@ ALLOWED_DATA_KEYS = {
     "url",
     "sha256",
     "files",
-    "generatedFiles",
     "requiredFiles",
     "gpu",
+    "roles",
 }
-ALLOWED_DATA_FILE_KEYS = {"path", "url", "sha256"}
+ALLOWED_DATA_FILE_KEYS = {"path", "url", "source", "content", "sha256"}
 
 
 class OpenADKitError(Exception):
     """A user-facing failure."""
+
+
+class UsageError(OpenADKitError):
+    """A command line that cannot run as given; exits 2 like the parser's own errors."""
 
 
 def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -108,6 +138,15 @@ def require_string(value: Any, where: str, *, nonempty: bool = True) -> str:
     return value
 
 
+def require_url(value: Any, where: str) -> str:
+    url = require_string(value, where)
+    parsed = urllib.parse.urlsplit(url)
+    # file: serves a local mirror; anything else would fail only at fetch.
+    if parsed.scheme not in ("http", "https", "file") or (parsed.scheme != "file" and not parsed.netloc):
+        raise OpenADKitError(f"{where} must be an http, https or file URL: {url}")
+    return url
+
+
 def require_string_list(
     value: Any,
     where: str,
@@ -122,17 +161,6 @@ def require_string_list(
         raise OpenADKitError(f"{where} must not be empty")
     if len(value) != len(set(value)):
         raise OpenADKitError(f"{where} contains duplicate values")
-    return value
-
-
-def require_environment(value: Any, where: str) -> dict[str, str]:
-    if not isinstance(value, dict):
-        raise OpenADKitError(f"{where} must be an object")
-    if any(
-        not ENV_NAME_RE.fullmatch(name) or not isinstance(item, str)
-        for name, item in value.items()
-    ):
-        raise OpenADKitError(f"{where} must map environment names to strings")
     return value
 
 
@@ -163,263 +191,210 @@ def ensure_safe_existing(
     return current
 
 
-def parse_dotenv(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError as error:
-        raise OpenADKitError(f"could not read environment file {path}: {error}") from error
-    for number, raw in enumerate(lines, 1):
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" not in line:
-            raise OpenADKitError(f"invalid dotenv assignment at {path}:{number}")
-        name, value = line.split("=", 1)
-        name = name.strip()
-        value = value.strip()
-        if not ENV_NAME_RE.fullmatch(name):
-            raise OpenADKitError(f"invalid environment name at {path}:{number}: {name}")
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[name] = value
-    return values
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def expand_home(value: str) -> str:
-    home = os.environ.get("HOME")
-    if not home:
-        raise OpenADKitError("HOME is required")
-    if value in ("$HOME", "${HOME}"):
-        return home
-    if value.startswith("$HOME/"):
-        return str(Path(home) / value[6:])
-    if value.startswith("${HOME}/"):
-        return str(Path(home) / value[8:])
+def validate_data(data: Any, roles: dict[str, Any], directory: Path) -> list[dict[str, Any]]:
+    if not isinstance(data, list):
+        raise OpenADKitError("data must be an array")
+    names: set[str] = set()
+    destinations: set[str] = set()
+    for index, resource in enumerate(data):
+        where = f"data[{index}]"
+        if not isinstance(resource, dict):
+            raise OpenADKitError(f"{where} must be an object")
+        reject_unknown(resource, ALLOWED_DATA_KEYS, where)
+        resource_name = require_string(resource.get("name"), f"{where}.name")
+        # The name also names the staging directory of its download.
+        if not NAME_RE.fullmatch(resource_name):
+            raise OpenADKitError(f"invalid {where}.name: {resource_name}")
+        if resource_name in names:
+            raise OpenADKitError(f"duplicate data resource: {resource_name}")
+        names.add(resource_name)
+        if resource.get("kind") not in ("zip", "files"):
+            raise OpenADKitError(f"{where}.kind must be zip or files")
+        require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
+        if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
+            raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
+        if resource["destinationEnv"] in destinations:
+            raise OpenADKitError(
+                f"duplicate data destination environment: {resource['destinationEnv']}"
+            )
+        destinations.add(resource["destinationEnv"])
+        if "gpu" in resource and not isinstance(resource["gpu"], bool):
+            raise OpenADKitError(f"{where}.gpu must be a boolean")
+        if "roles" in resource:
+            resource["roles"] = require_string_list(
+                resource["roles"], f"{where}.roles", nonempty=True
+            )
+            unknown_roles = sorted(set(resource["roles"]) - set(roles))
+            if unknown_roles:
+                raise OpenADKitError(
+                    f"{where}.roles contains undeclared role(s): "
+                    + ", ".join(unknown_roles)
+                )
+        resource["requiredFiles"] = require_string_list(
+            resource.get("requiredFiles", []), f"{where}.requiredFiles"
+        )
+        for required in resource["requiredFiles"]:
+            safe_relative(required, f"{where}.requiredFiles")
+        if resource["kind"] == "zip":
+            require_url(resource.get("url"), f"{where}.url")
+            checksum = require_string(resource.get("sha256"), f"{where}.sha256")
+            if not SHA256_RE.fullmatch(checksum):
+                raise OpenADKitError(f"{where}.sha256 is invalid")
+            # The archive's single top-level directory, which data.py extracts.
+            expected_root = safe_relative(
+                require_string(resource.get("expectedRoot"), f"{where}.expectedRoot"),
+                f"{where}.expectedRoot",
+            )
+            if len(expected_root.parts) != 1:
+                raise OpenADKitError(f"{where}.expectedRoot must be one directory name")
+            if resource.get("files") not in (None, []):
+                raise OpenADKitError(f"{where}.files is invalid for zip data")
+            resource["files"] = []
+        else:
+            files = resource.get("files")
+            if not isinstance(files, list) or not files:
+                raise OpenADKitError(f"{where}.files must be a nonempty array")
+            seen_paths: set[str] = set()
+            for file_index, item in enumerate(files):
+                file_where = f"{where}.files[{file_index}]"
+                if not isinstance(item, dict):
+                    raise OpenADKitError(f"{file_where} must be an object")
+                reject_unknown(item, ALLOWED_DATA_FILE_KEYS, file_where)
+                relative = require_string(item.get("path"), f"{file_where}.path")
+                safe_relative(relative, f"{file_where}.path")
+                if relative in seen_paths:
+                    raise OpenADKitError(f"duplicate data file path: {relative}")
+                seen_paths.add(relative)
+                # A file to download (url), one the deployment ships (source,
+                # relative to its directory) or a short one written out as it
+                # is here (content). A checksum vouches for the first two.
+                if sum(key in item for key in ("url", "source", "content")) != 1:
+                    raise OpenADKitError(f"{file_where} needs exactly one of url, source and content")
+                if "content" in item:
+                    require_string(item["content"], f"{file_where}.content")
+                    if "sha256" in item:
+                        raise OpenADKitError(f"{file_where}.sha256 is invalid with content")
+                    continue
+                if "url" in item:
+                    require_url(item["url"], f"{file_where}.url")
+                else:
+                    item["sourcePath"] = ensure_safe_existing(
+                        directory, item["source"], f"{file_where}.source"
+                    )
+                checksum = require_string(item.get("sha256"), f"{file_where}.sha256")
+                if not SHA256_RE.fullmatch(checksum):
+                    raise OpenADKitError(f"{file_where}.sha256 is invalid")
+                # A shipped file is part of the deployment: check it with the
+                # manifest, so validate and release packaging catch a mismatch
+                # before any user fetches it.
+                if "sourcePath" in item and sha256_file(item["sourcePath"]) != checksum:
+                    raise OpenADKitError(
+                        f"{file_where}.source {item['source']} does not match its sha256"
+                    )
+    return data
+
+
+def compose_layout(directory: Path, wait_timeout: int, *, gpu: bool = True) -> dict[str, Any]:
+    """A deployment's Compose files, by name, and how long its services may
+    take to become ready."""
+    gpu_file = directory / GPU_COMPOSE_FILE
+    return {
+        "files": [ENTRY_COMPOSE_FILE],
+        "gpuFiles": [GPU_COMPOSE_FILE] if gpu and (gpu_file.exists() or gpu_file.is_symlink()) else [],
+        "waitTimeout": wait_timeout,
+    }
+
+
+def read_deployment_manifest(directory: Path, allowed_keys: set[str], name: str) -> dict[str, Any]:
+    """The part every deployment manifest shares. The name is the deployment's
+    key in openadkit.json, and its schemaVersion is that file's: neither repeats here."""
+    if directory.is_symlink() or not directory.is_dir():
+        raise OpenADKitError(f"unsafe deployment directory: {directory}")
+    manifest = load_json(
+        ensure_safe_existing(directory, "deployment.json", "deployment manifest")
+    )
+    reject_unknown(manifest, allowed_keys, "manifest")
+    require_string(manifest.get("description"), "description")
+    manifest["name"] = name
+    return manifest
+
+
+def validate_verify(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise OpenADKitError("verify must be an object")
+    reject_unknown(value, ALLOWED_VERIFY_KEYS, "verify")
+    verify: dict[str, Any] = {"service": require_string(value.get("service"), "verify.service")}
+    if "command" in value:
+        verify["command"] = require_string_list(value["command"], "verify.command", nonempty=True)
+    return verify
+
+
+def validate_wait_timeout(value: Any) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise OpenADKitError("waitTimeout must be a positive integer")
     return value
 
 
-def host_architecture() -> str:
-    machine = platform.machine().lower()
-    if machine in ("x86_64", "amd64"):
-        return "amd64"
-    if machine in ("aarch64", "arm64"):
-        return "arm64"
-    return machine
+def narrow_requirements(base: dict[str, Any], value: Any) -> dict[str, Any]:
+    """The requirements of a deployment on a base: the base's, or fewer.
 
-
-@dataclass(frozen=True)
-class DeploymentRef:
-    path: str
-    checksum: str | None
-
-
-@dataclass(frozen=True)
-class RuntimeContext:
-    kind: str
-    default_ros_distro: str
-    version: str | None
-    image_prefix_component: str | None
-    component_images: dict[str, str]
-    images: dict[str, dict[str, str]]
-    deployments: dict[str, DeploymentRef]
-    shared: dict[str, str]
-
-    def component_environment(
-        self, ros_distro: str, architecture: str, gpu: bool
-    ) -> dict[str, str]:
-        applicable = {
-            name: target
-            for name, target in self.component_images.items()
-            if gpu or name != GPU_COMPONENT_IMAGE
-        }
-        if self.kind == "repository":
-            assert self.image_prefix_component is not None
-            return {
-                name: (
-                    f"{self.image_prefix_component}:{target}-{architecture}-{ros_distro}"
-                )
-                for name, target in applicable.items()
-            }
-
-        distro_images = self.images.get(ros_distro)
-        if distro_images is None:
+    It runs the base's services, so it runs nowhere the base does not. It may
+    name fewer architectures or ROS distros, and settle the GPU mode the base
+    leaves optional: none or required.
+    """
+    if value is None:
+        return base
+    if not isinstance(value, dict):
+        raise OpenADKitError("requirements must be an object")
+    reject_unknown(value, ALLOWED_REQUIREMENT_KEYS, "requirements")
+    requirements = dict(base)
+    for field in ("architectures", "rosDistros", "gpuArchitectures"):
+        if field not in value:
+            continue
+        items = require_string_list(value[field], f"requirements.{field}", nonempty=True)
+        added = sorted(set(items) - set(base.get(field, base["architectures"])))
+        if added:
             raise OpenADKitError(
-                f"release has no component images for ROS distro {ros_distro}"
+                f"requirements.{field} adds {', '.join(added)}, which the base deployment does not support"
             )
-        missing = sorted(set(applicable.values()) - set(distro_images))
-        if missing:
-            raise OpenADKitError(
-                "release is missing component image target(s) for "
-                f"{ros_distro}: {', '.join(missing)}"
-            )
-        return {
-            name: distro_images[target]
-            for name, target in applicable.items()
-            if target in distro_images
-        }
-
-
-@dataclass(frozen=True)
-class Selection:
-    ros_distro: str
-    gpu: bool
-    services: tuple[str, ...]
-    injections: dict[str, str]
-    environment: dict[str, str]
-
-
-class Deployment:
-    def __init__(self, root: Path, directory: Path, manifest: dict[str, Any]) -> None:
-        self.root = root
-        self.directory = directory
-        self.manifest_path = directory / "deployment.json"
-        self.manifest = manifest
-        self.name: str = manifest["name"]
-        self.compose: dict[str, Any] = manifest["compose"]
-        self.requirements: dict[str, Any] = manifest["requirements"]
-        self.distro_environment: dict[str, dict[str, str]] = manifest["distroEnvironment"]
-        self.data: list[dict[str, Any]] = manifest["data"]
-        self.shared: list[str] = manifest["shared"]
-        self.project = f"openadkit-{self.name}"
-
-    @property
-    def env_files(self) -> list[Path]:
-        result = [
-            ensure_safe_existing(self.directory, "config.env", "environment file")
+        requirements[field] = items
+    gpu = value.get("gpu", base["gpu"])
+    if gpu not in ("none", "optional", "required"):
+        raise OpenADKitError("requirements.gpu must be none, optional, or required")
+    if gpu != base["gpu"] and base["gpu"] != "optional":
+        raise OpenADKitError(f"requirements.gpu cannot change the base deployment's {base['gpu']}")
+    requirements["gpu"] = gpu
+    if gpu == "none":
+        requirements.pop("gpuArchitectures", None)
+    elif "gpuArchitectures" in requirements:
+        requirements["gpuArchitectures"] = [
+            item for item in requirements["gpuArchitectures"] if item in requirements["architectures"]
         ]
-        for name in ("config.release.env", "config.local.env"):
-            candidate = self.directory / name
-            if candidate.exists() or candidate.is_symlink():
-                result.append(
-                    ensure_safe_existing(self.directory, name, "environment file")
-                )
-        return result
-
-    @property
-    def configuration_environment(self) -> dict[str, str]:
-        values: dict[str, str] = {}
-        for path in self.env_files:
-            values.update(parse_dotenv(path))
-        values.update(os.environ)
-        return values
-
-    def compose_files(self, gpu: bool) -> list[Path]:
-        names = list(self.compose["files"])
-        if gpu:
-            names.extend(self.compose["gpuFiles"])
-        return [
-            ensure_safe_existing(self.directory, name, "Compose file") for name in names
-        ]
-
-    def select(
-        self,
-        current_context: RuntimeContext,
-        ros_distro: str | None,
-        gpu: bool,
-        *,
-        operational: bool = False,
-        require_gpu: bool = True,
-    ) -> Selection:
-        distro = ros_distro or current_context.default_ros_distro
-        architecture = host_architecture()
-        if architecture not in self.requirements["architectures"]:
+        if not requirements["gpuArchitectures"]:
             raise OpenADKitError(
-                f"{self.name} does not support {architecture}; expected "
-                f"{', '.join(self.requirements['architectures'])}"
+                "requirements leave no architecture for the GPU mode; set requirements.gpu to none"
             )
-        if distro not in self.requirements["rosDistros"]:
-            raise OpenADKitError(
-                f"{self.name} does not support ROS distro {distro}; expected "
-                f"{', '.join(self.requirements['rosDistros'])}"
-            )
-
-        gpu_requirement = self.requirements["gpu"]
-        if not operational and require_gpu:
-            if gpu_requirement == "required" and not gpu:
-                raise OpenADKitError(f"{self.name} requires --gpu")
-            if gpu_requirement == "none" and gpu:
-                raise OpenADKitError(f"{self.name} does not provide a GPU mode")
-            if gpu and gpu_requirement == "optional" and not self.compose["gpuFiles"]:
-                raise OpenADKitError(
-                    f"{self.name} declares optional GPU but has no GPU Compose file"
-                )
-            gpu_architectures = self.requirements.get("gpuArchitectures")
-            if (
-                gpu
-                and gpu_architectures is not None
-                and architecture not in gpu_architectures
-            ):
-                raise OpenADKitError(
-                    f"{self.name} GPU mode does not support {architecture}; expected "
-                    f"{', '.join(gpu_architectures)}"
-                )
-
-        services = list(self.compose["services"])
-        required_environment = list(self.requirements["requiredEnv"])
-        environment = self.configuration_environment
-        injections: dict[str, str] = {"ROS_DISTRO": distro}
-        injections.update(self.distro_environment.get(distro, {}))
-        component_environment = current_context.component_environment(
-            distro, architecture, gpu
-        )
-        if current_context.kind == "repository":
-            injections.update(
-                {
-                    name: environment.get(name) or reference
-                    for name, reference in component_environment.items()
-                }
-            )
-        else:
-            injections.update(component_environment)
-        injections["ROS_DISTRO"] = distro
-
-        environment.update(injections)
-        missing_environment = [
-            name for name in required_environment if not environment.get(name)
-        ]
-        if missing_environment:
-            raise OpenADKitError(
-                "required environment variable(s) are missing: "
-                + ", ".join(missing_environment)
-            )
-
-        return Selection(
-            ros_distro=distro,
-            gpu=gpu,
-            services=tuple(services),
-            injections=injections,
-            environment=environment,
-        )
+    return requirements
 
 
-def validate_manifest(root: Path, directory: Path) -> Deployment:
-    if directory.is_symlink() or not directory.is_dir():
-        raise OpenADKitError(f"unsafe deployment directory: {directory}")
-    manifest_path = ensure_safe_existing(
-        directory, "deployment.json", "deployment manifest"
-    )
-    manifest = load_json(manifest_path)
-    reject_unknown(manifest, ALLOWED_DEPLOYMENT_KEYS, "manifest")
-    if manifest.get("schemaVersion") != 1:
-        raise OpenADKitError("unsupported deployment schemaVersion (expected 1)")
-    name = require_string(manifest.get("name"), "name")
-    if not NAME_RE.fullmatch(name) or name != directory.name:
-        raise OpenADKitError(
-            f"manifest name must match deployment directory: {directory.name}"
-        )
-    require_string(manifest.get("description"), "description")
+def validate_deployment_manifest(root: Path, directory: Path, name: str) -> dict[str, Any]:
+    """A base deployment.json, checked and with its defaults filled in."""
+    manifest = read_deployment_manifest(directory, ALLOWED_BASE_DEPLOYMENT_KEYS, name)
 
-    shared = require_string_list(manifest.get("shared", []), "shared")
-    for shared_name in shared:
-        if not NAME_RE.fullmatch(shared_name):
-            raise OpenADKitError(f"invalid shared deployment asset name: {shared_name}")
-        shared_directory = root / "deployments" / shared_name
-        if shared_directory.is_symlink() or not shared_directory.is_dir():
-            raise OpenADKitError(
-                f"missing or unsafe shared deployment assets: {shared_name}"
-            )
-    manifest["shared"] = shared
+    shared_directory = root / "deployments" / SHARED_DIRECTORY
+    if shared_directory.is_symlink():
+        raise OpenADKitError(f"unsafe shared deployment assets: {shared_directory}")
+    manifest["shared"] = [SHARED_DIRECTORY] if shared_directory.is_dir() else []
 
     requirements = manifest.get("requirements")
     if not isinstance(requirements, dict):
@@ -453,139 +428,72 @@ def validate_manifest(root: Path, directory: Path) -> Deployment:
                 "requirements.gpuArchitectures contains undeclared architectures: "
                 + ", ".join(unknown)
             )
-    requirements["requiredEnv"] = require_string_list(
-        requirements.get("requiredEnv", []), "requirements.requiredEnv"
-    )
-    invalid = [
-        item for item in requirements["requiredEnv"] if not ENV_NAME_RE.fullmatch(item)
-    ]
-    if invalid:
-        raise OpenADKitError(
-            "requirements.requiredEnv contains invalid environment names: "
-            + ", ".join(invalid)
-        )
     manifest["requirements"] = requirements
 
-    distro_environment = manifest.get("distroEnvironment", {})
-    if not isinstance(distro_environment, dict):
-        raise OpenADKitError("distroEnvironment must be an object")
-    unknown_distros = sorted(
-        set(distro_environment) - set(requirements["rosDistros"])
-    )
-    if unknown_distros:
-        raise OpenADKitError(
-            "distroEnvironment contains undeclared distros: "
-            + ", ".join(unknown_distros)
-        )
-    for distro, environment in distro_environment.items():
-        distro_environment[distro] = require_environment(
-            environment, f"distroEnvironment.{distro}"
-        )
-    manifest["distroEnvironment"] = distro_environment
+    manifest["compose"] = compose_layout(directory, validate_wait_timeout(manifest.get("waitTimeout", 300)))
 
-    compose = manifest.get("compose")
-    if not isinstance(compose, dict):
-        raise OpenADKitError("compose must be an object")
-    reject_unknown(compose, ALLOWED_COMPOSE_KEYS, "compose")
-    for field in ("files", "gpuFiles", "profiles", "services", "resetServices"):
-        compose[field] = require_string_list(compose.get(field, []), f"compose.{field}")
-    if not compose["files"]:
-        raise OpenADKitError("compose.files must not be empty")
-    if not compose["services"]:
-        raise OpenADKitError("compose.services must not be empty")
-    wait_timeout = compose.get("waitTimeout", 300)
-    if not isinstance(wait_timeout, int) or isinstance(wait_timeout, bool) or wait_timeout <= 0:
-        raise OpenADKitError("compose.waitTimeout must be a positive integer")
-    compose["waitTimeout"] = wait_timeout
-    manifest["compose"] = compose
-
-    data = manifest.get("data", [])
-    if not isinstance(data, list):
-        raise OpenADKitError("data must be an array")
-    names: set[str] = set()
-    for index, resource in enumerate(data):
-        where = f"data[{index}]"
-        if not isinstance(resource, dict):
+    roles = manifest.get("roles", {})
+    if not isinstance(roles, dict):
+        raise OpenADKitError("roles must be an object")
+    domain_ids: set[int] = set()
+    for role_name, role in roles.items():
+        where = f"roles.{role_name}"
+        if not NAME_RE.fullmatch(role_name):
+            raise OpenADKitError(f"invalid role name: {role_name}")
+        if not isinstance(role, dict):
             raise OpenADKitError(f"{where} must be an object")
-        reject_unknown(resource, ALLOWED_DATA_KEYS, where)
-        resource_name = require_string(resource.get("name"), f"{where}.name")
-        if resource_name in names:
-            raise OpenADKitError(f"duplicate data resource: {resource_name}")
-        names.add(resource_name)
-        if resource.get("kind") not in ("zip", "files"):
-            raise OpenADKitError(f"{where}.kind must be zip or files")
-        require_string(resource.get("destinationEnv"), f"{where}.destinationEnv")
-        if not ENV_NAME_RE.fullmatch(resource["destinationEnv"]):
-            raise OpenADKitError(f"{where}.destinationEnv must be an environment name")
-        if "gpu" in resource and not isinstance(resource["gpu"], bool):
-            raise OpenADKitError(f"{where}.gpu must be a boolean")
-        resource["requiredFiles"] = require_string_list(
-            resource.get("requiredFiles", []), f"{where}.requiredFiles"
+        reject_unknown(role, ALLOWED_ROLE_KEYS, where)
+        role["files"] = require_string_list(role.get("files"), f"{where}.files", nonempty=True)
+        role["requiredEnv"] = require_string_list(
+            role.get("requiredEnv", []), f"{where}.requiredEnv"
         )
-        for required in resource["requiredFiles"]:
-            safe_relative(required, f"{where}.requiredFiles")
-        generated = resource.get("generatedFiles", {})
-        if not isinstance(generated, dict) or any(
-            not isinstance(value, str) for value in generated.values()
-        ):
-            raise OpenADKitError(f"{where}.generatedFiles must map paths to strings")
-        for relative in generated:
-            safe_relative(relative, f"{where}.generatedFiles")
-        resource["generatedFiles"] = generated
-        if resource["kind"] == "zip":
-            require_string(resource.get("url"), f"{where}.url")
-            checksum = require_string(resource.get("sha256"), f"{where}.sha256")
-            if not SHA256_RE.fullmatch(checksum):
-                raise OpenADKitError(f"{where}.sha256 is invalid")
-            safe_relative(
-                require_string(resource.get("expectedRoot"), f"{where}.expectedRoot"),
-                f"{where}.expectedRoot",
+        invalid_role_env = [
+            item for item in role["requiredEnv"] if not ENV_NAME_RE.fullmatch(item)
+        ]
+        if invalid_role_env:
+            raise OpenADKitError(
+                f"{where}.requiredEnv contains invalid environment names: "
+                + ", ".join(invalid_role_env)
             )
-            if resource.get("files") not in (None, []):
-                raise OpenADKitError(f"{where}.files is invalid for zip data")
-            resource["files"] = []
-        else:
-            files = resource.get("files")
-            if not isinstance(files, list) or not files:
-                raise OpenADKitError(f"{where}.files must be a nonempty array")
-            seen_paths: set[str] = set()
-            for file_index, item in enumerate(files):
-                file_where = f"{where}.files[{file_index}]"
-                if not isinstance(item, dict):
-                    raise OpenADKitError(f"{file_where} must be an object")
-                reject_unknown(item, ALLOWED_DATA_FILE_KEYS, file_where)
-                relative = require_string(item.get("path"), f"{file_where}.path")
-                safe_relative(relative, f"{file_where}.path")
-                if relative in seen_paths:
-                    raise OpenADKitError(f"duplicate data file path: {relative}")
-                seen_paths.add(relative)
-                require_string(item.get("url"), f"{file_where}.url")
-                checksum = require_string(item.get("sha256"), f"{file_where}.sha256")
-                if not SHA256_RE.fullmatch(checksum):
-                    raise OpenADKitError(f"{file_where}.sha256 is invalid")
+        domain_id = role.get("rosDomainId")
+        if (
+            not isinstance(domain_id, int)
+            or isinstance(domain_id, bool)
+            or not 0 <= domain_id <= MAX_ROS_DOMAIN_ID
+        ):
+            raise OpenADKitError(
+                f"{where}.rosDomainId must be an integer from 0 to {MAX_ROS_DOMAIN_ID}"
+            )
+        if domain_id in domain_ids:
+            raise OpenADKitError(f"{where}.rosDomainId {domain_id} is used by another role")
+        domain_ids.add(domain_id)
+        for file_name in role["files"]:
+            ensure_safe_existing(directory, file_name, "Compose file")
+    manifest["roles"] = roles
+
+    evidence = manifest.get("evidence", {})
+    if not isinstance(evidence, dict):
+        raise OpenADKitError("evidence must be an object")
+    reject_unknown(evidence, {"exempt"}, "evidence")
+    if "exempt" in evidence:
+        require_string(evidence["exempt"], "evidence.exempt")
+    manifest["evidence"] = evidence
+    manifest["verify"] = validate_verify(manifest.get("verify"))
+
+    data = validate_data(manifest.get("data", []), roles, directory)
     manifest["data"] = data
-
-    deployment = Deployment(root, directory, manifest)
-    deployment.compose_files(False)
-    if compose["gpuFiles"]:
-        deployment.compose_files(True)
-    deployment.env_files
-    return deployment
+    return manifest
 
 
-def root_path() -> Path:
-    raw = os.environ.get("OPENADKIT_ROOT")
-    if not raw:
-        raise OpenADKitError(
-            "OPENADKIT_ROOT is not set; invoke the root ./openadkit entrypoint"
-        )
-    root = Path(raw)
-    if root.is_symlink() or not root.is_dir():
-        raise OpenADKitError(f"unsafe Open AD Kit root: {root}")
-    return root.resolve()
+@dataclass(frozen=True)
+class DeploymentRef:
+    path: str
+    checksum: str | None
+    # A kit only: the deployment's entry in the kit's manifest.
+    entry: dict[str, Any] | None = None
 
 
-def _parse_component_images(value: Any) -> dict[str, str]:
+def parse_component_images(value: Any) -> dict[str, str]:
     if not isinstance(value, dict) or not value:
         raise OpenADKitError("componentImages must be a nonempty object")
     images: dict[str, str] = {}
@@ -600,7 +508,7 @@ def _parse_component_images(value: Any) -> dict[str, str]:
     return images
 
 
-def _parse_deployment_refs(value: Any, kind: str) -> dict[str, DeploymentRef]:
+def parse_deployment_refs(value: Any, kind: str) -> dict[str, DeploymentRef]:
     if not isinstance(value, dict) or not value:
         raise OpenADKitError("deployments must be a nonempty object")
     refs: dict[str, DeploymentRef] = {}
@@ -609,6 +517,14 @@ def _parse_deployment_refs(value: Any, kind: str) -> dict[str, DeploymentRef]:
             raise OpenADKitError(f"invalid deployment name: {name}")
         if not isinstance(entry, dict):
             raise OpenADKitError(f"deployments.{name} must be an object")
+        if kind == "kit":
+            # The entry is the deployment's manifest; its files go by name.
+            reject_unknown(entry, ALLOWED_KIT_DEPLOYMENT_KEYS, f"deployments.{name}")
+            require_string(entry.get("base"), f"deployments.{name}.base")
+            refs[name] = DeploymentRef(
+                path=f"{KIT_DEPLOYMENTS_DIRECTORY}/{name}", checksum=None, entry=dict(entry, name=name)
+            )
+            continue
         reject_unknown(entry, ALLOWED_DEPLOYMENT_REF_KEYS, f"deployments.{name}")
         path = require_string(entry.get("path"), f"deployments.{name}.path")
         safe_relative(path, f"deployments.{name}.path")
@@ -618,12 +534,61 @@ def _parse_deployment_refs(value: Any, kind: str) -> dict[str, DeploymentRef]:
             if not SHA256_RE.fullmatch(checksum):
                 raise OpenADKitError(f"deployments.{name}.checksum is invalid")
         elif checksum is not None:
-            raise OpenADKitError("repository deployments must not declare checksums")
+            raise OpenADKitError("a source checkout's deployments must not declare checksums")
         refs[name] = DeploymentRef(path=path, checksum=checksum)
     return refs
 
 
-def _require_checksum_map(value: Any, where: str) -> dict[str, str]:
+def parse_external_images(value: Any, component_images: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Images we pin but do not build: one ref, or one ref per ROS distro."""
+    if not isinstance(value, dict):
+        raise OpenADKitError("externalImages must be an object")
+    for name, image in value.items():
+        where = f"externalImages.{name}"
+        if not ENV_NAME_RE.fullmatch(name):
+            raise OpenADKitError(f"invalid external image name: {name}")
+        if name in component_images:
+            raise OpenADKitError(f"{where} is already a component image")
+        if not isinstance(image, dict):
+            raise OpenADKitError(f"{where} must be an object")
+        reject_unknown(image, ALLOWED_EXTERNAL_IMAGE_KEYS, where)
+        if ("ref" in image) == ("distros" in image):
+            raise OpenADKitError(f"{where} needs exactly one of ref or distros")
+        # `ref` serves every distro; `distros` names each one.
+        references = (
+            {"*": image["ref"]} if "ref" in image else image["distros"]
+        )
+        if not isinstance(references, dict) or not references:
+            raise OpenADKitError(f"{where}.distros must be a nonempty object")
+        for distro, reference in references.items():
+            if "ref" not in image and not NAME_RE.fullmatch(distro):
+                raise OpenADKitError(f"invalid ROS distro in {where}: {distro}")
+            if not isinstance(reference, str) or not IMAGE_REFERENCE_RE.fullmatch(reference):
+                raise OpenADKitError(f"{where} must use digest-pinned image references")
+    return value
+
+
+def parse_autoware(value: Any, kind: str) -> dict[str, str] | None:
+    if value is None:
+        if kind == "release":
+            raise OpenADKitError("release bundles must declare autoware")
+        return None
+    if kind != "release":
+        raise OpenADKitError("a source checkout's openadkit.json must not declare autoware")
+    if not isinstance(value, dict):
+        raise OpenADKitError("autoware must be an object")
+    reject_unknown(value, {"version", "ref", "lockSha256", "backports"}, "autoware")
+    for field in ("version", "ref", "lockSha256"):
+        require_string(value.get(field), f"autoware.{field}")
+    backports = value.get("backports", [])
+    if not isinstance(backports, list) or any(
+        not isinstance(item, dict) or not isinstance(item.get("upstream"), str) for item in backports
+    ):
+        raise OpenADKitError("autoware.backports must list fixes with their upstream URL")
+    return value
+
+
+def require_checksum_map(value: Any, where: str) -> dict[str, str]:
     if not isinstance(value, dict) or any(
         not isinstance(name, str)
         or not isinstance(checksum, str)
@@ -632,140 +597,3 @@ def _require_checksum_map(value: Any, where: str) -> dict[str, str]:
     ):
         raise OpenADKitError(f"{where} must map names to SHA-256 checksums")
     return value
-
-
-def load_kit(root: Path) -> RuntimeContext:
-    value = load_json(ensure_safe_existing(root, "openadkit.json", "bundle manifest"))
-    reject_unknown(value, ALLOWED_KIT_KEYS, "bundle")
-    if value.get("schemaVersion") != 1 or value.get("kind") not in (
-        "repository",
-        "release",
-    ):
-        raise OpenADKitError("invalid Open AD Kit bundle manifest")
-    default_ros_distro = require_string(
-        value.get("defaultRosDistro", "humble"), "defaultRosDistro"
-    )
-    kind = value["kind"]
-    component_images = _parse_component_images(value.get("componentImages"))
-    prefix: str | None = None
-    images: dict[str, dict[str, str]] = {}
-    if kind == "repository":
-        prefix = require_string(
-            value.get("imagePrefixComponent"), "imagePrefixComponent"
-        )
-        if "images" in value:
-            raise OpenADKitError("repository bundles must not declare release images")
-    else:
-        if "imagePrefixComponent" in value:
-            raise OpenADKitError("release bundles must not declare imagePrefixComponent")
-        raw_images = value.get("images")
-        if not isinstance(raw_images, dict):
-            raise OpenADKitError("images must be an object")
-        for distro, distro_images in raw_images.items():
-            if not isinstance(distro, str) or not NAME_RE.fullmatch(distro):
-                raise OpenADKitError(f"invalid ROS distro in images: {distro}")
-            if not isinstance(distro_images, dict) or any(
-                not isinstance(target, str)
-                or not target
-                or not isinstance(reference, str)
-                or not IMAGE_REFERENCE_RE.fullmatch(reference)
-                for target, reference in distro_images.items()
-            ):
-                raise OpenADKitError(
-                    f"images.{distro} must map targets to digest-pinned image references"
-                )
-            images[distro] = distro_images
-    version = value.get("version")
-    if version is not None:
-        version = require_string(version, "version")
-    elif kind == "release":
-        raise OpenADKitError("release bundles must declare version")
-    return RuntimeContext(
-        kind=kind,
-        default_ros_distro=default_ros_distro,
-        version=version,
-        image_prefix_component=prefix,
-        component_images=component_images,
-        images=images,
-        deployments=_parse_deployment_refs(value.get("deployments"), kind),
-        shared=_require_checksum_map(value.get("shared", {}), "shared"),
-    )
-
-
-def available_deployments(kit: RuntimeContext) -> str:
-    return ", ".join(kit.deployments)
-
-
-def get_deployment(root: Path, kit: RuntimeContext, name: str) -> Deployment:
-    available = available_deployments(kit)
-    if not NAME_RE.fullmatch(name):
-        raise OpenADKitError(
-            f"invalid deployment name: {name}\navailable: {available}"
-        )
-    try:
-        reference = kit.deployments[name]
-    except KeyError as error:
-        raise OpenADKitError(
-            f"unknown deployment: {name}\navailable: {available}"
-        ) from error
-    directory = root.joinpath(*safe_relative(reference.path, "deployment path").parts)
-    deployment = validate_manifest(root, directory)
-    if deployment.name != name:
-        raise OpenADKitError(
-            f"deployment {name} path does not match manifest name {deployment.name}"
-        )
-    return deployment
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def deployment_checksum(directory: Path) -> str:
-    digest = hashlib.sha256()
-    for candidate in sorted(
-        directory.rglob("*"),
-        key=lambda path: path.relative_to(directory).as_posix(),
-    ):
-        relative = candidate.relative_to(directory)
-        if (
-            relative.name == "config.local.env"
-            or "__pycache__" in relative.parts
-            or relative.suffix == ".pyc"
-            or relative.parts[0] in {".cache", "output"}
-        ):
-            continue
-        if candidate.is_symlink():
-            digest.update(
-                f"000 symlink:{os.readlink(candidate)}  {relative.as_posix()}\n".encode()
-            )
-            continue
-        if not candidate.is_file():
-            continue
-        mode = "755" if os.access(candidate, os.X_OK) else "644"
-        digest.update(
-            f"{mode} {sha256_file(candidate)}  {relative.as_posix()}\n".encode()
-        )
-    return digest.hexdigest()
-
-
-def deployment_integrity(
-    root: Path,
-    deployment: Deployment,
-    kit: RuntimeContext,
-) -> str:
-    if kit.kind != "release":
-        return "source"
-    expected = kit.deployments[deployment.name].checksum
-    if expected != deployment_checksum(deployment.directory):
-        return "modified"
-    if not all(
-        kit.shared.get(name) == deployment_checksum(root / "deployments" / name)
-        for name in deployment.shared
-    ):
-        return "modified"
-    return "intact"

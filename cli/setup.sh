@@ -2,52 +2,14 @@
 set -euo pipefail
 
 INSTALL_GPU=false
-RUN_VERIFY=false
+RUN_CHECK=true
 TARGET_USER=${SUDO_USER:-$(id -un)}
 FORCE_DOCKER_INSTALL=${OPENADKIT_CI_FORCE_DOCKER_INSTALL:-false}
 DOCKER_GROUP_ADDED=false
 
 log() { printf '[openadkit] %s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
-
-if [[ ${1:-} != setup ]]; then
-  fail "setup helper must be invoked through openadkit setup"
-fi
-shift
-while (($#)); do
-  case "$1" in
-    --gpu) INSTALL_GPU=true ;;
-    --verify) RUN_VERIFY=true ;;
-    -h|--help)
-      cat <<'EOF'
-Usage: openadkit setup [--gpu] [--verify]
-
-Installs the Ubuntu host dependencies needed to run Open AD Kit.
-EOF
-      exit 0
-      ;;
-    *) fail "unknown setup option: $1" ;;
-  esac
-  shift
-done
-
-if [[ $EUID -eq 0 ]]; then
-  fail "run openadkit setup as your normal user; it requests sudo when needed"
-fi
-if [[ $FORCE_DOCKER_INSTALL == true && ${CI:-false} != true ]]; then
-  fail "OPENADKIT_CI_FORCE_DOCKER_INSTALL is restricted to disposable CI hosts"
-fi
-[[ -r /etc/os-release ]] || fail "only Ubuntu hosts are supported"
-# shellcheck disable=SC1091
-source /etc/os-release
-[[ ${ID:-} == ubuntu ]] || fail "unsupported OS: ${ID:-unknown}; expected Ubuntu"
-case "$(uname -m)" in
-  x86_64|amd64|aarch64|arm64) ;;
-  *) fail "unsupported architecture: $(uname -m)" ;;
-esac
-
-RUNTIME_PACKAGES=(ca-certificates curl git gzip python3 python3-venv tar unzip)
-MISSING_PACKAGES=()
+usage_fail() { printf 'error: %s\n' "$*" >&2; exit 2; }
 
 compose_capable() {
   local temporary
@@ -80,7 +42,6 @@ user_in_docker_group() {
 docker_stack_ready() {
   [[ $FORCE_DOCKER_INSTALL != true ]] \
     && command -v docker >/dev/null 2>&1 \
-    && docker buildx version >/dev/null 2>&1 \
     && compose_capable
 }
 
@@ -113,7 +74,11 @@ docker_run() {
 
 install_docker() {
   if docker_stack_ready; then
-    log "Docker, Buildx, and Compose are already available"
+    log "Docker and Compose are already available"
+    if ! docker info >/dev/null 2>&1 && ! sudo docker info >/dev/null 2>&1; then
+      log "starting the Docker daemon"
+      sudo systemctl enable --now docker
+    fi
   else
     log "installing Docker from the official Ubuntu repository"
     sudo apt-get update
@@ -132,7 +97,11 @@ install_docker() {
 }
 
 nvidia_gl_libraries_present() {
-  ldconfig -p 2>/dev/null | grep -q 'libGLX_nvidia\.so'
+  # No pipe: under pipefail, grep -q's early exit can fail ldconfig with
+  # SIGPIPE and report a present library as missing.
+  local libraries
+  libraries="$(ldconfig -p 2>/dev/null || true)"
+  grep -q 'libGLX_nvidia\.so' <<<"${libraries}"
 }
 
 apt_package_has_candidate() {
@@ -161,15 +130,12 @@ install_nvidia_gl_libraries() {
     log "NVIDIA OpenGL/Vulkan libraries are already installed"
     return 0
   fi
-  if ! command -v nvidia-smi >/dev/null 2>&1; then
-    log "nvidia-smi not found; skipping NVIDIA OpenGL/Vulkan libraries"
-    return 0
-  fi
 
   local driver_version driver_branch pkg compute_pkg compute_ver gl_ver dep dep_ver
   local -a install_pkgs
 
-  driver_version="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | tr -d '[:space:]')"
+  driver_version="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | awk 'NR == 1')"
+  driver_version="${driver_version//[[:space:]]/}"
   driver_branch="${driver_version%%.*}"
   pkg="libnvidia-gl-${driver_branch}"
   compute_pkg="libnvidia-compute-${driver_branch}"
@@ -198,9 +164,11 @@ install_nvidia_gl_libraries() {
 }
 
 install_gpu() {
-  sudo apt-get install -y --no-install-recommends gnupg
   if ! command -v nvidia-ctk >/dev/null 2>&1; then
     log "installing NVIDIA Container Toolkit"
+    # gnupg dearmors the repository key; refresh the lists it installs from.
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends gnupg
     local key list
     key=$(mktemp)
     list=$(mktemp)
@@ -216,14 +184,16 @@ install_gpu() {
     sudo apt-get update
     sudo apt-get install -y nvidia-container-toolkit
   fi
-  if ! sudo docker info --format '{{json .Runtimes}}' | grep -q '"nvidia"'; then
+  local runtimes
+  runtimes="$(sudo docker info --format '{{json .Runtimes}}' || true)"
+  if ! grep -q '"nvidia"' <<<"${runtimes}"; then
     local config=/etc/docker/daemon.json backup=
     if sudo test -f "$config"; then
       backup=$(mktemp)
       sudo cp -a "$config" "$backup"
     fi
     if ! sudo nvidia-ctk runtime configure --runtime=docker \
-      || ! sudo python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$config" \
+      || ! sudo python3 -I -c 'import json,sys; json.load(open(sys.argv[1]))' "$config" \
       || ! sudo systemctl restart docker; then
       if [[ -n $backup ]]; then
         sudo cp -a "$backup" "$config"
@@ -239,34 +209,105 @@ install_gpu() {
   install_nvidia_gl_libraries
 }
 
-configure_dds_buffers() {
-  local config temporary
-  config=/etc/sysctl.d/99-openadkit-dds.conf
-  temporary=$(mktemp)
-  trap 'rm -f "$temporary"; trap - RETURN' RETURN
-  cat >"$temporary" <<'EOF'
-# Open AD Kit CycloneDDS buffers for high-bandwidth sensor data.
+DDS_SYSCTL=/etc/sysctl.d/99-openadkit-dds.conf
+
+# Every deployment moves point clouds between containers over DDS, GPU or not.
+# deployments/shared/cyclonedds.xml asks for the buffer sizes it needs; these
+# only raise the caps on what a socket may ask for, so sockets that ask for
+# nothing keep the kernel defaults.
+dds_buffer_settings() {
+  cat <<'EOF'
+# Open AD Kit: let CycloneDDS request large UDP buffers for sensor data.
 net.core.rmem_max=2147483647
 net.core.wmem_max=2147483647
-net.core.rmem_default=134217728
-net.core.wmem_default=134217728
 EOF
-  if ! sudo test -f "$config" || ! sudo cmp --silent "$temporary" "$config"; then
-    log "configuring kernel UDP buffers for DDS"
-    sudo install -m 0644 "$temporary" "$config"
-    sudo sysctl --system >/dev/null
-  fi
 }
 
+dds_buffers_configured() {
+  [[ -f $DDS_SYSCTL ]] && cmp --silent <(dds_buffer_settings) "$DDS_SYSCTL"
+}
+
+configure_dds_buffers() {
+  local temporary
+  if dds_buffers_configured; then
+    log "kernel UDP buffer limits for DDS are already configured"
+    return 0
+  fi
+  temporary=$(mktemp)
+  trap 'rm -f "$temporary"; trap - RETURN' RETURN
+  dds_buffer_settings >"$temporary"
+  log "configuring kernel UDP buffer limits for DDS"
+  sudo install -m 0644 "$temporary" "$DDS_SYSCTL"
+  sudo sysctl --system >/dev/null
+}
+
+
+main() {
+if [[ ${1:-} != setup ]]; then
+  usage_fail "setup helper must be invoked through openadkit setup"
+fi
+shift
+while (($#)); do
+  case "$1" in
+    --gpu) INSTALL_GPU=true ;;
+    --no-check) RUN_CHECK=false ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: openadkit setup [--gpu] [--no-check]
+
+Installs the Ubuntu host dependencies needed to run Open AD Kit, raises the
+kernel's UDP buffer limits for DDS, and runs a test container to confirm that
+Docker works.
+
+  --gpu        also install the NVIDIA Container Toolkit, and test the GPU
+  --no-check   skip the test containers, for a host that cannot pull them
+EOF
+      exit 0
+      ;;
+    *) usage_fail "unknown setup option: $1" ;;
+  esac
+  shift
+done
+
+if [[ $EUID -eq 0 ]]; then
+  fail "run openadkit setup as your normal user; it requests sudo when needed"
+fi
+if [[ $FORCE_DOCKER_INSTALL == true && ${CI:-false} != true ]]; then
+  fail "OPENADKIT_CI_FORCE_DOCKER_INSTALL is restricted to disposable CI hosts"
+fi
+[[ -r /etc/os-release ]] || fail "only Ubuntu hosts are supported"
+# shellcheck disable=SC1091
+source /etc/os-release
+[[ ${ID:-} == ubuntu ]] || fail "unsupported OS: ${ID:-unknown}; expected Ubuntu"
+case "$(uname -m)" in
+  x86_64|amd64|aarch64|arm64) ;;
+  *) fail "unsupported architecture: $(uname -m)" ;;
+esac
+# The toolkit and the OpenGL libraries follow the host's driver.
+if [[ $INSTALL_GPU == true ]] && ! nvidia-smi >/dev/null 2>&1; then
+  fail "nvidia-smi failed; install the NVIDIA driver first (and reboot), then rerun openadkit setup --gpu"
+fi
+
+RUNTIME_PACKAGES=(ca-certificates curl git gzip python3 tar)
+MISSING_PACKAGES=()
+
+# Deployments override services they include, which Compose rejects before
+# 5.0 ("conflicts with imported resource"). Probe that instead of a version.
 collect_missing_packages
+# Docker CE conflicts with the distribution's docker.io and containerd; never
+# replace an engine the host already runs.
+if [[ $FORCE_DOCKER_INSTALL != true ]] && command -v docker >/dev/null 2>&1 && ! compose_capable; then
+  fail "Docker is installed but Docker Compose 5.0 or newer is missing; install Docker's docker-compose-plugin (https://docs.docker.com/compose/install/linux/) and rerun setup"
+fi
 need_sudo=false
 if ((${#MISSING_PACKAGES[@]} > 0)) || ! docker_stack_ready || ! user_in_docker_group; then
   need_sudo=true
 fi
-if [[ $INSTALL_GPU == true ]]; then
+if [[ $INSTALL_GPU == true ]] || ! dds_buffers_configured; then
   need_sudo=true
 fi
-if [[ $RUN_VERIFY == true ]] && ! docker info >/dev/null 2>&1; then
+# A stopped daemon, or one this user cannot reach yet, is checked with sudo.
+if ! docker info >/dev/null 2>&1; then
   need_sudo=true
 fi
 if [[ $need_sudo == true ]]; then
@@ -281,16 +322,16 @@ else
   log "runtime packages are already installed"
 fi
 install_docker
+configure_dds_buffers
 
 if [[ $INSTALL_GPU == true ]]; then
   install_gpu
-  configure_dds_buffers
 fi
 
-if [[ $RUN_VERIFY == true ]]; then
+if [[ $RUN_CHECK == true ]]; then
+  log "checking Docker with a test container (--no-check skips this)"
   docker_run run --rm hello-world >/dev/null
   if [[ $INSTALL_GPU == true ]]; then
-    command -v nvidia-smi >/dev/null 2>&1 || fail "nvidia-smi is unavailable"
     nvidia_gl_libraries_present || fail "NVIDIA OpenGL/Vulkan libraries are missing"
     docker_run run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi >/dev/null
   fi
@@ -302,4 +343,10 @@ if [[ $DOCKER_GROUP_ADDED == true ]]; then
   log "run 'newgrp docker' to start a shell with the new membership, then run Open AD Kit"
 elif ! docker info >/dev/null 2>&1; then
   log "log out and back in, or run 'newgrp docker', to activate Docker group membership"
+fi
+}
+
+# Sourceable for tests: only a direct run sets up the host.
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
 fi

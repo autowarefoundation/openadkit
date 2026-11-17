@@ -1,0 +1,168 @@
+# syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom,UndefinedVar
+ARG UNIVERSE_COMMON_DEVEL_IMAGE
+ARG UNIVERSE_COMMON_IMAGE
+ARG BASE_CUDA_DEVEL_IMAGE
+ARG BASE_CUDA_RUNTIME_IMAGE
+
+# =============================================================================
+# Build stage: planning-cuda-devel
+# =============================================================================
+FROM ${BASE_CUDA_DEVEL_IMAGE} AS planning-cuda-devel
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+ARG COLCON_BASE_PATHS
+
+USER root
+# Install ROS packages from the snapshot the upstream images were built from;
+# fails when ROS_SNAPSHOT does not match them (components/shared/ros-snapshot).
+ARG ROS_SNAPSHOT
+LABEL org.autoware.openadkit.ros-snapshot="${ROS_SNAPSHOT}"
+RUN --mount=type=bind,source=components/shared/ros-snapshot,target=/tmp/ros-snapshot \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    bash /tmp/ros-snapshot/ros-snapshot.sh "${ROS_SNAPSHOT}" --check
+
+# Compile through ccache like the CPU images: base-cuda-devel names no compiler
+# launcher, so the ccache mount below stayed empty. nvcc objects are not cached.
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ccache
+ENV CC=/usr/lib/ccache/gcc CXX=/usr/lib/ccache/g++ CCACHE_DIR=/home/aw/.ccache
+
+COPY --from=universe-common-devel /opt/autoware /opt/autoware
+RUN chown -R ${USERNAME}:${USERNAME} /opt/autoware
+
+# autoware_path_optimizer and autoware_trajectory_modifier require acados and
+# generate solver code with its venv at build time; universe-common-devel has
+# it (components/universe-common).
+COPY --from=universe-common-devel /opt/acados /opt/acados
+ENV CMAKE_PREFIX_PATH="/opt/acados${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+ENV ACADOS_SOURCE_DIR="/opt/acados"
+ENV LD_LIBRARY_PATH="/opt/acados/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+COPY --parents --chown=${USERNAME}:${USERNAME} \
+    autoware/src/**/package.xml \
+    /tmp/
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
+      --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --dependency-types=build --dependency-types=build_export \
+      --dependency-types=buildtool --dependency-types=buildtool_export \
+      --dependency-types=test
+
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' ${COLCON_BASE_PATHS} > /opt/openadkit/colcon-base-paths && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths ${COLCON_BASE_PATHS} \
+      --install-base /opt/autoware \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf build log
+
+# autoware_tensorrt_plugins needs spconv, which Autoware does not install on
+# Ubuntu 24.04 (Jazzy) until it has a CUDA 13 build, so there the package
+# installs nothing. The Diffusion Planner's parameters still resolve its share
+# path, and its models use no plugin: register the package without the library.
+# Drop this once the pinned Autoware release fixes it
+# (https://github.com/autowarefoundation/autoware_universe/issues/13604).
+RUN pkg=autoware_tensorrt_plugins && pkg_prefix="/opt/autoware/${pkg}" && \
+    if [ ! -e "${pkg_prefix}/share/ament_index/resource_index/packages/${pkg}" ]; then \
+      install -d "${pkg_prefix}/share/ament_index/resource_index/packages" "${pkg_prefix}/share/${pkg}" && \
+      touch "${pkg_prefix}/share/ament_index/resource_index/packages/${pkg}" && \
+      printf '%s\n' "source;share/${pkg}/local_setup.dsv" > "${pkg_prefix}/share/${pkg}/package.dsv" && \
+      printf '%s\n' 'prepend-non-duplicate;AMENT_PREFIX_PATH;' > "${pkg_prefix}/share/${pkg}/local_setup.dsv"; \
+    fi
+
+# This image's launch and config packages, in their own layer after the
+# compile (components/shared/launch-packages.sh).
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/shared/launch-packages.sh,target=/tmp/launch-packages.sh \
+    bash /tmp/launch-packages.sh autoware_planning_launch autoware_planning_config
+
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    rosdep install -y --from-paths /tmp/autoware/src /opt/autoware/*/share \
+      --ignore-src --rosdistro "${ROS_DISTRO}" \
+      --dependency-types=exec && \
+    rm -rf /tmp/autoware
+
+# =============================================================================
+# Runtime stage: planning-cuda
+# =============================================================================
+FROM ${BASE_CUDA_RUNTIME_IMAGE} AS planning-cuda
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG ROS_DISTRO
+
+USER root
+# Leave out what only a compiler reads, as universe-common does.
+COPY components/shared/dpkg-runtime.cfg /etc/dpkg/dpkg.cfg.d/openadkit-runtime
+# Install ROS packages from the same snapshot as the devel stage; fails when
+# the base image's ROS packages differ from it.
+ARG ROS_SNAPSHOT
+LABEL org.autoware.openadkit.ros-snapshot="${ROS_SNAPSHOT}"
+RUN --mount=type=bind,source=components/shared/ros-snapshot,target=/tmp/ros-snapshot \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    bash /tmp/ros-snapshot/ros-snapshot.sh "${ROS_SNAPSHOT}" --check
+
+# Of acados, the compiled tree only links its shared libraries, as in
+# universe-common.
+RUN --mount=from=planning-cuda-devel,source=/opt/acados/lib,target=/mnt/acados-lib \
+    --mount=from=planning-cuda-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/shared/install-packages.sh,target=/tmp/install-packages.sh \
+    --mount=type=bind,source=components/shared/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    mkdir -p /opt/acados && \
+    cp -a /mnt/acados-lib /opt/acados/lib && \
+    bash /tmp/install-packages.sh /mnt/autoware /opt/autoware && \
+    bash /tmp/runtime-cleanup.sh opt
+
+ENV LD_LIBRARY_PATH="/opt/acados/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# autoware_planning_launch starts demo_nodes_cpp's parameter_blackboard with the
+# Diffusion Planner (learning_based_planning/diffusion_planner.launch.xml)
+# without declaring it, so rosdep does not install it. Drop the explicit package
+# once the pinned Autoware release declares it
+# (https://github.com/autowarefoundation/autoware_launch/pull/2015).
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/shared/runtime-deps.sh,target=/tmp/runtime-deps.sh \
+    --mount=type=bind,source=components/shared/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    bash /tmp/runtime-deps.sh /tmp/autoware/src && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      "ros-${ROS_DISTRO}-demo-nodes-cpp" && \
+    bash /tmp/runtime-cleanup.sh
+
+# Apply Ubuntu's updates the pinned upstream base image lags on
+# (components/shared/security-refresh.sh). A per-build SECURITY_REFRESH change
+# only re-runs this layer and the check after it, not the rosdep layer above.
+ARG SECURITY_REFRESH=0
+RUN --mount=type=bind,source=components/shared/security-refresh.sh,target=/tmp/security-refresh.sh \
+    --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    echo "openadkit security refresh ${SECURITY_REFRESH}" && \
+    bash /tmp/security-refresh.sh
+
+# Fail when a compiled binary cannot load its libraries in this image, after
+# the refresh (components/shared/check-linked-libs.sh).
+RUN --mount=type=bind,source=components/shared/check-linked-libs.sh,target=/tmp/check-linked-libs.sh \
+    bash /tmp/check-linked-libs.sh
+
+# On every start: run as the host user, source ROS and Autoware, and layer the
+# kit's config overrides and overlay workspace on top (components/shared/entrypoint).
+COPY components/shared/entrypoint/entrypoint.sh components/shared/entrypoint/overlay.py /opt/openadkit/
+COPY components/shared/entrypoint/health/ /opt/openadkit/health/
+ENTRYPOINT ["/opt/openadkit/entrypoint.sh"]
+CMD ["/bin/bash"]

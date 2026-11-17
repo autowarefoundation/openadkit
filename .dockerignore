@@ -1,0 +1,6 @@
+# vcs import leaves a .git in every Autoware repository under autoware/src, and
+# its index differs on each clone. The builds bind-mount autoware/src, so with
+# .git in the context every build would recompile unchanged sources.
+**/.git
+# Bytecode that local test runs leave next to the files the images copy.
+**/__pycache__

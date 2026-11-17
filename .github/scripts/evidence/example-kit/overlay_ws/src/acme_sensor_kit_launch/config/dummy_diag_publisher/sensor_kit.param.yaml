@@ -1,0 +1,5 @@
+# The sensor diagnostics that the dummy diag publisher reports in simulation.
+/**:
+  ros__parameters:
+    required_diags:
+      dummy_diag_empty: default

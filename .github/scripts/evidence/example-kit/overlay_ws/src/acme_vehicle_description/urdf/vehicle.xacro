@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:property name="vehicle_info" value="${xacro.load_yaml('$(find acme_vehicle_description)/config/vehicle_info.param.yaml')}"/>
+  <xacro:property name="p" value="${vehicle_info['/**']['ros__parameters']}"/>
+
+  <!-- The vehicle body as a box; a real vehicle has its mesh here. -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="${(p['wheel_base'] + p['front_overhang'] - p['rear_overhang']) / 2.0} 0 ${p['vehicle_height'] / 2.0}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${p['wheel_base'] + p['front_overhang'] + p['rear_overhang']} ${p['wheel_tread'] + p['left_overhang'] + p['right_overhang']} ${p['vehicle_height']}"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>

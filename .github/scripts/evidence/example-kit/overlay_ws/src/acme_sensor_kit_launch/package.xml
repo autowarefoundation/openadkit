@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>acme_sensor_kit_launch</name>
+  <version>0.1.0</version>
+  <description>The integrator's sensor kit launch files and diagnostics configuration</description>
+  <maintainer email="dev@example.com">Open AD Kit example</maintainer>
+  <license>Apache License 2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

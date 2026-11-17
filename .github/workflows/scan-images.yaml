@@ -1,9 +1,11 @@
 permissions:
   contents: read
 
-# Full image scan workflow for an existing build-all-images run.
-# It runs automatically only when the build requested scanning, or manually for
-# any build_tag. A successful scan metadata artifact makes a build promotable.
+# Full image scan of a build-all-images run: after every successful build of
+# main, by dispatch from a maintenance branch's build on that branch, weekly for
+# main's latest build so new vulnerabilities surface without a rebuild, or by
+# dispatch for any build_tag.
+# A successful scan metadata artifact makes a build promotable.
 
 name: scan-images
 
@@ -11,6 +13,9 @@ on:
   workflow_run:
     workflows: [build-all-images]
     types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       build_tag:
@@ -18,7 +23,7 @@ on:
         required: true
 
 concurrency:
-  group: scan-images-${{ github.event_name == 'workflow_dispatch' && inputs.build_tag || format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) }}
+  group: scan-images-${{ github.event_name == 'workflow_dispatch' && inputs.build_tag || github.event_name == 'workflow_run' && format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) || github.run_id }}
   cancel-in-progress: false
 
 env:
@@ -36,8 +41,14 @@ jobs:
       build_tag: ${{ steps.prepare.outputs.build_tag }}
       policy_sha: ${{ steps.prepare.outputs.policy_sha }}
       matrix: ${{ steps.prepare.outputs.matrix }}
-      should_scan: ${{ steps.prepare.outputs.should_scan }}
     steps:
+      - name: Check out trusted metadata policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          sparse-checkout: .github/scripts/images.py
+          sparse-checkout-cone-mode: false
+
       - name: Resolve build metadata
         id: prepare
         env:
@@ -46,10 +57,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
-            run_id="${{ github.event.workflow_run.id }}"
-            run_attempt="${{ github.event.workflow_run.run_attempt }}"
-            build_tag="${run_id}-${run_attempt}"
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ]; then
+            run_id=$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow build-all-images.yaml --branch main \
+              --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "${run_id}" ] || { echo "main has no successful build to scan" >&2; exit 1; }
+          fi
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+            run_id="${run_id:-${{ github.event.workflow_run.id }}}"
+            # "Re-run failed jobs" keeps the first attempt's tag; read it from
+            # the newest metadata artifact instead of this attempt's number.
+            build_tag=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.expired | not) | .name | select(startswith("build-metadata-")) | ltrimstr("build-metadata-")' \
+              | sort -V | tail -n 1)
+            [ -n "${build_tag}" ] || { echo "Build run ${run_id} has no build metadata artifact" >&2; exit 1; }
           else
             build_tag="${DISPATCH_BUILD_TAG}"
             if ! printf '%s\n' "${build_tag}" | grep -Eq '^[0-9]+-[0-9]+$'; then
@@ -65,41 +85,24 @@ jobs:
             --name "build-metadata-${build_tag}" \
             --dir build-metadata
 
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
-            should_scan=$(jq -r '.scan_requested' build-metadata/build-metadata.json)
-          else
-            should_scan=true
-          fi
           policy_sha=$(jq -r '.openadkit_sha' build-metadata/build-metadata.json)
           if ! printf '%s\n' "${policy_sha}" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "Invalid OpenADKit SHA in build metadata: ${policy_sha}" >&2
+            echo "Invalid Open AD Kit SHA in build metadata: ${policy_sha}" >&2
             exit 1
           fi
 
-          matrix=$(
-            jq -c '{include: [.images[] as $image | $image.platforms[] | {
-              repo: $image.repo,
-              target: $image.target,
-              ros_distro: $image.ros_distro,
-              digest: $image.digest,
-              image_ref: ($image.repo + "@" + $image.digest),
-              platform: .,
-              platform_label: (gsub("/"; "-"))
-            }]}' build-metadata/build-metadata.json
-          )
+          matrix=$(python3 .github/scripts/images.py scan-matrix build-metadata/build-metadata.json)
 
           {
             echo "build_tag=${build_tag}"
             echo "policy_sha=${policy_sha}"
-            echo "should_scan=${should_scan}"
             echo "matrix=${matrix}"
           } >> "$GITHUB_OUTPUT"
         shell: bash
 
   scan:
     needs: prepare
-    if: needs.prepare.outputs.should_scan == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -110,8 +113,8 @@ jobs:
       max-parallel: 6
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.policy_sha }}
           sparse-checkout: .trivyignore
@@ -119,7 +122,7 @@ jobs:
           fetch-depth: 1
 
       - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -138,7 +141,7 @@ jobs:
           exit-code: '1'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          scanners: vuln
+          scanners: vuln,secret
           timeout: 15m
           trivyignores: .trivyignore
           limit-severities-for-sarif: true
@@ -156,7 +159,7 @@ jobs:
           exit-code: '1'
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          scanners: vuln
+          scanners: vuln,secret
           timeout: 15m
           trivyignores: .trivyignore
           limit-severities-for-sarif: true
@@ -167,63 +170,37 @@ jobs:
 
       - name: Upload scan results to GitHub Security
         if: ${{ always() && hashFiles(format('trivy-{0}-{1}-{2}.sarif', matrix.target, matrix.ros_distro, matrix.platform_label)) != '' }}
-        uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: trivy-${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}.sarif
           category: ${{ matrix.target }}-${{ matrix.ros_distro }}-${{ matrix.platform_label }}
 
   publish-metadata:
     needs: [prepare, scan]
-    if: always() && needs.prepare.outputs.should_scan == 'true'
+    if: always() && needs.prepare.result == 'success'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
+      - name: Check out trusted metadata policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          sparse-checkout: .github/scripts/images.py
+          sparse-checkout-cone-mode: false
+
       - name: Write scan metadata
         env:
           BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
           POLICY_SHA: ${{ needs.prepare.outputs.policy_sha }}
           SCAN_RESULT: ${{ needs.scan.result }}
           SCAN_MATRIX: ${{ needs.prepare.outputs.matrix }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p scan-metadata
-          status="failed"
-          if [ "${SCAN_RESULT}" = "success" ]; then
-            status="passed"
-          fi
-
-          jq -n \
-            --arg build_tag "${BUILD_TAG}" \
-            --arg policy_sha "${POLICY_SHA}" \
-            --arg scan_status "${status}" \
-            --arg scan_result "${SCAN_RESULT}" \
-            --arg run_id "${GITHUB_RUN_ID}" \
-            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
-            --argjson scan_matrix "${SCAN_MATRIX}" \
-            '{
-              build_tag: $build_tag,
-              policy_sha: $policy_sha,
-              scan_scope: "all",
-              scan_status: $scan_status,
-              scan_result: $scan_result,
-              run_id: $run_id,
-              run_attempt: $run_attempt,
-              scanned_images: ($scan_matrix.include | map({
-                repo,
-                target,
-                ros_distro,
-                digest,
-                platform,
-                image_ref
-              }))
-            }' > scan-metadata/scan-metadata.json
+        run: python3 .github/scripts/images.py scan-report
         shell: bash
 
       - name: Upload scan metadata
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: scan-metadata-${{ needs.prepare.outputs.build_tag }}
           path: scan-metadata/scan-metadata.json
@@ -232,3 +209,26 @@ jobs:
       - name: Fail if full scan failed
         if: needs.scan.result != 'success'
         run: exit 1
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, scan, publish-metadata]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Weekly image scan failed (${new Date().toISOString().split('T')[0]})`,
+              body: [
+                '**The weekly scan of main\'s latest build failed.**',
+                '',
+                `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n'),
+            })

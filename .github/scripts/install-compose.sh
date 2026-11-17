@@ -14,12 +14,15 @@ mkdir -p ~/.docker/cli-plugins
 # Use GITHUB_TOKEN if available to avoid GitHub API rate limiting.
 token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
+# GitHub's download service has outages of up to a minute; ride them out.
+retry=(--retry 5 --retry-delay 15)
+
 # Pin the Compose version for reproducible builds. Override COMPOSE_VERSION to
 # bump deliberately, or set it to "latest" to resolve the newest release. The
 # per-release SHA-256 checksum is still verified below regardless of the source.
 compose_version="${COMPOSE_VERSION:-v5.3.1}"
 if [ "${compose_version}" = "latest" ]; then
-  latest_tag=$(curl -fsSL --retry 3 --retry-delay 1 \
+  latest_tag=$(curl -fsSL "${retry[@]}" \
     ${token:+-H "Authorization: token ${token}"} \
     https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name')
 else
@@ -38,9 +41,9 @@ base_url="https://github.com/docker/compose/releases/download/${latest_tag}"
 bin_name="docker-compose-linux-${compose_arch}"
 bin_path="${HOME}/.docker/cli-plugins/docker-compose"
 
-curl -fsSL --retry 3 --retry-delay 1 \
+curl -fsSL "${retry[@]}" \
   "${base_url}/${bin_name}" -o "${bin_path}"
-curl -fsSL --retry 3 --retry-delay 1 \
+curl -fsSL "${retry[@]}" \
   "${base_url}/${bin_name}.sha256" -o "${bin_path}.sha256"
 
 # Verify checksum: extract expected hash and compare.

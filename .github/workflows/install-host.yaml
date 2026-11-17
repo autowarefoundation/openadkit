@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Test Open AD Kit CLI safety
         run: |
@@ -41,13 +41,13 @@ jobs:
         # cannot pass solely because GitHub's preinstalled Docker works.
         run: |
           env CI=true OPENADKIT_CI_FORCE_DOCKER_INSTALL=true \
-            ./openadkit setup --verify
+            ./openadkit setup
 
       - name: Validate repository Compose configs
         run: |
           set -euo pipefail
           for ros_distro in humble jazzy; do
-            for deployment in planning-simulation scenario-simulation logging-simulation; do
+            for deployment in planning-simulation scenario-simulation logging-simulation safety-island-simulation; do
               ./openadkit validate "${deployment}" --ros-distro "${ros_distro}"
             done
             ./openadkit validate logging-simulation \

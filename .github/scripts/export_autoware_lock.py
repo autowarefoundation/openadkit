@@ -8,7 +8,6 @@ import sys
 
 import yaml
 
-
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
@@ -42,8 +41,7 @@ def resolve(url, version):
 
 
 def export_lock(source, target):
-    data = yaml.safe_load(source.read_text())
-    repos = data.get("repositories", {})
+    repos = yaml.safe_load(source.read_text()).get("repositories", {})
     target.parent.mkdir(parents=True, exist_ok=True)
 
     with target.open("w") as out:

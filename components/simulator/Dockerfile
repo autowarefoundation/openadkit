@@ -27,10 +27,8 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    . /opt/autoware/setup.sh && \
-    colcon build \
-      --base-paths \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_simulator_launch \
         /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/carla_sensor_kit_launch/carla_sensor_kit_description \
@@ -60,9 +58,22 @@ RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
         /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \
         /tmp/autoware/src/universe/autoware_universe/system/autoware_dummy_infrastructure \
+      > /opt/openadkit/colcon-base-paths && \
+    colcon_base_paths=$(tr '\n' ' ' < /opt/openadkit/colcon-base-paths) && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths ${colcon_base_paths} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
+
+# This image's launch and config packages, in their own layer after the
+# compile (components/shared/launch-packages.sh).
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/shared/launch-packages.sh,target=/tmp/launch-packages.sh \
+    bash /tmp/launch-packages.sh autoware_perception_launch autoware_perception_config \
+      autoware_localization_launch autoware_localization_config
 
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
@@ -81,20 +92,38 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
+# Install the packages this image adds to universe-common, and only those
+# (install-packages.sh).
 RUN --mount=from=simulator-devel,source=/opt/autoware,target=/mnt/autoware \
-    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
-    cp -a /mnt/autoware/. /opt/autoware/ && \
-    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
-    bash /tmp/runtime-cleanup.sh opt
+    --mount=type=bind,source=components/shared/install-packages.sh,target=/tmp/install-packages.sh \
+    bash /tmp/install-packages.sh /mnt/autoware /opt/autoware
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
-    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=bind,source=components/shared/runtime-deps.sh,target=/tmp/runtime-deps.sh \
+    --mount=type=bind,source=components/shared/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
-    apt-get update && \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
-    rosdep install -y --from-paths /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
-      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-deps.sh /tmp/autoware/src && \
     bash /tmp/runtime-cleanup.sh
+
+# The CARLA bridge (autoware_carla_interface, built above) needs the CARLA
+# Python client and two ROS tools. CARLA publishes its client for x86_64 only,
+# and carla-simulation runs only on amd64, so arm64 images go without it.
+ARG TARGETARCH
+ARG CARLA_PYTHON_VERSION=0.9.16
+RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    if [ "${TARGETARCH}" = amd64 ]; then \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        python3-pip \
+        "ros-${ROS_DISTRO}-compressed-image-transport" \
+        "ros-${ROS_DISTRO}-topic-tools" && \
+      PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install --no-cache-dir \
+        "carla==${CARLA_PYTHON_VERSION}" transforms3d; \
+    fi
+
+# Fail when a compiled binary cannot load its libraries in this image
+# (components/shared/check-linked-libs.sh).
+RUN --mount=type=bind,source=components/shared/check-linked-libs.sh,target=/tmp/check-linked-libs.sh \
+    bash /tmp/check-linked-libs.sh

@@ -4,9 +4,9 @@ ARG UNIVERSE_COMMON_DEVEL_IMAGE
 ARG UNIVERSE_COMMON_IMAGE
 
 # =============================================================================
-# Build stage: planning-control-devel
+# Build stage: control-devel
 # =============================================================================
-FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS planning-control-devel
+FROM ${UNIVERSE_COMMON_DEVEL_IMAGE} AS control-devel
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
@@ -27,26 +27,28 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    . /opt/autoware/setup.sh && \
-    colcon build \
-      --base-paths \
-        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_control_launch \
-        /tmp/autoware/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' \
         /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/universe/autoware_universe/control \
-        /tmp/autoware/src/universe/autoware_universe/planning \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pcl_extensions \
-        /tmp/autoware/src/universe/autoware_universe/sensing/autoware_pointcloud_preprocessor \
-        /tmp/autoware/src/*/*/*/autoware_cuda_utils \
-        /tmp/autoware/src/*/*/*/autoware_tensorrt_common \
-        /tmp/autoware/src/universe/autoware_universe/perception/autoware_tensorrt_plugins \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_external_cmd_converter \
         /tmp/autoware/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter \
         /tmp/autoware/src/universe/autoware_universe/system/autoware_command_mode_types \
+      > /opt/openadkit/colcon-base-paths && \
+    colcon_base_paths=$(tr '\n' ' ' < /opt/openadkit/colcon-base-paths) && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths ${colcon_base_paths} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
+
+# This image's launch and config packages, in their own layer after the
+# compile (components/shared/launch-packages.sh).
+RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
+    --mount=type=bind,source=components/shared/launch-packages.sh,target=/tmp/launch-packages.sh \
+    bash /tmp/launch-packages.sh autoware_control_launch autoware_control_config
 
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
@@ -58,27 +60,28 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
     rm -rf /tmp/autoware
 
 # =============================================================================
-# Runtime stage: planning-control
+# Runtime stage: control
 # =============================================================================
-FROM ${UNIVERSE_COMMON_IMAGE} AS planning-control
+FROM ${UNIVERSE_COMMON_IMAGE} AS control
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
-RUN --mount=from=planning-control-devel,source=/opt/autoware,target=/mnt/autoware \
-    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
-    cp -a /mnt/autoware/. /opt/autoware/ && \
-    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
-    bash /tmp/runtime-cleanup.sh opt
+# Install the packages this image adds to universe-common, and only those
+# (install-packages.sh).
+RUN --mount=from=control-devel,source=/opt/autoware,target=/mnt/autoware \
+    --mount=type=bind,source=components/shared/install-packages.sh,target=/tmp/install-packages.sh \
+    bash /tmp/install-packages.sh /mnt/autoware /opt/autoware
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
-    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=bind,source=components/shared/runtime-deps.sh,target=/tmp/runtime-deps.sh \
+    --mount=type=bind,source=components/shared/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
-    apt-get update && \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
-    rosdep install -y --from-paths /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
-      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-deps.sh /tmp/autoware/src && \
     bash /tmp/runtime-cleanup.sh
+
+# Fail when a compiled binary cannot load its libraries in this image
+# (components/shared/check-linked-libs.sh).
+RUN --mount=type=bind,source=components/shared/check-linked-libs.sh,target=/tmp/check-linked-libs.sh \
+    bash /tmp/check-linked-libs.sh

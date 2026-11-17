@@ -27,14 +27,19 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
     --mount=type=cache,id=ccache-${ROS_DISTRO},target=/home/aw/.ccache,uid=1000,gid=1000 \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    . /opt/autoware/setup.sh && \
-    colcon build \
-      --base-paths \
+    mkdir -p /opt/openadkit && \
+    printf '%s\n' \
         /tmp/autoware/src/universe/autoware_universe/visualization \
+        /tmp/autoware/src/universe/autoware_universe/simulator/tier4_dummy_object_rviz_plugin \
         /tmp/autoware/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description \
         /tmp/autoware/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description \
         /tmp/autoware/src/sensor_component/external/sensor_component_description/velodyne_description \
+      > /opt/openadkit/colcon-base-paths && \
+    colcon_base_paths=$(tr '\n' ' ' < /opt/openadkit/colcon-base-paths) && \
+    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
+    . /opt/autoware/setup.sh && \
+    colcon build \
+      --base-paths ${colcon_base_paths} \
       --install-base /opt/autoware \
       --cmake-args -DCMAKE_BUILD_TYPE=Release && \
     rm -rf build log
@@ -56,32 +61,27 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG ROS_DISTRO
 
 USER root
+# Install this image's packages, the RViz plugins the other images leave out
+# included (install-packages.sh).
 RUN --mount=from=visualizer-devel,source=/opt/autoware,target=/mnt/autoware \
-    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
-    cp -a /mnt/autoware/. /opt/autoware/ && \
-    find /opt/autoware -name '*.so' -exec strip --strip-unneeded {} + && \
-    bash /tmp/runtime-cleanup.sh opt
+    --mount=type=bind,source=components/shared/install-packages.sh,target=/tmp/install-packages.sh \
+    bash /tmp/install-packages.sh --with-visualization /mnt/autoware /opt/autoware
 
 RUN --mount=type=bind,source=autoware/src,target=/tmp/autoware/src \
-    --mount=type=bind,source=components/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
+    --mount=type=bind,source=components/shared/runtime-deps.sh,target=/tmp/runtime-deps.sh \
+    --mount=type=bind,source=components/shared/runtime-cleanup.sh,target=/tmp/runtime-cleanup.sh \
     --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
-    apt-get update && \
-    . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    internal_packages="$(colcon list --base-paths /tmp/autoware/src --names-only | tr '\n' ' ')" && \
-    rosdep install -y --from-paths /opt/autoware/*/share \
-      --dependency-types=exec --ignore-src --rosdistro "${ROS_DISTRO}" \
-      --skip-keys "${internal_packages}" && \
+    bash /tmp/runtime-deps.sh --with-visualization /tmp/autoware/src && \
     bash /tmp/runtime-cleanup.sh
 
-# Install VNC / NoVNC / Openbox stack and simulation tooling.
+# Install the VNC / noVNC / Openbox stack.
 USER root
 RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-${ROS_DISTRO},target=/var/lib/apt/lists,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
-      unzip \
       openssl \
       openbox \
       tigervnc-standalone-server \
@@ -89,11 +89,7 @@ RUN --mount=type=cache,id=apt-cache-${ROS_DISTRO},target=/var/cache/apt,sharing=
       tigervnc-tools \
       novnc \
       websockify \
-      python3-numpy \
-      python3-xdg \
-      pipx && \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install yamale && \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install xmlschema && \
+      python3-numpy && \
     VIRTUALGL_VERSION=3.1.2 && \
     arch="$(dpkg --print-architecture)" && \
     case "${arch}" in \
@@ -125,10 +121,32 @@ COPY --chown=aw:aw components/visualizer/etc/xstartup /home/aw/.vnc/xstartup
 COPY components/visualizer/etc/visualizer_entrypoint.sh /usr/local/bin/visualizer_entrypoint.sh
 RUN chmod +x /usr/local/bin/visualizer_entrypoint.sh /home/aw/.vnc/xstartup
 
+# Open AD Kit's look for noVNC: a stylesheet after noVNC's own, the Autoware
+# Foundation logo and symbol, favicons and the page title
+# (components/visualizer/novnc/README.md). noVNC's code is unchanged. The
+# patterns match noVNC 1.0 (humble, Ubuntu 22.04) and 1.3 (jazzy, 24.04).
+COPY components/visualizer/novnc/ /usr/share/novnc/app/openadkit/
+RUN sed -i \
+      -e 's|<title>noVNC</title>|<title>Open AD Kit \&middot; RViz</title>|' \
+      -e 's|\(<link rel="stylesheet" href="app/styles/base.css"[^>]*>\)|\1\n    <link rel="stylesheet" href="app/openadkit/openadkit.css">|' \
+      -e 's|app/images/icons/novnc-\([0-9]*x[0-9]*\)\.png|app/openadkit/icons/openadkit-\1.png|g' \
+      -e '/novnc-icon\.svg/d' \
+      /usr/share/novnc/vnc.html && \
+    rm /usr/share/novnc/app/openadkit/README.md && \
+    grep -q 'app/openadkit/openadkit.css' /usr/share/novnc/vnc.html && \
+    grep -q '<title>Open AD Kit' /usr/share/novnc/vnc.html && \
+    ! grep -q 'icons/novnc-' /usr/share/novnc/vnc.html
+
+# Fail when a compiled binary cannot load its libraries in this image
+# (components/shared/check-linked-libs.sh).
+RUN --mount=type=bind,source=components/shared/check-linked-libs.sh,target=/tmp/check-linked-libs.sh \
+    bash /tmp/check-linked-libs.sh
+
 # In remote mode, report unhealthy if noVNC (6080) or VNC (5999) stops accepting
 # connections. Local mode has no endpoints; PID 1 exits if its command fails.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD bash -c 'if [ "${REMOTE_DISPLAY:-true}" = false ]; then exit 0; fi; exec 3<>/dev/tcp/127.0.0.1/6080 && exec 4<>/dev/tcp/127.0.0.1/5999'
+    CMD ["bash", "-c", "if [ \"${REMOTE_DISPLAY:-true}\" = false ]; then exit 0; fi; exec 3<>/dev/tcp/127.0.0.1/6080 && exec 4<>/dev/tcp/127.0.0.1/5999"]
 
-USER aw
-ENTRYPOINT ["/usr/local/bin/visualizer_entrypoint.sh"]
+# universe-common's entrypoint runs first: it switches to the host user and
+# applies the config overrides and the overlay workspace (components/shared/entrypoint).
+ENTRYPOINT ["/opt/openadkit/entrypoint.sh", "/usr/local/bin/visualizer_entrypoint.sh"]

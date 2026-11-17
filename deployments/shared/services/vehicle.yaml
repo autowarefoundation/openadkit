@@ -1,0 +1,17 @@
+# Vehicle — bridges vehicle commands to the vehicle or simulator.
+services:
+  vehicle:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-vehicle
+    pid: service:map
+    command: >
+      ros2 launch tier4_vehicle_launch vehicle.launch.xml
+      launch_vehicle_interface:=${LAUNCH_VEHICLE_INTERFACE}
+      raw_vehicle_cmd_converter_param_path:=/tmp/openadkit/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_id:=${VEHICLE_ID}
+      vehicle_model:=${VEHICLE_MODEL}

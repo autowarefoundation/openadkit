@@ -1,0 +1,23 @@
+# Perception — object, traffic light, and drivable space recognition.
+# Variant flags (GPU models, CARLA extras) come from settings.env / settings.gpu.env.
+# Its point cloud nodes run in a container of its own, not in sensing's, so
+# either service restarts without the other.
+services:
+  perception:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-perception
+    pid: service:map
+    volumes:
+      - ${DATA_PATH}:/autoware_data:rw
+    command: >
+      ros2 launch autoware_launch component_perception.launch.xml
+      data_path:=/autoware_data
+      launch_pointcloud_container:=true
+      lidar_detection_model:=${LIDAR_DETECTION_MODEL}
+      occupancy_grid_map_method:=${OCCUPANCY_GRID_MAP_METHOD}
+      pointcloud_container_name:=perception_pointcloud_container
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}

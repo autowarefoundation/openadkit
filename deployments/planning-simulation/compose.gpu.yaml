@@ -1,0 +1,17 @@
+# GPU mode of planning simulation: Autoware 2.0's Diffusion Planner plans
+# instead of the rule-based planner, on the CUDA planning image. Control and
+# the rest of the stack stay the same. Planner settings come from settings.gpu.env.
+services:
+  planning:
+    image: ${PLANNING_GPU_IMAGE:?set by the openadkit CLI}
+    # The CLI installs the model here. The planner builds its TensorRT engine
+    # next to it on the first start, so the mount is writable.
+    volumes:
+      - ${DIFFUSION_PLANNER_DATA_PATH}:/autoware_data/ml_models/diffusion_planner/v5.0:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

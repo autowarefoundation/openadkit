@@ -1,8 +1,0 @@
-nav:
-  - index.md
-  - Planning Simulation: planning-simulation
-  - Scenario Simulation: scenario-simulation
-  - Logging Simulation: logging-simulation
-  - CARLA Simulation: carla-simulation
-  - Zenoh Bridge: zenoh-bridge
-  - Custom Deployment: custom-deployment.md

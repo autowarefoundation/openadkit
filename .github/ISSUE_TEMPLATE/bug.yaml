@@ -23,13 +23,9 @@ body:
   - type: textarea
     attributes:
       label: Versions
-      description: Provide the version information. You can omit this if you believe it's irrelevant.
-      placeholder: |-
-        - OS:
-        - ROS 2:
-        - Autoware:
+      description: Paste the output of `openadkit version --json`, and name your OS.
     validations:
-      required: false
+      required: true
 
   - type: textarea
     attributes:

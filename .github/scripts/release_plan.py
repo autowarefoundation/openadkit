@@ -4,26 +4,31 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
-from pathlib import Path
+import os
 import re
-import sys
+import shutil
+from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, NoReturn
 
+import autoware_patches
+import validation_matrix
+from images import build_images, image_ref
 
-CARLA_INTERFACE_ENV = "CARLA_INTERFACE_IMAGE"
-CARLA_INTERFACE_TARGET = "carla-interface"
+_IDENTIFIER = r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+# Strict SemVer release tag; must agree with the launcher (test_release_versions.py).
 SEMVER_RE = re.compile(
     r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+    rf"(?:-{_IDENTIFIER}(?:\.{_IDENTIFIER})*)?$"
 )
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+UPSTREAM_REPOSITORY = "autowarefoundation/openadkit"
+REPOSITORY_RE = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+ROS_SNAPSHOT_RE = re.compile(r'variable "ROS_SNAPSHOT_([A-Z]+)" \{\s*default = "(\d{4}-\d{2}-\d{2})"\s*\}')
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise ValueError(message)
 
 
@@ -38,19 +43,7 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def load_runtime(source_root: Path) -> ModuleType:
-    module_path = source_root / "cli/manifest.py"
-    if not module_path.is_file():
-        fail(f"could not load runtime manifest module: {module_path}")
-    spec = importlib.util.spec_from_file_location("openadkit_release_manifest", module_path)
-    if spec is None or spec.loader is None:
-        fail(f"could not load runtime manifest module: {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    try:
-        spec.loader.exec_module(module)
-    except (OSError, ImportError) as error:
-        fail(f"could not load runtime manifest module: {module_path}: {error}")
-    return module
+    return validation_matrix.load_runtime(source_root)
 
 
 def require_string(value: Any, name: str) -> str:
@@ -60,59 +53,69 @@ def require_string(value: Any, name: str) -> str:
 
 
 def load_product(runtime: ModuleType, source_root: Path) -> dict[str, Any]:
-    kit = runtime.load_kit(source_root)
-    if not kit.deployments:
-        fail("release source has no deployments")
-
-    deployments: dict[str, dict[str, str]] = {}
-    shared_names: set[str] = set()
-    distros: set[str] = set()
-    validation: list[dict[str, Any]] = []
-    for name in sorted(kit.deployments):
-        deployment = runtime.get_deployment(source_root, kit, name)
-        deployments[name] = {
-            "path": kit.deployments[name].path,
-            "checksum": runtime.deployment_checksum(deployment.directory),
-        }
-        shared_names.update(deployment.shared)
-        gpu = deployment.requirements["gpu"]
-        for distro in deployment.requirements["rosDistros"]:
-            distros.add(distro)
-            if gpu in ("none", "optional"):
-                validation.append(
-                    {"deployment": name, "gpu": False, "rosDistro": distro}
-                )
-            if gpu in ("required", "optional"):
-                validation.append(
-                    {"deployment": name, "gpu": True, "rosDistro": distro}
-                )
-
-    if not distros:
-        fail("release deployments do not declare any ROS distros")
-    if not validation:
-        fail("release deployments do not produce any validation cases")
-    if not shared_names:
+    catalog = runtime.load_catalog(source_root)
+    validation = validation_matrix.validation_cells(runtime, source_root, catalog)
+    inventory = validation_matrix.catalog_inventory(runtime, source_root, catalog)
+    if not inventory["shared"]:
         fail("release deployments do not declare shared assets")
-    for name in sorted(shared_names):
-        shared_dir = source_root / "deployments" / name
-        if not shared_dir.is_dir():
-            fail(f"missing shared deployment assets: {name}")
-
-    validation.sort(key=lambda row: (row["deployment"], row["rosDistro"], row["gpu"]))
     return {
-        "kit": kit,
-        "deployments": deployments,
-        "distros": sorted(distros),
-        "shared": {
-            name: runtime.deployment_checksum(source_root / "deployments" / name)
-            for name in sorted(shared_names)
-        },
+        "catalog": catalog,
+        **inventory,
+        "distros": sorted({row["rosDistro"] for row in validation}),
         "validation": validation,
+        "evidenceExempt": validation_matrix.evidence_exemptions(runtime, source_root, catalog),
     }
 
 
-def verify_staged_bundle(source_root: Path, plan: dict[str, Any]) -> None:
-    runtime = load_runtime(source_root)
+def stage_bundle(
+    source_root: Path, plan: dict[str, Any], bundle_root: Path, *, include_example_kits: bool
+) -> None:
+    """Copy the planned kit into bundle_root, verify it and pin its release context.
+
+    Release packaging and evidence staging both stage through here, so the
+    evidence cells run the tree the release ships; evidence adds only the
+    example kits, made by the staged CLI's own `openadkit new`.
+    """
+    if bundle_root.exists():
+        fail(f"bundle root already exists: {bundle_root}")
+    items = [
+        *plan["bundle"]["runtime"],
+        *(meta["path"] for meta in plan["releaseContext"]["deployments"].values()),
+        *(f"deployments/{name}" for name in plan["bundle"]["shared"]),
+    ]
+    scrubbed = ["__pycache__", "*.pyc"]
+    for item in items:
+        source, target = source_root / item, bundle_root / item
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.is_dir() and not source.is_symlink():
+            shutil.copytree(source, target, symlinks=True, ignore=shutil.ignore_patterns(*scrubbed))
+        else:
+            shutil.copy2(source, target, follow_symlinks=False)
+    for directory, names, files in os.walk(bundle_root):
+        for name in [*names, *files]:
+            if os.path.islink(os.path.join(directory, name)):
+                fail(f"Release bundle must not contain symlinks: {os.path.join(directory, name)}")
+
+    verify_staged_bundle(bundle_root, plan)
+    pin_release_repository(bundle_root / "openadkit", os.environ.get("GITHUB_REPOSITORY", UPSTREAM_REPOSITORY))
+    write_json(bundle_root / "openadkit.json", plan["releaseContext"])
+    verify_release_integrity(bundle_root, plan)
+    if include_example_kits:
+        validation_matrix.make_example_kits(bundle_root, bundle_root / validation_matrix.EXAMPLE_KIT_DIRECTORY)
+
+
+def pin_release_repository(launcher: Path, repository: str) -> None:
+    """The launcher installs and upgrades from the repository that released it."""
+    if not REPOSITORY_RE.fullmatch(repository):
+        fail(f"not a GitHub repository: {repository}")
+    default = f"readonly OPENADKIT_REPOSITORY={UPSTREAM_REPOSITORY}\n"
+    text = launcher.read_text(encoding="utf-8")
+    if text.count(default) != 1:
+        fail(f"{launcher}: expected one line {default.strip()}")
+    launcher.write_text(text.replace(default, f"readonly OPENADKIT_REPOSITORY={repository}\n"), encoding="utf-8")
+
+
+def verify_staged_bundle(bundle_root: Path, plan: dict[str, Any]) -> None:
     context = plan.get("releaseContext")
     bundle = plan.get("bundle")
     if not isinstance(context, dict) or not isinstance(bundle, dict):
@@ -129,38 +132,52 @@ def verify_staged_bundle(source_root: Path, plan: dict[str, Any]) -> None:
     if sorted(expected_shared) != sorted(context.get("shared", {})):
         fail("release plan shared assets do not match releaseContext")
 
+    staged = validation_matrix.catalog_inventory(load_runtime(bundle_root), bundle_root)
     for name in expected_deployments:
         meta = context["deployments"].get(name)
         if not isinstance(meta, dict):
             fail(f"release plan is missing deployment context: {name}")
-        path = require_string(meta.get("path"), f"releaseContext.deployments.{name}.path")
-        expected = require_string(
-            meta.get("checksum"), f"releaseContext.deployments.{name}.checksum"
-        )
-        actual = runtime.deployment_checksum(source_root / path)
-        if actual != expected:
+        require_string(meta.get("path"), f"releaseContext.deployments.{name}.path")
+        require_string(meta.get("checksum"), f"releaseContext.deployments.{name}.checksum")
+        if staged["deployments"].get(name) != meta:
             fail(f"deployment checksum mismatch: {name}")
-
     for name in expected_shared:
-        expected = require_string(
-            context["shared"].get(name), f"releaseContext.shared.{name}"
-        )
-        actual = runtime.deployment_checksum(source_root / "deployments" / name)
-        if actual != expected:
+        expected = require_string(context["shared"].get(name), f"releaseContext.shared.{name}")
+        if staged["shared"].get(name) != expected:
             fail(f"shared checksum mismatch: {name}")
 
 
-def verify_release_integrity(source_root: Path, plan: dict[str, Any]) -> None:
-    runtime = load_runtime(source_root)
-    kit = runtime.load_kit(source_root)
+def verify_release_integrity(bundle_root: Path, plan: dict[str, Any]) -> None:
+    runtime = load_runtime(bundle_root)
+    catalog = runtime.load_catalog(bundle_root)
     expected = plan["bundle"]["deployments"]
-    if sorted(kit.deployments) != sorted(expected):
+    if sorted(catalog.deployments) != sorted(expected):
         fail("staged bundle deployments do not match the release plan")
     for name in expected:
-        deployment = runtime.get_deployment(source_root, kit, name)
-        state = runtime.deployment_integrity(source_root, deployment, kit)
-        if state != "intact":
-            fail(f"packaged deployment is not intact: {name} ({state})")
+        deployment = runtime.get_deployment(bundle_root, catalog, name)
+        if runtime.deployment_modified(bundle_root, deployment, catalog) is not False:
+            fail(f"packaged deployment does not match its checksum: {name}")
+
+
+def ros_snapshots(source_root: Path, distros: list[str]) -> dict[str, str]:
+    """The ROS apt snapshot each distro's images were built from."""
+    bake = (source_root / "components/docker-bake.hcl").read_text(encoding="utf-8")
+    snapshots = {name.lower(): date for name, date in ROS_SNAPSHOT_RE.findall(bake)}
+    missing = sorted(set(distros) - snapshots.keys())
+    if missing:
+        fail(f"components/docker-bake.hcl declares no ROS snapshot for: {', '.join(missing)}")
+    return {distro: snapshots[distro] for distro in sorted(distros)}
+
+
+def passing_evidence(summary: dict[str, Any], build_tag: str, release_sha: str) -> dict[str, Any]:
+    """The release's evidence summary, which the release gate selected."""
+    if summary.get("result") != "PASSED" or summary.get("release_evidence") is not True:
+        fail("evidence summary did not pass this release")
+    if summary.get("build_tag") != build_tag:
+        fail("evidence summary is for another build")
+    if summary.get("build_sha") != release_sha or summary.get("source_sha") != release_sha:
+        fail("evidence summary tested another commit")
+    return {key: summary.get(key) for key in ("result", "build_tag", "source_sha", "url", "cells")}
 
 
 def build_plan(args: argparse.Namespace) -> dict[str, Any]:
@@ -173,60 +190,35 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         fail(f"invalid release version: {args.version}")
     if not SHA_RE.fullmatch(args.release_sha):
         fail("release SHA must be 40 lowercase hexadecimal characters")
-    if not SHA_RE.fullmatch(args.packager_sha):
-        fail("packager SHA must be 40 lowercase hexadecimal characters")
-    if args.default_ros_distro not in product["distros"]:
-        fail(f"unsupported default ROS distro: {args.default_ros_distro}")
+    default_ros_distro = product["catalog"].default_ros_distro
+    if default_ros_distro not in product["distros"]:
+        fail(f"unsupported default ROS distro: {default_ros_distro}")
     if args.publish_latest_aliases and not args.stable_release:
-        fail("prereleases cannot publish stable aliases")
+        fail("prereleases cannot publish latest aliases")
     if metadata.get("openadkit_sha") != args.release_sha:
         fail("build metadata Open AD Kit SHA does not match the release SHA")
 
     build_tag = require_string(metadata.get("build_tag"), "build_tag")
-    raw_images = metadata.get("images")
-    if not isinstance(raw_images, list) or not raw_images:
-        fail("build metadata images must be a nonempty array")
-
     image_rows: list[dict[str, Any]] = []
     indexed: dict[tuple[str, str], dict[str, Any]] = {}
-    seen: set[tuple[str, str, str]] = set()
-    for index, raw in enumerate(raw_images):
-        if not isinstance(raw, dict):
-            fail(f"images[{index}] must be an object")
-        repo = require_string(raw.get("repo"), f"images[{index}].repo")
-        target = require_string(raw.get("target"), f"images[{index}].target")
-        distro = require_string(raw.get("ros_distro"), f"images[{index}].ros_distro")
-        source_ref = require_string(raw.get("ref"), f"images[{index}].ref")
-        digest = require_string(raw.get("digest"), f"images[{index}].digest")
-        platforms = raw.get("platforms")
-        key = (repo, target, distro)
-        if key in seen:
-            fail(f"duplicate build image: {repo}:{target}-{distro}")
-        seen.add(key)
-        if not DIGEST_RE.fullmatch(digest):
-            fail(f"invalid image digest for {target}-{distro}")
-        if source_ref != f"{repo}:{target}-{distro}-{build_tag}":
-            fail(f"invalid source image reference for {target}-{distro}")
-        if not isinstance(platforms, list) or not platforms or any(
-            platform not in ("linux/amd64", "linux/arm64") for platform in platforms
-        ):
-            fail(f"invalid platforms for {target}-{distro}")
-
-        release_ref = f"{repo}:{target}-{distro}-{args.version}"
+    for raw in build_images(metadata):
+        repo, target, distro = raw["repo"], raw["target"], raw["ros_distro"]
+        digest = raw["digest"]
+        release_ref = image_ref(raw, args.version)
+        # One latest alias per image and distro; no distro-less alias, which
+        # would switch ROS distro when the default changes.
         aliases: list[str] = []
         if args.stable_release and args.publish_latest_aliases:
-            aliases.extend((f"{repo}:{target}-{distro}", f"{repo}:{target}-{distro}-latest"))
-            if distro == args.default_ros_distro:
-                aliases.extend((f"{repo}:{target}", f"{repo}:{target}-latest"))
-        row = {
+            aliases.append(f"{repo}:{target}-{distro}")
+        row: dict[str, Any] = {
             "aliases": aliases,
             "digest": digest,
-            "platforms": sorted(platforms),
+            "platforms": sorted(raw["platforms"]),
             "releaseExactRef": f"{release_ref}@{digest}",
             "releaseRef": release_ref,
             "repo": repo,
             "rosDistro": distro,
-            "sourceRef": source_ref,
+            "sourceRef": raw["ref"],
             "target": target,
         }
         image_rows.append(row)
@@ -235,32 +227,49 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             fail(f"duplicate target/distro image across repositories: {target}-{distro}")
         indexed[runtime_key] = row
 
-    kit = product["kit"]
-    component_images = dict(kit.component_images)
-    component_images[CARLA_INTERFACE_ENV] = CARLA_INTERFACE_TARGET
-    runtime_targets = sorted(set(component_images.values()))
+    catalog = product["catalog"]
+    component_images = dict(catalog.component_images)
+    # The devel image ships pinned too, so integrators build overlays in it.
+    runtime_targets = sorted(set(component_images.values()) | {runtime.DEVEL_IMAGE_TARGET})
     context_images: dict[str, dict[str, str]] = {}
     for distro in product["distros"]:
         distro_images: dict[str, str] = {}
         for target in runtime_targets:
-            row = indexed.get((target, distro))
-            if row is None:
+            image = indexed.get((target, distro))
+            if image is None:
                 fail(f"missing runtime image: {target}-{distro}")
-            distro_images[target] = row["releaseExactRef"]
+            distro_images[target] = image["releaseExactRef"]
         context_images[distro] = distro_images
 
     root_name = f"openadkit-{args.version}"
     asset_name = f"{root_name}.tar.gz"
+    autoware: dict[str, Any] = {
+        "version": require_string(metadata.get("autoware_version"), "autoware_version"),
+        "ref": require_string(metadata.get("autoware_ref"), "autoware_ref"),
+        "lockSha256": require_string(metadata.get("autoware_lock_sha256"), "autoware_lock_sha256"),
+    }
+    # The fixes the build applied on top of the tag; the release commit is the
+    # build commit, so its patch directory is what the images carry.
+    backports = autoware_patches.list_patches(source_root)
+    if backports:
+        autoware["backports"] = [
+            {key: item[key] for key in ("repository", "subject", "upstream")} for item in backports
+        ]
     release_context = {
+        "externalImages": catalog.external_images,
+        "autoware": autoware,
         "componentImages": component_images,
-        "defaultRosDistro": args.default_ros_distro,
+        "defaultRosDistro": default_ros_distro,
         "deployments": product["deployments"],
         "images": context_images,
         "kind": "release",
-        "schemaVersion": 1,
+        "schemaVersion": runtime.SCHEMA_VERSION,
         "shared": product["shared"],
         "version": args.version,
     }
+    evidence: dict[str, Any] = {"exempt": product["evidenceExempt"]}
+    if args.evidence_summary is not None:
+        evidence.update(passing_evidence(load_json(args.evidence_summary), build_tag, args.release_sha))
     return {
         "bundle": {
             "asset": asset_name,
@@ -270,8 +279,9 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
             "shared": sorted(product["shared"]),
             "validation": product["validation"],
         },
+        # The plan itself stays in the workflow: release-metadata.json is the
+        # one file a release publishes about itself.
         "githubAssets": [
-            {"name": "release-plan.json", "path": "release-plan.json"},
             {"name": "release-metadata.json", "path": "release-metadata.json"},
             {
                 "name": "autoware-lock.repos",
@@ -290,22 +300,26 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "release": {
             "buildTag": build_tag,
-            "defaultRosDistro": args.default_ros_distro,
-            "packagerSha": args.packager_sha,
+            "defaultRosDistro": default_ros_distro,
             "publishLatestAliases": args.publish_latest_aliases,
             "releaseSha": args.release_sha,
             "stable": args.stable_release,
             "version": args.version,
         },
         "releaseContext": release_context,
+        "rosSnapshots": ros_snapshots(source_root, product["distros"]),
+        # The passing evidence summary, and the deployments that ship without
+        # CI evidence, with the reason.
+        "evidence": evidence,
         "schemaVersion": 1,
     }
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
+    # Keys keep their order, so the bundle lists deployments as the catalog does.
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(value, indent=2, sort_keys=True, separators=(",", ": ")) + "\n",
+        json.dumps(value, indent=2, separators=(",", ": ")) + "\n",
         encoding="utf-8",
     )
 
@@ -320,32 +334,35 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--verify", action="store_true")
+    parser.add_argument(
+        "--stage",
+        type=Path,
+        metavar="BUNDLE_ROOT",
+        help="stage and verify the kit of the existing plan at --output",
+    )
+    parser.add_argument("--include-example-kits", action="store_true")
     parser.add_argument("--build-metadata", type=Path)
+    parser.add_argument("--evidence-summary", type=Path)
     parser.add_argument("--version")
     parser.add_argument("--release-sha")
-    parser.add_argument("--packager-sha")
-    parser.add_argument("--default-ros-distro")
     parser.add_argument("--stable-release", type=parse_bool)
     parser.add_argument("--publish-latest-aliases", type=parse_bool)
-    parser.add_argument("--context-output", type=Path)
     args = parser.parse_args()
     try:
         source_root = args.source_root.resolve()
-        if args.verify:
-            plan = load_json(args.output)
-            verify_staged_bundle(source_root, plan)
-            context_path = args.context_output or (source_root / "openadkit.json")
-            write_json(context_path, plan["releaseContext"])
-            verify_release_integrity(source_root, plan)
+        if args.stage:
+            stage_bundle(
+                source_root,
+                load_json(args.output),
+                args.stage.resolve(),
+                include_example_kits=args.include_example_kits,
+            )
             return 0
 
         required = {
             "--build-metadata": args.build_metadata,
             "--version": args.version,
             "--release-sha": args.release_sha,
-            "--packager-sha": args.packager_sha,
-            "--default-ros-distro": args.default_ros_distro,
             "--stable-release": args.stable_release,
             "--publish-latest-aliases": args.publish_latest_aliases,
         }
@@ -353,10 +370,7 @@ def main() -> int:
         if missing:
             parser.error("the following arguments are required: " + ", ".join(missing))
 
-        plan = build_plan(args)
-        write_json(args.output, plan)
-        if args.context_output:
-            write_json(args.context_output, plan["releaseContext"])
+        write_json(args.output, build_plan(args))
     except ValueError as error:
         parser.error(str(error))
     return 0

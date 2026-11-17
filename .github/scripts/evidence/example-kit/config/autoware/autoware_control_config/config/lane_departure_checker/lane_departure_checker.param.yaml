@@ -1,0 +1,6 @@
+# Config override (extension point 2): only the parameters that differ.
+# The entrypoint hook merges them into autoware_control_config's file on every
+# start, so upstream changes to the other parameters still arrive on upgrade.
+/**:
+  ros__parameters:
+    update_rate: 20.0

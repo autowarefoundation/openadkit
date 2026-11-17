@@ -1,0 +1,41 @@
+# The CI fixture's services for the deployment `openadkit new example-kit`
+# made: Planning Simulation and the kit's own services (extension point 4).
+include:
+  - ${OPENADKIT_BASE_DEPLOYMENT}/compose.yaml
+
+services:
+  heartbeat:
+    # A kit's external image (extension point 5), pinned in its openadkit.json.
+    image: ${HEARTBEAT_IMAGE:?pinned in openadkit.json externalImages}
+    network_mode: none
+    init: true
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+  acme-probe:
+    # The kit's own C++ node from overlay_ws (extension point 3), built by
+    # openadkit build and started by the package's own launch file. It runs in
+    # an Open AD Kit runtime image, whose entrypoint hook sources the overlay
+    # workspace mounted below.
+    # What every Autoware service shares: host network, DDS settings, config overrides
+    # and the overlay workspace.
+    extends:
+      file: ${OPENADKIT_ROOT}/deployments/shared/services/autoware.yaml
+      service: autoware
+    image: ${PLANNING_IMAGE:?set by the openadkit CLI}
+    # A service that runs `ros2 launch` joins the map's PID namespace, as the
+    # base's Autoware services do: each launch then has a PID of its own.
+    pid: service:map
+    volumes:
+      - ../../checks:/openadkit/checks:ro
+    command: ros2 launch acme_probe probe.launch.xml
+    # This kit's readiness, which `openadkit run` waits for
+    # (checks/example_kit.py), after the check that no process of the launch died.
+    healthcheck:
+      test: ["CMD-SHELL", "! cat /tmp/openadkit/died 2>/dev/null && . /opt/ros/${ROS_DISTRO}/setup.sh && . /opt/autoware/setup.sh && exec python3 /openadkit/checks/example_kit.py"]
+      start_period: 10m
+      start_interval: 5s
+      interval: 1m
+      timeout: 90s
+      retries: 3
+    restart: on-failure

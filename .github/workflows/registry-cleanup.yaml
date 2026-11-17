@@ -1,0 +1,231 @@
+name: registry-cleanup
+
+# Keep the container registry to what is still used. Builds push an image set
+# per run and nothing removed them:
+#   - openadkit-ci: a pull request's images (build-single-image.yaml), deleted
+#     when it closes and, for older runs of it, after 14 days.
+#   - openadkit: a branch build's images, tagged
+#     <target>[-<arch>]-<distro>-<run>-<attempt>. A release only promotes a
+#     build younger than 90 days (validate_release.sh), so older ones go;
+#     release tags (-vX.Y.Z), latest aliases (<target>-<distro>) and the
+#     moving <target>-<arch>-<distro> tags, with their platform images, stay.
+#   - openadkit-buildcache: compile bases of builds older than 90 days, the
+#     caches of images and branches that no longer exist, and the cache
+#     exports each build overwrites after 14 days. Its ages go by build, not
+#     by version date: an unchanged compile base or cache keeps its digest and
+#     first date while later builds tag it again.
+# The scheduled run only lists what it would delete until the repository
+# variable REGISTRY_CLEANUP is "delete"; a dispatch lists unless asked to delete.
+# GITHUB_TOKEN deletes only in packages that give this repository the Admin
+# role (package settings, "Manage Actions access"); see .github/CI.md.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      delete:
+        description: 'Delete the versions instead of only listing them'
+        type: boolean
+        default: false
+
+concurrency:
+  group: registry-cleanup-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'scheduled' }}
+  cancel-in-progress: false
+
+env:
+  # Build tags end in <run>-<attempt>; everything else a build pushes is named.
+  BUILD_TAGS: '^.*-[0-9]+-[0-9]+$'
+  KEEP_TAGS: '^.*-v[0-9]+\.[0-9]+\.[0-9]+.*$|^[a-z0-9-]+-(humble|jazzy)$'
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && !inputs.delete || github.event_name == 'schedule' && vars.REGISTRY_CLEANUP != 'delete' }}
+
+jobs:
+  pull-request:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      packages: write
+    steps:
+      - name: Name every image of the pull request's builds
+        # An image goes only once all its tags do: its -pr<number> tag, and
+        # the build tags of every run of the pull request's image build.
+        id: tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          runs=$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow build-single-image.yaml \
+            --branch "${HEAD_BRANCH}" --event pull_request --limit 200 --json databaseId \
+            --jq '[.[].databaseId | tostring] | join("|")')
+          tags="^.*-pr${PR_NUMBER}$"
+          [ -z "${runs}" ] || tags+="|^.*-(${runs})-[0-9]+$"
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Delete the pull request's CI images
+        id: delete
+        # GitHub can refuse to delete a version, as it did the last one left
+        # in the package; the next step checks what matters.
+        continue-on-error: true
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: openadkit-ci
+          use-regex: true
+          delete-tags: ${{ steps.tags.outputs.tags }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check that none of the pull request's tags is left
+        if: steps.delete.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          set -euo pipefail
+          owner=users
+          [ "$(gh api "users/${GITHUB_REPOSITORY_OWNER}" --jq .type)" != Organization ] || owner=orgs
+          left=$(gh api --paginate "${owner}/${GITHUB_REPOSITORY_OWNER}/packages/container/openadkit-ci/versions?per_page=100" \
+            --jq '.[].metadata.container.tags[]' | grep -E "${TAGS}" || true)
+          if [ -n "${left}" ]; then
+            echo "::error::Tags of the pull request are left: $(paste -sd ' ' <<<"${left}")"
+            exit 1
+          fi
+          echo "::warning::None of the pull request's tags is left; the weekly run retries the version GitHub refused."
+        shell: bash
+
+  retention:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the image inventory
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/image-inventory.json
+          sparse-checkout-cone-mode: false
+
+      - name: Name what the build cache still uses
+        # Compile bases of the builds from the last 90 days, and the cache of
+        # each inventory image on main and each maintenance branch, the only
+        # branches whose builds export caches (build.py's cache_ref). The
+        # action takes patterns of at most 1000 characters.
+        id: buildcache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          oldest=$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow build-all-images.yaml \
+            --created ">=$(date -u -d '90 days ago' +%F)" --limit 1000 --json databaseId \
+            --jq 'map(.databaseId) | min // empty')
+          recent='^$'
+          if [ -n "${oldest}" ]; then
+            # Run IDs only grow: match that build's ID and every larger one.
+            recent="^.*-($(python3 -c '
+          import sys
+          n = sys.argv[1]
+          alternatives = [n, f"[0-9]{{{len(n) + 1},}}"]
+          for i, digit in enumerate(n):
+              if digit != "9":
+                  alternatives.append(f"{n[:i]}[{int(digit) + 1}-9][0-9]{{{len(n) - i - 1}}}")
+          print("|".join(alternatives))' "${oldest}"))-[0-9]+\$"
+          fi
+          targets=$(jq -r '[.images[].target, "universe-common-build"] | join("|")' .github/image-inventory.json)
+          distros=$(jq -r '.ros_distros | join("|")' .github/image-inventory.json)
+          # Each branch's cache scope, as resolve_build_inputs.sh spells it.
+          scopes=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/branches" --jq '.[].name | select(. == "main" or startswith("release/"))' \
+            | tr -c 'A-Za-z0-9_.\n-' '-' | sed 's/\./\\./g' | paste -sd '|')
+          echo "recent_builds=${recent}" >> "$GITHUB_OUTPUT"
+          echo "caches=^(${targets})-(amd64|arm64)-(${distros})-(${scopes})\$" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Delete CI images older than 14 days
+        id: ci-images
+        # As for a pull request's images: a refused version must not stop the
+        # other packages' cleanup; the next step checks what matters.
+        continue-on-error: true
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: openadkit-ci
+          delete-tags: '*'
+          delete-untagged: true
+          older-than: 14 days
+          dry-run: ${{ env.DRY_RUN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check that no CI image older than 14 days is tagged
+        if: steps.ci-images.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          owner=users
+          [ "$(gh api "users/${GITHUB_REPOSITORY_OWNER}" --jq .type)" != Organization ] || owner=orgs
+          # The cleanup action ages a version by updated_at.
+          cutoff=$(date -u -d '14 days ago' +%FT%TZ)
+          left=$(gh api --paginate "${owner}/${GITHUB_REPOSITORY_OWNER}/packages/container/openadkit-ci/versions?per_page=100" \
+            --jq ".[] | select(.updated_at < \"${cutoff}\") | .metadata.container.tags[]")
+          if [ -n "${left}" ]; then
+            echo "::error::CI images older than 14 days are left: $(paste -sd ' ' <<<"${left}")"
+            exit 1
+          fi
+          echo "::warning::No CI image older than 14 days is tagged; the next run retries the version GitHub refused."
+        shell: bash
+
+      - name: Delete branch builds older than 90 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: openadkit
+          use-regex: true
+          delete-tags: ${{ env.BUILD_TAGS }}
+          exclude-tags: ${{ env.KEEP_TAGS }}
+          # And the platform images those leave behind.
+          delete-untagged: true
+          delete-partial-images: true
+          older-than: 90 days
+          validate: true
+          dry-run: ${{ env.DRY_RUN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete compile bases of builds older than 90 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: openadkit-buildcache
+          use-regex: true
+          delete-tags: ${{ env.BUILD_TAGS }}
+          exclude-tags: ${{ steps.buildcache.outputs.recent_builds }}
+          dry-run: ${{ env.DRY_RUN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete caches of removed images and branches
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: openadkit-buildcache
+          use-regex: true
+          # Every tag; the action also matches digests (sha256:…), which a tag cannot spell.
+          delete-tags: '^[^:]+$'
+          exclude-tags: ${{ steps.buildcache.outputs.caches }}|${{ env.BUILD_TAGS }}
+          dry-run: ${{ env.DRY_RUN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete overwritten cache exports older than 14 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: openadkit-buildcache
+          delete-untagged: true
+          older-than: 14 days
+          dry-run: ${{ env.DRY_RUN }}
+          token: ${{ secrets.GITHUB_TOKEN }}

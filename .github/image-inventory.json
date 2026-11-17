@@ -1,16 +1,16 @@
 {
   "ros_distros": ["humble", "jazzy"],
   "images": [
-    {"repo": "common", "target": "universe-common-devel", "stage": "common", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "common", "target": "universe-common", "stage": "common", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "sensing-perception", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "sensing-perception-cuda", "stage": "component", "platforms": ["linux/amd64"]},
-    {"repo": "component", "target": "localization-mapping", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "planning-control", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "vehicle-system", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "api", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "visualizer", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "simulator", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
-    {"repo": "component", "target": "carla-interface", "stage": "component", "platforms": ["linux/amd64"]}
+    {"target": "universe-common-devel", "stage": "common", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "universe-common", "stage": "common", "platforms": ["linux/amd64", "linux/arm64"], "release": false},
+    {"target": "sensing-perception", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "sensing-perception-cuda", "stage": "component", "platforms": ["linux/amd64"]},
+    {"target": "localization-mapping", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "planning", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "planning-cuda", "stage": "component", "platforms": ["linux/amd64"]},
+    {"target": "control", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "vehicle-system", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "visualizer", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]},
+    {"target": "simulator", "stage": "component", "platforms": ["linux/amd64", "linux/arm64"]}
   ]
 }

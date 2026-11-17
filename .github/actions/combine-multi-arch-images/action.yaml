@@ -6,7 +6,7 @@ inputs:
     description: Full image prefix, e.g. ghcr.io/<owner>/openadkit
     required: true
   target:
-    description: Image target name, e.g. planning-control
+    description: Image target name, e.g. planning
     required: true
   ros-distro:
     description: ROS distribution name
@@ -28,7 +28,7 @@ runs:
   using: composite
   steps:
     - name: Log in to Container Registry
-      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
       with:
         registry: ${{ inputs.registry }}
         username: ${{ github.actor }}

@@ -1,0 +1,275 @@
+name: build-single-image-distro
+
+permissions:
+  contents: read
+
+# The jobs of build-single-image.yaml for one ROS distribution. That workflow
+# calls this once per distribution; it also owns the concurrency group and the
+# pull request's cache cleanup, which both distributions share.
+
+on:
+  workflow_call:
+    inputs:
+      ros-distro:
+        description: "ROS distribution (humble or jazzy)"
+        required: true
+        type: string
+      target:
+        description: "Space-separated Bake targets. Empty = auto-detect relevant changes."
+        required: false
+        default: ""
+        type: string
+      push:
+        description: "Push the images to the CI package for the pull request's evidence instead of loading them"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/openadkit
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      autoware_input_ref: ${{ steps.prepare.outputs.autoware_input_ref }}
+      autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
+      autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
+      autoware_version: ${{ steps.prepare.outputs.autoware_version }}
+      upstream_tag: ${{ steps.prepare.outputs.upstream_tag }}
+      cache_scope: ${{ steps.prepare.outputs.cache_scope }}
+      autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
+      upstream_core_devel: ${{ steps.upstream.outputs.core_devel }}
+      upstream_base: ${{ steps.upstream.outputs.base }}
+      upstream_cuda_runtime: ${{ steps.upstream.outputs.cuda_runtime }}
+      upstream_cuda_devel: ${{ steps.upstream.outputs.cuda_devel }}
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      targets_json: ${{ steps.detect.outputs.targets_json }}
+      setup_autoware: ${{ steps.detect.outputs.setup_autoware }}
+      with_middleware: ${{ steps.detect.outputs.with_middleware }}
+      use_local_common: ${{ steps.contexts.outputs.use_local_common }}
+      devel_context: ${{ steps.contexts.outputs.devel_context }}
+      runtime_context: ${{ steps.contexts.outputs.runtime_context }}
+    steps:
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve shared build inputs
+        id: prepare
+        run: bash .github/scripts/resolve_build_inputs.sh
+        shell: bash
+
+      - name: Install YAML parser
+        # The hosted runner images ship it; apt runs only where it is missing.
+        run: python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
+        shell: bash
+
+      - name: Export Autoware dependency lockfile
+        id: lock
+        run: |
+          set -euo pipefail
+          mkdir -p autoware-lock
+          python3 .github/scripts/export_autoware_lock.py \
+            autoware-metadata/repositories/autoware.repos \
+            autoware-lock/autoware-lock.repos
+          autoware_lock_sha256=$(sha256sum autoware-lock/autoware-lock.repos | cut -d ' ' -f1)
+          echo "autoware_lock_sha256=${autoware_lock_sha256}" >> "${GITHUB_OUTPUT}"
+        shell: bash
+
+      - name: Upload Autoware dependency lockfile
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          # Both distributions run in one workflow run: name each one's lock.
+          name: autoware-lock-${{ steps.prepare.outputs.build_tag }}-${{ inputs.ros-distro }}
+          path: autoware-lock/autoware-lock.repos
+          retention-days: 7
+
+      - name: Detect changed targets
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          ROS_DISTRO: ${{ inputs.ros-distro }}
+          TARGET_INPUT: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+
+          changed_files=""
+          if [ -z "${TARGET_INPUT}" ]; then
+            if [ "${EVENT_NAME}" = "pull_request" ]; then
+              if [ -z "${BASE_SHA}" ]; then
+                echo "Pull request base SHA is unavailable" >&2
+                exit 1
+              fi
+              diff_base="${BASE_SHA}"
+            else
+              diff_base=$(git rev-parse HEAD^)
+            fi
+
+            changed_files=$(git diff --name-only "${diff_base}...HEAD")
+            echo "Changed files:" >&2
+            printf '%s\n' "${changed_files}" >&2
+          fi
+
+          python3 .github/scripts/build.py \
+            single-image "${ROS_DISTRO}" "${TARGET_INPUT}" \
+            <<< "${changed_files}" >> "${GITHUB_OUTPUT}"
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Resolve registry contexts
+        id: contexts
+        env:
+          ROS_DISTRO: ${{ inputs.ros-distro }}
+          TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
+          USE_LOCAL_COMMON: ${{ steps.detect.outputs.use_local_common }}
+          AUTOWARE_INPUT_REF: ${{ steps.prepare.outputs.autoware_input_ref }}
+          AUTOWARE_REF_TYPE: ${{ steps.prepare.outputs.autoware_ref_type }}
+          AUTOWARE_REF: ${{ steps.prepare.outputs.autoware_ref }}
+          AUTOWARE_VERSION: ${{ steps.prepare.outputs.autoware_version }}
+          AUTOWARE_LOCK_SHA256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
+        run: bash .github/scripts/resolve_registry_contexts.sh
+        shell: bash
+
+      - name: Resolve required immutable upstream Autoware images
+        if: steps.detect.outputs.targets_json != '[]'
+        id: upstream
+        env:
+          UPSTREAM_TAG: ${{ steps.prepare.outputs.upstream_tag }}
+          TARGETS_JSON: ${{ steps.detect.outputs.targets_json }}
+          UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro }}
+          USE_LOCAL_COMMON: ${{ steps.contexts.outputs.use_local_common }}
+        run: |
+          set -euo pipefail
+          names=()
+          if [ "${USE_LOCAL_COMMON}" = true ] \
+            || jq -e 'index("universe-common-devel") != null or index("universe-common") != null' <<<"${TARGETS_JSON}" >/dev/null; then
+            names+=(core-devel base)
+          fi
+          if jq -e 'any(.[]; endswith("-cuda"))' <<<"${TARGETS_JSON}" >/dev/null; then
+            names+=(base-cuda-runtime base-cuda-devel)
+          fi
+          export UPSTREAM_IMAGE_NAMES="${names[*]}"
+          bash .github/scripts/resolve_upstream_images.sh
+          {
+            echo "core_devel=$(jq -r 'map(select(.name == "core-devel"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "base=$(jq -r 'map(select(.name == "base"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "cuda_runtime=$(jq -r 'map(select(.name == "base-cuda-runtime"))[0].uri // empty' upstream-images/upstream-images.json)"
+            echo "cuda_devel=$(jq -r 'map(select(.name == "base-cuda-devel"))[0].uri // empty' upstream-images/upstream-images.json)"
+          } >> "${GITHUB_OUTPUT}"
+        shell: bash
+
+  build-local-common:
+    needs: prepare
+    # When a change rebuilds the common images, check them on their own first,
+    # so a failure there shows as itself. They build from main's registry
+    # cache; each image job below builds them again the same way, since a
+    # multi-GB hand-over through the Actions cache stalled.
+    if: needs.prepare.outputs.use_local_common == 'true'
+    runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
+    timeout-minutes: 120
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    steps:
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up build environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          build-tag: ${{ needs.prepare.outputs.build_tag }}-${{ inputs.ros-distro }}
+          registry: ${{ env.REGISTRY }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          free-disk: true
+          setup-autoware: true
+          with-middleware: true
+
+      - name: Build the universe-common images
+        uses: ./.github/actions/build-image
+        with:
+          target: universe-common
+          ros-distro: ${{ inputs.ros-distro }}
+          platform: linux/amd64
+          prepared: ${{ toJSON(needs.prepare.outputs) }}
+          tag-suffix: pr${{ github.event.pull_request.number || github.run_id }}
+          common-check: true
+
+  build:
+    needs: [prepare, build-local-common]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.prepare.result == 'success' &&
+      needs.prepare.outputs.targets_json != '[]' &&
+      (needs.build-local-common.result == 'success' ||
+      needs.build-local-common.result == 'skipped')
+    runs-on: ${{ vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
+    # planning can take nearly two hours before the bounded Trivy scan;
+    # fork PRs may also compile development core and universe-common first.
+    timeout-minutes: 180
+    permissions:
+      actions: read
+      contents: read
+      # A fork's pull request gets a read-only token whatever this says.
+      packages: write
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        target: ${{ fromJson(needs.prepare.outputs.targets_json) }}
+    steps:
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up build environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
+          build-tag: ${{ needs.prepare.outputs.build_tag }}-${{ inputs.ros-distro }}
+          registry: ${{ env.REGISTRY }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          free-disk: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
+          setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
+          with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' || needs.prepare.outputs.use_local_common == 'true' }}
+
+      - name: Build ${{ matrix.target }}
+        id: image
+        uses: ./.github/actions/build-image
+        with:
+          target: ${{ matrix.target }}
+          ros-distro: ${{ inputs.ros-distro }}
+          platform: linux/amd64
+          prepared: ${{ toJSON(needs.prepare.outputs) }}
+          # Pushed under the run's build tag, which assemble_pr_build.sh looks for.
+          tag-suffix: ${{ inputs.push && needs.prepare.outputs.build_tag || format('pr{0}', github.event.pull_request.number || github.run_id) }}
+          push: ${{ inputs.push }}
+          image-repo: ${{ inputs.push && format('ghcr.io/{0}/openadkit-ci', github.repository_owner) || '' }}
+
+      - name: Scan ${{ matrix.target }} for HIGH and CRITICAL vulnerabilities
+        # The release gate's policy (scan-images.yaml), so a finding stops the pull
+        # request instead of main's next release.
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.tags }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          scanners: vuln,secret
+          timeout: 15m
+          trivyignores: .trivyignore

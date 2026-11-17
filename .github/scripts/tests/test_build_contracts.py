@@ -1,439 +1,355 @@
-import io
+"""Build selection and real Compose topology boundaries, without running containers."""
+
 import json
-from pathlib import Path
+import os
 import re
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
-
+import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT / ".github/scripts"))
+sys.path[:0] = [str(ROOT / "cli"), str(ROOT / ".github/scripts")]
 
-import resolve_image_matrices as matrices
-
+import build as matrices  # noqa: E402
+import catalog  # noqa: E402
+import compose  # noqa: E402
+import settings  # noqa: E402
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
-BAKE = (ROOT / "components/docker-bake.hcl").read_text()
-ALL_IMAGES_WORKFLOW = (ROOT / ".github/workflows/build-all-images.yaml").read_text()
-SINGLE_IMAGE_WORKFLOW = (ROOT / ".github/workflows/build-single-image.yaml").read_text()
-LINT_WORKFLOW = (ROOT / ".github/workflows/lint.yaml").read_text()
-DOCS_WORKFLOW = (ROOT / ".github/workflows/deploy-docs.yaml").read_text()
-REGISTRY_CONTEXT_RESOLVER = (
-    ROOT / ".github/scripts/resolve_registry_contexts.sh"
-).read_text()
-CAPTURE_METADATA = (ROOT / ".github/scripts/capture_build_metadata.sh").read_text()
-ZENOH_COMPOSE = (ROOT / "deployments/zenoh-bridge/docker-compose.yaml").read_text()
 
 
-def manifest_index():
-    return {
-        (entry["repo"], entry["target"], entry["ros-distro"]): entry["arches"]
-        for entry in matrices.build_matrices(INVENTORY)["manifest_matrix"]["include"]
-    }
-
-
-def test_inventory_matches_bake_targets_and_metadata_stubs():
-    inventory = {image["target"] for image in INVENTORY["images"]}
-    targets = set(
-        re.findall(
-            r'^target\s+"(?!_|docker-metadata-action-)([\w-]+)"',
-            BAKE,
-            flags=re.MULTILINE,
-        )
-    )
-    metadata = set(re.findall(r'target\s+"docker-metadata-action-([\w-]+)"', BAKE))
-    assert targets == inventory
-    assert metadata == inventory
-
-
-def test_matrix_preserves_platform_and_distro_constraints():
-    index = manifest_index()
-    assert index[("component", "planning-control", "humble")] == "amd64 arm64"
-    assert index[("component", "sensing-perception-cuda", "jazzy")] == "amd64"
-    assert index[("component", "carla-interface", "humble")] == "amd64"
-    assert index[("component", "carla-interface", "jazzy")] == "amd64"
-
-
-def test_carla_builds_after_simulator():
+def test_inventory_bake_and_runtime_catalog_agree():
+    bake = (ROOT / "components/docker-bake.hcl").read_text()
+    targets = {image["target"] for image in INVENTORY["images"]}
+    # universe-common-build is CI's unpublished compile base for components.
+    assert set(re.findall(r'^target\s+"(?!_|docker-metadata-action-)([\w-]+)"', bake, re.M)) == targets | {"universe-common-build"}
+    assert set(re.findall(r'target\s+"docker-metadata-action-([\w-]+)"', bake)) == targets
+    # Bake resolves a name to a group first: a group named like a target hides it.
+    assert not set(re.findall(r'^group\s+"([\w-]+)"', bake, re.M)) & targets
+    kit = json.loads((ROOT / "openadkit.json").read_text())
+    assert set(kit["componentImages"].values()) == {image["target"] for image in INVENTORY["images"] if image["stage"] == "component"}
     resolved = matrices.build_matrices(INVENTORY)
-    components = {entry["target"] for entry in resolved["component_matrix"]["include"]}
-    carla = {entry["target"] for entry in resolved["carla_matrix"]["include"]}
-    assert "simulator" in components
-    assert "carla-interface" not in components
-    assert carla == {"carla-interface"}
+    # universe-common is the components' runtime base, built per architecture and never published.
+    assert {row["target"] for row in resolved["manifest_matrix"]["include"]} == {
+        image["target"] for image in INVENTORY["images"] if image.get("release", True)}
+    assert "universe-common" not in {row["target"] for row in resolved["manifest_matrix"]["include"]}
+    index = {(row["target"], row["ros-distro"]): row["arches"] for row in resolved["manifest_matrix"]["include"]}
+    assert index[("planning", "humble")] == "amd64 arm64"
+    assert index[("control", "humble")] == "amd64 arm64"
+    assert index[("sensing-perception-cuda", "jazzy")] == "amd64"
+    assert index[("planning-cuda", "jazzy")] == "amd64"
+    assert "simulator" in {row["target"] for row in resolved["component_matrix"]["include"]}
+    assert set(resolved) == {"common_matrix", "component_matrix", "manifest_matrix"}
 
 
-@pytest.mark.parametrize(
-    ("changed", "expected", "flags"),
-    [
-        (
-            "components/universe-common/Dockerfile",
-            {image["target"] for image in INVENTORY["images"]},
-            {"with_middleware": True, "use_local_common": True},
-        ),
-        ("components/sensing-perception/Dockerfile", {"sensing-perception"}, {}),
-        (
-            "components/sensing-perception/Dockerfile.cuda",
-            {"sensing-perception-cuda"},
-            {},
-        ),
-        (
-            "components/sensing-perception/scripts/build.sh",
-            {"sensing-perception", "sensing-perception-cuda"},
-            {},
-        ),
-        ("components/api/Dockerfile", {"api"}, {}),
-        (
-            "components/simulator/Dockerfile",
-            {"carla-interface"},
-            {"use_local_simulator": True},
-        ),
-        (
-            "components/carla-interface/Dockerfile",
-            {"carla-interface"},
-            {"setup_autoware": False},
-        ),
-    ],
-)
-def test_component_changes_select_required_targets(changed, expected, flags):
-    plan = matrices.build_single_image_plan(INVENTORY, [changed])
+@pytest.mark.parametrize(("path", "expected", "flags"), [
+    ("components/universe-common/Dockerfile", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    (".dockerignore", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    (".github/autoware.ref", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    ("components/sensing-perception/Dockerfile.cuda", {"sensing-perception-cuda"}, {}),
+    ("components/planning/Dockerfile.cuda", {"planning-cuda"}, {}),
+    ("components/planning/Dockerfile", {"planning"}, {}),
+    ("components/sensing-perception/scripts/build.sh", {"sensing-perception", "sensing-perception-cuda"}, {}),
+    ("components/simulator/Dockerfile", {"simulator"}, {}),
+    ("docs/index.md", set(), {}),
+    (".github/autoware-patches/universe/autoware_universe/0001-fix.patch",
+     {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    (".github/scripts/autoware_patches.py", {image["target"] for image in INVENTORY["images"]}, {"use_local_common": True}),
+    ("components/visualizer/README.md", set(), {}),
+    # Shared by every image.
+    ("components/shared/runtime-deps.sh", {image["target"] for image in INVENTORY["images"]}, {}),
+    # The pipeline alone: one small image proves it.
+    (".github/scripts/build.py", {"localization-mapping"}, {"use_local_common": False}),
+    (".github/workflows/build-single-image-distro.yaml", {"localization-mapping"}, {}),
+    (".github/actions/build-image/action.yaml", {"localization-mapping"}, {}),
+    # Copied into the image, unlike the component's own README.
+    ("components/visualizer/novnc/README.md", {"visualizer"}, {}),
+])
+def test_changed_inputs_select_required_builds(path, expected, flags):
+    plan = matrices.build_single_image_plan(INVENTORY, [path])
     assert set(plan["targets_json"]) == expected
     assert all(plan[name] is value for name, value in flags.items())
 
 
-def test_shared_build_inputs_select_all_targets():
-    expected = {image["target"] for image in INVENTORY["images"]}
-    for changed in (
-        ".github/scripts/registry_lookup.sh",
-        ".github/scripts/resolve_registry_contexts.sh",
-        ".github/scripts/resolve_upstream_images.sh",
-        ".github/actions/inject-ccache/action.yaml",
-        ".trivyignore",
-    ):
-        plan = matrices.build_single_image_plan(INVENTORY, [changed])
-        assert set(plan["targets_json"]) == expected
-
-
-def test_docker_bake_change_uses_all_local_images():
-    plan = matrices.build_single_image_plan(
-        INVENTORY, ["components/docker-bake.hcl"]
-    )
-    assert plan["use_local_common"] is True
-    assert plan["use_local_simulator"] is True
-    assert "carla-interface" in plan["targets_json"]
-    assert "simulator" not in plan["targets_json"]
-
-
-def test_manual_targets_are_validated_sorted_and_deduplicated():
-    plan = matrices.build_single_image_plan(
-        INVENTORY, target_input="visualizer api visualizer"
-    )
-    assert plan["targets_json"] == ["api", "visualizer"]
-
-    with pytest.raises(ValueError, match="Unknown Bake target: missing"):
-        matrices.build_single_image_plan(INVENTORY, target_input="missing")
-
-
-def test_distro_validation_applies_to_global_and_target_constraints():
-    with pytest.raises(ValueError, match="Unsupported ROS distro: rolling"):
-        matrices.build_single_image_plan(INVENTORY, distro="rolling")
-    plan = matrices.build_single_image_plan(
-        INVENTORY, target_input="carla-interface", distro="jazzy"
-    )
-    assert plan["targets_json"] == ["carla-interface"]
-
-
-def test_irrelevant_and_readme_changes_produce_empty_plan():
-    plan = matrices.build_single_image_plan(
-        INVENTORY,
-        ["docs/index.md", "components/README.md", "components/api/README.md"],
-    )
+def test_a_removed_component_builds_nothing(tmp_path, monkeypatch):
+    # A deleted component's files are in the diff of the change that removes it.
+    monkeypatch.setattr(matrices, "REPOSITORY", tmp_path)
+    plan = matrices.build_single_image_plan(INVENTORY, ["components/carla-interface/Dockerfile"])
     assert plan["targets_json"] == []
 
 
-def test_unknown_component_input_fails_closed():
-    with pytest.raises(ValueError, match="Unmapped component build input"):
-        matrices.build_single_image_plan(
-            INVENTORY, ["components/new-component/Dockerfile"]
-        )
+def test_invalid_build_inputs_fail_closed(tmp_path, monkeypatch):
+    # A component in the checkout but not in the inventory must be mapped.
+    monkeypatch.setattr(matrices, "REPOSITORY", tmp_path)
+    (tmp_path / "components/new-component").mkdir(parents=True)
+    for options, message in [
+        ({"target_input": "missing"}, "Unknown Bake target"),
+        ({"distro": "rolling"}, "Unsupported ROS distro"),
+        ({"changed_files": ["components/new-component/Dockerfile"]}, "Unmapped component build input"),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            matrices.build_single_image_plan(INVENTORY, **options)
 
 
-def test_long_pr_build_leaves_time_for_vulnerability_scan():
-    assert re.search(
-        r"(?m)^\s+timeout-minutes:\s+(1[5-9][0-9]|[2-9][0-9]{2,})$",
-        SINGLE_IMAGE_WORKFLOW,
+@pytest.mark.parametrize(("target", "publish", "local"), [
+    ("universe-common", True, False), ("sensing-perception-cuda", True, False), ("planning-cuda", True, False),
+    ("simulator", True, False), ("control", False, False), ("simulator", False, True),
+])
+def test_shared_build_recipe_keeps_pins_provenance_and_local_graphs(target, publish, local):
+    uri = "docker-image://example/base@sha256:" + "c" * 64
+    prepared = {"build_tag": "123-1", "cache_scope": "main", "autoware_input_ref": "1.8.0", "autoware_ref_type": "tag",
+                "autoware_ref": "a" * 40, "autoware_version": "1.8.0", "autoware_lock_sha256": "e" * 64,
+                "upstream_images": json.dumps({"humble": {name: {"uri": uri} for name in ("core-devel", "base", "base-cuda-runtime", "base-cuda-devel")}}),
+                "use_local_common": str(local).lower()}
+    if not local:
+        prepared.update(devel_context=uri, runtime_context=uri)
+    recipe, targets = matrices.bake_recipe(INVENTORY, prepared, target, "humble", "linux/amd64", publish=publish,
+                                           common_check=False, owner="example")
+    row = recipe["target"][target]
+    assert targets == (["universe-common-build", "universe-common-devel", "universe-common"]
+                       if publish and target == "universe-common" else [target])
+    common_build = "ghcr.io/example/openadkit-buildcache:universe-common-build-amd64-humble-123-1"
+    if publish:
+        # The project's own namespace, with plain keys so `docker inspect` reads
+        # a label by its documented name; the OCI keys are metadata-action's.
+        assert row["labels"] == {"org.autoware.openadkit.autoware-version": "1.8.0",
+                                 "org.autoware.openadkit.autoware-ref": "a" * 40,
+                                 "org.autoware.openadkit.autoware-lock-sha256": "e" * 64}
+        assert not any('"' in key for key in row["labels"])
+        assert row["cache-to"][0].endswith(",mode=max")
+        assert (row["contexts"].get("autoware-base-cuda-devel") == uri) is target.endswith("-cuda")
+        if target == "universe-common":
+            # Per-build labels or provenance would change the compile base's
+            # digest on every build and invalidate every component compile.
+            build = recipe["target"]["universe-common-build"]
+            assert build["tags"] == [common_build] and not build["labels"]
+            assert build["attest"] == ["type=provenance,disabled=true"]
+            # Nor may the build time: the config records it.
+            assert build["args"]["SOURCE_DATE_EPOCH"] == matrices.COMPILE_BASE_EPOCH
+            assert "SOURCE_DATE_EPOCH" not in row["args"]
+            # The build and runtime stages keep separate caches; neither
+            # export may overwrite the other.
+            cache = "type=registry,ref=ghcr.io/example/openadkit-buildcache:{}-amd64-humble-main"
+            assert build["cache-to"] == [cache.format("universe-common-build") + ",mode=max"]
+            assert row["cache-to"] == [cache.format("universe-common") + ",mode=max"]
+            assert "cache-to" not in recipe["target"]["universe-common-devel"]
+            assert row["cache-from"] == [cache.format(name) for name in ("universe-common-build", "universe-common")]
+        else:
+            assert row["contexts"]["universe-common-devel"] == "docker-image://" + common_build
+    else:
+        assert not row["labels"] and "cache-to" not in row
+        assert ("universe-common" in row["contexts"]) is (not local)
+        assert "simulator" not in row["contexts"]
+
+
+@pytest.mark.parametrize(("target", "common_check"), [("universe-common", True), ("control", False)])
+def test_pull_requests_rebuild_common_from_the_registry_cache_only(target, common_check):
+    # A multi-GB hand-over through the Actions cache stalled; each job builds
+    # the common images again from main's registry cache instead.
+    prepared = {"build_tag": "123-1", "cache_scope": "main", "use_local_common": "true"}
+    recipe, _ = matrices.bake_recipe(INVENTORY, prepared, target, "humble", "linux/amd64", publish=False,
+                                     common_check=common_check, owner="example")
+    assert "type=gha" not in json.dumps(recipe) and "cache-to" not in json.dumps(recipe)
+    cache = "type=registry,ref=ghcr.io/example/openadkit-buildcache:universe-common-amd64-humble-main"
+    assert cache in recipe["target"][target]["cache-from"]
+
+
+@pytest.mark.parametrize("path", ["components/universe-common/Dockerfile", "components/sensing-perception/Dockerfile.cuda"])
+def test_stages_pin_ros_snapshot_and_runtime_checks_linked_libraries(path):
+    text = (ROOT / path).read_text()
+    devel, runtime = text.rsplit("\nFROM ", 1)
+    pin = 'bash /tmp/ros-snapshot/ros-snapshot.sh "${ROS_SNAPSHOT}" --check'
+    assert devel.index(pin) < devel.index("colcon build")
+    assert runtime.index(pin) < runtime.index("bash /tmp/security-refresh.sh") < runtime.index("bash /tmp/check-linked-libs.sh") < runtime.index("COPY components/shared/entrypoint/")
+    assert 'ENTRYPOINT ["/opt/openadkit/entrypoint.sh"]' in runtime
+
+
+@pytest.fixture
+def compose_context(tmp_path, monkeypatch):
+    if shutil.which("docker") is None:
+        pytest.skip("docker compose is required")
+    # Keep Docker's own config: CI installs Compose v5 into ~/.docker/cli-plugins,
+    # and without it Docker falls back to the runner's older plugin.
+    monkeypatch.setenv("DOCKER_CONFIG", os.environ.get("DOCKER_CONFIG") or str(Path.home() / ".docker"))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("OPENADKIT_HOME", str(tmp_path / "oak"))
+    monkeypatch.setenv("ZENOH_LISTEN", "tcp/127.0.0.1:7447")
+    monkeypatch.setenv("ZENOH_PEER", "tcp/127.0.0.1:7447")
+    monkeypatch.setenv("REMOTE_PASSWORD", "ci-validate")
+    monkeypatch.delenv("OPENADKIT_KIT", raising=False)
+    monkeypatch.delenv("OPENADKIT_DELEGATED", raising=False)
+    return catalog.load_catalog(ROOT)
+
+
+def test_third_party_services_stay_in_the_deployments_that_use_them():
+    # deployments/shared holds what runs on Open AD Kit's own images. A
+    # simulator, or the bridge between split-host roles, is the deployment's.
+    external = json.loads((ROOT / "openadkit.json").read_text())["externalImages"]
+    shared = [path for path in sorted((ROOT / "deployments/shared").rglob("*")) if path.suffix in (".yaml", ".env")]
+    assert shared and not [(path.name, name) for path in shared for name in external if name in path.read_text()]
+
+
+@pytest.mark.parametrize("name", ["scenario-simulation", "carla-simulation"])
+def test_the_bridge_mounts_its_allowlist_without_creating_it(name):
+    directory = ROOT / "deployments" / name
+    bridge = yaml.safe_load((directory / "compose.zenoh.yaml").read_text())["services"]["zenoh-bridge"]
+    # The short volume form would make a root-owned directory of a missing file.
+    allowlist = next(item for item in bridge["volumes"] if isinstance(item, dict))
+    assert allowlist["target"] == "/config/zenoh.json5" and allowlist["bind"] == {"create_host_path": False}
+    assert (directory / allowlist["source"]).is_file()
+
+
+@pytest.mark.parametrize(("name", "role", "present", "absent"), [
+    ("scenario-simulation", None, {"scenario-simulator", "map", "mrm-state-relay", "visualizer"}, {"zenoh-bridge"}),
+    ("scenario-simulation", "autoware", {"map", "zenoh-bridge", "mrm-state-relay"}, {"scenario-simulator", "visualizer"}),
+    ("scenario-simulation", "scenario", {"scenario-simulator", "zenoh-bridge", "visualizer"},
+     {"map", "vehicle", "mrm-state-relay"}),
+    ("carla-simulation", None, {"carla", "carla-interface", "map", "visualizer"}, {"zenoh-bridge"}),
+    ("carla-simulation", "autoware", {"map", "zenoh-bridge"}, {"carla", "carla-interface", "visualizer"}),
+    ("carla-simulation", "carla", {"carla", "carla-interface", "carla-map-loader", "zenoh-bridge", "visualizer"},
+     {"map", "vehicle"}),
+])
+def test_real_compose_preserves_single_and_split_graphs(compose_context, name, role, present, absent):
+    deployment = catalog.get_deployment(ROOT, compose_context, name)
+    selection = settings.resolve(deployment, compose_context, "humble", False, role=role)
+    result = compose.run_compose(deployment, selection, ["config", "--format", "json"])
+    services = json.loads(result.stdout)["services"]
+    assert present <= services.keys() and not absent & services.keys()
+    if role:
+        bridge = services["zenoh-bridge"]
+        assert "container_name" not in bridge
+        assert bridge["environment"]["ROS_DOMAIN_ID"] == str(deployment.roles[role]["rosDomainId"])
+        mounts = {item["target"]: item["source"] for item in bridge["volumes"]}
+        assert mounts["/config/zenoh.json5"] == str(deployment.directory / "config/zenoh.json5")
+        assert mounts["/etc/cyclonedds/cyclonedds.xml"] == str(ROOT / "deployments/shared/cyclonedds.xml")
+    if role in ("scenario", "carla"):
+        assert set(services) == present
+    if role == "scenario":
+        assert "pid" not in services["scenario-simulator"]
+    if name == "carla-simulation" and role == "autoware":
+        assert "carla-interface" not in services["vehicle"].get("depends_on", {})
+    # The CARLA bridge is an Autoware service: its death turns it unhealthy,
+    # and restart and config overrides reach it.
+    if "carla-interface" in services:
+        bridge = services["carla-interface"]
+        assert "/tmp/openadkit/died" in " ".join(bridge["healthcheck"]["test"])
+        assert "/openadkit/overlay_ws" in {item["target"] for item in bridge["volumes"]}
+    if name == "carla-simulation" and role is None:
+        assert {"map", "carla-interface"} <= services["vehicle"]["depends_on"].keys()
+        assert {"map", "system", "carla-interface"} <= services["sensing"]["depends_on"].keys()
+    # The visualizer joins no PID namespace, and only the single-host graph waits on Autoware.
+    if "visualizer" in services:
+        assert "pid" not in services["visualizer"]
+        assert ("map" in services["visualizer"].get("depends_on", {})) is (role is None)
+
+
+def test_safety_island_simulation_keeps_planning_simulations_stack():
+    """Safety Island Simulation repeats Planning Simulation's services, settings
+    and map in its own files, so the copies must not drift apart."""
+    planning, island = ROOT / "deployments/planning-simulation", ROOT / "deployments/safety-island-simulation"
+    stack = (planning / "compose.yaml").read_text(encoding="utf-8")
+    assert stack[stack.index("include:"):].rstrip() in (island / "compose.yaml").read_text(encoding="utf-8")
+
+    def values(path):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        return dict(line.split("=", 1) for line in lines if line and not line.startswith("#"))
+
+    own = {"SAFETY_ISLAND_PATH", "SYSTEM_DIAGNOSTICS_GRAPH"}
+    # The Diffusion Planner model belongs to the GPU mode, which this deployment does not have.
+    expected = {name: value for name, value in values(planning / "settings.env").items() if name != "DIFFUSION_PLANNER_DATA_PATH"}
+    assert {name: value for name, value in values(island / "settings.env").items() if name not in own} == expected
+
+    base, standalone = (json.loads((path / "deployment.json").read_text(encoding="utf-8")) for path in (planning, island))
+    assert standalone["verify"] == base["verify"]
+    assert standalone["waitTimeout"] == base["waitTimeout"]
+    assert [item for item in base["data"] if not item.get("gpu")] == standalone["data"][:1]
+
+
+def test_real_kit_validates_against_its_source_base(tmp_path, compose_context):
+    import validation_matrix
+    [kit] = validation_matrix.make_example_kits(ROOT, tmp_path)
+    assert json.loads((kit / "openadkit.json").read_text())["extends"] == str(ROOT)
+    # Documented host settings, used by the shared services and runtime.env.
+    (kit / "settings.env").write_text(
+        "VEHICLE_ID=custom\nCYCLONEDDS_NETWORK_INTERFACE=eth0\nWEBSOCKIFY_BIND=0.0.0.0\nRVIZ_GPU=off\n"
     )
+    # The kit's files apply to both of its deployments, each on its own base.
+    for base in ("planning-simulation", "logging-simulation"):
+        result = subprocess.run([str(ROOT / "openadkit"), "validate", f"example-kit-{base}", "--json"],
+                                cwd=kit, env=dict(os.environ), text=True, capture_output=True, timeout=30)
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)["base"] == base
+    result = subprocess.run([str(ROOT / "openadkit"), "config", "example-kit-logging-simulation"],
+                            cwd=kit, env=dict(os.environ), text=True, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    services = json.loads(result.stdout)["services"]
+    # It has no Compose file, so it runs its base's services and none of the other deployment's.
+    assert "perception" in services and "acme-probe" not in services
+    mounts = {item["target"]: item["source"] for item in services["perception"]["volumes"]}
+    assert mounts["/openadkit/config/kit"] == str(kit / "config") and mounts["/openadkit/overlay_ws"] == str(kit / "overlay_ws")
+    # Its own settings win over the kit's.
+    assert "sensor_model:=sample_sensor_kit" in services["sensing"]["command"]
 
 
-def test_single_image_skips_ccache_extraction():
-    assert SINGLE_IMAGE_WORKFLOW.count('skip-extraction: "true"') == 2
-    assert "steps.cache-restore.outputs.cache-hit" not in SINGLE_IMAGE_WORKFLOW
-    assert "lookup-only: true" not in SINGLE_IMAGE_WORKFLOW
-
-
-def test_scheduled_main_builds_refresh_ccache_lineages():
-    save_ccache = (
-        "github.ref == 'refs/heads/main' && "
-        "(github.event_name == 'push' || github.event_name == 'schedule')"
+def test_kit_on_one_service_layer_owns_its_services_and_settings(tmp_path, compose_context):
+    # A kit: carla-simulation's Autoware side, with its own CARLA.
+    kit = tmp_path / "kit"
+    directory = kit / "deployments/world"
+    directory.mkdir(parents=True)
+    (kit / "openadkit.json").write_text(json.dumps({
+        "schemaVersion": 2, "kind": "kit", "extends": str(ROOT),
+        "deployments": {"world": {"description": "Own simulator", "base": "carla-simulation"}},
+        "externalImages": {},
+    }))
+    (directory / "settings.env").write_text("TOWN=Town01\n")
+    (directory / "compose.yaml").write_text(
+        "include:\n  - ${OPENADKIT_BASE_DEPLOYMENT}/compose.autoware.yaml\n"
+        "services:\n"
+        "  carla:\n    image: busybox:1.36.1\n    command: [\"sleep\", \"${TOWN}\"]\n"
     )
-    assert save_ccache in ALL_IMAGES_WORKFLOW
-    common = ALL_IMAGES_WORKFLOW.split("  build-common:\n", 1)[1].split(
-        "  build-components:\n", 1
-    )[0]
-    components = ALL_IMAGES_WORKFLOW.split("  build-components:\n", 1)[1].split(
-        "\n  build-carla-interface:\n", 1
-    )[0]
-    for job in (common, components):
-        assert save_ccache in job
-        assert job.count("if: env.SAVE_CCACHE == 'true'") == 2
-        assert "if: env.IS_MAIN_PUSH == 'true'" not in job
-        assert "enable=${{ env.IS_MAIN_PUSH }}" in job
+    result = subprocess.run([str(ROOT / "openadkit"), "validate", "world", "--gpu", "--json"],
+                            cwd=kit, env=dict(os.environ), text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, result.stderr
 
 
-def test_local_common_build_is_shared_without_persistent_pr_cache():
-    assert "github.event_name == 'workflow_dispatch' && github.run_id || github.ref" in (
-        SINGLE_IMAGE_WORKFLOW
+def test_kit_files_shared_by_deployments_and_host_reads_are_the_kits(tmp_path, compose_context):
+    # A kit: a world file two deployments include, one of which
+    # takes nothing from the base and reads the desktop's DISPLAY.
+    kit = tmp_path / "kit"
+    (kit / "deployments/shared").mkdir(parents=True)
+    (kit / "openadkit.json").write_text(json.dumps({
+        "schemaVersion": 2, "kind": "kit", "extends": str(ROOT),
+        "deployments": {"manual": {"description": "Drive by hand", "base": "carla-simulation"}},
+        "externalImages": {},
+    }))
+    world = '  carla:\n    image: busybox:1.36.1\n    command: ["sleep", "${TOWN}"]\n'
+    (kit / "deployments/shared/world.yaml").write_text("services:\n" + world)
+    directory = kit / "deployments/manual"
+    directory.mkdir()
+    (directory / "settings.env").write_text("TOWN=Town01\n")
+    (directory / "compose.yaml").write_text(
+        "include:\n  - ../shared/world.yaml\n"
+        "services:\n  manual:\n    image: busybox:1.36.1\n"
+        "    environment:\n      DISPLAY: ${DISPLAY:?run from a desktop session}\n"
     )
-    assert "cancel-in-progress: true" in SINGLE_IMAGE_WORKFLOW
-
-    producer = SINGLE_IMAGE_WORKFLOW.split("  build-local-common:\n", 1)[1].split(
-        "\n  build:\n", 1
-    )[0]
-    build = SINGLE_IMAGE_WORKFLOW.split("\n  build:\n", 1)[1].split(
-        "\n  cleanup-pr-caches:\n", 1
-    )[0]
-    cleanup = SINGLE_IMAGE_WORKFLOW.split("\n  cleanup-pr-caches:\n", 1)[1]
-
-    assert "github.event_name == 'pull_request'" in producer
-    assert "head.repo.full_name == github.repository" in producer
-    assert "actions: write" in producer
-    assert "targets: universe-common" in producer
-    assert "scope=pr-common-devel-${{ github.run_id }},mode=min" in producer
-    assert "scope=pr-common-runtime-${{ github.run_id }},mode=min" in producer
-    assert 'gh cache delete --all --ref "${PR_REF}"' in producer
-
-    assert "needs: [prepare, build-local-common]" in build
-    assert "always() &&\n      !cancelled()" in build
-    assert "needs.build-local-common.result == 'skipped'" in build
-    assert "*.cache-from+=type=gha,scope=pr-common-devel-" in build
-    assert "*.cache-from+=type=gha,scope=pr-common-runtime-" in build
-
-    assert "needs: [prepare, build-local-common, build]" in cleanup
-    assert "always() &&" in cleanup
-    assert "!cancelled()" in cleanup
-    assert "actions: write" in cleanup
-    assert 'gh cache delete --all --ref "${PR_REF}"' not in cleanup
-    assert 'test("pr-common-(devel|runtime)-" + $run)' in cleanup
-    assert "*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:universe-common" in build
-    assert "*.cache-from+=type=registry,ref=ghcr.io/{0}/openadkit-buildcache:simulator" in build
+    environment = dict(os.environ, DISPLAY=":1")
+    result = subprocess.run([str(ROOT / "openadkit"), "validate", "manual", "--gpu", "--json"],
+                            cwd=kit, env=environment, text=True, capture_output=True, timeout=60)
+    assert result.returncode == 0, result.stderr
 
 
-def test_single_image_build_pins_all_upstream_autoware_contexts():
-    assert "UPSTREAM_ROS_DISTRO: ${{ inputs.ros-distro || 'humble' }}" in (
-        SINGLE_IMAGE_WORKFLOW
-    )
-    for output, context in (
-        ("upstream_core_devel", "*.contexts.autoware-core-devel={0}"),
-        ("upstream_base", "*.contexts.autoware-base={0}"),
-        (
-            "upstream_cuda_runtime",
-            "sensing-perception-cuda.contexts.autoware-base-cuda-runtime={0}",
-        ),
-        (
-            "upstream_cuda_devel",
-            "sensing-perception-cuda.contexts.autoware-base-cuda-devel={0}",
-        ),
-    ):
-        assert f"{output}: ${{{{ steps.upstream.outputs." in SINGLE_IMAGE_WORKFLOW
-        assert context in SINGLE_IMAGE_WORKFLOW
-        assert f"needs.prepare.outputs.{output}" in SINGLE_IMAGE_WORKFLOW
-    assert 'export UPSTREAM_IMAGE_NAMES="${names[*]}"' in SINGLE_IMAGE_WORKFLOW
-    assert "@sha256:" not in SINGLE_IMAGE_WORKFLOW
-
-
-def test_carla_runs_after_unrelated_component_failure():
-    carla = ALL_IMAGES_WORKFLOW.split("  build-carla-interface:\n", 1)[1].split(
-        "\n  # =============================================================================\n"
-        "  # Stage 3:",
-        1,
-    )[0]
-    assert "needs: [prepare, build-common, build-components]" in carla
-    assert "!cancelled()" in carla
-    assert "needs.prepare.result == 'success'" in carla
-    assert "needs.build-common.result == 'success'" in carla
-    assert "needs.build-components.result == 'success'" not in carla
-
-
-def test_common_matrix_failure_does_not_skip_component_cells():
-    components = ALL_IMAGES_WORKFLOW.split("  build-components:\n", 1)[1].split(
-        "\n  build-carla-interface:\n", 1
-    )[0]
-    assert "!cancelled() && needs.prepare.result == 'success'" in components
-    assert "needs.build-common.result == 'success'" not in components
-
-
-def test_manifest_jobs_require_prepare_success():
-    manifests = ALL_IMAGES_WORKFLOW.split("  create-manifests:\n", 1)[1].split(
-        "\n  manifest-report:\n", 1
-    )[0]
-    report = ALL_IMAGES_WORKFLOW.split("  manifest-report:\n", 1)[1].split(
-        "\n  capture-metadata:\n", 1
-    )[0]
-    assert "!cancelled() && needs.prepare.result == 'success'" in manifests
-    assert "!cancelled() && needs.prepare.result == 'success'" in report
-
-
-def test_yaml_and_docs_navigation_inputs_trigger_validation():
-    for path in (
-        ".github/ISSUE_TEMPLATE/**",
-        ".github/DISCUSSION_TEMPLATE/**",
-        ".github/dependabot.yaml",
-        ".github/stale.yml",
-        ".github/sync-files.yaml",
-        "deployments/**/*.yaml",
-        "platforms/**/*.yml",
-    ):
-        assert path in LINT_WORKFLOW
-    assert '"docs/.pages"' in DOCS_WORKFLOW
-    assert '"docs/**/.pages"' in DOCS_WORKFLOW
-    assert '"cli/**"' in DOCS_WORKFLOW
-    assert "openadkit.json" in DOCS_WORKFLOW
-    assert "openadkit.d" not in DOCS_WORKFLOW
-    preview = (ROOT / ".github/workflows/pr-preview.yaml").read_text()
-    assert '"cli/**"' in preview
-    assert "openadkit.json" in preview
-    assert "openadkit.d" not in preview
-    assert '"docs/.pages"' in preview
-    assert '"docs/**/.pages"' in preview
-    assert "'docs/.pages'" in LINT_WORKFLOW
-    assert "'docs/**/.pages'" in LINT_WORKFLOW
-    release = (ROOT / ".github/workflows/release.yaml").read_text()
-    assert "source_ref: ${{ github.event.repository.default_branch }}" in release
-    assert "source_ref: ${{ github.sha }}" not in release
-    assert "source_ref: ${{ inputs.version }}" not in release
-    assert "INSTALLER_SOURCE_DIR: ${{ github.workspace }}" in release
-    assert "must match openadkit.json defaultRosDistro" in release
-    validate_job = release.split("\n  validate:\n", 1)[1].split(
-        "\n  package-bundles:", 1
-    )[0]
-    assert "openadkit.json" in validate_job
-    preview_deploy = (ROOT / ".github/workflows/pr-preview-deploy.yaml").read_text()
-    shared_pages = (
-        "group: gh-pages\n"
-        "      cancel-in-progress: false\n"
-        "      queue: max"
-    )
-    assert shared_pages in DOCS_WORKFLOW
-    assert DOCS_WORKFLOW.count(shared_pages) == 1
-    assert shared_pages in preview_deploy
-    assert preview_deploy.count(shared_pages) == 2
-    assert "group: preview-deploy-" not in preview_deploy
-    actionlint_config = (ROOT / ".github/actionlint.yaml").read_text()
-    assert 'unexpected key "queue" for "concurrency" section' in actionlint_config
-    macros = (ROOT / "docs/macros.py").read_text()
-    assert 'kit["imagePrefixComponent"]' in macros
-    assert 'REGISTRY = "ghcr.io/autowarefoundation/openadkit"' not in macros
-
-
-def test_docs_use_plural_deployments_path():
-    assert (ROOT / "docs/deployments/index.md").is_file()
-    assert not (ROOT / "docs/deployment").exists()
-    assert ": deployment/" not in (ROOT / "mkdocs.yaml").read_text()
-
-
-def test_capture_metadata_uses_retrying_registry_lookup():
-    assert "source \"${script_dir}/registry_lookup.sh\"" in CAPTURE_METADATA
-    assert "registry_inspect_json" in CAPTURE_METADATA
-    assert 'select(test("^sha256:[0-9a-f]{64}$"))' in CAPTURE_METADATA
-
-
-def test_published_images_include_autoware_lock_provenance():
-    label = 'labels."org.opencontainers.image.autoware-lock-sha256"'
-    assert ALL_IMAGES_WORKFLOW.count(label) == 3
-    assert "AUTOWARE_LOCK_SHA256: ${{ steps.lock.outputs.autoware_lock_sha256 }}" in (
-        SINGLE_IMAGE_WORKFLOW
-    )
-    assert "AUTOWARE_LOCK_SHA256" in REGISTRY_CONTEXT_RESOLVER
-
-
-def test_carla_registry_simulator_provenance_is_validated():
-    assert 'resolve_registry_context "${simulator_ref}"' in REGISTRY_CONTEXT_RESOLVER
-
-
-def test_registry_provenance_mismatch_falls_back_before_source_setup():
-    assert SINGLE_IMAGE_WORKFLOW.index("Resolve registry contexts") < (
-        SINGLE_IMAGE_WORKFLOW.index("Set up build environment")
-    )
-    assert (
-        "use_local_common: ${{ steps.contexts.outputs.use_local_common }}"
-        in SINGLE_IMAGE_WORKFLOW
-    )
-    assert (
-        "setup-autoware: ${{ needs.prepare.outputs.setup_autoware == 'true' || "
-        "needs.prepare.outputs.use_local_common == 'true' || "
-        "needs.prepare.outputs.use_local_simulator == 'true' }}"
-        in SINGLE_IMAGE_WORKFLOW
-    )
-    assert (
-        "with-middleware: ${{ needs.prepare.outputs.with_middleware == 'true' || "
-        "needs.prepare.outputs.use_local_common == 'true' }}"
-        in SINGLE_IMAGE_WORKFLOW
-    )
-    assert "needs.prepare.outputs.devel_context != ''" in SINGLE_IMAGE_WORKFLOW
-    assert "needs.prepare.outputs.runtime_context != ''" in SINGLE_IMAGE_WORKFLOW
-
-
-def test_carla_registry_simulator_overrides_named_context():
-    for workflow in (ALL_IMAGES_WORKFLOW, SINGLE_IMAGE_WORKFLOW):
-        assert "carla-interface.contexts.simulator=" in workflow
-        assert "carla-interface.args.SIMULATOR_IMAGE=" not in workflow
-
-    assert 'echo "simulator_context=${simulator_context}"' in REGISTRY_CONTEXT_RESOLVER
-    assert "printf 'docker-image://%s@%s\\n'" in REGISTRY_CONTEXT_RESOLVER
-    assert 'SIMULATOR_IMAGE = "simulator"' in BAKE
-
-
-def test_logging_universe_image_has_compose_default():
-    logging = (ROOT / "deployments/logging-simulation/docker-compose.yaml").read_text()
-    assert "${AUTOWARE_UNIVERSE_IMAGE:-ghcr.io/autowarefoundation/autoware:universe@" in logging
-
-
-def test_carla_compose_uses_gpu_sensing_image():
-    carla = (ROOT / "deployments/carla-simulation/docker-compose.yaml").read_text()
-    env = (ROOT / "deployments/carla-simulation/config.env").read_text()
-    assert "SENSING_PERCEPTION_GPU_IMAGE:-ghcr.io/autowarefoundation/openadkit:sensing-perception-cuda" in carla
-    assert "SENSING_PERCEPTION_GPU_IMAGE=" not in env
-    assert "image: ${SENSING_PERCEPTION_IMAGE" not in carla
-
-
-def test_lint_validates_standalone_zenoh_compose():
-    assert "cd deployments/zenoh-bridge && docker compose --env-file config.env config -q" in (
-        LINT_WORKFLOW
-    )
-
-
-def test_zenoh_stays_off_cli_inventory():
-    inventory = (ROOT / "openadkit.json").read_text()
-    assert '"zenoh-bridge"' not in inventory
-
-
-def test_zenoh_cloud_bridge_is_internal_only():
-    cloud_bridge = ZENOH_COMPOSE.split("\n  cloud_zenoh_bridge:", 1)[1].split(
-        "\n  cloud_zenoh_ready:", 1
-    )[0]
-    assert "ports:" not in cloud_bridge
-    assert "-l tcp/0.0.0.0:7448" in cloud_bridge
-    assert re.search(
-        r"cloud_zenoh_ready:.*?depends_on:\s+cloud_zenoh_bridge:\s+"
-        r"condition: service_started",
-        ZENOH_COMPOSE,
-        flags=re.DOTALL,
-    )
-
-
-def test_single_image_cli_writes_github_outputs(monkeypatch, capsys):
-    monkeypatch.chdir(ROOT)
-    monkeypatch.setattr(sys, "stdin", io.StringIO("components/api/Dockerfile\n"))
-    assert matrices.main(["resolver", "single-image", "humble", ""]) == 0
-    assert 'targets_json=["api"]' in capsys.readouterr().out
+def test_centerpoint_models_mount_where_the_cli_installs_them(compose_context, tmp_path):
+    import data
+    (tmp_path / "oak/settings").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "oak/settings/logging-simulation.env").write_text("DATA_PATH=/srv/autoware_data\n")
+    deployment = catalog.get_deployment(ROOT, compose_context, "logging-simulation")
+    selection = settings.resolve(deployment, compose_context, "humble", True)
+    resource = next(item for item in deployment.data if item["destinationEnv"] == "CENTERPOINT_DATA_PATH")
+    result = compose.run_compose(deployment, selection, ["config", "--format", "json"])
+    mounts = {item["target"]: item["source"] for item in json.loads(result.stdout)["services"]["perception"]["volumes"]}
+    assert mounts["/autoware_data"] == "/srv/autoware_data"
+    assert mounts["/autoware_data/lidar_centerpoint"] == str(data.resolve_destination(resource, selection))

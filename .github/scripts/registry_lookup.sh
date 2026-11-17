@@ -9,6 +9,9 @@
 #                              retries, unclassified).
 # registry_manifest_digest   - prints the sha256 manifest digest for a ref;
 #                              exit codes as above, plus 2 for invalid metadata.
+# registry_preflight_release_images
+#                            - checks release images before any tag moves.
+#                              Exit codes: 0 clean, 1 conflicts, 2 lookup failure.
 
 registry_inspect_json() {
   local ref="$1"
@@ -77,4 +80,37 @@ registry_manifest_digest() {
   fi
   echo "Registry returned invalid manifest metadata for ${ref}" >&2
   return 2
+}
+
+# Release validation and promotion both run this preflight: once against the
+# build metadata and again against the sealed plan right before tags move.
+# Reads "<source-ref> TAB <release-ref> TAB <digest>" lines on stdin. Every
+# source ref must still resolve to its digest, and no release tag may already
+# point elsewhere. Reports every conflict before failing.
+registry_preflight_release_images() {
+  local conflicts=0 source_ref release_ref digest observed lookup_status
+
+  while IFS=$'\t' read -r source_ref release_ref digest; do
+    lookup_status=0
+    observed=$(registry_manifest_digest "${source_ref}") || lookup_status=$?
+    if [ "${lookup_status}" -eq 1 ]; then
+      echo "Source image not found: ${source_ref}" >&2
+      conflicts=1
+    elif [ "${lookup_status}" -ne 0 ]; then
+      return "${lookup_status}"
+    elif [ "${observed}" != "${digest}" ]; then
+      echo "Source digest mismatch for ${source_ref}: ${observed} != ${digest}" >&2
+      conflicts=1
+    fi
+
+    lookup_status=0
+    observed=$(registry_manifest_digest "${release_ref}") || lookup_status=$?
+    if [ "${lookup_status}" -eq 0 ] && [ "${observed}" != "${digest}" ]; then
+      echo "Release tag conflict: ${release_ref} points to ${observed}, expected ${digest}" >&2
+      conflicts=1
+    elif [ "${lookup_status}" -ne 0 ] && [ "${lookup_status}" -ne 1 ]; then
+      return "${lookup_status}"
+    fi
+  done
+  [ "${conflicts}" -eq 0 ]
 }

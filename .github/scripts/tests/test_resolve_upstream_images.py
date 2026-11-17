@@ -1,15 +1,16 @@
 import json
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
+import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / ".github/scripts/resolve_upstream_images.sh"
 DIGEST = f"sha256:{'a' * 64}"
 
 
-def resolver_env(tmp_path, distro=None, image_names=None):
+def resolver_env(tmp_path, distro=None, image_names=None, upstream_tag="1.8.0"):
     inventory = tmp_path / "inventory.json"
     inventory.write_text(json.dumps({"ros_distros": ["humble", "jazzy"]}))
     output = tmp_path / "upstream-images.json"
@@ -25,7 +26,7 @@ printf '{"manifest":{"digest":"%s"}}\n' "${DIGEST}"
     fake_docker.chmod(0o755)
     env = os.environ | {
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
-        "AUTOWARE_BASE_VERSION": "1.8.0",
+        "UPSTREAM_TAG": upstream_tag,
         "IMAGE_INVENTORY": str(inventory),
         "UPSTREAM_IMAGES_OUTPUT": str(output),
         "DOCKER_LOG": str(docker_log),
@@ -38,8 +39,8 @@ printf '{"manifest":{"digest":"%s"}}\n' "${DIGEST}"
     return env, output, docker_log
 
 
-def run_resolver(tmp_path, distro=None, image_names=None):
-    env, output, docker_log = resolver_env(tmp_path, distro, image_names)
+def run_resolver(tmp_path, distro=None, image_names=None, upstream_tag="1.8.0"):
+    env, output, docker_log = resolver_env(tmp_path, distro, image_names, upstream_tag)
     result = subprocess.run(
         ["bash", str(SCRIPT)], env=env, text=True, capture_output=True
     )
@@ -48,51 +49,52 @@ def run_resolver(tmp_path, distro=None, image_names=None):
     return result, data, inspected
 
 
-def test_resolves_all_inventory_distros_by_default(tmp_path):
-    result, data, inspected = run_resolver(tmp_path)
-    assert result.returncode == 0
-    assert len(data) == 8
-    assert len(inspected) == 8
-    assert {item["ros_distro"] for item in data} == {"humble", "jazzy"}
-
-
-def test_resolves_only_requested_distro(tmp_path):
-    result, data, inspected = run_resolver(tmp_path, "humble")
-    assert result.returncode == 0
-    assert len(data) == 4
-    assert len(inspected) == 4
-    assert {item["ros_distro"] for item in data} == {"humble"}
-    assert all("-humble-1.8.0" in ref for ref in inspected)
+@pytest.mark.parametrize(
+    ("distro", "names", "distros", "count"),
+    [
+        (None, None, {"humble", "jazzy"}, 8),
+        ("humble", None, {"humble"}, 4),
+        ("humble", "core-devel base", {"humble"}, 2),
+        ("humble", "", set(), 0),
+    ],
+)
+def test_resolves_requested_distros_and_images(tmp_path, distro, names, distros, count):
+    result, data, inspected = run_resolver(tmp_path, distro, names)
+    assert result.returncode == 0, result.stderr
+    assert len(data) == len(inspected) == count
+    assert {item["ros_distro"] for item in data} == distros
+    if names:
+        assert {item["name"] for item in data} == set(names.split())
+    if distro:
+        assert all(f"-{distro}-1.8.0" in ref for ref in inspected)
     assert all(item["uri"] == f"docker-image://{item['ref']}@{DIGEST}" for item in data)
 
 
-def test_resolves_only_requested_image_names(tmp_path):
-    result, data, inspected = run_resolver(
-        tmp_path, "humble", "core-devel base"
-    )
-    assert result.returncode == 0
-    assert {item["name"] for item in data} == {"core-devel", "base"}
-    assert len(inspected) == 2
+def test_an_upstream_release_is_required(tmp_path):
+    result, data, inspected = run_resolver(tmp_path, "humble", upstream_tag="")
+    assert result.returncode != 0 and data is None and inspected == []
+    assert "UPSTREAM_TAG is required" in result.stderr
 
 
-def test_empty_image_name_list_skips_registry_lookup(tmp_path):
-    result, data, inspected = run_resolver(tmp_path, "humble", "")
-    assert result.returncode == 0
-    assert data == []
-    assert inspected == []
+def test_a_missing_inventory_fails_instead_of_resolving_nothing(tmp_path):
+    env, output, _ = resolver_env(tmp_path)
+    env["IMAGE_INVENTORY"] = str(tmp_path / "missing.json")
+    result = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True)
+    assert result.returncode != 0
+    assert not output.exists()
+    assert "Image inventory not found" in result.stderr
 
 
-def test_rejects_unknown_distro_before_registry_lookup(tmp_path):
-    result, data, inspected = run_resolver(tmp_path, "rolling")
+@pytest.mark.parametrize(
+    ("distro", "names", "message"),
+    [
+        ("rolling", None, "Unsupported upstream ROS distro: rolling"),
+        ("humble", "base unknown", "Unsupported upstream image name: unknown"),
+    ],
+)
+def test_rejects_unknown_inputs_before_registry_lookup(tmp_path, distro, names, message):
+    result, data, inspected = run_resolver(tmp_path, distro, names)
     assert result.returncode != 0
     assert data is None
     assert inspected == []
-    assert "Unsupported upstream ROS distro: rolling" in result.stderr
-
-
-def test_rejects_unknown_image_before_registry_lookup(tmp_path):
-    result, data, inspected = run_resolver(tmp_path, "humble", "base unknown")
-    assert result.returncode != 0
-    assert data is None
-    assert inspected == []
-    assert "Unsupported upstream image name: unknown" in result.stderr
+    assert message in result.stderr

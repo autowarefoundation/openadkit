@@ -1,0 +1,31 @@
+# Map — serves the Lanelet2 and pointcloud map from the host MAP_PATH.
+#
+# The Autoware services join this container's PID namespace (pid: service:map)
+# so their PIDs are unique. ROS 2 launch names its internal node
+# launch_ros_<PID>: in separate namespaces every `ros2 launch` gets the same PID,
+# duplicated_node_checker reports the repeated /launch_ros_<PID> as an error,
+# and the diagnostics graph then makes autonomous mode unavailable. Map holds
+# the namespace because it loads its files once and then only publishes, so it
+# is the service least likely to crash: when it exits, every joined container
+# is killed and restarts with it.
+services:
+  map:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-map
+    volumes:
+      - type: bind
+        source: ${MAP_PATH}
+        target: /autoware_map
+        read_only: true
+        bind:
+          create_host_path: false
+      - ../launch/component.launch.py:/openadkit/launch/component.launch.py:ro
+    command: >
+      ros2 launch /openadkit/launch/component.launch.py component:=component_map
+      lanelet2_map_file:=${LANELET2_MAP_FILE}
+      map_path:=/autoware_map
+      pointcloud_map_file:=${POINTCLOUD_MAP_FILE}
+      use_sim_time:=${USE_SIM_TIME}

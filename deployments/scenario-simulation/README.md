@@ -1,8 +1,8 @@
 # Scenario Simulation
 
-Runs TIER IV Scenario Simulator workflows. See the
+Runs predefined traffic scenarios in TIER IV Scenario Simulator. See the
 [canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/)
-for configuration and troubleshooting.
+for settings.
 
 ```bash
 cd ../..

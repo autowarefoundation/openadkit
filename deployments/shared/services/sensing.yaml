@@ -1,0 +1,17 @@
+# Sensing — captures and preprocesses raw sensor data.
+services:
+  sensing:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-sensing
+    pid: service:map
+    command: >
+      ros2 launch autoware_launch component_sensing.launch.xml
+      launch_pointcloud_container:=true
+      launch_sensing_driver:=${LAUNCH_SENSING_DRIVER}
+      pointcloud_container_name:=${POINTCLOUD_CONTAINER_NAME}
+      sensor_model:=${SENSOR_MODEL}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}

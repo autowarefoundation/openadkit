@@ -1,9 +1,8 @@
 # Logging Simulation
 
-Replays recorded sensor data through the Autoware sensing, perception, and
-localization stack. Install the host dependencies as described in the
-[canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/)
-before starting.
+Replays recorded sensor data through Autoware's sensing, perception and
+localization. See the
+[canonical documentation](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/).
 
 ```bash
 cd ../..
@@ -14,7 +13,7 @@ GPU:
 
 ```bash
 cd ../..
-./openadkit setup --gpu --verify
+./openadkit setup --gpu
 ./openadkit run logging-simulation --gpu
 ```
 

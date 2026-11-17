@@ -1,0 +1,26 @@
+# API — the Autoware API and default ADAPI surface.
+services:
+  api:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-api
+    pid: service:map
+    volumes:
+      - ../checks:/openadkit/checks:ro
+    # Healthy once Autoware is ready (READINESS_CHECKS in settings.env), which
+    # `openadkit run` waits for. Without checks it is healthy once it runs.
+    # As in every Autoware service, a node that died comes first.
+    healthcheck:
+      test: ["CMD-SHELL", "! cat /tmp/openadkit/died 2>/dev/null && . /opt/ros/${ROS_DISTRO}/setup.sh && . /opt/autoware/setup.sh && exec python3 /openadkit/checks/readiness.py ${READINESS_CHECKS:-}"]
+      start_period: 10m
+      start_interval: 5s
+      interval: 1m
+      timeout: 90s
+      retries: 3
+    command: >
+      ros2 launch autoware_launch tier4_autoware_api_component.launch.xml
+      scenario_simulation:=${SCENARIO_SIMULATION}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}

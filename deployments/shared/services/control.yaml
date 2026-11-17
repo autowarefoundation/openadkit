@@ -1,0 +1,18 @@
+# Control — turns a trajectory into throttle, brake, and steering commands.
+services:
+  control:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${CONTROL_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-control
+    pid: service:map
+    command: >
+      ros2 launch autoware_launch component_control.launch.xml
+      check_external_emergency_heartbeat:=${CHECK_EXTERNAL_EMERGENCY_HEARTBEAT}
+      lateral_controller_mode:=${LATERAL_CONTROLLER_MODE}
+      longitudinal_controller_mode:=${LONGITUDINAL_CONTROLLER_MODE}
+      module_preset:=${CONTROL_MODULE_PRESET}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_id:=${VEHICLE_ID}
+      vehicle_model:=${VEHICLE_MODEL}

@@ -1,0 +1,56 @@
+# Planning simulation — Autoware planning and control against a pre-recorded map
+# in the built-in dummy simulator.
+#
+# Service definitions live in ../shared/services/<service>.yaml (one file per service).
+# This file selects the stack and owns its topology: depends_on and any
+# deployment-specific mounts or overrides.
+include:
+  - ../shared/services/map.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/simulator.yaml
+  - ../shared/services/simulated-perception.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
+
+services:
+  planning:
+    depends_on:
+      - map
+
+  vehicle:
+    depends_on:
+      - map
+
+  system:
+    depends_on:
+      - map
+
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
+  simulator:
+    depends_on:
+      map:
+        condition: service_started
+      system:
+        condition: service_started
+      vehicle:
+        condition: service_started
+
+  simulated-perception:
+    depends_on:
+      - map
+
+  api:
+    depends_on:
+      - map
+
+  visualizer:
+    depends_on:
+      - map

@@ -1,0 +1,103 @@
+# Planning Simulation with the Safety Island as the controller.
+#
+# Autoware runs on DDS domain 1 without its trajectory follower (control preset).
+# The Safety Island runs on domain 2 and publishes the control command that the
+# follower would; domain_bridge carries the topics of the Safety Island's
+# released bridge-config.yaml between the two domains.
+include:
+  - ../shared/services/map.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/simulator.yaml
+  - ../shared/services/simulated-perception.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
+
+services:
+  planning:
+    depends_on:
+      - map
+
+  vehicle:
+    depends_on:
+      - map
+
+  system:
+    depends_on:
+      - map
+
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
+  simulator:
+    depends_on:
+      map:
+        condition: service_started
+      system:
+        condition: service_started
+      vehicle:
+        condition: service_started
+
+  simulated-perception:
+    depends_on:
+      - map
+
+  api:
+    depends_on:
+      - map
+
+  visualizer:
+    depends_on:
+      - map
+
+  safety-island-bridge:
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
+    container_name: safety-island-bridge
+    network_mode: host
+    init: true
+    ipc: host
+    env_file:
+      - ../shared/runtime.env
+    environment:
+      # The shared config applies to every domain, so both sides of the bridge
+      # stay on one interface; the release's domain-2 setting keeps datagrams
+      # within what the Safety Island receives.
+      CYCLONEDDS_URI: file:///etc/cyclonedds/cyclonedds.xml,file:///safety-island/cyclonedds-domain2.xml
+    volumes:
+      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${SAFETY_ISLAND_PATH:?set in settings.env}:/safety-island:ro
+      - ./checks:/openadkit/checks:ro
+    command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
+    # Healthy once the Safety Island, not Autoware's follower, publishes the
+    # control command, which `openadkit run` waits for.
+    healthcheck:
+      test: ["CMD-SHELL", ". /opt/ros/${ROS_DISTRO}/setup.sh && . /opt/autoware/setup.sh && exec python3 /openadkit/checks/safety_island.py"]
+      start_period: 10m
+      start_interval: 5s
+      interval: 1m
+      timeout: 90s
+      retries: 3
+    restart: on-failure
+
+  safety-island:
+    # The FreeRTOS POSIX build needs only glibc and libstdc++, which every
+    # runtime image ships. Downloaded data has no executable bit.
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
+    container_name: safety-island
+    network_mode: host
+    init: true
+    environment:
+      SI_DDS_INTERFACE: ${CYCLONEDDS_NETWORK_INTERFACE:-lo}
+    volumes:
+      - ${SAFETY_ISLAND_PATH:?set in settings.env}:/safety-island:ro
+    command: >
+      sh -c 'install -m 0755 /safety-island/actuation_freertos /tmp/actuation_freertos
+      && exec /tmp/actuation_freertos'
+    depends_on:
+      - safety-island-bridge
+    restart: on-failure

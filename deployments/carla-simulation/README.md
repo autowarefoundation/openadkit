@@ -5,7 +5,7 @@ are required. See the [canonical documentation](https://autowarefoundation.githu
 
 ```bash
 cd ../..
-./openadkit setup --gpu --verify
-./openadkit run carla-simulation --gpu
-./openadkit stop carla-simulation
+./openadkit setup --gpu
+./openadkit run carla-simulation
+./openadkit stop
 ```

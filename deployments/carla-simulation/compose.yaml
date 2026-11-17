@@ -1,0 +1,36 @@
+# CARLA simulation — single-host graph.
+#
+# Assembles the shared Autoware and CARLA service files and restores the
+# single-host wiring: vehicle/sensing/visualizer wait on carla-interface. The
+# split views remove those edges: --role autoware and --role carla start the
+# files that deployment.json lists for the role. This file never includes the
+# Zenoh bridge.
+#
+# Compose merges depends_on with what the included files declare, so this file
+# adds only the carla-interface edges, and the visualizer's edges to Autoware.
+include:
+  - compose.autoware.yaml
+  - compose.carla.yaml
+
+services:
+  # Like every Autoware launch, carla-interface joins map's PID namespace so its
+  # /launch_ros_<PID> node is unique (../shared/services/map.yaml). The
+  # --role carla view has no map and keeps its own namespace.
+  carla-interface:
+    pid: service:map
+
+  vehicle:
+    depends_on:
+      - carla-interface
+
+  sensing:
+    depends_on:
+      - carla-interface
+
+  visualizer:
+    depends_on:
+      - map
+      - api
+      - planning
+      - control
+      - carla-interface

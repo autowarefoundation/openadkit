@@ -1,0 +1,15 @@
+# GPU mode of logging simulation — swap perception onto the CUDA image and
+# reserve the GPU. Model flags come from settings.gpu.env.
+services:
+  perception:
+    image: ${SENSING_PERCEPTION_GPU_IMAGE:?set by the openadkit CLI}
+    # The CLI installs the CenterPoint models here; mount the same path.
+    volumes:
+      - ${CENTERPOINT_DATA_PATH}:/autoware_data/lidar_centerpoint:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

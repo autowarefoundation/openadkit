@@ -1,50 +1,63 @@
-# Deployment
+# Deployments
 
-A deployment combines Open AD Kit images, environment files, and Docker Compose
-configuration for a specific task.
+A deployment is a ready-to-run Autoware stack for one task. The deployments a
+release ships are its catalog. New users should start with Planning Simulation.
 
-| Deployment | Purpose | Topology | GPU |
-|------------|---------|----------|-----|
-| [Planning Simulation](planning-simulation/index.md) | Plan and follow a route on a demo map | Single host | No |
-| [Scenario Simulation](scenario-simulation/index.md) | Execute predefined traffic scenarios | Single host | No |
-| [Logging Simulation](logging-simulation/index.md) | Replay sensor data through sensing, perception, and localization | Single host | Recommended |
-| [CARLA Simulation](carla-simulation/index.md) | Drive a CARLA ego vehicle in closed loop | Single host | Required |
-| [Zenoh Bridge](zenoh-bridge/index.md) | Separate edge compute from visualization and control | Single Compose project | Varies |
+| Deployment | Purpose | GPU | Architectures | CI evidence |
+|------------|---------|-----|---------------|-------------|
+| [Planning Simulation](planning-simulation.md) | Plan and follow a route on a sample map with the built-in simulator; `--gpu` plans with the Diffusion Planner | Optional | amd64, arm64 | Yes, in CPU mode |
+| [Scenario Simulation](scenario-simulation.md) | Run predefined traffic scenarios in Scenario Simulator | No | amd64, arm64 | Yes |
+| [Logging Simulation](logging-simulation.md) | Replay recorded sensor data through sensing, perception and localization | Optional | amd64, arm64 | Yes, in CPU mode |
+| [CARLA Simulation](carla-simulation.md) | Drive in closed loop with the CARLA simulator | Required | amd64 | Exempt |
+| [Safety Island Simulation](safety-island-simulation.md) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller | No | amd64 | Yes |
 
-New users should start with Planning Simulation. The CLI and release bundle
-support Planning, Scenario, Logging, and CARLA Simulation. Zenoh remains a
-standalone source-checkout deployment.
+All run on Humble and Jazzy except CARLA Simulation, which is Humble-only, and
+the GPU modes are amd64-only. **CI evidence** says whether a release runs the
+deployment end to end before it ships; an exempt deployment ships without that
+check. Evidence runs on every architecture the deployment supports. See the
+[Evidence Policy](../releases/evidence.md).
 
-## Base and Overlay Model
+Scenario and CARLA Simulation can also run as
+[split-host](split-host.md) roles, with Autoware on one host and the simulator
+on another over Zenoh (experimental).
 
-Planning, Scenario, Logging, and CARLA Simulation include the shared
-`deployments/base/docker-compose.yaml`. The base defines map-check, map,
-planning, vehicle, system, control, API, and visualizer services. Planning and
-scenario overlays add the dummy simulator; each deployment adds only its delta.
+## Every Deployment
 
-Each curated deployment carries a `deployment.json` manifest and one complete
-`config.env` for Compose interpolation.
-
---8<-- "includes/cli-command-context.md"
+Complete the [Quickstart](../getting-started/index.md) setup first, with
+`openadkit setup --gpu` for a GPU mode.
 
 ```bash
 openadkit list
-openadkit validate planning-simulation
 openadkit run planning-simulation
-openadkit status planning-simulation
-openadkit logs planning-simulation --follow
-openadkit stop planning-simulation
+openadkit status
+openadkit logs --follow
+openadkit stop
 ```
 
-Add `--ros-distro jazzy` to select Jazzy; Humble is the default. CARLA is
-Humble-only and requires `--gpu`. The release bundle vendors the curated
-deployments and shared base. Local settings belong in ignored
-`config.local.env`; release component images remain pinned. The base's
-`runtime.env` is loaded inside containers via `env_file:`.
+- Add `--ros-distro jazzy` to `validate`, `run` or `build` to select Jazzy;
+  Humble is the default. `fetch` takes no distro: the data is the same for both.
+- Add `--gpu` for the optional GPU mode of Planning Simulation (the Diffusion
+  Planner) or Logging Simulation (CenterPoint). CARLA needs a GPU, so its GPU
+  mode turns on by itself.
+- Put host settings in `~/.config/openadkit/<deployment>.env`; see
+  [Settings](../getting-started/cli.md#settings).
 
-Zenoh does not have a runtime manifest. Use its source-checkout launcher
-scripts documented on its deployment page.
+[CLI & Maintenance](../getting-started/cli.md) covers the other commands.
 
-See [Custom Deployment](custom-deployment.md) to compose a different stack and
-[Container Images & Versioning](../getting-started/container-images.md) for tag
-selection.
+### Open the Visualizer
+
+--8<-- "includes/visualizer-remote-access.md"
+
+### Stop and Recover
+
+`openadkit stop` stops and removes the deployment. To download missing data,
+run `openadkit fetch <deployment>`; to repair incomplete data, add `--force`.
+For other issues, see [Troubleshooting](../getting-started/troubleshooting.md).
+
+## Your Own Kit
+
+Start a kit with `openadkit new` ([Create a Kit](../kits/create-a-kit.md)). It
+is your own project: it runs one or more of these deployments with your
+vehicle's files on top, without copying them, and keeps only your differences. The
+[Kit Guide](../kits/kit-guide.md) is the reference for every
+extension point.

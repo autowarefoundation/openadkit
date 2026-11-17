@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 444" width="1000" height="444" role="img" aria-labelledby="title desc">
+  <title id="title">One command starts Autoware as separate containers</title>
+  <desc id="desc">openadkit run planning-simulation starts localization-mapping, planning, control, vehicle-system, simulator, visualizer and api as containers that talk over ROS 2. The sensing-perception image and the Safety Island belong to other deployments. Caption: one reproducible path from simulation to in-vehicle systems.</desc>
+  <rect x="12" y="52" width="976" height="324" rx="16" fill="none" stroke="#d0d7de" stroke-width="1.5"/>
+  <rect x="302" y="30" width="396" height="44" rx="10" fill="#0d1117" stroke="#0d1117" stroke-width="1.5"/>
+  <text x="500" y="57.5" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" fill="#e6edf3"><tspan fill="#7cacff">$</tspan> openadkit run planning-simulation</text>
+  <path d="M41 212H462M538 212H960" fill="none" stroke="#afb8c1" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="500" y="216.5" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="0.6" fill="#656d76">ROS 2</text>
+  <line x1="138.5" y1="174" x2="138.5" y2="212" stroke="#afb8c1" stroke-width="1.5" stroke-dasharray="3 4"/>
+  <line x1="376.0" y1="174" x2="376.0" y2="212" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="571.5" y1="174" x2="571.5" y2="212" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="712.5" y1="174" x2="712.5" y2="212" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="879.0" y1="174" x2="879.0" y2="212" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="138.5" y1="212" x2="138.5" y2="250" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="376.0" y1="212" x2="376.0" y2="250" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="571.5" y1="212" x2="571.5" y2="250" stroke="#afb8c1" stroke-width="1.5"/>
+  <line x1="879.0" y1="212" x2="879.0" y2="250" stroke="#afb8c1" stroke-width="1.5" stroke-dasharray="3 4"/>
+  <path d="M244 146.0H262M257 141.5L262 146.0L257 150.5" fill="none" stroke="#afb8c1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M490 146.0H508M503 141.5L508 146.0L503 150.5" fill="none" stroke="#656d76" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M635 146.0H653M648 141.5L653 146.0L648 150.5" fill="none" stroke="#656d76" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M772 146.0H790M785 141.5L790 146.0L785 150.5" fill="none" stroke="#656d76" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="41" y="118" width="195" height="56" rx="10" fill="none" stroke="#afb8c1" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <text x="138.5" y="151.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="400" fill="#8c959f">sensing-perception</text>
+  <rect x="270" y="118" width="212" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="376.0" y="151.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">localization-mapping</text>
+  <rect x="516" y="118" width="111" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="571.5" y="151.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">planning</text>
+  <rect x="661" y="118" width="103" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="712.5" y="151.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">control</text>
+  <rect x="798" y="118" width="162" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="879.0" y="151.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">vehicle-system</text>
+  <rect x="78.5" y="250" width="120" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="138.5" y="283.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">simulator</text>
+  <rect x="312" y="250" width="128" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="376.0" y="283.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">visualizer</text>
+  <rect x="531.5" y="250" width="80" height="56" rx="10" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="571.5" y="283.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="500" fill="#1f2328">api</text>
+  <rect x="798" y="250" width="162" height="56" rx="10" fill="none" stroke="#afb8c1" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <text x="879.0" y="283.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#8c959f">Safety Island</text>
+  <rect x="318" y="337" width="14" height="14" rx="4" fill="#eef4ff" stroke="#2f6fe4" stroke-width="1.5"/>
+  <text x="340" y="348.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" fill="#656d76">started by this command</text>
+  <rect x="530" y="337" width="14" height="14" rx="4" fill="none" stroke="#afb8c1" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="552" y="348.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" fill="#656d76">used by other deployments</text>
+  <text x="500" y="418" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" fill="#1f2328">One reproducible path from <tspan fill="#2f6fe4">simulation</tspan> to <tspan fill="#2f6fe4">in-vehicle systems</tspan></text>
+</svg>

@@ -1,29 +1,9 @@
 name: deploy-docs
 
+# The site documents the latest stable release, not main: the release workflow
+# publishes it, and a maintainer can dispatch it to publish a fix in between.
+# Pull requests get a preview (pr-preview.yaml).
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - mkdocs.yaml
-      - openadkit
-      - openadkit.json
-      - "cli/**"
-      - docs/macros.py
-      - .github/image-inventory.json
-      - docs/requirements.txt
-      - "docs/scripts/**"
-      - "**/*.md"
-      - "**/*.svg"
-      - "**/*.png"
-      - "**/*.jpg"
-      - "docs/.pages"
-      - "docs/**/.pages"
-      - "docs/assets/**"
-      - "docs/overrides/**"
-      - "**/*.pages"
-      - ".github/actions/build-docs/**"
-      - ".github/workflows/deploy-docs.yaml"
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -41,20 +21,28 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    outputs:
+      source_sha: ${{ steps.checkout.outputs.commit }}
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Release calls pass the default branch so the build tracks main at
-          # deployment time instead of the dispatch-time SHA. Manual runs also
-          # use main. Pushes check out the triggering commit by default.
+          # build time instead of the dispatch-time SHA. Manual runs also
+          # use main.
           ref: ${{ inputs.source_ref || (github.event_name == 'workflow_dispatch' && github.event.repository.default_branch) || '' }}
 
       - name: Build docs
         uses: ./.github/actions/build-docs
 
+      - name: Record site source
+        env:
+          SOURCE_SHA: ${{ steps.checkout.outputs.commit }}
+        run: printf '%s\n' "$SOURCE_SHA" > site/openadkit-docs-source.txt
+
       - name: Upload production site
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: production-docs-site
           path: site
@@ -79,18 +67,53 @@ jobs:
       contents: write
     steps:
       - name: Checkout deployment repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Reject superseded site sources
+        id: freshness
+        env:
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # PR previews leave this production marker intact. Only forward
+          # source revisions (or rebuilding the same revision) may publish.
+          # For the first marked deployment, use the current default branch.
+          # A marker from another repository (for example, a fork that
+          # inherited gh-pages) is not comparable here; fall back to the
+          # default branch so the fork can publish its own site.
+          if published=$(git show origin/gh-pages:openadkit-docs-source.txt 2>/dev/null); then
+            if ! printf '%s\n' "$published" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "Invalid published documentation source" >&2
+              exit 1
+            fi
+            if ! git cat-file -e "$published^{commit}" 2>/dev/null; then
+              echo "Published documentation source is not in this repository; using $DEFAULT_BRANCH" >&2
+              published=$(git rev-parse "origin/$DEFAULT_BRANCH")
+            fi
+          else
+            published=$(git rev-parse "origin/$DEFAULT_BRANCH")
+          fi
+          if git merge-base --is-ancestor "$published" "$SOURCE_SHA"; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping superseded or divergent site source: $SOURCE_SHA"
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download production site
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: ${{ steps.freshness.outputs.current == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: production-docs-site
           path: site
 
       - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
+        if: ${{ steps.freshness.outputs.current == 'true' }}
+        uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
         with:
           folder: site
           branch: gh-pages

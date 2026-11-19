@@ -1136,10 +1136,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-validate-run-stop" class="md-nav__link">
+  <a href="#run-and-stop" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build, Validate, Run, Stop
+        Run and Stop
       
     </span>
   </a>
@@ -1147,10 +1147,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#make-a-change" class="md-nav__link">
+  <a href="#add-a-package" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Make a Change
+        Add a Package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-a-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change a Parameter
       
     </span>
   </a>
@@ -1778,10 +1789,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-validate-run-stop" class="md-nav__link">
+  <a href="#run-and-stop" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build, Validate, Run, Stop
+        Run and Stop
       
     </span>
   </a>
@@ -1789,10 +1800,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#make-a-change" class="md-nav__link">
+  <a href="#add-a-package" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Make a Change
+        Add a Package
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#change-a-parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change a Parameter
       
     </span>
   </a>
@@ -1841,6 +1863,12 @@ without copying it. A kit holds one or more deployments. Each runs a deployment
 of the release, its base, with the kit's files on top, so the kit holds only
 your differences. Every base is a simulation: a kit shows your vehicle's
 software in simulation, not on the vehicle.</p>
+<p>Without a kit, a deployment of the release takes your settings from the
+<a href="../../getting-started/cli/#settings">host settings file</a> and your packages from
+<a href="../kit-guide/#without-a-kit"><code>--ws</code></a>. A kit keeps your changes, from config
+overrides to your vehicle, services and images, on top of a release that passed
+its <a href="../../releases/evidence/">evidence</a>, and takes the next release when you
+change <code>extends</code> (<a href="../kit-guide/#upgrade-without-losing-your-work">Upgrade</a>).</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>new<span class="w"> </span>my-kit<span class="w">                       </span><span class="c1"># on top of planning-simulation</span>
 openadkit<span class="w"> </span>new<span class="w"> </span>my-kit<span class="w"> </span>--base<span class="w"> </span>scenario-simulation
 </code></pre></div>
@@ -1894,10 +1922,8 @@ cannot be the name of a deployment of the release, such as
 <code>deployments/my-kit-logging-simulation/</code> only when it needs files of its own.
 What you wrote at the kit root now applies to both, so move what only one of
 them needs into its directory.</p>
-<h2 id="build-validate-run-stop">Build, Validate, Run, Stop<a class="headerlink" href="#build-validate-run-stop" title="Permanent link">#</a></h2>
+<h2 id="run-and-stop">Run and Stop<a class="headerlink" href="#run-and-stop" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>my-kit
-openadkit<span class="w"> </span>build<span class="w">                 </span><span class="c1"># overlay_ws, in the release's devel image</span>
-openadkit<span class="w"> </span>validate
 openadkit<span class="w"> </span>run<span class="w"> </span>--verify<span class="w">          </span><span class="c1"># start, wait until ready, run the base's verify step</span>
 openadkit<span class="w"> </span>stop
 </code></pre></div>
@@ -1908,13 +1934,27 @@ a name act on each of them. From elsewhere, one of them is
 <code>./my-kit/deployments/&lt;name&gt;</code>, also while it has no directory of its own. A kit on a source checkout
 runs that checkout's local build, or the CI build <code>OPENADKIT_BUILD</code> names; see
 <a href="../kit-guide/#3-overlay-workspace">Overlay Workspace</a>.</p>
-<p>Add <code>--ros-distro jazzy</code> to <code>build</code>, <code>validate</code> and <code>run</code> for Jazzy.
-<code>validate</code> renders the Compose model without starting anything; it is not
-runtime or ABI evidence, so finish with <code>run --verify</code>.</p>
+<p>For Jazzy, add <code>--ros-distro jazzy</code> to <code>run</code> and <code>validate</code>.
+<code>openadkit validate</code> checks the kit and renders the Compose model without
+starting anything; it is not runtime or ABI evidence, so finish with
+<code>run --verify</code>.</p>
 <p>Every release tests a kit made this way: the
 <a href="https://github.com/autowarefoundation/openadkit/tree/main/.github/scripts/evidence/example-kit">example kit</a> exercises each
 extension point on Humble and Jazzy.</p>
-<h2 id="make-a-change">Make a Change<a class="headerlink" href="#make-a-change" title="Permanent link">#</a></h2>
+<h2 id="add-a-package">Add a Package<a class="headerlink" href="#add-a-package" title="Permanent link">#</a></h2>
+<p>Put your ROS packages in <code>overlay_ws/src</code>, then build them and restart the
+services, or only the one that runs them. The build runs in the release's devel
+image, so the host needs no ROS, and the next build compiles only what changed.
+For Jazzy, add <code>--ros-distro jazzy</code> to <code>build</code> too:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>build<span class="w">                 </span><span class="c1"># overlay_ws, in the release's devel image</span>
+openadkit<span class="w"> </span>restart<span class="w">               </span><span class="c1"># or: openadkit restart &lt;service&gt;</span>
+</code></pre></div>
+<p>A changed copy of an Autoware package runs where Autoware already launches it;
+a new node needs something to start it, such as a service of your own
+(<a href="../kit-guide/#3-overlay-workspace">Overlay Workspace</a>).
+<a href="../develop-and-debug/">Develop and Debug</a> times this loop and shows how to look
+into the running services.</p>
+<h2 id="change-a-parameter">Change a Parameter<a class="headerlink" href="#change-a-parameter" title="Permanent link">#</a></h2>
 <p>A config override changes a parameter without a build. Put the file with only
 the keys you change under <code>config/autoware/</code>, at the path it has in its
 package's share directory, then recreate the services that use it:</p>
@@ -1922,12 +1962,6 @@ package's share directory, then recreate the services that use it:</p>
 <span class="nv">$EDITOR</span><span class="w"> </span>config/autoware/autoware_planning_config/config/scenario_planning/common/common.param.yaml
 openadkit<span class="w"> </span>restart<span class="w">               </span><span class="c1"># the services with config overrides or settings that changed</span>
 </code></pre></div>
-<p>A package change needs a build and a restart of the service that runs it:</p>
-<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>build
-openadkit<span class="w"> </span>restart<span class="w"> </span>&lt;service&gt;
-</code></pre></div>
-<p><a href="../develop-and-debug/">Develop and Debug</a> times that loop and shows how to look
-into the running services.</p>
 <h2 id="where-changes-go">Where Changes Go<a class="headerlink" href="#where-changes-go" title="Permanent link">#</a></h2>
 <p>Keep parameter changes in <code>config/autoware/</code> and packages in <code>overlay_ws/</code>
 rather than mounting over <code>/opt/autoware</code> or replacing a base service's

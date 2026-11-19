@@ -2195,9 +2195,9 @@ openadkit<span class="w"> </span>build<span class="w"> </span>--<span class="w">
 <ul>
 <li>Packages build incrementally: a second build compiles only what changed.</li>
 <li>The CLI records the image and distro in <code>install/.openadkit-overlay.json</code>.
-  After a release upgrade or a distro change, <code>validate</code> and <code>run</code> warn until you
-  rebuild, and that rebuild starts from a clean <code>build/</code> and <code>install/</code>, since
-  CMake caches record the paths they were configured with.</li>
+  After a release upgrade or a distro change, <code>validate</code>, <code>run</code> and <code>restart</code>
+  stop and name the rebuild; that rebuild starts from a clean <code>build/</code> and
+  <code>install/</code>, since CMake caches record the paths they were configured with.</li>
 <li>Without <code>--ros-distro</code>, the build uses the release's default distro, or
   the first one that every kit deployment runs on.</li>
 <li>A <code>build/</code> or <code>install/</code> that <code>openadkit build</code> did not make, such as a colcon
@@ -2231,8 +2231,8 @@ with <code>--ws</code>:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>build<span class="w"> </span>~/my_ws
 openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation<span class="w"> </span>--ws<span class="w"> </span>~/my_ws
 </code></pre></div>
-<p><code>--ws</code> is for a deployment without a workspace of its own; on a kit that has
-one it is an error rather than a second layer.</p>
+<p><code>--ws</code> is for a deployment without packages of its own; on a kit whose
+<code>overlay_ws/src</code> holds packages it is an error rather than a second layer.</p>
 <h4 id="abi">ABI<a class="headerlink" href="#abi" title="Permanent link">#</a></h4>
 <p>The devel and runtime images install ROS packages from the same
 <a href="../../releases/container-images/#ros-package-snapshot">ROS snapshot</a>, so

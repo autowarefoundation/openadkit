@@ -102,13 +102,15 @@ def test_an_image_manifest_needs_a_root_password(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "image/image.aib.yml").read_text())["auth"] == {"root_password": PASSWORD_HASH}
 
 
-def test_an_output_outside_the_working_directory_still_translates(tmp_path, monkeypatch):
+def test_only_units_can_go_outside_the_working_directory(tmp_path, monkeypatch):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
     monkeypatch.chdir(elsewhere)
-    monkeypatch.setattr(quadlet, "EMBEDDED_LIMIT", 3)
-    quadlet.write(model(tmp_path), tmp_path / "out", [], PASSWORD_HASH)
-    assert (tmp_path / "out/image.aib.yml").is_file()
+    quadlet.write(model(tmp_path), tmp_path / "units", [])
+    assert unit(tmp_path / "units", "autoware-map")
+    with pytest.raises(quadlet.TranslationError, match="outside the working directory"):
+        quadlet.write(model(tmp_path), tmp_path / "image", [], PASSWORD_HASH)
+    assert not (tmp_path / "image").exists()
 
 
 def test_a_large_file_reaches_the_image_builder_by_url(tmp_path, monkeypatch):

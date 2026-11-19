@@ -278,6 +278,10 @@ def write(model: dict[str, Any], output: Path, without: list[str], root_password
     if root_password_hash:
         for service in services.values():
             container_image(service["image"])
+        if not output.resolve().is_relative_to(Path.cwd()):
+            raise TranslationError(
+                f"{output} is outside the working directory, which Automotive Image Builder mounts at {BUILDER_ROOT}"
+            )
     rootfs = output / "rootfs"
     if output.exists():
         raise TranslationError(f"{output} already exists")

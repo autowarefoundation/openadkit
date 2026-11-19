@@ -19,6 +19,7 @@ from catalog import (
     Deployment,
     ci_build,
     deployment_checksum,
+    holds_packages,
     host_architecture,
     state_root,
 )
@@ -832,26 +833,22 @@ def build_container(name: str, workspace: Path, image: str, colcon: Sequence[str
     )
 
 
-def check_overlay_build(deployment: Deployment, selection: Selection, image: str | None) -> str | None:
-    """Warn about an overlay workspace that holds packages but no build, or
-    an install that build made for another image."""
+def check_overlay_build(deployment: Deployment, selection: Selection, image: str | None) -> None:
+    """Warn about an overlay workspace that holds packages but no build, and
+    stop on an install that build made for another image or ROS distro."""
     workspace = deployment.workspace
     stamp = read_overlay_stamp(workspace)
     if stamp is None:
-        source = workspace / "src"
-        if (workspace / "install").exists() or not source.is_dir() or next(source.rglob("package.xml"), None) is None:
-            return None
-        warning = f"{workspace} holds packages that are not built; build it: openadkit build {workspace}"
-        print(f"warning: overlay workspace: {warning}", file=sys.stderr)
-        return warning
+        if not (workspace / "install").exists() and holds_packages(workspace):
+            print(f"warning: overlay workspace: {workspace} holds packages that are not built; "
+                  f"build it: openadkit build {workspace}", file=sys.stderr)
+        return
     if stamp.get("rosDistro") == selection.ros_distro and (not image or stamp.get("image") == image):
-        return None
-    warning = (
-        f"{deployment.workspace} was built for {stamp.get('rosDistro')} in {stamp.get('image')}; "
-        f"rebuild it: openadkit build {deployment.workspace} --ros-distro {selection.ros_distro}"
+        return
+    raise OpenADKitError(
+        f"overlay workspace {workspace} was built for {stamp.get('rosDistro')} in {stamp.get('image')}; "
+        f"rebuild it: openadkit build {workspace} --ros-distro {selection.ros_distro}"
     )
-    print(f"warning: overlay workspace: {warning}", file=sys.stderr)
-    return warning
 
 
 # Sourced before a ROS command runs in a service container: docker exec skips

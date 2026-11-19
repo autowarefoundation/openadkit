@@ -26,6 +26,7 @@ from catalog import (
     default_ros_distro,
     deployment_modified,
     get_deployment,
+    holds_packages,
     install_root,
     load_catalog,
     resolve_extends,
@@ -576,7 +577,7 @@ def new_command(root: Path, catalog: Catalog, args: argparse.Namespace) -> int:
     target = create_kit(root, catalog, args.name, args.base, Path.cwd())
     print(f"created: {target}")
     print(f"deployment: {args.name}-{args.base}, which runs {args.base} with the kit's files on top")
-    print(f"next: cd {args.name} && openadkit validate && openadkit run --verify")
+    print(f"next: cd {args.name} && openadkit run --verify")
     return 0
 
 
@@ -594,6 +595,9 @@ def build_command(root: Path, catalog: Catalog, args: argparse.Namespace) -> int
         raise UsageError("name the workspace to build: openadkit build PATH")
     if not (workspace / "src").is_dir():
         raise OpenADKitError(f"{workspace} has no src/ to build")
+    if not holds_packages(workspace):
+        print(f"nothing to build: {workspace / 'src'} holds no packages")
+        return 0
     ros_distro = args.ros_distro or build_ros_distro(root, catalog)
     image = catalog.devel_image(ros_distro)
     if not image and catalog.images and ros_distro not in catalog.images:
@@ -862,6 +866,7 @@ def restart_command(args: argparse.Namespace) -> int:
     if state["workspace"]:
         deployment.use_workspace(Path(state["workspace"]))
     selection = settings.resolve(deployment, catalog, state["rosDistro"], state["gpu"], role=state["role"])
+    compose.check_overlay_build(deployment, selection, catalog.devel_image(selection.ros_distro))
     skipped = set(state["skipped"])
     running = set(live.running_services(project))
     if args.all_services:

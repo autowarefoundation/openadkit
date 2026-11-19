@@ -264,6 +264,11 @@ class EnvironmentLayer:
         return result
 
 
+def holds_packages(workspace: Path) -> bool:
+    """Whether a workspace's src/ holds a ROS package."""
+    return next((workspace / "src").rglob("package.xml"), None) is not None
+
+
 class Deployment:
     def __init__(
         self,
@@ -353,10 +358,10 @@ class Deployment:
 
     def use_workspace(self, path: Path) -> None:
         """Mount a workspace built elsewhere (run --ws) as the overlay workspace."""
-        if (self.workspace / "src").is_dir():
+        if holds_packages(self.workspace):
             raise OpenADKitError(
-                f"{self.name} has its own overlay workspace ({self.workspace}); "
-                "--ws is for a deployment without one"
+                f"{self.name} has packages of its own in {self.workspace / 'src'}; "
+                "--ws is for a deployment without any"
             )
         if not (path / "install/local_setup.bash").is_file():
             raise OpenADKitError(f"{path} is not built; run: openadkit build {path}")

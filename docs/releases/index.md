@@ -24,6 +24,8 @@ moves to the latest stable version with `openadkit upgrade`.
 - [Compatibility](compatibility.md) — what a version number promises
 - [Evidence Policy](evidence.md) — what a build must pass to be released
 - [Verify a Release](verification.md) — check the files before you run them
+- [Before v2.0.0](before-v2.md) — what the Open AD Kit name covered before
+  its first release
 
 ## Versions
 

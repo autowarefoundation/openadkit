@@ -11,7 +11,7 @@ This page lists what that promise covers. Within one major version:
   release runs the kit's commands, whichever `openadkit` you called.
 - **A major release** (`v3.0.0`) is the only one that removes or changes an item
   below. Its release notes list each change under **Breaking changes**. v2.0.0
-  is the first release, so its notes have no such list.
+  is the [first release](before-v2.md), so its notes have no such list.
 
 [Experimental](#experimental) features and what is
 [not covered](#not-covered) can change in any release.

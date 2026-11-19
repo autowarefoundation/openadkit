@@ -6,6 +6,13 @@ of the release, its base, with the kit's files on top, so the kit holds only
 your differences. Every base is a simulation: a kit shows your vehicle's
 software in simulation, not on the vehicle.
 
+Without a kit, a deployment of the release takes your settings from the
+[host settings file](../getting-started/cli.md#settings) and your packages from
+[`--ws`](kit-guide.md#without-a-kit). A kit keeps your changes, from config
+overrides to your vehicle, services and images, on top of a release that passed
+its [evidence](../releases/evidence.md), and takes the next release when you
+change `extends` ([Upgrade](kit-guide.md#upgrade-without-losing-your-work)).
+
 ```bash
 openadkit new my-kit                       # on top of planning-simulation
 openadkit new my-kit --base scenario-simulation
@@ -71,12 +78,10 @@ It gets the kit's settings, config overrides and packages. Make
 What you wrote at the kit root now applies to both, so move what only one of
 them needs into its directory.
 
-## Build, Validate, Run, Stop
+## Run and Stop
 
 ```bash
 cd my-kit
-openadkit build                 # overlay_ws, in the release's devel image
-openadkit validate
 openadkit run --verify          # start, wait until ready, run the base's verify step
 openadkit stop
 ```
@@ -89,15 +94,34 @@ a name act on each of them. From elsewhere, one of them is
 runs that checkout's local build, or the CI build `OPENADKIT_BUILD` names; see
 [Overlay Workspace](kit-guide.md#3-overlay-workspace).
 
-Add `--ros-distro jazzy` to `build`, `validate` and `run` for Jazzy.
-`validate` renders the Compose model without starting anything; it is not
-runtime or ABI evidence, so finish with `run --verify`.
+For Jazzy, add `--ros-distro jazzy` to `run` and `validate`.
+`openadkit validate` checks the kit and renders the Compose model without
+starting anything; it is not runtime or ABI evidence, so finish with
+`run --verify`.
 
 Every release tests a kit made this way: the
 [example kit](https://github.com/autowarefoundation/openadkit/tree/main/.github/scripts/evidence/example-kit) exercises each
 extension point on Humble and Jazzy.
 
-## Make a Change
+## Add a Package
+
+Put your ROS packages in `overlay_ws/src`, then build them and restart the
+services, or only the one that runs them. The build runs in the release's devel
+image, so the host needs no ROS, and the next build compiles only what changed.
+For Jazzy, add `--ros-distro jazzy` to `build` too:
+
+```bash
+openadkit build                 # overlay_ws, in the release's devel image
+openadkit restart               # or: openadkit restart <service>
+```
+
+A changed copy of an Autoware package runs where Autoware already launches it;
+a new node needs something to start it, such as a service of your own
+([Overlay Workspace](kit-guide.md#3-overlay-workspace)).
+[Develop and Debug](develop-and-debug.md) times this loop and shows how to look
+into the running services.
+
+## Change a Parameter
 
 A config override changes a parameter without a build. Put the file with only
 the keys you change under `config/autoware/`, at the path it has in its
@@ -108,16 +132,6 @@ mkdir -p config/autoware/autoware_planning_config/config/scenario_planning/commo
 $EDITOR config/autoware/autoware_planning_config/config/scenario_planning/common/common.param.yaml
 openadkit restart               # the services with config overrides or settings that changed
 ```
-
-A package change needs a build and a restart of the service that runs it:
-
-```bash
-openadkit build
-openadkit restart <service>
-```
-
-[Develop and Debug](develop-and-debug.md) times that loop and shows how to look
-into the running services.
 
 ## Where Changes Go
 

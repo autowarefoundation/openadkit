@@ -57,8 +57,9 @@ A kit holds only your differences from a deployment: your ROS packages, config o
 ```bash
 openadkit new my-kit        # on top of planning-simulation
 cd my-kit
-openadkit build             # your overlay workspace
 openadkit run --verify      # start, wait until ready, run the verify step
+openadkit build             # after you add ROS packages to overlay_ws/src
+openadkit restart           # the services pick up the build
 ```
 
 ## Documentation

@@ -135,9 +135,9 @@ openadkit build -- --cmake-args -DCMAKE_BUILD_TYPE=Debug   # Release unless you 
 
 - Packages build incrementally: a second build compiles only what changed.
 - The CLI records the image and distro in `install/.openadkit-overlay.json`.
-  After a release upgrade or a distro change, `validate` and `run` warn until you
-  rebuild, and that rebuild starts from a clean `build/` and `install/`, since
-  CMake caches record the paths they were configured with.
+  After a release upgrade or a distro change, `validate`, `run` and `restart`
+  stop and name the rebuild; that rebuild starts from a clean `build/` and
+  `install/`, since CMake caches record the paths they were configured with.
 - Without `--ros-distro`, the build uses the release's default distro, or
   the first one that every kit deployment runs on.
 - A `build/` or `install/` that `openadkit build` did not make, such as a colcon
@@ -176,8 +176,8 @@ openadkit build ~/my_ws
 openadkit run planning-simulation --ws ~/my_ws
 ```
 
-`--ws` is for a deployment without a workspace of its own; on a kit that has
-one it is an error rather than a second layer.
+`--ws` is for a deployment without packages of its own; on a kit whose
+`overlay_ws/src` holds packages it is an error rather than a second layer.
 
 #### ABI
 

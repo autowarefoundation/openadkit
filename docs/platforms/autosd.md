@@ -65,9 +65,11 @@ chmod +x auto-image-builder.sh
 sudo bash ./auto-image-builder.sh build-builder --distro autosd10-sig
 ```
 
-Build the image from the directory you generated `out` in, because the manifest
-names its large files by path. `/var/tmp` goes on disk because the runner's own
-is in memory and too small for this image. The arguments are the manifest, the
+Run the runner from the directory you ran `quadlet.py` in: the runner mounts
+that directory, and the manifest names its large files by their path in it. For
+the same reason, `quadlet.py` with `--root-password-hash` stops when `--output`
+is outside that directory. `/var/tmp` goes on disk because the runner's own is
+in memory and too small for this image. The arguments are the manifest, the
 container image name, and the disk image to write:
 
 ```bash

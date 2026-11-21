@@ -1,0 +1,388 @@
+name: evidence
+
+# Run the verification cells against one build, staged as the release would
+# ship it, and publish the run's summary as evidence-summary-<build_tag>. The
+# release gate requires a successful run of this workflow whose summary is
+# PASSED for the build it promotes.
+#
+# A pull request that rebuilds images gets this workflow from its own build
+# (build-single-image.yaml), on its images in the CI package. A change that
+# rebuilds no image is tested against an existing build: a pull request uses
+# its base branch's latest successful build, and a dispatch with source_ref
+# tests that commit. Its deployments, CLI and checks come from the
+# tested commit and its images from the build. Such a run is not release
+# evidence: its summary names the tested commit, which the release gate rejects.
+
+permissions:
+  contents: read
+
+on:
+  # Builds of main. A workflow_run run is main's, so a maintenance branch's
+  # build dispatches its evidence on its own branch (build-all-images.yaml).
+  workflow_run:
+    workflows: [build-all-images]
+    types: [completed]
+    branches: [main]
+  # Changes that need no new image; one that does is verified after its build.
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'deployments/**'
+      - 'platforms/autosd/**'
+      - 'openadkit'
+      - 'openadkit.json'
+      - '.github/scripts/evidence/**'
+      - '.github/scripts/validation_matrix.py'
+      - '.github/workflows/evidence.yaml'
+  workflow_dispatch:
+    inputs:
+      build_tag:
+        description: 'Build tag to verify (e.g. 123456789-1; default: the latest successful build of this branch)'
+        required: false
+      source_ref:
+        description: 'Commit or branch to test against the build images (default: the build commit; not release evidence)'
+        required: false
+  workflow_call:
+    inputs:
+      build_tag:
+        description: 'Build tag to verify (e.g. 123456789-1)'
+        required: true
+        type: string
+
+concurrency:
+  group: evidence-${{ github.event_name == 'workflow_run' && format('{0}-{1}', github.event.workflow_run.id, github.event.workflow_run.run_attempt) || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', inputs.build_tag, inputs.source_ref) }}
+  # A newer push to a pull request replaces its run; builds are verified once each.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  prepare:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      build_tag: ${{ steps.prepare.outputs.build_tag }}
+      build_sha: ${{ steps.prepare.outputs.build_sha }}
+      source_sha: ${{ steps.source.outputs.source_sha }}
+      release_evidence: ${{ steps.source.outputs.release_evidence }}
+      skip: ${{ steps.source.outputs.skip }}
+      cells: ${{ steps.cells.outputs.cells }}
+    steps:
+      - name: Resolve build metadata
+        id: prepare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCH_BUILD_TAG: ${{ inputs.build_tag }}
+          # A pull request reuses its base branch's images, a dispatch its own branch's.
+          BUILD_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          newest_metadata() {
+            # "Re-run failed jobs" keeps the first attempt's tag; read it from
+            # the newest metadata artifact instead of this attempt's number.
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/$1/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.expired | not) | .name | select(startswith("build-metadata-")) | ltrimstr("build-metadata-")' \
+              | sort -V | tail -n 1
+          }
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_run" ]; then
+            run_id="${{ github.event.workflow_run.id }}"
+            build_tag=$(newest_metadata "${run_id}")
+            [ -n "${build_tag}" ] || { echo "Build run ${run_id} has no build metadata artifact" >&2; exit 1; }
+          elif [ -z "${DISPATCH_BUILD_TAG}" ]; then
+            run_id=$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow build-all-images.yaml \
+              --branch "${BUILD_BRANCH}" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "${run_id}" ] || { echo "No successful build-all-images run on ${BUILD_BRANCH}" >&2; exit 1; }
+            build_tag=$(newest_metadata "${run_id}")
+            [ -n "${build_tag}" ] || { echo "Build run ${run_id} has no build metadata artifact left" >&2; exit 1; }
+            echo "Using build ${build_tag}, the latest successful build of ${BUILD_BRANCH}" >&2
+          else
+            build_tag="${DISPATCH_BUILD_TAG}"
+            if ! printf '%s\n' "${build_tag}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+              echo "Invalid build_tag '${build_tag}': must be RUN_ID-RUN_ATTEMPT" >&2
+              exit 1
+            fi
+            run_id="${build_tag%%-*}"
+          fi
+
+          metadata_dir="${RUNNER_TEMP}/openadkit-build-metadata"
+          mkdir -p "${metadata_dir}"
+          gh run download "${run_id}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "build-metadata-${build_tag}" \
+            --dir "${metadata_dir}"
+
+          build_sha=$(jq -r '.openadkit_sha' "${metadata_dir}/build-metadata.json")
+          if ! printf '%s\n' "${build_sha}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Invalid Open AD Kit SHA in build metadata: ${build_sha}" >&2
+            exit 1
+          fi
+
+          {
+            echo "build_tag=${build_tag}"
+            echo "build_sha=${build_sha}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The pull request's merge commit, the dispatched source_ref, or the build commit.
+          ref: ${{ github.event_name == 'pull_request' && github.sha || inputs.source_ref || steps.prepare.outputs.build_sha }}
+          fetch-depth: 0
+
+      - name: Resolve the tested commit
+        id: source
+        env:
+          BUILD_SHA: ${{ steps.prepare.outputs.build_sha }}
+        run: |
+          set -euo pipefail
+          source_sha=$(git rev-parse HEAD)
+          release_evidence=false
+          [ "${GITHUB_EVENT_NAME}" = pull_request ] || [ "${source_sha}" != "${BUILD_SHA}" ] || release_evidence=true
+          skip=false
+          if [ "${release_evidence}" = false ]; then
+            echo "Testing ${source_sha} against the images of ${BUILD_SHA}; not release evidence" >&2
+            if ! git merge-base "${BUILD_SHA}" "${source_sha}" > /dev/null 2>&1; then
+              # The build is outside this history, for example after the branch
+              # was rewritten: any of its images may differ.
+              echo "::warning title=evidence images differ::the build commit ${BUILD_SHA} is not in the history of ${source_sha}; its images are not built yet"
+              [ "${GITHUB_EVENT_NAME}" != pull_request ] || skip=true
+            else
+              # Images of the tested commit that would differ from the build's.
+              targets=$(git diff --name-only "${BUILD_SHA}...${source_sha}" \
+                | python3 .github/scripts/build.py single-image humble "" | sed -n 's/^targets_json=//p')
+              if [ "${targets}" != "[]" ]; then
+                echo "::warning title=evidence images differ::${source_sha} changes the inputs of ${targets}; its images are not built yet"
+                [ "${GITHUB_EVENT_NAME}" != pull_request ] || skip=true
+              fi
+            fi
+          fi
+          {
+            echo "source_sha=${source_sha}"
+            echo "release_evidence=${release_evidence}"
+            echo "skip=${skip}"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: List evidence cells
+        # Every deployment and distro the manifests declare, minus the
+        # deployments with an evidence exemption. Each row is a complete cell
+        # plan: identity, roles and the checks run_cell.sh executes.
+        # A pull request runs the amd64 cells only: the images it builds are
+        # amd64, and it gets its answer sooner. A build of the branch runs
+        # every architecture.
+        if: steps.source.outputs.skip != 'true'
+        id: cells
+        env:
+          PLATFORMS: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+        run: |
+          set -euo pipefail
+          cells=$(python3 .github/scripts/validation_matrix.py --source-root . --evidence-cells --include-example-kits --evidence-platforms "${PLATFORMS}")
+          echo "cells=${cells}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage evidence kit
+        if: steps.source.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          bash .github/scripts/evidence/stage_kit.sh \
+            "$PWD" "$RUNNER_TEMP/openadkit-build-metadata/build-metadata.json" "$PWD/evidence-kit" \
+            "${{ steps.prepare.outputs.build_sha }}"
+
+      - name: Upload evidence kit
+        if: steps.source.outputs.skip != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: evidence-kit-${{ steps.prepare.outputs.build_tag }}
+          path: evidence-kit
+          retention-days: 7
+
+      - name: Upload build metadata
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: evidence-build-metadata-${{ steps.prepare.outputs.build_tag }}
+          path: ${{ runner.temp }}/openadkit-build-metadata/build-metadata.json
+          retention-days: 7
+
+  cell:
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ${{ matrix.runner || (matrix.platform == 'linux/arm64' && (vars.RUNNER_ARM64 || 'ubuntu-22.04-arm')) || vars.RUNNER_AMD64 || 'ubuntu-22.04' }}
+    timeout-minutes: 120
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.cells) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+
+      - name: Log in to Container Registry
+        # A pull request's images are in the CI package, which is not public.
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download evidence kit
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: evidence-kit-${{ needs.prepare.outputs.build_tag }}
+          path: evidence-kit
+
+      - name: Restore launcher permissions
+        # Artifact downloads do not preserve executable bits.
+        run: chmod +x evidence-kit/openadkit
+
+      - name: Install Docker Compose 5.0+
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/install-compose.sh
+
+      - name: Install Podman for the AutoSD units
+        if: ${{ matrix.backend == 'quadlet' }}
+        run: sudo apt-get update && sudo apt-get install -y podman catatonit
+
+      - name: Build the kit's overlay workspace
+        # As an integrator would: the staged kit pins its devel image.
+        if: ${{ matrix.kit != '' }}
+        working-directory: evidence-kit/${{ matrix.kit }}
+        env:
+          DISTRO: ${{ matrix.distro }}
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/evidence-kit/openadkit" build --ros-distro "$DISTRO"
+
+      - name: Run evidence cell
+        id: cell
+        working-directory: evidence-kit
+        env:
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          CELL: ${{ toJson(matrix) }}
+          KIT_PATH: ${{ matrix.kit }}
+          OPENADKIT_CLI: ${{ github.workspace }}/evidence-kit/openadkit
+        run: |
+          set -uo pipefail
+          if [ -n "$KIT_PATH" ]; then cd "$KIT_PATH"; fi
+          runner="$GITHUB_WORKSPACE/.github/scripts/evidence/run_cell.sh"
+          output="$GITHUB_WORKSPACE/cell-output"
+          cell_name=$(jq -r '.name' <<<"$CELL")
+
+          mkdir -p "$output"
+          status=0
+          if ! bash "$runner" "$CELL" "$output/attempt-1"; then
+            echo "::warning title=evidence retry::${cell_name} failed on the first attempt; retrying once"
+            rm -rf "$output/attempt-2"
+            if ! bash "$runner" "$CELL" "$output/attempt-2"; then
+              echo "cell ${cell_name} failed after the retry" >&2
+              status=1
+            fi
+          fi
+
+          # Collect the final attempt even when it failed: the summary must
+          # carry a FAILED cell instead of silently missing one.
+          final="$output/attempt-2"
+          [ -d "$final" ] || final="$output/attempt-1"
+          mkdir -p "$GITHUB_WORKSPACE/cells"
+          cp -a "$final" "$GITHUB_WORKSPACE/cells/${cell_name}"
+          exit "$status"
+        shell: bash
+
+      - name: Upload cell artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: evidence-cell-${{ matrix.name }}
+          path: |
+            cells
+            cell-output
+            !cell-output/**/home/data
+          retention-days: 14
+
+  summarize:
+    needs: [prepare, cell]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.prepare.outputs.skip != 'true' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+
+      - name: Download cell artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: evidence-cell-*
+          merge-multiple: true
+          path: evidence-cells
+
+      - name: Download build metadata
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: evidence-build-metadata-${{ needs.prepare.outputs.build_tag }}
+          path: build-metadata
+
+      - name: Summarize the cells
+        env:
+          EVIDENCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Data, not script text: a verify command may hold any character.
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          EXPECTED_CELLS: ${{ needs.prepare.outputs.cells }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/evidence/summary.py \
+            --cells-dir evidence-cells/cells \
+            --build-metadata build-metadata/build-metadata.json \
+            --source-sha "${SOURCE_SHA}" \
+            --expected-cells "${EXPECTED_CELLS}" \
+            --output-dir evidence-summary
+
+      - name: Upload the summary
+        # The release gate and release notes read it from here.
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: evidence-summary-${{ needs.prepare.outputs.build_tag }}
+          path: evidence-summary
+          retention-days: 90
+
+      - name: Write job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## Evidence for build \`${{ needs.prepare.outputs.build_tag }}\`"
+            echo
+            if [ "${{ needs.prepare.outputs.release_evidence }}" != true ]; then
+              echo "Tested \`${{ needs.prepare.outputs.source_sha }}\` against the images of \`${{ needs.prepare.outputs.build_sha }}\`. Not release evidence."
+              echo
+            fi
+            python3 .github/scripts/evidence/report.py \
+              --current evidence-summary/evidence-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: Fail when the evidence did not pass
+        if: always()
+        run: |
+          set -euo pipefail
+          result=$(jq -r '.result' evidence-summary/evidence-summary.json)
+          if [ "${result}" != "PASSED" ]; then
+            echo "evidence result is ${result}" >&2
+            exit 1
+          fi
+        shell: bash

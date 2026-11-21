@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Promote validated build image digests to release tags and stable aliases.
+# Promote validated build image digests to release tags and latest aliases.
 set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -9,19 +9,10 @@ source "${script_dir}/registry_lookup.sh"
 source "${script_dir}/stable_alias_policy.sh"
 
 plan_file=${RELEASE_PLAN_FILE:-release-plan.json}
-jq -e '
-  . as $plan
-  | $plan.schemaVersion == 1 and
-  ($plan.release.version | type == "string") and
-  ($plan.release.defaultRosDistro | type == "string") and
-  any($plan.images[]; .rosDistro == $plan.release.defaultRosDistro) and
-  ($plan.release.stable | type == "boolean") and
-  ($plan.release.publishLatestAliases | type == "boolean") and
-  ($plan.images | type == "array" and length > 0)
-' "${plan_file}" >/dev/null
+# release_plan.py validated this plan in this run's package-bundles job.
+jq -e '.schemaVersion == 1' "${plan_file}" >/dev/null
 VERSION=$(jq -r '.release.version' "${plan_file}")
 export VERSION
-DEFAULT_ROS_DISTRO=$(jq -r '.release.defaultRosDistro' "${plan_file}")
 PUBLISH_LATEST_ALIASES=$(jq -r '.release.publishLatestAliases' "${plan_file}")
 STABLE_RELEASE=$(jq -r '.release.stable' "${plan_file}")
 
@@ -30,16 +21,6 @@ stable_release="${STABLE_RELEASE}"
 # Record converged refs for the summary. Immutable version tags abort immediately.
 # Alias updates continue after a single failure so a rerun can finish leftovers.
 PROMOTED_REFS=()
-
-available_distros=$(jq -r '.images | unique_by(.rosDistro) | map(.rosDistro) | join(" ")' "${plan_file}")
-echo "Available ROS distros in build: ${available_distros}"
-
-if ! echo "${available_distros}" | grep -qw "${DEFAULT_ROS_DISTRO}"; then
-  echo "ERROR: default_ros_distro '${DEFAULT_ROS_DISTRO}' is not in the build metadata." >&2
-  echo "Available distros: ${available_distros}" >&2
-  echo "Update the 'default_ros_distro' input or trigger a new build for '${DEFAULT_ROS_DISTRO}'." >&2
-  exit 1
-fi
 
 promote_tag() {
   local ref="$1"
@@ -92,33 +73,6 @@ promote_tag() {
   return 1
 }
 
-preflight_images() {
-  local conflicts=0 source_ref release_ref digest source_digest existing_digest lookup_status
-  while IFS=$'\t' read -r source_ref release_ref digest; do
-    lookup_status=0
-    source_digest=$(registry_manifest_digest "${source_ref}") || lookup_status=$?
-    if [ "${lookup_status}" -eq 1 ]; then
-      echo "Source image not found: ${source_ref}" >&2
-      conflicts=1
-    elif [ "${lookup_status}" -ne 0 ]; then
-      return "${lookup_status}"
-    elif [ "${source_digest}" != "${digest}" ]; then
-      echo "Source digest mismatch for ${source_ref}: ${source_digest} != ${digest}" >&2
-      conflicts=1
-    fi
-
-    lookup_status=0
-    existing_digest=$(registry_manifest_digest "${release_ref}") || lookup_status=$?
-    if [ "${lookup_status}" -eq 0 ] && [ "${existing_digest}" != "${digest}" ]; then
-      echo "Release tag conflict: ${release_ref} points to ${existing_digest}, expected ${digest}" >&2
-      conflicts=1
-    elif [ "${lookup_status}" -ne 0 ] && [ "${lookup_status}" -ne 1 ]; then
-      return "${lookup_status}"
-    fi
-  done < <(jq -r '.images[] | [.sourceRef, .releaseRef, .digest] | @tsv' "${plan_file}")
-  [ "${conflicts}" -eq 0 ]
-}
-
 check_alias_policy() {
   local current_policy
   [ "${stable_release}" = true ] || return 0
@@ -142,7 +96,8 @@ preflight_aliases() {
 }
 
 check_alias_policy
-preflight_images
+jq -r '.images[] | [.sourceRef, .releaseRef, .digest] | @tsv' "${plan_file}" \
+  | registry_preflight_release_images
 preflight_aliases
 
 while IFS=$'\t' read -r release_ref repo digest; do

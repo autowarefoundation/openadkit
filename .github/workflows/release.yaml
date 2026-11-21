@@ -1,6 +1,7 @@
-# Manually promotes an existing build-all-images run to an OpenADKit release.
-# The build records provenance; this workflow only assigns the OpenADKit version
-# after validating build metadata, full scan metadata, and registry digests.
+# Manually promotes an existing build-all-images run to an Open AD Kit release.
+# The build records provenance; this workflow only assigns the Open AD Kit version
+# after validating build metadata, a passing full scan, a passing evidence run,
+# and registry digests.
 
 name: release
 
@@ -8,19 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'OpenADKit release version (e.g. v1.0.0 or v1.0.0-rc.1)'
+        description: 'Open AD Kit release version (e.g. v2.0.0 or v2.0.0-rc.1)'
         required: true
       build_tag:
-        description: 'Build tag to promote (e.g. 123456789-1)'
+        description: 'Build tag of a build of this branch to promote (e.g. 123456789-1)'
         required: true
-      default_ros_distro:
-        description: 'ROS distro for bare tag aliases; must match openadkit.json defaultRosDistro'
-        required: false
-        type: choice
-        options:
-          - humble
-          - jazzy
-        default: humble
 
 concurrency:
   group: release
@@ -28,8 +21,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
-  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/openadkit
 
 jobs:
   validate:
@@ -45,21 +37,21 @@ jobs:
       is_stable_release: ${{ steps.validate.outputs.is_stable_release }}
     steps:
       - name: Check out release scripts
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
-            .github/scripts/release_tag.sh
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
             .github/scripts/validate_release.sh
+            .github/scripts/images.py
             openadkit.json
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -70,13 +62,12 @@ jobs:
         env:
           BUILD_TAG: ${{ inputs.build_tag }}
           VERSION: ${{ inputs.version }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/validate_release.sh
         shell: bash
 
       - name: Upload validated release metadata
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
@@ -90,36 +81,12 @@ jobs:
     permissions:
       actions: read
       contents: read
-    outputs:
-      packager_sha: ${{ steps.packager.outputs.packager_sha }}
-      release_plan_sha256: ${{ steps.package.outputs.release_plan_sha256 }}
     steps:
-      - name: Check out release scripts
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: |
-            /openadkit
-            .github/scripts/install-compose.sh
-            .github/scripts/package_release_bundles.sh
-            .github/scripts/release_plan.py
-
-      - name: Verify packager revision
-        id: packager
-        env:
-          EXPECTED_PACKAGER_SHA: ${{ github.workflow_sha }}
-        run: |
-          set -euo pipefail
-          packager_sha=$(git rev-parse HEAD)
-          if [ "${packager_sha}" != "${EXPECTED_PACKAGER_SHA}" ]; then
-            echo "Packager checkout ${packager_sha} does not match workflow ${EXPECTED_PACKAGER_SHA}" >&2
-            exit 1
-          fi
-          echo "packager_sha=${packager_sha}" >> "${GITHUB_OUTPUT}"
-        shell: bash
-
+      # The build commit packages itself: its own scripts made the tree its
+      # evidence ran, so they make the bundle too. Validation above stays with
+      # the branch's scripts.
       - name: Check out repository at release SHA
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
           path: src
@@ -128,40 +95,36 @@ jobs:
             /openadkit
             /openadkit.json
             /cli/
+            /components/docker-bake.hcl
             /deployments/
+            /.github/autoware-patches/
+            /.github/scripts/
 
       - name: Download validated release metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
 
-      - name: Install Docker Compose v5.2+
+      - name: Install Docker Compose 5.0+
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/install-compose.sh
+        run: bash src/.github/scripts/install-compose.sh
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Package and validate deployment bundles
-        id: package
         env:
           VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-          PACKAGER_SHA: ${{ steps.packager.outputs.packager_sha }}
-          INSTALLER_SOURCE_DIR: ${{ github.workspace }}
-          DEFAULT_ROS_DISTRO: ${{ inputs.default_ros_distro }}
           PUBLISH_LATEST_ALIASES: ${{ needs.validate.outputs.publish_latest_aliases }}
           STABLE_RELEASE: ${{ needs.validate.outputs.is_stable_release }}
-        run: |
-          bash .github/scripts/package_release_bundles.sh
-          echo "release_plan_sha256=$(sha256sum release-plan.json | cut -d ' ' -f1)" \
-            >> "${GITHUB_OUTPUT}"
+        run: bash src/.github/scripts/package_release_bundles.sh
         shell: bash
 
       - name: Upload deployment bundles
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-bundles-${{ inputs.build_tag }}
           path: |
@@ -172,202 +135,92 @@ jobs:
           retention-days: 7
           overwrite: true
 
-  release-tag:
+  publish:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: [validate, package-bundles]
     environment: release
     permissions:
-      contents: write
-    steps:
-      - name: Check out release tag helper
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: .github/scripts/release_tag.sh
-
-      - name: Download immutable release plan
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: release-bundles-${{ inputs.build_tag }}
-          path: release-output
-
-      - name: Create or verify git tag
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          set -euo pipefail
-          plan=release-output/release-plan.json
-          test "$(sha256sum "${plan}" | cut -d ' ' -f1)" = "${EXPECTED_PLAN_SHA256}"
-          VERSION=$(jq -r '.release.version' "${plan}")
-          RELEASE_SHA=$(jq -r '.release.releaseSha' "${plan}")
-          export VERSION RELEASE_SHA
-          bash .github/scripts/release_tag.sh
-        shell: bash
-
-  release-images:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    needs: [validate, package-bundles, prepare-github-release]
-    environment: release
-    permissions:
       actions: read
-      contents: read
+      contents: write
       packages: write
+      attestations: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out release scripts
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
+            .github/scripts/images.py
+            .github/scripts/manage_github_release.sh
             .github/scripts/promote_release_images.sh
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
-
-      - name: Download immutable release plan
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: release-bundles-${{ inputs.build_tag }}
-          path: release-output
-
-      - name: Verify immutable release plan
-        env:
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          test "$(sha256sum release-output/release-plan.json | cut -d ' ' -f1)" \
-            = "${EXPECTED_PLAN_SHA256}"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Promote image digests
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_PLAN_FILE: release-output/release-plan.json
-        run: bash .github/scripts/promote_release_images.sh
-        shell: bash
-
-  prepare-github-release:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-    needs: [validate, package-bundles, release-tag]
-    environment: release
-    permissions:
-      actions: read
-      contents: write
-    outputs:
-      created: ${{ steps.prepare-release.outputs.created }}
-      release_body_sha256: ${{ steps.prepare-release.outputs.release_body_sha256 }}
-      release_id: ${{ steps.prepare-release.outputs.release_id }}
-    steps:
-      - name: Check out release scripts
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: |
-            .github/scripts/manage_github_release.sh
-            .github/scripts/release_tag.sh
+            .github/scripts/validate_release.sh
             .github/scripts/write_release_notes.sh
+            .github/scripts/release_notes.py
+            .github/scripts/evidence/report.py
+            .github/scripts/evidence/cells.py
+            .github/release-highlights
 
       - name: Download validated release metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: validated-release-${{ inputs.build_tag }}
           path: release-input
 
       - name: Download deployment bundles
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-bundles-${{ inputs.build_tag }}
           path: .
 
-      - name: Verify immutable release plan
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check scan and evidence again
         env:
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          test "$(sha256sum release-plan.json | cut -d ' ' -f1)" \
-            = "${EXPECTED_PLAN_SHA256}"
+          BUILD_TAG: ${{ inputs.build_tag }}
+          VERSION: ${{ inputs.version }}
+        run: bash .github/scripts/validate_release.sh --recheck
+        shell: bash
 
       - name: Create release metadata and notes
-        env:
-          RELEASE_PLAN_FILE: release-plan.json
         run: bash .github/scripts/write_release_notes.sh
         shell: bash
 
-      - name: Verify existing release or create draft
-        id: prepare-release
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_PLAN_FILE: release-plan.json
-        run: bash .github/scripts/manage_github_release.sh prepare
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/openadkit
+            dist/openadkit-${{ inputs.version }}.tar.gz
+            release-metadata.json
+
+      - name: Create the draft release
+        run: bash .github/scripts/manage_github_release.sh draft
         shell: bash
 
-      - name: Upload expected release asset manifest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: release-asset-manifest-${{ inputs.build_tag }}
-          path: release-assets.sha256
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
+      - name: Promote image digests
+        run: bash .github/scripts/promote_release_images.sh
+        shell: bash
 
-  release-github:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-    needs: [validate, package-bundles, prepare-github-release, release-images]
-    environment: release
-    permissions:
-      actions: read
-      contents: write
-    steps:
-      - name: Check out release manager
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          sparse-checkout: |
-            .github/scripts/manage_github_release.sh
-            .github/scripts/release_tag.sh
-
-      - name: Download expected release asset manifest
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: release-asset-manifest-${{ inputs.build_tag }}
-          path: release-asset-manifest
-
-      - name: Download immutable release plan
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: release-bundles-${{ inputs.build_tag }}
-          path: release-output
-
-      - name: Verify immutable release plan
-        env:
-          EXPECTED_PLAN_SHA256: ${{ needs.package-bundles.outputs.release_plan_sha256 }}
-        run: |
-          test "$(sha256sum release-output/release-plan.json | cut -d ' ' -f1)" \
-            = "${EXPECTED_PLAN_SHA256}"
-
-      - name: Publish prepared GitHub Release
-        if: needs.prepare-github-release.outputs.created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ needs.prepare-github-release.outputs.release_id }}
-          RELEASE_BODY_SHA256: ${{ needs.prepare-github-release.outputs.release_body_sha256 }}
-          RELEASE_ASSET_MANIFEST: release-asset-manifest/release-assets.sha256
-          RELEASE_PLAN_FILE: release-output/release-plan.json
+      - name: Publish the release
         run: bash .github/scripts/manage_github_release.sh publish
         shell: bash
 
   deploy-docs:
-    needs: [validate, release-github]
+    needs: [validate, publish]
     if: needs.validate.outputs.is_stable_release == 'true' && needs.validate.outputs.publish_latest_aliases == 'true'
     permissions:
       contents: write

@@ -1,0 +1,3 @@
+<launch>
+  <node pkg="acme_probe" exec="probe" name="acme_probe" output="screen"/>
+</launch>

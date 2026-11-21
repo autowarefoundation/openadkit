@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<robot name="vehicle" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="config_dir" default="$(find acme_sensor_kit_description)/config"/>
+  <xacro:property name="sensors" value="${xacro.load_yaml('$(arg config_dir)/sensors_calibration.yaml')}"/>
+  <xacro:property name="kit" value="${xacro.load_yaml('$(arg config_dir)/sensor_kit_calibration.yaml')}"/>
+
+  <!-- One frame per sensor, at its calibrated pose; a real kit adds its sensor models here. -->
+  <xacro:macro name="frame" params="parent child pose">
+    <link name="${child}"/>
+    <joint name="${child}_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${child}"/>
+      <origin xyz="${pose['x']} ${pose['y']} ${pose['z']}" rpy="${pose['roll']} ${pose['pitch']} ${pose['yaw']}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:frame parent="base_link" child="sensor_kit_base_link" pose="${sensors['base_link']['sensor_kit_base_link']}"/>
+  <xacro:frame parent="sensor_kit_base_link" child="lidar_top_base_link" pose="${kit['sensor_kit_base_link']['lidar_top_base_link']}"/>
+</robot>

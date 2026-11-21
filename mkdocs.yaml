@@ -57,6 +57,7 @@ extra_css:
 exclude_docs: |
   /includes/
   /macros.py
+  /diagrams.py
   /requirements.txt
   /overrides/
   __pycache__/

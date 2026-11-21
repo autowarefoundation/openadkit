@@ -5,6 +5,9 @@ Run predefined traffic scenarios with
 The deployment runs a scenario automatically and writes the results to the host.
 No GPU is required.
 
+![Scenario Simulation runs localization-mapping, planning, control, vehicle-system, simulator, Scenario Simulator and visualizer, which talk over ROS 2](../assets/images/deployment-scenario-simulation-light.svg#only-light)
+![Scenario Simulation runs localization-mapping, planning, control, vehicle-system, simulator, Scenario Simulator and visualizer, which talk over ROS 2](../assets/images/deployment-scenario-simulation-dark.svg#only-dark)
+
 ## Run
 
 ```bash

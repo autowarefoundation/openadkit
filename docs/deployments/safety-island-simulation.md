@@ -7,6 +7,9 @@ the Safety Island on domain 2, and
 [`domain_bridge`](https://github.com/ros2/domain_bridge) connects them. No GPU
 is required.
 
+![Safety Island Simulation runs localization-mapping, planning, control, vehicle-system, simulator, Safety Island and visualizer, which talk over ROS 2](../assets/images/deployment-safety-island-simulation-light.svg#only-light)
+![Safety Island Simulation runs localization-mapping, planning, control, vehicle-system, simulator, Safety Island and visualizer, which talk over ROS 2](../assets/images/deployment-safety-island-simulation-dark.svg#only-dark)
+
 ## Requirements
 
 - amd64 host: the pinned Safety Island release ships a `linux/amd64` binary.

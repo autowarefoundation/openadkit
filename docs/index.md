@@ -23,8 +23,8 @@ Safety Island Simulation runs its POSIX build in a container. Open AD Kit is not
 an OTA service, a Kubernetes stack or a fork of upstream workloads, and it makes
 no ASIL or NCAP certification claim.
 
-![Planning Simulation as separate containers that talk over ROS 2](assets/images/readme-hero-light.svg#only-light)
-![Planning Simulation as separate containers that talk over ROS 2](assets/images/readme-hero-dark.svg#only-dark)
+![Open AD Kit: component images, deployments with your kit on top, and the hosts one command runs them on](assets/images/readme-hero-light.svg#only-light)
+![Open AD Kit: component images, deployments with your kit on top, and the hosts one command runs them on](assets/images/readme-hero-dark.svg#only-dark)
 
 ## Start Here { .oak-eyebrow }
 

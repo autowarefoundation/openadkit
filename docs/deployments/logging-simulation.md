@@ -4,6 +4,9 @@ Replay a sample rosbag through sensing, perception and localization. An NVIDIA
 GPU with at least 4 GB of VRAM is recommended; CPU mode detects objects by
 clustering instead of CenterPoint.
 
+![Logging Simulation runs sensing-perception, localization-mapping, vehicle-system, rosbag and visualizer, which talk over ROS 2](../assets/images/deployment-logging-simulation-light.svg#only-light)
+![Logging Simulation runs sensing-perception, localization-mapping, vehicle-system, rosbag and visualizer, which talk over ROS 2](../assets/images/deployment-logging-simulation-dark.svg#only-dark)
+
 ## Run
 
 ```bash

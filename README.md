@@ -12,7 +12,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/images/readme-hero-dark.svg">
-  <img src="docs/assets/images/readme-hero-light.svg" width="100%" alt="One command, openadkit run planning-simulation, starts Autoware as separate containers that talk over ROS 2: localization-mapping, planning, control, vehicle-system, simulator, visualizer and api. One reproducible path from simulation to in-vehicle systems.">
+  <img src="docs/assets/images/readme-hero-light.svg" width="100%" alt="Open AD Kit packages Autoware into component images, combines them into ready-to-run deployments with your kit on top, and one command runs them on Ubuntu, on two hosts or on in-vehicle Linux. One reproducible path from simulation to in-vehicle systems.">
 </picture>
 
 ## Quickstart

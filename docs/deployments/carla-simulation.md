@@ -2,6 +2,9 @@
 
 Run the full modular Autoware stack against CARLA 0.9.16 in closed loop.
 
+![CARLA Simulation runs sensing-perception, localization-mapping, planning, control, vehicle-system, simulator, CARLA and visualizer, which talk over ROS 2](../assets/images/deployment-carla-simulation-light.svg#only-light)
+![CARLA Simulation runs sensing-perception, localization-mapping, planning, control, vehicle-system, simulator, CARLA and visualizer, which talk over ROS 2](../assets/images/deployment-carla-simulation-dark.svg#only-dark)
+
 ## Requirements
 
 - amd64 host with Ubuntu 22.04 or 24.04

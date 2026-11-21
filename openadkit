@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly OPENADKIT_REPOSITORY=${OPENADKIT_REPOSITORY:-autowarefoundation/openadkit}
-readonly OPENADKIT_RELEASES_URL=${OPENADKIT_RELEASES_URL:-"https://github.com/${OPENADKIT_REPOSITORY}/releases"}
-# SemVer pattern shared with SEMVER_RE in .github/scripts/release_plan.py.
-# Keep the two definitions in sync.
-readonly OPENADKIT_VERSION_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+# Packaging a release writes the repository that released it here, so a
+# launcher installs and upgrades from the repository it came from.
+readonly OPENADKIT_REPOSITORY=autowarefoundation/openadkit
+readonly OPENADKIT_RELEASES_URL="https://github.com/${OPENADKIT_REPOSITORY}/releases"
+# Strict SemVer release tag. The same pattern appears in cli/installation.py,
+# .github/scripts/release_plan.py and validate_release.sh; the bootstrap
+# cannot import it, so test_release_versions.py checks all four agree.
+readonly OPENADKIT_VERSION_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(\.((0|[1-9][0-9]*)|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$'
 
 INSTALL_TEMP=
 INSTALL_STAGE=
+# A replaced release moved aside, and where it goes back if the swap stops.
+INSTALL_ASIDE=
+INSTALL_FINAL=
 RESOLVED_VERSION=
 RESOLVED_ARCHIVE=
 RESOLVED_SHA256=
+RESOLVED_AUTOWARE=
 
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
+usage_fail() { printf 'error: %s\n' "$*" >&2; exit 2; }
 log() { printf '[openadkit] %s\n' "$*"; }
 
 cleanup_install() {
+  if [[ -n $INSTALL_ASIDE && ! -e $INSTALL_FINAL ]]; then
+    mv -T "$INSTALL_ASIDE" "$INSTALL_FINAL"
+  fi
   [[ -z $INSTALL_TEMP ]] || rm -rf "$INSTALL_TEMP"
   [[ -z $INSTALL_STAGE ]] || rm -rf "$INSTALL_STAGE"
 }
@@ -27,25 +38,28 @@ require_command() {
 
 install_usage() {
   cat <<'EOF'
-Usage: openadkit install [--version vX.Y.Z] [--destination DIRECTORY] [--force]
+Usage: openadkit install [--version vX.Y.Z] [--force]
 
-Downloads and verifies an Open AD Kit release bundle. The default destination is
-~/.local/share/openadkit. A launcher is installed at ~/.local/bin/openadkit.
-Reinstalling over an existing version requires --force.
+Downloads and verifies an Open AD Kit release bundle into $OPENADKIT_HOME/releases,
+else ~/.local/share/openadkit. A launcher is installed at ~/.local/bin/openadkit,
+with Tab completion.
+A version that is already installed becomes the active one as it is, without a
+download; --force downloads and replaces it.
 
 To move an installed release to the latest stable version, run: openadkit upgrade
 EOF
 }
 
-upgrade_usage() {
-  cat <<'EOF'
-Usage: openadkit upgrade
-
-Upgrades an installed release to the latest stable Open AD Kit release. The
-previous version is kept under the install destination for rollback with
-`openadkit install --version vX.Y.Z --force`; the kept directory must be
-replaced. Source checkouts update with git pull or git checkout instead.
-EOF
+# Links the installer made point into a versioned release directory; any
+# other file at a link's path is the user's and is left alone.
+link_beside_launcher() {
+  local target=$1 path=$2
+  if [[ -e $path || -L $path ]] && [[ ! -L $path || $(readlink "$path") != */openadkit-v*/* ]]; then
+    log "kept ${path}: it was not installed by openadkit"
+    return 0
+  fi
+  ln -sfn "$target" "${path}.new"
+  mv -Tf "${path}.new" "$path"
 }
 
 start_install_temp() {
@@ -67,117 +81,121 @@ download_release_metadata() {
   metadata="${INSTALL_TEMP}/release-metadata.json"
   log "downloading release metadata"
   curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-delay 1 \
-    "$(release_base_url "$requested")/release-metadata.json" -o "${metadata}"
+    "$(release_base_url "$requested")/release-metadata.json" -o "${metadata}" \
+    || fail "could not download the release metadata of ${requested/#latest/the latest release}"
 
-  readarray -t release_fields < <(python3 - "${metadata}" "${OPENADKIT_VERSION_RE}" <<'PY'
+  readarray -t release_fields < <(python3 -I - "${metadata}" "${OPENADKIT_VERSION_RE}" <<'PY'
 import json
 import re
 import sys
 
 try:
     metadata = json.load(open(sys.argv[1], encoding="utf-8"))
-    version = metadata["openadkit_version"]
+    version = metadata["version"]
     bundles = metadata["bundles"]
     if not isinstance(version, str) or not re.fullmatch(sys.argv[2], version):
         raise ValueError("invalid Open AD Kit version")
-    if not isinstance(bundles, list) or len(bundles) != 1:
-        raise ValueError("expected exactly one release bundle")
-    bundle = bundles[0]
-    name, digest = bundle["name"], bundle["sha256"]
-    if name != f"openadkit-{version}.tar.gz":
-        raise ValueError("bundle name does not match the release version")
+    # The bundle this installer knows, by name; a release may list others.
+    name = f"openadkit-{version}.tar.gz"
+    if not isinstance(bundles, list):
+        raise ValueError("bundles must be a list")
+    named = [bundle for bundle in bundles if isinstance(bundle, dict) and bundle.get("name") == name]
+    if len(named) != 1:
+        raise ValueError(f"expected one bundle named {name}")
+    digest = named[0]["sha256"]
+    autoware = ((metadata.get("bom") or {}).get("autoware") or {}).get("version") or "unknown"
     if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
         raise ValueError("invalid bundle SHA-256")
-    print(version, name, digest, sep="\t")
+    print(version, name, digest, autoware, sep="\t")
 except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
     print(f"invalid release metadata: {error}", file=sys.stderr)
     raise SystemExit(1)
 PY
 )
   ((${#release_fields[@]} == 1)) || exit 1
-  IFS=$'\t' read -r RESOLVED_VERSION RESOLVED_ARCHIVE RESOLVED_SHA256 <<<"${release_fields[0]}"
+  IFS=$'\t' read -r RESOLVED_VERSION RESOLVED_ARCHIVE RESOLVED_SHA256 RESOLVED_AUTOWARE <<<"${release_fields[0]}"
 }
 
-compare_release_versions() {
-  python3 - "$1" "$2" <<'PY'
-import re
-import sys
+# A release the installer put there: its launcher and its manifest.
+release_is_installed() {
+  [[ -x "$1/openadkit" && -f "$1/openadkit.json" ]]
+}
 
-VERSION_RE = re.compile(
-    r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?$"
-)
+refuse_foreign_launcher() {
+  local launcher_path="${HOME}/.local/bin/openadkit"
+  if [[ -e $launcher_path && ! -L $launcher_path ]]; then
+    fail "refusing to replace non-symlink launcher: ${launcher_path}"
+  fi
+}
 
+# Point the launcher and Tab completion at the release in final_root.
+activate_release() {
+  local final_root=$1 launcher_dir="${HOME}/.local/bin" link_path completion_dir
+  mkdir -p "$launcher_dir"
+  link_path="${launcher_dir}/openadkit.new"
+  ln -sfn "$final_root/openadkit" "$link_path"
+  mv -Tf "$link_path" "${launcher_dir}/openadkit"
+  # Tab completion, which bash-completion loads from this directory on first use.
+  if [[ -f "$final_root/cli/completion.bash" ]]; then
+    completion_dir="${XDG_DATA_HOME:-${HOME}/.local/share}/bash-completion/completions"
+    mkdir -p "$completion_dir"
+    link_beside_launcher "$final_root/cli/completion.bash" "${completion_dir}/openadkit"
+  fi
+}
 
-def parse(value):
-    match = VERSION_RE.fullmatch(value)
-    if match is None:
-        raise ValueError(f"invalid version: {value}")
-    return tuple(int(part) for part in match.group(1, 2, 3)), match.group(4)
+announce_next_steps() {
+  local launcher_dir="${HOME}/.local/bin" next_command="openadkit setup"
+  case ":${PATH}:" in
+    *":${launcher_dir}:"*) ;;
+    *)
+      next_command="${launcher_dir}/openadkit setup"
+      cat <<EOF
+Add ${launcher_dir} to PATH, then start a new shell:
+  echo 'export PATH="${launcher_dir}:\$PATH"' >> ~/.bashrc
+EOF
+      ;;
+  esac
+  printf 'Next: %s\n' "${next_command}"
+}
 
-
-def compare(current, latest):
-    current_core, current_pre = parse(current)
-    latest_core, latest_pre = parse(latest)
-    if current_core != latest_core:
-        return "newer" if latest_core > current_core else "older"
-    if current_pre == latest_pre:
-        return "same"
-    if current_pre is None:
-        return "older"
-    if latest_pre is None:
-        return "newer"
-    current_parts = current_pre.split(".")
-    latest_parts = latest_pre.split(".")
-    for current_part, latest_part in zip(current_parts, latest_parts):
-        if current_part == latest_part:
-            continue
-        current_numeric = current_part.isdigit()
-        latest_numeric = latest_part.isdigit()
-        if current_numeric and latest_numeric:
-            return "newer" if int(latest_part) > int(current_part) else "older"
-        if current_numeric != latest_numeric:
-            # Numeric identifiers have lower precedence than alphanumeric ones.
-            return "newer" if current_numeric else "older"
-        return "newer" if latest_part > current_part else "older"
-    if len(current_parts) == len(latest_parts):
-        return "same"
-    # A larger set of identifiers has higher precedence when all shared ones match.
-    return "newer" if len(latest_parts) > len(current_parts) else "older"
-
-
-try:
-    print(compare(sys.argv[1], sys.argv[2]))
-except ValueError as error:
-    print(error, file=sys.stderr)
-    raise SystemExit(1)
-PY
+# An installed version is used as it is: making it the active one needs no
+# download, so going back to a kept version works offline.
+use_installed_release() {
+  local release_version=$1 final_root=$2 announce_next=$3 activate=$4
+  if [[ $activate != true ]]; then
+    log "${release_version} is already installed at ${final_root}"
+    return 0
+  fi
+  refuse_foreign_launcher
+  activate_release "$final_root"
+  log "${release_version} is already installed at ${final_root} and is now the active openadkit; --force downloads it again"
+  [[ $announce_next != true ]] || announce_next_steps
 }
 
 install_resolved_release() {
   local release_version=$1 archive_name=$2 expected_sha256=$3
-  local destination=$4 force=$5 announce_next=$6
-  local root_name final_root staged_bundle launcher_dir launcher_path link_path moved_aside
-  local next_command
+  local destination=$4 force=$5 announce_next=$6 activate=$7
+  local root_name final_root staged_bundle moved_aside
 
   root_name="openadkit-${release_version}"
   final_root="${destination}/${root_name}"
   if [[ -e $final_root && $force != true ]]; then
-    fail "${final_root} already exists; rerun with --force to replace it"
+    release_is_installed "$final_root" \
+      || fail "${final_root} exists but is not an installed release; rerun with --force to replace it"
+    use_installed_release "$release_version" "$final_root" "$announce_next" "$activate"
+    return 0
   fi
-  launcher_dir="${HOME}/.local/bin"
-  launcher_path="${launcher_dir}/openadkit"
-  if [[ -e $launcher_path && ! -L $launcher_path ]]; then
-    fail "refusing to replace non-symlink launcher: ${launcher_path}"
-  fi
+  [[ $activate != true ]] || refuse_foreign_launcher
 
   staged_bundle="${INSTALL_TEMP}/${archive_name}"
   log "downloading ${release_version}"
   curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-delay 1 \
-    "$(release_base_url "$release_version")/${archive_name}" -o "${staged_bundle}"
+    "$(release_base_url "$release_version")/${archive_name}" -o "${staged_bundle}" \
+    || fail "could not download ${archive_name}"
   printf '%s  %s\n' "$expected_sha256" "$staged_bundle" | sha256sum --check --status \
     || fail "checksum verification failed for ${archive_name}"
 
-  python3 - "${staged_bundle}" "${root_name}" <<'PY'
+  python3 -I - "${staged_bundle}" "${root_name}" <<'PY'
 import tarfile
 import sys
 
@@ -212,12 +230,12 @@ PY
   INSTALL_STAGE=$(mktemp -d "${destination}/.openadkit-stage.XXXXXXXX")
   tar -xzf "$staged_bundle" -C "$INSTALL_STAGE" --no-same-owner --no-same-permissions
   [[ -x "${INSTALL_STAGE}/${root_name}/openadkit" ]] \
-    || fail 'release bundle is missing its executable entry point'
+    || fail 'release bundle is missing its launcher'
 
   # Re-check immediately before the swap so a concurrent install cannot be
   # silently replaced unless --force was requested.
   if [[ -e $final_root && $force != true ]]; then
-    fail "${final_root} already exists; rerun with --force to replace it"
+    fail "${final_root} appeared during the install; rerun to use it, or with --force to replace it"
   fi
   moved_aside=
   if [[ -e $final_root ]]; then
@@ -225,163 +243,90 @@ PY
     while [[ -e $moved_aside ]]; do
       moved_aside="${moved_aside}-x"
     done
+    INSTALL_ASIDE=$moved_aside INSTALL_FINAL=$final_root
     mv -T "$final_root" "$moved_aside"
   fi
-  if ! mv "${INSTALL_STAGE}/${root_name}" "$final_root"; then
-    if [[ -n $moved_aside ]]; then
-      mv -T "$moved_aside" "$final_root"
-    fi
-    fail "could not replace ${final_root}"
-  fi
+  # On failure or interruption, cleanup_install moves the old release back.
+  mv -T "${INSTALL_STAGE}/${root_name}" "$final_root" || fail "could not replace ${final_root}"
+  INSTALL_ASIDE=
   if [[ -n $moved_aside ]]; then
     rm -rf "$moved_aside"
   fi
   rmdir "$INSTALL_STAGE"
   INSTALL_STAGE=
 
-  mkdir -p "$launcher_dir"
-  link_path="${launcher_path}.new"
-  ln -sfn "$final_root/openadkit" "$link_path"
-  mv -Tf "$link_path" "$launcher_path"
+  if [[ $activate != true ]]; then
+    cleanup_install
+    INSTALL_TEMP=
+    trap - EXIT INT TERM
+    log "installed ${release_version} (Autoware ${RESOLVED_AUTOWARE:-unknown}) to ${final_root}"
+    return 0
+  fi
 
+  activate_release "$final_root"
   cleanup_install
   INSTALL_TEMP=
   trap - EXIT INT TERM
 
-  log "installed ${release_version} to ${final_root}"
-  if [[ $announce_next != true ]]; then
-    return 0
-  fi
-  next_command="openadkit setup --verify"
-  case ":${PATH}:" in
-    *":${launcher_dir}:"*) ;;
-    *)
-      next_command="${launcher_path} setup --verify"
-      cat <<EOF
-Add ${launcher_dir} to PATH, then start a new shell:
-  echo 'export PATH="${launcher_dir}:\$PATH"' >> ~/.bashrc
-EOF
-      ;;
-  esac
-  printf 'Next: %s\n' "${next_command}"
+  log "installed ${release_version} (Autoware ${RESOLVED_AUTOWARE:-unknown}) to ${final_root}"
+  [[ $announce_next != true ]] || announce_next_steps
 }
 
 install_openadkit() {
-  local version=latest destination="${HOME}/.local/share/openadkit" force=false
+  # Kits find the release they extend under the same root (cli/catalog.py).
+  local version=latest destination force=false
+  if [[ -n ${OPENADKIT_HOME:-} ]]; then
+    destination="${OPENADKIT_HOME}/releases"
+  else
+    destination="${XDG_DATA_HOME:-${HOME}/.local/share}/openadkit"
+  fi
+  local resolve_only=false announce_next=true activate=true
 
   while (($#)); do
     case "$1" in
       --version)
-        (($# >= 2)) || fail '--version requires a value'
+        (($# >= 2)) || usage_fail '--version requires a value'
         version=$2
         shift
         ;;
-      --destination)
-        (($# >= 2)) || fail '--destination requires a value'
-        destination=$2
-        shift
-        ;;
       --force) force=true ;;
+      # Internal, for `openadkit upgrade` (cli/installation.py): print the
+      # verified version the release metadata resolves to, or install without
+      # the first-run guidance. --no-activate, for the release a kit pins
+      # (cli/main.py), installs it without making it the active openadkit.
+      --resolve) resolve_only=true ;;
+      --no-next-steps) announce_next=false ;;
+      --no-activate) activate=false ;;
       -h|--help) install_usage; return 0 ;;
-      *) fail "unknown install option: $1" ;;
+      *) usage_fail "unknown install option: $1" ;;
     esac
     shift
   done
 
   [[ $version == latest || $version =~ $OPENADKIT_VERSION_RE ]] \
-    || fail "invalid release version: ${version}"
-  [[ $destination = /* ]] || fail '--destination must be an absolute path'
+    || usage_fail "invalid release version: ${version}"
+  [[ $destination = /* ]] || fail 'OPENADKIT_HOME must be an absolute path'
+  if [[ $version != latest && $force != true && $resolve_only != true ]] \
+    && release_is_installed "${destination}/openadkit-${version}"; then
+    use_installed_release "$version" "${destination}/openadkit-${version}" "$announce_next" "$activate"
+    return 0
+  fi
   require_command curl
   require_command python3
-  require_command sha256sum
-  require_command tar
 
   start_install_temp
   download_release_metadata "$version"
   [[ $version == latest || $version == "$RESOLVED_VERSION" ]] \
     || fail "release metadata is for ${RESOLVED_VERSION}, expected ${version}"
-
-  install_resolved_release \
-    "$RESOLVED_VERSION" "$RESOLVED_ARCHIVE" "$RESOLVED_SHA256" "$destination" "$force" true
-}
-
-upgrade_openadkit() {
-  local kit_fields kit_kind current_version destination relationship launcher_path
-
-  if [[ ${1:-} == -h || ${1:-} == --help ]]; then
-    upgrade_usage
+  if [[ $resolve_only == true ]]; then
+    printf '%s\n' "$RESOLVED_VERSION"
     return 0
   fi
-  (($# == 0)) || fail "unknown upgrade option: $1"
 
-  require_command curl
-  require_command python3
   require_command sha256sum
   require_command tar
-
-  [[ -f "$SCRIPT_DIR/openadkit.json" ]] \
-    || fail 'Open AD Kit is not installed. Run: openadkit install'
-  kit_fields=$(python3 - "$SCRIPT_DIR/openadkit.json" <<'PY'
-import json
-import sys
-
-try:
-    kit = json.load(open(sys.argv[1], encoding="utf-8"))
-except (OSError, json.JSONDecodeError) as error:
-    print(f"could not read installed release metadata: {error}", file=sys.stderr)
-    raise SystemExit(1)
-print(kit.get("kind", "unknown"), kit.get("version", ""), sep="\t")
-PY
-) || fail 'could not read the installed release metadata'
-  IFS=$'\t' read -r kit_kind current_version <<<"${kit_fields}"
-
-  case "$kit_kind" in
-    repository)
-      fail 'upgrade is for release installs; update a source checkout with git pull or git checkout'
-      ;;
-    release) ;;
-    *) fail "unrecognized Open AD Kit installation: ${SCRIPT_DIR}" ;;
-  esac
-  [[ $current_version =~ $OPENADKIT_VERSION_RE ]] \
-    || fail "could not read the installed release version: ${current_version:-unknown}"
-  [[ $(basename -- "$SCRIPT_DIR") == "openadkit-${current_version}" ]] \
-    || fail "installed release is not in a versioned directory: ${SCRIPT_DIR}; use openadkit install --destination"
-  destination=$(dirname -- "$SCRIPT_DIR")
-
-  # Only the active installation may repoint the launcher; an extracted bundle
-  # or a stale copy must not take over ~/.local/bin/openadkit.
-  launcher_path="${HOME}/.local/bin/openadkit"
-  if [[ -e $launcher_path && ! -L $launcher_path ]]; then
-    fail "refusing to replace non-symlink launcher: ${launcher_path}"
-  fi
-  [[ -L $launcher_path ]] || fail 'Open AD Kit is not installed. Run: openadkit install'
-  [[ $(readlink -f -- "$launcher_path") == "${SCRIPT_DIR}/openadkit" ]] \
-    || fail "the active installation is not ${SCRIPT_DIR}; run openadkit upgrade through the installed launcher"
-
-  start_install_temp
-  download_release_metadata latest
-  relationship=$(compare_release_versions "$current_version" "$RESOLVED_VERSION") \
-    || fail 'could not compare release versions'
-  case "$relationship" in
-    same)
-      printf 'Open AD Kit is up to date: %s\n' "$current_version"
-      return 0
-      ;;
-    older)
-      printf 'Open AD Kit %s is newer than the latest stable release %s; nothing to upgrade\n' \
-        "$current_version" "$RESOLVED_VERSION"
-      return 0
-      ;;
-    newer) ;;
-    *) fail "unexpected release version comparison: ${relationship}" ;;
-  esac
-
-  # Force replacement so a version directory left behind by a rollback or a
-  # previous install is re-verified and reinstalled instead of failing.
   install_resolved_release \
-    "$RESOLVED_VERSION" "$RESOLVED_ARCHIVE" "$RESOLVED_SHA256" "$destination" true false
-  printf 'Upgraded %s -> %s (previous version kept at %s)\n' \
-    "$current_version" "$RESOLVED_VERSION" "${destination}/openadkit-${current_version}"
+    "$RESOLVED_VERSION" "$RESOLVED_ARCHIVE" "$RESOLVED_SHA256" "$destination" "$force" "$announce_next" "$activate"
 }
 
 if [[ ${1:-} == install ]]; then
@@ -394,10 +339,11 @@ SOURCE=${BASH_SOURCE[0]:-}
 [[ -n $SOURCE ]] || fail 'Open AD Kit is not installed. Run: openadkit install'
 SCRIPT_DIR=$(cd -- "$(dirname -- "$(readlink -f -- "$SOURCE")")" && pwd -P)
 
-if [[ ${1:-} == upgrade ]]; then
-  shift
-  upgrade_openadkit "$@"
-  exit 0
+if [[ ${1:-} == upgrade || ${1:-} == uninstall ]]; then
+  [[ -f "$SCRIPT_DIR/cli/installation.py" ]] || fail 'Open AD Kit is not installed. Run: openadkit install'
+  require_command python3
+  export OPENADKIT_ROOT="$SCRIPT_DIR"
+  exec python3 "$SCRIPT_DIR/cli/installation.py" "$@"
 fi
 
 if [[ ${1:-} == setup ]]; then

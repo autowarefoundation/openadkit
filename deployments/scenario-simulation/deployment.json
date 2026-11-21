@@ -52,8 +52,7 @@
           "url": "https://raw.githubusercontent.com/tier4/scenario_simulator_v2/63ccb1da6944a7be4427440bf200ad62281dc899/map/kashiwanoha_map/map/map.map_publisher.yaml",
           "sha256": "68df5e92c9bb174178b018f5e10561b6c9019e14decdd2a02a9aebd784b181ab"
         }
-      ],
-      "requiredFiles": ["lanelet2_map.osm", "pointcloud_map.pcd", "global_map_center.pcd.yaml", "lanelet2_map_provider.osm.yaml", "map.map_publisher.yaml"]
+      ]
     }
   ]
 }

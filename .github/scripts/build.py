@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+"""Plan CI builds: inventory matrices, changed targets and the shared Bake recipe.
+
+Prints `KEY=<compact-json>` lines for each matrix to stdout. The `prepare`
+job redirects this into `$GITHUB_OUTPUT`. Uses only the standard library so
+it runs before any pip/apt install step.
+"""
+import fnmatch
+import json
+import os
+import pathlib
+import sys
+
+DEFAULT_INVENTORY = ".github/image-inventory.json"
+# Labels of this project; org.opencontainers.image.* is reserved for the OCI's own keys.
+LABEL_NAMESPACE = "org.autoware.openadkit."
+REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
+
+# What every image is built from: a change to one rebuilds them all.
+IMAGE_INPUTS = (
+    "components/shared/*",
+    ".github/image-inventory.json",
+    ".github/scripts/export_autoware_lock.py",
+)
+# The pull request build pipeline itself, which changes no image: building
+# one small image, pushing it and running the evidence on it proves it.
+PIPELINE_INPUTS = (
+    ".github/scripts/build.py",
+    ".github/scripts/images.py",
+    ".github/scripts/assemble_pr_build.sh",
+    ".github/scripts/resolve_build_inputs.sh",
+    ".github/scripts/resolve_registry_contexts.sh",
+    ".github/scripts/resolve_upstream_images.sh",
+    ".github/scripts/registry_lookup.sh",
+    ".github/actions/free-disk-space/*",
+    ".github/actions/build-image/*",
+    ".github/actions/setup-build-env/*",
+    ".github/workflows/build-single-image.yaml",
+    ".github/workflows/build-single-image-distro.yaml",
+    ".trivyignore",
+)
+PIPELINE_CHECK_TARGET = "localization-mapping"
+
+
+def platform_label(platform):
+    if platform == "linux/amd64":
+        return "amd64"
+    if platform == "linux/arm64":
+        return "arm64"
+    raise ValueError(f"unsupported platform: {platform}")
+
+
+def image_distros(image, default_distros):
+    return image.get("ros_distros", default_distros)
+
+
+def build_matrices(inventory):
+    distros = inventory["ros_distros"]
+    images = inventory["images"]
+
+    def matrix_for(stage):
+        include = []
+        for image in images:
+            if image["stage"] != stage:
+                continue
+            for distro in image_distros(image, distros):
+                for platform in image["platforms"]:
+                    include.append({
+                        "platform": platform,
+                        "platform-label": platform_label(platform),
+                        "ros-distro": distro,
+                        "target": image["target"],
+                    })
+        return {"include": include}
+
+    common_pairs = sorted({
+        (platform, distro)
+        for image in images if image["stage"] == "common"
+        for distro in image_distros(image, distros)
+        for platform in image["platforms"]
+    })
+    common_matrix = {"include": [
+        {"platform": p, "platform-label": platform_label(p), "ros-distro": d}
+        for p, d in common_pairs
+    ]}
+
+    # A multi-arch image for each published one; the components build on the
+    # unpublished ones per architecture.
+    manifest_include = []
+    for image in images:
+        if not image.get("release", True):
+            continue
+        arches = " ".join(platform_label(p) for p in image["platforms"])
+        for distro in image_distros(image, distros):
+            manifest_include.append({
+                "target": image["target"],
+                "ros-distro": distro,
+                "arches": arches,
+            })
+    manifest_matrix = {"include": manifest_include}
+
+    return {
+        "common_matrix": common_matrix,
+        "component_matrix": matrix_for("component"),
+        "manifest_matrix": manifest_matrix,
+    }
+
+
+def build_single_image_plan(inventory, changed_files=(), target_input="", distro="humble"):
+    images = inventory["images"]
+    images_by_target = {image["target"]: image for image in images}
+    all_targets = set(images_by_target)
+    targets = set(target_input.split())
+    use_local_common = False
+
+    if not target_input:
+        for changed_file in changed_files:
+            if not changed_file:
+                continue
+            # These shape every image's sources, context and dependency graph.
+            # Autoware patches change the sources every image compiles, as a new
+            # Autoware revision does.
+            if changed_file in ("components/docker-bake.hcl", ".dockerignore", ".github/autoware.ref",
+                                ".github/scripts/autoware_patches.py") or fnmatch.fnmatchcase(
+                changed_file, ".github/autoware-patches/*"
+            ):
+                targets.update(all_targets)
+                use_local_common = True
+            # A component's own README documents it; a README deeper down may be
+            # copied into the image (fnmatch's "*" would also match "/").
+            elif changed_file == "components/README.md" or (
+                changed_file.endswith("/README.md") and changed_file.count("/") == 2
+            ):
+                continue
+            elif any(fnmatch.fnmatchcase(changed_file, pattern) for pattern in IMAGE_INPUTS):
+                targets.update(all_targets)
+            elif any(fnmatch.fnmatchcase(changed_file, pattern) for pattern in PIPELINE_INPUTS):
+                targets.add(PIPELINE_CHECK_TARGET)
+            elif changed_file.startswith("components/"):
+                component, separator, component_path = changed_file.removeprefix(
+                    "components/"
+                ).partition("/")
+                # A component with a CUDA variant: Dockerfile.cuda builds <component>-cuda.
+                if separator and f"{component}-cuda" in images_by_target:
+                    if component_path == "Dockerfile":
+                        mapped_targets = {component}
+                    elif component_path == "Dockerfile.cuda":
+                        mapped_targets = {f"{component}-cuda"}
+                    else:
+                        mapped_targets = {component, f"{component}-cuda"}
+                elif component == "universe-common" and separator:
+                    mapped_targets = all_targets
+                elif component in images_by_target and separator:
+                    mapped_targets = {component}
+                elif separator and not (REPOSITORY / "components" / component).exists():
+                    # A removed component builds nothing; a new one must be mapped.
+                    mapped_targets = set()
+                else:
+                    mapped_targets = None
+
+                if mapped_targets is None:
+                    raise ValueError(f"Unmapped component build input: {changed_file}")
+                targets.update(mapped_targets)
+                use_local_common |= component == "universe-common"
+
+    unknown_targets = targets - all_targets
+    if unknown_targets:
+        raise ValueError(f"Unknown Bake target: {sorted(unknown_targets)[0]}")
+
+    distro = distro or "humble"
+    if distro not in inventory["ros_distros"]:
+        raise ValueError(f"Unsupported ROS distro: {distro}")
+
+    for target in sorted(targets):
+        supported_distros = image_distros(
+            images_by_target[target], inventory["ros_distros"]
+        )
+        if distro not in supported_distros:
+            supported = ", ".join(supported_distros)
+            raise ValueError(
+                f"Target '{target}' does not support ROS distro '{distro}' "
+                f"(supported: {supported})"
+            )
+
+    return {
+        "targets_json": sorted(targets),
+        "setup_autoware": bool(targets),
+        "with_middleware": bool(
+            targets & {"universe-common-devel", "universe-common"}
+        ),
+        "use_local_common": use_local_common,
+    }
+
+
+def format_outputs(matrices):
+    lines = [f"{k}={json.dumps(v, separators=(',', ':'))}" for k, v in matrices.items()]
+    return "\n".join(lines) + "\n"
+
+
+# Image creation time of the compile base, universe-common-build. Images built on a base are cached against its
+# config digest, and that digest records when each layer was built: with
+# identical layers, a rebuild at another time still recompiled every jazzy
+# component. These images are internal, so a fixed time costs nothing.
+COMPILE_BASE_EPOCH = "0"
+
+
+def bake_recipe(inventory, prepared, target, distro, platform, *, publish, common_check, owner):
+    """Overlay the local HCL graph, preserving local dependency builds in PRs."""
+    images = {image["target"]: image for image in inventory["images"]}
+    if target not in images or distro not in image_distros(images[target], inventory["ros_distros"]) or platform not in images[target]["platforms"]:
+        raise ValueError(f"Unsupported build cell: {target}/{distro}/{platform}")
+    arch = platform_label(platform)
+    build_tag = prepared["build_tag"]
+    def cache_ref(name):
+        return f"ghcr.io/{owner}/openadkit-buildcache:{name}-{arch}-{distro}-{prepared['cache_scope']}"
+    cache = cache_ref(target)
+    # universe-common's build and runtime stages export separate caches so
+    # neither overwrites the other; the devel image adds only its per-build
+    # refresh, which nothing reuses.
+    common_stages = ("universe-common-build", "universe-common")
+    common_cache_from = [f"type=registry,ref={cache_ref(name)}" for name in common_stages]
+    # Internal compile base for components (the devel image without its
+    # per-build refresh). Without per-build labels or provenance its digest
+    # only changes with its inputs, which keeps component compiles cached.
+    common_build = f"ghcr.io/{owner}/openadkit-buildcache:universe-common-build-{arch}-{distro}-{build_tag}"
+    contexts = {}
+    args = {"ROS_DISTRO": distro}
+    labels = {}
+    cache_from = common_cache_from.copy() if target == "universe-common" else [f"type=registry,ref={cache}"]
+    cuda_contexts = {}
+    if publish:
+        if target == "universe-common":
+            upstream = json.loads(prepared["upstream_images"])[distro]
+            contexts.update({f"autoware-{name}": upstream[name]["uri"] for name in ("core-devel", "base")})
+            args["SECURITY_REFRESH"] = build_tag
+        else:
+            contexts["universe-common-devel"] = f"docker-image://{common_build}"
+            contexts["universe-common"] = f"docker-image://ghcr.io/{owner}/openadkit:universe-common-{arch}-{distro}-{build_tag}"
+            upstream = json.loads(prepared["upstream_images"])[distro]
+            cuda_contexts = {f"autoware-{name}": upstream[name]["uri"] for name in ("base-cuda-runtime", "base-cuda-devel")}
+        # The Autoware an image is built from, in the project's own label
+        # namespace; metadata-action adds the OCI ones, the commit among them.
+        labels = {f"{LABEL_NAMESPACE}{name}": prepared[key] for name, key in (
+            ("autoware-version", "autoware_version"), ("autoware-ref", "autoware_ref"),
+            ("autoware-lock-sha256", "autoware_lock_sha256"),
+        )}
+    else:
+        for key, name in (("upstream_core_devel", "autoware-core-devel"), ("upstream_base", "autoware-base"),
+                          ("devel_context", "universe-common-devel"), ("runtime_context", "universe-common")):
+            if prepared.get(key) and not (common_check and name.startswith("universe-common")):
+                contexts[name] = prepared[key]
+        for key, name in (("upstream_cuda_runtime", "autoware-base-cuda-runtime"), ("upstream_cuda_devel", "autoware-base-cuda-devel")):
+            if prepared.get(key) and not common_check:
+                cuda_contexts[name] = prepared[key]
+        # A pull request that rebuilds the common images builds them in each
+        # job from main's registry cache, as its common check job does.
+        if not common_check and prepared.get("use_local_common") == "true":
+            cache_from.extend(common_cache_from)
+
+    # Apply the same settings to dependency targets too, as the previous *.set
+    # overrides did. HCL remains the owner of Dockerfiles and local graph edges.
+    overrides = {}
+    for name in [*images, "universe-common-build"]:
+        overrides[name] = {"platforms": [platform], "args": args.copy(), "labels": labels.copy(),
+                           "contexts": contexts.copy(), "cache-from": cache_from.copy()}
+        if publish:
+            overrides[name]["cache-to"] = [f"type=registry,ref={cache},mode=max"]
+    if publish and target == "universe-common":
+        overrides["universe-common-build"].update(
+            tags=[common_build], labels={}, attest=["type=provenance,disabled=true"],
+            args={**args, "SOURCE_DATE_EPOCH": COMPILE_BASE_EPOCH},
+            **{"cache-to": [f"type=registry,ref={cache_ref('universe-common-build')},mode=max"]})
+        del overrides["universe-common-devel"]["cache-to"]
+    for name in [image for image in images if image.endswith("-cuda")]:
+        overrides[name]["contexts"].update(cuda_contexts)
+        if publish and target != "universe-common":
+            overrides[name]["args"]["SECURITY_REFRESH"] = build_tag
+    targets = (["universe-common-build", "universe-common-devel", "universe-common"]
+               if publish and target == "universe-common" else [target])
+    return {"target": overrides}, targets
+
+
+def write_recipe():
+    inventory = json.loads(pathlib.Path(DEFAULT_INVENTORY).read_text())
+    target = os.environ["BUILD_TARGET"]
+    distro = os.environ["ROS_DISTRO"]
+    platform = os.environ["BUILD_PLATFORM"]
+    prepared = json.loads(os.environ["BUILD_INPUTS"])
+    publish = os.environ["PUBLISH"] == "true"
+    owner = os.environ["GITHUB_REPOSITORY"].split("/")[0]
+    recipe, targets = bake_recipe(
+        inventory, prepared, target, distro, platform,
+        publish=publish, common_check=os.environ["COMMON_CHECK"] == "true", owner=owner,
+    )
+    pathlib.Path(".build-recipe.json").write_text(json.dumps(recipe))
+    with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+        output.write(f"cache_prefix=buildkit-mounts-{target}-{distro}-{platform_label(platform)}-\n")
+        output.write("targets<<BUILD_TARGETS\n" + "\n".join(targets) + "\nBUILD_TARGETS\n")
+
+
+def main(argv):
+    if len(argv) > 1 and argv[1] == "recipe":
+        write_recipe()
+        return 0
+    if len(argv) > 1 and argv[1] == "single-image":
+        if len(argv) != 4:
+            print("usage: build.py single-image ROS_DISTRO TARGETS", file=sys.stderr)
+            return 2
+        inventory = json.loads(pathlib.Path(DEFAULT_INVENTORY).read_text())
+        try:
+            plan = build_single_image_plan(
+                inventory,
+                changed_files=sys.stdin.read().splitlines(),
+                target_input=argv[3],
+                distro=argv[2],
+            )
+        except ValueError as error:
+            print(error, file=sys.stderr)
+            return 1
+        sys.stdout.write(format_outputs(plan))
+        targets = " ".join(plan["targets_json"])
+        print(f"Detected targets: '{targets}'", file=sys.stderr)
+        return 0
+
+    path = argv[1] if len(argv) > 1 else DEFAULT_INVENTORY
+    inventory = json.loads(pathlib.Path(path).read_text())
+    sys.stdout.write(format_outputs(build_matrices(inventory)))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

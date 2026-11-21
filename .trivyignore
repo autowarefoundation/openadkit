@@ -8,3 +8,38 @@ CVE-2025-47273
 # fixed in 1.2.1 but not yet present in the distro/ROS packages used here.
 # Tracked for a base-image bump; ignored so PR checks stay actionable.
 GHSA-6v7p-g79w-8964
+
+# Pillow 12.3.0 in the acados code-generation venv of the Humble devel image
+# (/opt/acados/.venv). Every fix is in Pillow 13, which needs Python 3.11, and
+# Humble has 3.10; acados_template imports matplotlib, so Pillow cannot go. The
+# venv only turns our own solver models into C code at build time and never
+# reads an image, and no runtime image ships it. Reviewed again by the expiry.
+CVE-2026-96637 exp:2027-01-31
+CVE-2026-96639 exp:2027-01-31
+CVE-2026-96640 exp:2027-01-31
+CVE-2026-96642 exp:2027-01-31
+CVE-2026-96643 exp:2027-01-31
+CVE-2026-96644 exp:2027-01-31
+CVE-2026-96778 exp:2027-01-31
+CVE-2026-112390 exp:2027-01-31
+CVE-2026-112392 exp:2027-01-31
+CVE-2026-112393 exp:2027-01-31
+CVE-2026-112397 exp:2027-01-31
+CVE-2026-112398 exp:2027-01-31
+CVE-2026-112399 exp:2027-01-31
+CVE-2026-112400 exp:2027-01-31
+CVE-2026-112402 exp:2027-01-31
+CVE-2026-112403 exp:2027-01-31
+CVE-2026-112404 exp:2027-01-31
+CVE-2026-112405 exp:2027-01-31
+CVE-2026-112406 exp:2027-01-31
+CVE-2026-112892 exp:2027-01-31
+CVE-2026-112893 exp:2027-01-31
+CVE-2026-112894 exp:2027-01-31
+CVE-2026-112895 exp:2027-01-31
+CVE-2026-112896 exp:2027-01-31
+CVE-2026-112897 exp:2027-01-31
+CVE-2026-112900 exp:2027-01-31
+CVE-2026-112902 exp:2027-01-31
+CVE-2026-128067 exp:2027-01-31
+GHSA-78g4-xqwv-q3g8 exp:2027-01-31

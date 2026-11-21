@@ -4,29 +4,33 @@ on:
   push:
     branches:
       - main
+      - 'release/*'
     paths:
+      - '.dockerignore'
+      - '.github/autoware.ref'
+      - '.github/autoware-patches/**'
       - '.github/actions/combine-multi-arch-images/**'
       - '.github/actions/free-disk-space/**'
-      - '.github/actions/inject-ccache/**'
+      - '.github/actions/build-image/**'
       - '.github/actions/setup-build-env/**'
       - '.github/image-inventory.json'
-      - '.github/scripts/**'
+      # Only the scripts the build runs (test_build_trigger.py keeps this list
+      # complete); release, scan and evidence scripts rebuild no image.
+      - '.github/scripts/autoware_patches.py'
+      - '.github/scripts/build.py'
+      - '.github/scripts/export_autoware_lock.py'
+      - '.github/scripts/images.py'
+      - '.github/scripts/registry_lookup.sh'
+      - '.github/scripts/resolve_build_inputs.sh'
+      - '.github/scripts/resolve_upstream_images.sh'
       - '.github/workflows/build-all-images.yaml'
+      # README-only pushes change no image.
       - 'components/**'
+      - '!components/README.md'
+      - '!components/*/README.md'
 
-  schedule:
-    - cron: '0 0 * * 0'
+  # The branch's .github/autoware.ref selects the Autoware sources.
   workflow_dispatch:
-    inputs:
-      autoware_ref:
-        description: 'Autoware ref to build from (branch, tag, or SHA). Defaults to UPSTREAM_TAG, then main.'
-        required: false
-        default: ''
-      run_scan:
-        description: 'Run a full image scan after this build completes.'
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: build-all-images-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
@@ -34,9 +38,9 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX_COMMON: ghcr.io/${{ github.repository_owner }}/openadkit-common
-  IMAGE_PREFIX_COMPONENT: ghcr.io/${{ github.repository_owner }}/openadkit
-  BAKE_FILE: components/docker-bake.hcl
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/openadkit
+  IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+  SAVE_CCACHE: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && github.event_name == 'push' }}
 
 jobs:
   prepare:
@@ -48,24 +52,21 @@ jobs:
       autoware_input_ref: ${{ steps.prepare.outputs.autoware_input_ref }}
       autoware_ref_type: ${{ steps.prepare.outputs.autoware_ref_type }}
       autoware_ref: ${{ steps.prepare.outputs.autoware_ref }}
-      autoware_base_version: ${{ steps.prepare.outputs.autoware_base_version }}
+      autoware_version: ${{ steps.prepare.outputs.autoware_version }}
+      upstream_tag: ${{ steps.prepare.outputs.upstream_tag }}
+      cache_scope: ${{ steps.prepare.outputs.cache_scope }}
       upstream_images: ${{ steps.upstream.outputs.upstream_images }}
       autoware_lock_sha256: ${{ steps.lock.outputs.autoware_lock_sha256 }}
       build_tag: ${{ steps.prepare.outputs.build_tag }}
-      scan_requested: ${{ steps.prepare.outputs.scan_requested }}
       common_matrix: ${{ steps.inventory.outputs.common_matrix }}
       component_matrix: ${{ steps.inventory.outputs.component_matrix }}
-      carla_matrix: ${{ steps.inventory.outputs.carla_matrix }}
       manifest_matrix: ${{ steps.inventory.outputs.manifest_matrix }}
     steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Resolve shared build inputs
         id: prepare
-        env:
-          AUTOWARE_REF_INPUT: ${{ inputs.autoware_ref || vars.UPSTREAM_TAG || 'main' }}
-          RUN_SCAN_INPUT: ${{ inputs.run_scan || false }}
         run: bash .github/scripts/resolve_build_inputs.sh
         shell: bash
 
@@ -75,16 +76,16 @@ jobs:
           set -euo pipefail
           mkdir -p image-inventory
           cp .github/image-inventory.json image-inventory/image-inventory.json
-          python3 .github/scripts/resolve_image_matrices.py >> "$GITHUB_OUTPUT"
+          python3 .github/scripts/build.py >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Resolve immutable upstream Autoware images
         id: upstream
         env:
-          AUTOWARE_BASE_VERSION: ${{ steps.prepare.outputs.autoware_base_version }}
+          UPSTREAM_TAG: ${{ steps.prepare.outputs.upstream_tag }}
         run: |
           set -euo pipefail
           bash .github/scripts/resolve_upstream_images.sh
@@ -92,29 +93,29 @@ jobs:
         shell: bash
 
       - name: Upload immutable upstream image metadata
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: upstream-images-${{ steps.prepare.outputs.build_tag }}
           path: upstream-images/upstream-images.json
           retention-days: 90
 
       - name: Upload image inventory
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: image-inventory-${{ steps.prepare.outputs.build_tag }}
           path: image-inventory/image-inventory.json
           retention-days: 90
 
       - name: Install YAML parser
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-yaml
+        # The hosted runner images ship it; apt runs only where it is missing.
+        run: python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update && sudo apt-get install -y python3-yaml; }
         shell: bash
 
       - name: Export exact Autoware dependency lockfile
         id: lock
         run: |
           set -euo pipefail
+          mkdir -p autoware-lock
           python3 .github/scripts/export_autoware_lock.py \
             autoware-metadata/repositories/autoware.repos \
             autoware-lock/autoware-lock.repos
@@ -123,7 +124,7 @@ jobs:
         shell: bash
 
       - name: Upload Autoware dependency lockfile
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: autoware-lock-${{ steps.prepare.outputs.build_tag }}
           path: autoware-lock/autoware-lock.repos
@@ -134,23 +135,19 @@ jobs:
   # =============================================================================
   build-common:
     needs: prepare
-    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
+    runs-on: ${{ matrix.platform == 'linux/amd64' && (vars.RUNNER_AMD64 || 'ubuntu-22.04') || (vars.RUNNER_ARM64 || 'ubuntu-22.04-arm') }}
     timeout-minutes: 120
     permissions:
       actions: write
       contents: read
       packages: write
-    env:
-      CACHE_KEY_PREFIX: buildkit-mounts-universe-common-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
-      IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-      SAVE_CCACHE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
     strategy:
       fail-fast: false
       max-parallel: 8
       matrix: ${{ fromJson(needs.prepare.outputs.common_matrix) }}
     steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up build environment
         uses: ./.github/actions/setup-build-env
@@ -164,98 +161,27 @@ jobs:
           setup-autoware: true
           with-middleware: true
 
-      - name: Extract metadata for openadkit-common:universe-common-devel
-        id: meta-universe-common-devel
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE_PREFIX_COMMON }}
-          bake-target: docker-metadata-action-universe-common-devel
-          tags: |
-            type=raw,value=universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable=${{ env.IS_MAIN_PUSH }}
-            type=raw,value=universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Extract metadata for openadkit-common:universe-common
-        id: meta-universe-common
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE_PREFIX_COMMON }}
-          bake-target: docker-metadata-action-universe-common
-          tags: |
-            type=raw,value=universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable=${{ env.IS_MAIN_PUSH }}
-            type=raw,value=universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Restore BuildKit cache mounts
-        id: cache-restore
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: cache-mounts
-          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
-          restore-keys: |
-            ${{ env.CACHE_KEY_PREFIX }}
-
-      - name: Arm post-step save of BuildKit cache mounts
-        if: env.SAVE_CCACHE == 'true'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: cache-mounts
-          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
-          lookup-only: true
-
-      - name: Inject BuildKit cache mounts
-        uses: ./.github/actions/inject-ccache
-        with:
-          ros-distro: ${{ matrix.ros-distro }}
-          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
-
       - name: Build and push universe-common images
-        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
-        env:
-          ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
-          LOCAL_IMAGE: ""
+        uses: ./.github/actions/build-image
         with:
-          files: |
-            ${{ env.BAKE_FILE }}
-            ${{ steps.meta-universe-common-devel.outputs.bake-file }}
-            ${{ steps.meta-universe-common.outputs.bake-file }}
-          targets: |
-            universe-common-devel
-            universe-common
-          push: true
-          set: |
-            *.platform=${{ matrix.platform }}
-            *.contexts.autoware-core-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['core-devel'].uri }}
-            *.contexts.autoware-base=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro].base.uri }}
-            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
-            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
-            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
-            *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
-            *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
-            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
-
-      - name: Prune BuildKit cache mount lineage
-        if: env.SAVE_CCACHE == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CACHE_KEY_PREFIX: ${{ env.CACHE_KEY_PREFIX }}
-          KEEP_KEY: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
-          MAX_GB: 6
-        run: bash .github/scripts/prune-buildkit-cache.sh
+          target: universe-common
+          ros-distro: ${{ matrix.ros-distro }}
+          platform: ${{ matrix.platform }}
+          prepared: ${{ toJSON(needs.prepare.outputs) }}
+          tag-suffix: ${{ needs.prepare.outputs.build_tag }}
+          publish: true
+          # PR builds, which run on amd64, start from these (resolve_registry_contexts.sh).
+          stable-tags: ${{ env.IS_MAIN_PUSH == 'true' && matrix.platform == 'linux/amd64' }}
+          save-ccache: ${{ env.SAVE_CCACHE }}
 
   # =============================================================================
   # Stage 2: Build component images (parallel)
   # =============================================================================
   build-components:
-    runs-on: ${{ matrix.platform == 'linux/amd64' && 'ubuntu-22.04' || 'ubuntu-22.04-arm' }}
-    timeout-minutes: 120
+    runs-on: ${{ matrix.platform == 'linux/amd64' && (vars.RUNNER_AMD64 || 'ubuntu-22.04') || (vars.RUNNER_ARM64 || 'ubuntu-22.04-arm') }}
+    # A compile with a cold ccache, such as the first build of new Autoware
+    # sources, takes planning close to two hours.
+    timeout-minutes: 180
     needs: [prepare, build-common]
     # A single common matrix failure must not skip cells whose common image
     # was already published. Missing contexts fail at pull.
@@ -264,17 +190,13 @@ jobs:
       actions: write
       contents: read
       packages: write
-    env:
-      CACHE_KEY_PREFIX: buildkit-mounts-${{ matrix.target }}-${{ matrix.ros-distro }}-${{ matrix.platform-label }}-
-      IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-      SAVE_CCACHE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
     strategy:
       fail-fast: false
       max-parallel: 8
       matrix: ${{ fromJson(needs.prepare.outputs.component_matrix) }}
     steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up build environment
         uses: ./.github/actions/setup-build-env
@@ -288,152 +210,16 @@ jobs:
           setup-autoware: true
           with-middleware: false
 
-      - name: Extract metadata for ${{ matrix.target }}
-        id: meta
-        uses: docker/metadata-action@v6
+      - name: Build and push ${{ matrix.target }}
+        uses: ./.github/actions/build-image
         with:
-          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          bake-target: docker-metadata-action-${{ matrix.target }}
-          tags: |
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable=${{ env.IS_MAIN_PUSH }}
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Restore BuildKit cache mounts
-        id: cache-restore
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: cache-mounts
-          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
-          restore-keys: |
-            ${{ env.CACHE_KEY_PREFIX }}
-
-      - name: Arm post-step save of BuildKit cache mounts
-        if: env.SAVE_CCACHE == 'true'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: cache-mounts
-          key: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
-          lookup-only: true
-
-      - name: Inject BuildKit cache mounts
-        uses: ./.github/actions/inject-ccache
-        with:
+          target: ${{ matrix.target }}
           ros-distro: ${{ matrix.ros-distro }}
-          skip-extraction: ${{ steps.cache-restore.outputs.cache-hit }}
-
-      - name: Build and push ${{ matrix.target }}
-        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
-        env:
-          ROS_DISTRO: ${{ matrix.ros-distro }}
-          UPSTREAM_TAG: ${{ needs.prepare.outputs.autoware_base_version }}
-          LOCAL_IMAGE: ""
-        with:
-          files: |
-            ${{ env.BAKE_FILE }}
-            ${{ steps.meta.outputs.bake-file }}
-          targets: ${{ matrix.target }}
-          push: true
-          set: |
-            *.platform=${{ matrix.platform }}
-            *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            sensing-perception-cuda.contexts.autoware-base-cuda-runtime=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['base-cuda-runtime'].uri }}
-            sensing-perception-cuda.contexts.autoware-base-cuda-devel=${{ fromJSON(needs.prepare.outputs.upstream_images)[matrix.ros-distro]['base-cuda-devel'].uri }}
-            *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
-            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
-            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
-            *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
-            *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
-            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
-
-      - name: Prune BuildKit cache mount lineage
-        if: env.SAVE_CCACHE == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CACHE_KEY_PREFIX: ${{ env.CACHE_KEY_PREFIX }}
-          KEEP_KEY: ${{ env.CACHE_KEY_PREFIX }}${{ github.sha }}
-          MAX_GB: 6
-        run: bash .github/scripts/prune-buildkit-cache.sh
-
-  build-carla-interface:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
-    needs: [prepare, build-common, build-components]
-    # build-components remains an ordering dependency, but unrelated matrix
-    # failures must not suppress CARLA when its simulator image was published.
-    if: >-
-      !cancelled() &&
-      needs.prepare.result == 'success' &&
-      needs.build-common.result == 'success'
-    permissions:
-      contents: read
-      packages: write
-    env:
-      # Publish the unversioned stable tag only for real pushes to main, never
-      # for manual or scheduled runs that can build an arbitrary Autoware ref.
-      IS_MAIN_PUSH: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare.outputs.carla_matrix) }}
-    steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Set up build environment
-        uses: ./.github/actions/setup-build-env
-        with:
-          registry: ${{ env.REGISTRY }}
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          free-disk: true
-          setup-autoware: false
-
-      - name: Extract metadata for ${{ matrix.target }}
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          bake-target: docker-metadata-action-${{ matrix.target }}
-          tags: |
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }},enable=${{ env.IS_MAIN_PUSH }}
-            type=raw,value=${{ matrix.target }}-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-          flavor: |
-            latest=false
-
-      - name: Build and push ${{ matrix.target }}
-        uses: docker/bake-action@4a9a8d494466d37134e2bfca2d3a8de8fb2681ad # v5
-        env:
-          ROS_DISTRO: ${{ matrix.ros-distro }}
-          LOCAL_IMAGE: ""
-        with:
-          files: |
-            ${{ env.BAKE_FILE }}
-            ${{ steps.meta.outputs.bake-file }}
-          targets: ${{ matrix.target }}
-          push: true
-          set: |
-            *.platform=${{ matrix.platform }}
-            *.args.ROS_DISTRO=${{ matrix.ros-distro }}
-            *.contexts.universe-common-devel=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-devel-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.contexts.universe-common=docker-image://${{ env.IMAGE_PREFIX_COMMON }}:universe-common-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            carla-interface.contexts.simulator=docker-image://${{ env.IMAGE_PREFIX_COMPONENT }}:simulator-amd64-${{ matrix.ros-distro }}-${{ needs.prepare.outputs.build_tag }}
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/openadkit-buildcache:carla-interface-${{ matrix.platform-label }}-${{ matrix.ros-distro }}-main,mode=max
-            *.labels."org.opencontainers.image.build-tag"=${{ needs.prepare.outputs.build_tag }}
-            *.labels."org.opencontainers.image.run-id"=${{ github.run_id }}
-            *.labels."org.opencontainers.image.openadkit-sha"=${{ github.sha }}
-            *.labels."org.opencontainers.image.autoware-input-ref"=${{ needs.prepare.outputs.autoware_input_ref }}
-            *.labels."org.opencontainers.image.autoware-ref-type"=${{ needs.prepare.outputs.autoware_ref_type }}
-            *.labels."org.opencontainers.image.autoware-ref"=${{ needs.prepare.outputs.autoware_ref }}
-            *.labels."org.opencontainers.image.autoware-base-version"=${{ needs.prepare.outputs.autoware_base_version }}
-            *.labels."org.opencontainers.image.autoware-lock-sha256"=${{ needs.prepare.outputs.autoware_lock_sha256 }}
+          platform: ${{ matrix.platform }}
+          prepared: ${{ toJSON(needs.prepare.outputs) }}
+          tag-suffix: ${{ needs.prepare.outputs.build_tag }}
+          publish: true
+          save-ccache: ${{ env.SAVE_CCACHE }}
 
   # =============================================================================
   # Stage 3: Create multi-arch manifests
@@ -441,7 +227,7 @@ jobs:
   create-manifests:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
-    needs: [prepare, build-common, build-components, build-carla-interface]
+    needs: [prepare, build-common, build-components]
     # Run even if one build leg failed so multi-arch manifests for the legs
     # that did complete are still published, instead of suppressing the whole
     # image set on a single flaky platform build. Prepare must have succeeded
@@ -455,52 +241,21 @@ jobs:
       matrix: ${{ fromJson(needs.prepare.outputs.manifest_matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Create multi-arch manifest for ${{ matrix.target }} (${{ matrix.ros-distro }})
         uses: ./.github/actions/combine-multi-arch-images
         with:
-          image: ${{ matrix.repo == 'common' && env.IMAGE_PREFIX_COMMON || env.IMAGE_PREFIX_COMPONENT }}
+          image: ${{ env.IMAGE_REPO }}
           target: ${{ matrix.target }}
           ros-distro: ${{ matrix.ros-distro }}
           arches: ${{ matrix.arches }}
           build-tag: ${{ needs.prepare.outputs.build_tag }}
           registry: ${{ env.REGISTRY }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  manifest-report:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    needs: [prepare, create-manifests]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Write manifest report
-        env:
-          MANIFEST_MATRIX: ${{ needs.prepare.outputs.manifest_matrix }}
-          IMAGE_PREFIX_COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
-          IMAGE_PREFIX_COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
-          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
-        run: bash .github/scripts/report_manifests.sh >> "$GITHUB_STEP_SUMMARY"
-        shell: bash
 
   capture-metadata:
     runs-on: ubuntu-22.04
@@ -511,32 +266,32 @@ jobs:
       contents: read
       packages: read
     steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check out the Open AD Kit repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download Autoware dependency lockfile
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: autoware-lock-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
       - name: Download image inventory
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: image-inventory-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
       - name: Download immutable upstream image metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: upstream-images-${{ needs.prepare.outputs.build_tag }}
           path: build-metadata
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -549,16 +304,14 @@ jobs:
           AUTOWARE_INPUT_REF: ${{ needs.prepare.outputs.autoware_input_ref }}
           AUTOWARE_REF_TYPE: ${{ needs.prepare.outputs.autoware_ref_type }}
           AUTOWARE_REF: ${{ needs.prepare.outputs.autoware_ref }}
-          AUTOWARE_BASE_VERSION: ${{ needs.prepare.outputs.autoware_base_version }}
+          AUTOWARE_VERSION: ${{ needs.prepare.outputs.autoware_version }}
           PREPARED_LOCK_SHA256: ${{ needs.prepare.outputs.autoware_lock_sha256 }}
-          SCAN_REQUESTED: ${{ needs.prepare.outputs.scan_requested }}
-          COMMON: ${{ env.IMAGE_PREFIX_COMMON }}
-          COMPONENT: ${{ env.IMAGE_PREFIX_COMPONENT }}
-        run: bash .github/scripts/capture_build_metadata.sh
+          IMAGE_REPO: ${{ env.IMAGE_REPO }}
+        run: python3 .github/scripts/images.py capture
         shell: bash
 
       - name: Upload build metadata
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: build-metadata-${{ needs.prepare.outputs.build_tag }}
           path: |
@@ -568,45 +321,24 @@ jobs:
             build-metadata/upstream-images.json
           retention-days: 90
 
-  summarize:
+  # A workflow_run run is main's, so scan and evidence follow main's builds on
+  # their own; a maintenance branch's build dispatches them on its branch, where
+  # the release gate looks for them.
+  verify-maintenance-build:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [prepare, capture-metadata]
-    if: success()
-    steps:
-      - name: Checkout OpenADKit repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Write job summary
-        env:
-          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
-          AUTOWARE_INPUT_REF: ${{ needs.prepare.outputs.autoware_input_ref }}
-          AUTOWARE_REF_TYPE: ${{ needs.prepare.outputs.autoware_ref_type }}
-          AUTOWARE_REF: ${{ needs.prepare.outputs.autoware_ref }}
-          AUTOWARE_BASE_VERSION: ${{ needs.prepare.outputs.autoware_base_version }}
-          SCAN_REQUESTED: ${{ needs.prepare.outputs.scan_requested }}
-          SOURCE_REF: ${{ github.ref }}
-        run: bash .github/scripts/write_build_summary.sh >> "$GITHUB_STEP_SUMMARY"
-
-  notify-failure:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [prepare, build-common, build-components, build-carla-interface, create-manifests, capture-metadata]
-    if: failure() && github.event_name == 'schedule'
+    if: startsWith(github.ref, 'refs/heads/release/')
     permissions:
-      issues: write
+      actions: write
     steps:
-      - name: Create failure issue
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
-        with:
-          script: |
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Scheduled build failed (${new Date().toISOString().split('T')[0]})`,
-              body: [
-                '**Scheduled build-all-images workflow failed.**',
-                '',
-                `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              ].join('\n'),
-            })
+      - name: Dispatch the scan and the evidence cells on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_TAG: ${{ needs.prepare.outputs.build_tag }}
+        run: |
+          set -euo pipefail
+          for workflow in scan-images.yaml evidence.yaml; do
+            gh workflow run "${workflow}" --repo "${GITHUB_REPOSITORY}" --ref "${GITHUB_REF_NAME}" -f build_tag="${BUILD_TAG}"
+          done
+        shell: bash

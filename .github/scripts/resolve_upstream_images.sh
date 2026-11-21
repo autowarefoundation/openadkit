@@ -3,14 +3,15 @@
 # Optional filters narrow PR checks; release builds leave them unset.
 set -euo pipefail
 
-: "${AUTOWARE_BASE_VERSION:?AUTOWARE_BASE_VERSION is required}"
-
+# UPSTREAM_TAG names the upstream release whose images the build starts from.
+: "${UPSTREAM_TAG:?UPSTREAM_TAG is required}"
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=.github/scripts/registry_lookup.sh
 # shellcheck disable=SC1091
 source "${script_dir}/registry_lookup.sh"
 
 inventory="${IMAGE_INVENTORY:-.github/image-inventory.json}"
+[ -f "${inventory}" ] || { echo "Image inventory not found: ${inventory}" >&2; exit 1; }
 output="${UPSTREAM_IMAGES_OUTPUT:-upstream-images/upstream-images.json}"
 repo="${UPSTREAM_REPO:-ghcr.io/autowarefoundation/autoware}"
 tmp=$(mktemp)
@@ -50,7 +51,7 @@ mkdir -p "$(dirname -- "${output}")"
 
 for distro in "${distros[@]}"; do
   for name in "${names[@]}"; do
-    ref="${repo}:${name}-${distro}-${AUTOWARE_BASE_VERSION}"
+    ref="${repo}:${name}-${distro}-${UPSTREAM_TAG}"
     digest=$(registry_manifest_digest "${ref}")
     jq -n \
       --arg name "${name}" \

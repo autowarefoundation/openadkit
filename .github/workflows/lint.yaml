@@ -9,46 +9,43 @@ on:
       - '.gitignore'
       - 'openadkit'
       - 'cli/**'
+      - 'pyproject.toml'
+      - '.github/scripts/evidence/example-kit/**'
+      - 'deployments/safety-island-simulation/**'
       - '**/*.sh'
       - '**/*.json'
       - '**/*.json5'
       - '.github/image-inventory.json'
       - '.github/ISSUE_TEMPLATE/**'
-      - '.github/DISCUSSION_TEMPLATE/**'
       - '.github/dependabot.yaml'
       - '.github/stale.yml'
-      - '.github/sync-files.yaml'
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/actions/**'
       - '**/*.md'
       - '**/Dockerfile*'
       - '**/*.dockerfile'
-      - '**/docker-compose*.yaml'
-      - '**/docker-compose*.yml'
+      - '**/compose*.yaml'
       - '**/*.env'
       - 'deployments/**/*.yaml'
       - 'deployments/**/*.yml'
       - 'platforms/**/*.yaml'
       - 'platforms/**/*.yml'
+      - 'platforms/**/*.py'
+      - 'deployments/**/*.py'
       - 'components/**/*.hcl'
+      - 'components/shared/**'
       - '.hadolint.yaml'
       - '.markdownlint.yaml'
       - '.markdownlintignore'
       - '.yamllint.yaml'
       - 'mkdocs.yaml'
-      - 'docs/Makefile'
       - 'docs/macros.py'
       - 'docs/requirements.txt'
       - 'docs/assets/**'
       - 'docs/overrides/**'
       - 'docs/**/*.yaml'
       - 'docs/**/*.yml'
-      - 'docs/.pages'
-      - 'docs/**/.pages'
-      - 'platforms/autosd/x5h/components/nodes/*.py'
-      - 'platforms/autosd/x5h/components/nodes/fixtures/*'
-      - 'platforms/autosd/x5h/scripts/*.awk'
       - '.github/workflows/lint.yaml'
 
 concurrency:
@@ -61,16 +58,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install tools
         run: |
-          pip install yamllint pytest
+          pip install yamllint pytest ruff mypy
           curl -sSL -o /tmp/actionlint.sh https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash
           bash /tmp/actionlint.sh
 
       - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           severity: error
 
@@ -78,7 +75,7 @@ jobs:
         run: ./actionlint
 
       - name: Run hadolint
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: Dockerfile*
           recursive: true
@@ -90,79 +87,128 @@ jobs:
             .github/workflows/ \
             .github/actions/ \
             .github/ISSUE_TEMPLATE/ \
-            .github/DISCUSSION_TEMPLATE/ \
             .github/dependabot.yaml \
             .github/stale.yml \
-            .github/sync-files.yaml \
             deployments/ \
             platforms/ \
             mkdocs.yaml \
             docs/
 
-      - name: Run markdownlint
-        run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**' '!platforms/autosd/x5h/**'
+      - name: Run ruff
+        run: ruff check --output-format github cli .github/scripts components/shared/entrypoint
 
-      - name: Install Docker Compose v5.2+
+      - name: Run mypy
+        # Settings and the checked paths live in pyproject.toml.
+        run: mypy
+
+      - name: Run markdownlint
+        run: npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md'
+
+      - name: Install Docker Compose 5.0+
         # The ubuntu-latest runner ships an older compose plugin that rejects
         # service overrides after `include:` (used by scenario-simulation).
         # Install the latest release that supports the compose-spec include/merge.
         run: bash .github/scripts/install-compose.sh
 
       - name: Validate Docker Compose files
-        # `docker compose config -q` parses, interpolates, and schema-validates
-        # each documented stack with its sample env file. It does not pull images.
+        # The cell list comes from the deployment manifests through the same
+        # enumerator release_plan.py uses; role cells carry a --role argument.
+        # Dummy Zenoh endpoints satisfy role requirement checks only.
         run: |
           set -euo pipefail
-          for ros_distro in humble jazzy; do
-            for deployment in planning-simulation scenario-simulation logging-simulation; do
-              ./openadkit validate "${deployment}" --ros-distro "${ros_distro}"
-            done
-            ./openadkit validate logging-simulation \
-              --ros-distro "${ros_distro}" --gpu
-          done
-          ./openadkit validate carla-simulation --gpu --ros-distro humble
           export REMOTE_PASSWORD="${REMOTE_PASSWORD:-ci-validate}"
-          ( cd deployments/zenoh-bridge && docker compose --env-file config.env config -q )
+          export ZENOH_LISTEN="tcp/127.0.0.1:7447"
+          export ZENOH_PEER="tcp/127.0.0.1:7447"
+          matrix=$(python3 .github/scripts/validation_matrix.py --source-root .)
+          while IFS=$'\t' read -r deployment ros_distro gpu role; do
+            validate_args=(./openadkit validate "${deployment}" --ros-distro "${ros_distro}")
+            if [ "${gpu}" = true ]; then
+              validate_args+=(--gpu)
+            fi
+            if [ -n "${role}" ]; then
+              validate_args+=(--role "${role}")
+            fi
+            "${validate_args[@]}"
+          done <<< "${matrix}"
+
+      - name: Validate the example kits made by openadkit new
+        env:
+          REMOTE_PASSWORD: ci-validate
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/validation_matrix.py --source-root . --make-example-kits "$RUNNER_TEMP/kits" |
+            while read -r kit; do
+              # Without a name: each deployment of the kit.
+              (cd "${kit}" && "$GITHUB_WORKSPACE/openadkit" validate)
+            done
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Validate bake.hcl parses and COLCON_BASE_PATHS is single-source
         # `docker buildx bake --print` parses the HCL and resolves every target
-        # without pulling images. The CPU and CUDA sensing targets must produce
-        # the same COLCON_BASE_PATHS value (R4's invariant: a single source of
-        # truth for the sensing `--base-paths` list).
+        # without pulling images. Each CUDA target (<image>-cuda) must produce
+        # the same COLCON_BASE_PATHS value as its CPU image: a single source of
+        # truth for the package list of both.
         run: |
           set -euo pipefail
           fail=0
-          cpu=$(docker buildx bake -f components/docker-bake.hcl --print sensing-perception \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["target"]["sensing-perception"]["args"]["COLCON_BASE_PATHS"])')
-          cuda=$(docker buildx bake -f components/docker-bake.hcl --print sensing-perception-cuda \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["target"]["sensing-perception-cuda"]["args"]["COLCON_BASE_PATHS"])')
-          if [ -z "${cpu}" ]; then
-            echo "::error::sensing-perception has no COLCON_BASE_PATHS"
-            fail=1
-          fi
-          if [ -z "${cuda}" ]; then
-            echo "::error::sensing-perception-cuda has no COLCON_BASE_PATHS"
-            fail=1
-          fi
-          if [ "${cpu}" != "${cuda}" ]; then
-            echo "::error::COLCON_BASE_PATHS diverges between CPU and CUDA sensing targets"
-            echo "  cpu:  ${cpu}"
-            echo "  cuda: ${cuda}"
-            fail=1
-          fi
+          base_paths() {
+            docker buildx bake -f components/docker-bake.hcl --print "$1" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["target"][sys.argv[1]]["args"].get("COLCON_BASE_PATHS", ""))' "$1"
+          }
+          for cuda in $(jq -r '.images[].target | select(endswith("-cuda"))' .github/image-inventory.json); do
+            cpu_target=${cuda%-cuda}
+            cpu=$(base_paths "${cpu_target}")
+            gpu=$(base_paths "${cuda}")
+            if [ -z "${cpu}" ] || [ -z "${gpu}" ]; then
+              echo "::error::${cpu_target} and ${cuda} must both set COLCON_BASE_PATHS"
+              fail=1
+            elif [ "${cpu}" != "${gpu}" ]; then
+              echo "::error::COLCON_BASE_PATHS diverges between ${cpu_target} and ${cuda}"
+              echo "  cpu:  ${cpu}"
+              echo "  cuda: ${gpu}"
+              fail=1
+            fi
+          done
           # Validate that the universe-common-devel target parses cleanly (catches
           # locals-blocks, typo'd function names, missing ARGs, etc.).
           docker buildx bake -f components/docker-bake.hcl --print universe-common-devel \
             > /dev/null
+          # Repository-mode `./openadkit` looks up
+          # <prefix>:<target>-<arch>-<ros-distro>. Every catalog target must
+          # carry that local tag so a --load build needs no --set overrides.
+          arch=$(uname -m)
+          case "${arch}" in
+            x86_64|amd64) arch=amd64 ;;
+            aarch64|arm64) arch=arm64 ;;
+          esac
+          prefix=$(python3 -c 'import json; print(json.load(open("openadkit.json"))["imageRepository"])')
+          distro=$(python3 -c 'import json; print(json.load(open("openadkit.json"))["defaultRosDistro"])')
+          for target in $(python3 -c 'import json; print(" ".join(json.load(open("openadkit.json"))["componentImages"].values()))'); do
+            expected="${prefix}:${target}-${arch}-${distro}"
+            tags=$(docker buildx bake -f components/docker-bake.hcl --print "${target}" \
+              | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)["target"][sys.argv[1]].get("tags", [])))' "${target}")
+            case " ${tags} " in
+              *" ${expected} "*) ;;
+              *)
+                echo "::error::${target} is missing local tag ${expected}"
+                fail=1
+                ;;
+            esac
+          done
           exit "${fail}"
 
-      - name: Smoke-test Dockerized docs build
+      - name: Build the docs site
+        env:
+          NO_MKDOCS_2_WARNING: 1
         run: |
-          make -C docs build
+          pip install -r docs/requirements.txt
+          mkdocs build
           test -f site/index.html
+
+      - name: Check the docs-site links in READMEs against the built site
+        run: python3 .github/scripts/check_site_links.py
 
       - name: Run Python tests
         run: pytest .github/scripts/
@@ -170,59 +216,4 @@ jobs:
       - name: Run shell tests
         run: |
           bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
-          bash .github/scripts/tests/test_report_manifests.sh
-
-  # This job runs every unit test suite under components/nodes: traj_relay's
-  # arithmetic, the stop-distance metric awk, and the before/after demo
-  # orchestrator's local gates.
-  #
-  # traj_relay.py downsamples the Autoware trajectory to fit domain 2's
-  # MTU 462. That arithmetic is load-bearing -- an off-by-one in the point
-  # budget means the CR52 either receives a fragmented sample it cannot
-  # reassemble or receives nothing -- and test_traj_relay.py pins it against
-  # CDR sizes measured with rclpy's own serialize_message() on the staged
-  # arm64 image. The tests need no ROS: traj_relay defers its rclpy imports
-  # into main(), so everything exercised is plain Python.
-  #
-  # test_stop_metrics.py pins scripts/x5h-stop-metrics.awk (the before/after
-  # demo's stop-distance measurement) against fixture captures via
-  # subprocess, also with no ROS required.
-  #
-  # test_mrm_demo_gates.py exercises scripts/x5h-mrm-demo.sh's `check`
-  # subcommand and its board-free `run` gates (payload validation, argument
-  # ordering, the payload_exceeds_extent size check) with ssh/scp stubbed
-  # onto PATH so no test can reach the board.
-  #
-  # Gated here rather than deleted. The file sat in the tree for a while with
-  # nothing running it, which is the worst of both worlds -- it reads as
-  # coverage while proving nothing, and it rots silently. 44 tests, all
-  # passing at the time this comment was last updated -- see `pytest -q`'s
-  # own count for the current total, which this comment will again drift
-  # from as tests are added.
-  x5h-node-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pytest
-        run: python3 -m pip install --user pytest
-        shell: bash
-
-      - name: Run x5h node and metrics unit tests
-        run: python3 -m pytest -q
-        working-directory: platforms/autosd/x5h/components/nodes
-        shell: bash
-
-      # The demo reel composer lives under scripts/ with the other operator
-      # tooling rather than under components/nodes, so pytest has to be pointed
-      # at it separately. It needs Pillow, and only Pillow: the panes are drawn
-      # with it and the frames are piped to ffmpeg, which this step never runs.
-      - name: Install Pillow
-        run: python3 -m pip install --user pillow
-        shell: bash
-
-      - name: Run x5h demo reel tests
-        run: python3 -m pytest -q
-        working-directory: platforms/autosd/x5h/scripts
-        shell: bash
+          bash .github/scripts/tests/test_setup_helpers.sh

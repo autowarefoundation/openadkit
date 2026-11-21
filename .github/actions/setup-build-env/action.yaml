@@ -7,7 +7,7 @@ name: setup-build-env
 # needs the repo on disk to resolve the local composite action path).
 #
 # Usage:
-#   - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+#   - uses: actions/checkout@v7
 #   - uses: ./.github/actions/setup-build-env
 #     with:
 #       autoware-ref: ${{ needs.prepare.outputs.autoware_ref }}
@@ -52,21 +52,27 @@ inputs:
 runs:
   using: composite
   steps:
+    # The ARM runner image already has ample space and lacks most of the
+    # packages this removes, so its apt-get remove fails with a warning.
     - name: Free Disk Space (Ubuntu)
-      if: inputs.free-disk == 'true'
+      if: inputs.free-disk == 'true' && runner.arch == 'X64'
       uses: ./.github/actions/free-disk-space
 
     - name: Install jq and vcs2l
       if: inputs.setup-autoware == 'true'
       run: |
-        sudo apt-get update
-        sudo apt-get install -y jq pipx
+        # The hosted runner images ship jq and pipx. apt runs only where one is
+        # missing, so an outage of the Ubuntu mirror cannot fail the build here.
+        if ! command -v jq >/dev/null || ! command -v pipx >/dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y jq pipx
+        fi
         pipx install "vcs2l==1.1.7"
       shell: bash
 
     - name: Checkout Autoware repository
       if: inputs.setup-autoware == 'true'
-      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         repository: autowarefoundation/autoware
         ref: ${{ inputs.autoware-ref }}
@@ -75,7 +81,7 @@ runs:
 
     - name: Download Autoware dependency lockfile
       if: inputs.setup-autoware == 'true' && inputs.build-tag != ''
-      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: autoware-lock-${{ inputs.build-tag }}
         path: autoware-lock
@@ -91,6 +97,8 @@ runs:
           exit 1
         fi
         vcs import --shallow autoware/src < autoware-lock/autoware-lock.repos
+        # A release line's backported Autoware fixes (.github/autoware-patches).
+        python3 .github/scripts/autoware_patches.py apply autoware/src
         if [ "${{ inputs.with-middleware }}" = "true" ]; then
           # Some Autoware refs do not provide middleware sources, but
           # components/universe-common/Dockerfile bind-mounts this path.
@@ -100,10 +108,10 @@ runs:
       shell: bash
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
     - name: Log in to Container Registry
-      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
       with:
         registry: ${{ inputs.registry }}
         username: ${{ inputs.registry-username }}

@@ -238,11 +238,6 @@ def validate_data(data: Any, roles: dict[str, Any], directory: Path) -> list[dic
                     f"{where}.roles contains undeclared role(s): "
                     + ", ".join(unknown_roles)
                 )
-        resource["requiredFiles"] = require_string_list(
-            resource.get("requiredFiles", []), f"{where}.requiredFiles"
-        )
-        for required in resource["requiredFiles"]:
-            safe_relative(required, f"{where}.requiredFiles")
         if resource["kind"] == "zip":
             require_url(resource.get("url"), f"{where}.url")
             checksum = require_string(resource.get("sha256"), f"{where}.sha256")
@@ -299,6 +294,12 @@ def validate_data(data: Any, roles: dict[str, Any], directory: Path) -> list[dic
                     raise OpenADKitError(
                         f"{file_where}.source {item['source']} does not match its sha256"
                     )
+        # Files data needs every file it lists, unless it names fewer.
+        resource["requiredFiles"] = require_string_list(
+            resource.get("requiredFiles", [item["path"] for item in resource["files"]]), f"{where}.requiredFiles"
+        )
+        for required in resource["requiredFiles"]:
+            safe_relative(required, f"{where}.requiredFiles")
     return data
 
 

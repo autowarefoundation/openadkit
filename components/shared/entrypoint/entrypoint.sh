@@ -23,8 +23,9 @@ set -eo pipefail
 user="${USERNAME:-aw}"
 if [ "$(id -u)" = 0 ]; then
     if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
-        groupmod -g "${HOST_GID}" "${user}" >/dev/null 2>&1 || true
-        usermod -u "${HOST_UID}" "${user}" >/dev/null 2>&1 || true
+        # -o: the host ids may already exist in the image, such as gid 100 (users).
+        [ "$(id -g "${user}")" = "${HOST_GID}" ] || groupmod -o -g "${HOST_GID}" "${user}"
+        [ "$(id -u "${user}")" = "${HOST_UID}" ] || usermod -o -u "${HOST_UID}" "${user}"
     fi
     exec gosu "${user}" "$0" "$@"
 fi

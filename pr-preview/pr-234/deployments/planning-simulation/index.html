@@ -1795,6 +1795,8 @@
 <p>Run the Autoware planning and control stack on a sample map with the built-in
 simulator, then set a route in RViz in your browser. No GPU is required; with
 an NVIDIA GPU, <code>--gpu</code> plans with Autoware 2.0's Diffusion Planner.</p>
+<p><img alt="Planning Simulation runs localization-mapping, planning, control, vehicle-system, simulator and visualizer, which talk over ROS 2" src="../../assets/images/deployment-planning-simulation-light.svg#only-light" />
+<img alt="Planning Simulation runs localization-mapping, planning, control, vehicle-system, simulator and visualizer, which talk over ROS 2" src="../../assets/images/deployment-planning-simulation-dark.svg#only-dark" /></p>
 <h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation<span class="w">         </span><span class="c1"># CPU: the rule-based planner</span>
 openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation<span class="w"> </span>--gpu<span class="w">   </span><span class="c1"># GPU: the Diffusion Planner (amd64 only)</span>

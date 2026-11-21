@@ -1761,6 +1761,8 @@
 <p>Replay a sample rosbag through sensing, perception and localization. An NVIDIA
 GPU with at least 4 GB of VRAM is recommended; CPU mode detects objects by
 clustering instead of CenterPoint.</p>
+<p><img alt="Logging Simulation runs sensing-perception, localization-mapping, vehicle-system, rosbag and visualizer, which talk over ROS 2" src="../../assets/images/deployment-logging-simulation-light.svg#only-light" />
+<img alt="Logging Simulation runs sensing-perception, localization-mapping, vehicle-system, rosbag and visualizer, which talk over ROS 2" src="../../assets/images/deployment-logging-simulation-dark.svg#only-dark" /></p>
 <h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation<span class="w">         </span><span class="c1"># CPU: clustering-based detection</span>
 openadkit<span class="w"> </span>run<span class="w"> </span>logging-simulation<span class="w"> </span>--gpu<span class="w">   </span><span class="c1"># GPU: CenterPoint on CUDA (amd64 only)</span>

@@ -45,7 +45,7 @@ it.
 
 | Term | Meaning |
 |------|---------|
-| [**Evidence cell**](releases/evidence.md#cells-and-levels) | One runtime test of a deployment on one ROS distro and topology, such as `planning-simulation-humble-linux-amd64`. |
+| [**Evidence cell**](releases/evidence.md#cells-and-levels) | One runtime test of a deployment on one ROS distro, architecture and topology, such as `planning-simulation-humble-linux-amd64`. |
 | [**Evidence**](releases/evidence.md) | The evidence cells run against one build. A release needs a run in which every cell passed. |
 | [**CI exemption**](releases/evidence.md#ci-exemptions) | A reasoned manifest entry for a deployment without a hosted evidence cell. It is not a passing test. |
 | [**BOM**](releases/index.md) | A release's bill of materials: the pinned Autoware release, component images and external images. |

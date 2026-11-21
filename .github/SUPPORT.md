@@ -18,7 +18,7 @@ For a bug report, include `openadkit version --json`, the deployment, ROS
 distro, host architecture, Docker/Compose versions, reproduction steps, and
 relevant logs. Remove credentials and personal or sensitive data first.
 For a kit, also include the pinned release version and the result of
-`openadkit validate --json`, run in the kit.
+`openadkit validate <deployment> --json`, run in the kit.
 
 ## Supported versions and configurations
 

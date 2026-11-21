@@ -38,10 +38,12 @@ available but commented out.
 
 ## Drive
 
-Open the [visualizer](index.md#open-the-visualizer). In RViz, set a goal with **2D Goal Pose** and select **Auto**.
+Open the [visualizer](index.md#open-the-visualizer). In RViz, set a goal with
+**2D Goal Pose**, then press **AUTO** in the **OperationMode** section of the
+AutowareStatePanel.
 
 ## Stop and Recover
 
 Run `stop` also after a failed start, to release the GPU. If autonomous mode is
 unavailable, inspect `/system/command_mode/availability` and
-`/diagnostics_graph/status`. See [Stop and Recover](index.md#stop-and-recover) for the rest.
+`/diagnostics_graph/status`. See [Troubleshooting](../getting-started/troubleshooting.md) for the rest.

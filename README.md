@@ -20,9 +20,11 @@
 From nothing to a driving Autoware on Ubuntu. No GPU needed. The [full Quickstart](https://autowarefoundation.github.io/openadkit/getting-started/) has the details.
 
 ```bash
-# 1. Install the CLI
+# 1. Install the CLI. A new account has ~/.local/bin on PATH only from its
+#    next login, so add it to this shell.
 curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \
   | bash -s -- install
+export PATH="$HOME/.local/bin:$PATH"
 
 # 2. Prepare the host, then start a shell in the docker group it adds you to
 openadkit setup

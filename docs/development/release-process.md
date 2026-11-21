@@ -76,7 +76,9 @@ flowchart LR
 4. **deploy-docs**: publishes the docs site from `main` when the latest
    aliases moved. If it fails after a publish, re-run only the failed job or
    dispatch `deploy-docs`: re-running all jobs stops at the draft step, since
-   the release is already published.
+   the release is already published. Dispatch it too when `publish` failed
+   after the release went public, for example waiting for it to turn
+   immutable: `deploy-docs` is then skipped.
 
 The release plan records the exact image digests, aliases and assets of the
 release for the jobs after it; it stays in the workflow run. The release itself
@@ -137,8 +139,8 @@ See [Verify a Release](../releases/verification.md) to check a release yourself.
 
 ## The Docs Site
 
-The site documents the latest stable release. A push to `main` does not
-publish it: a docs change reaches the site with the next stable release, and a
+The site is built from `main` each time the newest stable release is
+published. A push to `main` does not publish it: a docs change reaches the site with the next stable release, and a
 pull request shows its own preview. To publish a fix in between, dispatch
 [`deploy-docs.yaml`](https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/deploy-docs.yaml),
 which builds the site from `main`; do that only while `main` documents nothing

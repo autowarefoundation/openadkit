@@ -21,13 +21,20 @@ Images are built with [Docker Bake](https://docs.docker.com/build/bake/) from
 [`components/docker-bake.hcl`](https://github.com/autowarefoundation/openadkit/blob/main/components/docker-bake.hcl),
 the same file CI uses.
 
---8<-- "includes/build-pipeline.md"
+```mermaid
+flowchart LR
+    CORE["autoware:core-devel (build)<br/>autoware:base (runtime)"] --> UC["universe-common"]
+    CORE --> UCD["universe-common-devel<br/>(builds overlay workspaces)"]
+    UC --> COMP["sensing-perception<br/>localization-mapping<br/>planning, control<br/>vehicle-system<br/>visualizer, simulator"]
+    CUDA["autoware:base-cuda-{devel,runtime}"] --> GPU["sensing-perception-cuda<br/>planning-cuda"]
+    UCD -.-> GPU
+```
 
 `universe-common` compiles the shared part of Autoware Universe on the upstream
 `core-devel` image and copies the result onto the lean upstream `base` image, so
 build tools never reach the runtime layers. Every component builds from it.
 The CUDA variants, `sensing-perception-cuda` and `planning-cuda`, build on the
-upstream CUDA images and add the `universe-common` install tree.
+upstream CUDA images and copy in the Autoware tree of the devel image.
 
 The published images end with a per-build Ubuntu security refresh. Components
 compile on `universe-common-build`, the devel image without that refresh, which

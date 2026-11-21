@@ -43,7 +43,7 @@ openadkit setup
 
 Run setup as your normal user; it asks for `sudo` only for host changes:
 
-- missing base packages such as `git` and `curl`
+- missing packages such as `git` and `curl`
 - Docker, when the host has none; it never replaces an existing engine
 - your user's membership of the `docker` group
 - the kernel's UDP buffer limits, which DDS needs for sensor data
@@ -66,7 +66,7 @@ openadkit run planning-simulation
 `run` downloads and verifies the sample map, pulls missing images, starts the
 services, and returns once Autoware is ready.
 
---8<-- "includes/ros-distro.md"
+Add `--ros-distro jazzy` to select Jazzy; Humble is the default.
 
 ## 4. Open the Visualizer {: #open-the-visualizer }
 

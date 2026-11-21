@@ -85,7 +85,7 @@ cannot add any.
 | `url`, `sha256` | `zip` only: the archive and its checksum |
 | `expectedRoot` | `zip` only: the archive's one top-level directory, whose contents become the resource |
 | `files` | `files` only: the files, each with a `path` in the resource and exactly one of `url` (to download), `source` (a file of the kit or the release, by its path from the manifest's directory) and `content` (the file's text). `url` and `source` need a `sha256` |
-| `requiredFiles` | Paths that must exist, and not be empty, in data the CLI installed |
+| `requiredFiles` | Paths that must exist, and not be empty, in data the CLI installed. For `files`, every listed file unless it names fewer |
 | `gpu` | `true`: only the GPU mode uses it |
 | `roles` | Catalog only: the split-host roles that use it |
 
@@ -147,7 +147,7 @@ Each document carries `schemaVersion: 1`.
 | `version` | The release, or `null` in a source checkout. In a kit, the release it pins |
 | `commit` | The commit of a source checkout, also of the one a kit extends; else `null` |
 | `extends` | In a kit, what it pins, as its manifest says; else `null` |
-| `bom` | What the release runs: `autoware` (the pinned Autoware release: `version`, `ref`, `lockSha256`), `images` (the digest-pinned component images per ROS distro) and `externalImages` |
+| `bom` | What the release runs: `autoware` (the pinned Autoware release: `version`, `ref`, `lockSha256`, and `backports` when the release applies Autoware fixes: each with its `repository`, `subject` and `upstream` link), `images` (the digest-pinned component images per ROS distro) and `externalImages` |
 
 ### `validate --json`
 
@@ -173,5 +173,5 @@ plain `validate` checks each of them.
 | `modelSha256` | The digest of the resolved Compose model |
 | `configSha256` | The content digest of each config override layer: `base`, `kit` and `deployment` |
 | `overlaySha256` | The content digest of the overlay workspace, without its `build` and `log` directories |
-| `readySeconds` | How long the services took to become ready |
+| `readySeconds` | How long `run` took to start the services, from pulling missing images until they settled |
 | `verify` | With `--verify`: the step's `service`, `seconds`, `exitCode` and `result`, `PASSED` or `FAILED` |

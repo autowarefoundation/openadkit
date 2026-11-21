@@ -42,17 +42,12 @@ openadkit stop
 - Put host settings in `~/.config/openadkit/<deployment>.env`; see
   [Settings](../getting-started/cli.md#settings).
 
-[CLI & Maintenance](../getting-started/cli.md) covers the other commands.
+[CLI & Maintenance](../getting-started/cli.md) covers the other commands, and
+[Troubleshooting](../getting-started/troubleshooting.md) what goes wrong.
 
 ### Open the Visualizer
 
 --8<-- "includes/visualizer-remote-access.md"
-
-### Stop and Recover
-
-`openadkit stop` stops and removes the deployment. To download missing data,
-run `openadkit fetch <deployment>`; to repair incomplete data, add `--force`.
-For other issues, see [Troubleshooting](../getting-started/troubleshooting.md).
 
 ## Your Own Kit
 

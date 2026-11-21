@@ -2,12 +2,12 @@
 
 The registry prefix and default ROS distro title come from openadkit.json, the
 release manifest the release reads them from, so the published docs cannot
-contradict the release. The component image table is generated from the image inventory
+contradict the release. The image table is generated from the image inventory
 (.github/image-inventory.json) so the docs cannot drift from what CI builds.
 
 Used by the `macros` plugin configured in mkdocs.yaml. Reference in any page
 under docs/ as `{{ registry }}`, `{{ default_distro_title }}`, or
-`{{ component_table() }}`.
+`{{ image_table() }}`.
 
 Parameterless shared blocks live as plain markdown under docs/includes/ and are
 inserted with pymdownx snippets (`--8<--`) — keep markdown in markdown files,
@@ -40,8 +40,8 @@ def define_env(env):
     env.variables["default_distro_title"] = manifest["defaultRosDistro"].capitalize()
 
     @env.macro
-    def component_table():
-        """Markdown table of component images, generated from the image inventory.
+    def image_table():
+        """Markdown table of the released images, generated from the image inventory.
 
         The ROS Distros column reflects the per-image `ros_distros` override in
         the inventory when present, otherwise the inventory-wide `ros_distros` list.
@@ -49,11 +49,11 @@ def define_env(env):
         data = _load_json(INVENTORY, "image inventory")
         global_distros = data["ros_distros"]
         rows = [
-            "| Component | Image | ROS Distros | Platforms |",
+            "| Target | Image | ROS Distros | Platforms |",
             "|-----------|-------|-------------|-----------|",
         ]
         for img in data["images"]:
-            if img.get("stage") != "component":
+            if not img.get("release", True):
                 continue
             target = img["target"]
             distros = ", ".join(img.get("ros_distros", global_distros))

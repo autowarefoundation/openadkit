@@ -1,7 +1,8 @@
 name: deploy-docs
 
-# The site documents the latest stable release, not main: the release workflow
-# publishes it, and a maintainer can dispatch it to publish a fix in between.
+# The site is built from main when a stable release is published, not on every
+# push: the release workflow publishes it, and a maintainer can dispatch it to
+# publish a fix in between.
 # Pull requests get a preview (pr-preview.yaml).
 on:
   workflow_dispatch:

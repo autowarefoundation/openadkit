@@ -40,8 +40,10 @@ commit (`source_sha`), the passing cells, the CI exemptions (`exempt`) and the
 `url` of the evidence run the release gate accepted.
 
 After verification, install with the downloaded `openadkit` or follow the
-[Quickstart](../getting-started/index.md). Evidence is bounded to the tested
-cells; it is not a vehicle-safety or security certification.
+[Quickstart](../getting-started/index.md). The installer downloads the bundle
+again and checks it against the release's published SHA-256; releases are
+immutable, so it gets the same bytes you verified. Evidence is bounded to the
+tested cells; it is not a vehicle-safety or security certification.
 
 ## Checksum Only
 

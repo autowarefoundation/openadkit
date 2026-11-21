@@ -24,7 +24,7 @@ carries RViz and its plugins. A kit compiles its overlay workspace in the
 | `planning` | `planning` | Planning, Scenario, CARLA, Safety Island |
 | `control` | `control` | Planning, Scenario, CARLA, Safety Island |
 | `vehicle-system` | `vehicle`, `system`, `api`, `safety-island-bridge`, `safety-island` | All; the last two in Safety Island |
-| `simulator` | `simulator`, `simulated-perception`, `mrm-state-relay`, `carla-interface`, `carla-map-loader` | Planning, Scenario, Safety Island; `mrm-state-relay` in Scenario; `carla-*` in CARLA |
+| `simulator` | `simulator`, `simulated-perception`, `mrm-state-relay`, `traffic-light-relay`, `carla-interface`, `carla-map-loader` | Planning, Scenario, Safety Island; the relays in Scenario; `carla-*` in CARLA |
 | `visualizer` | `visualizer` | All |
 
 ### Sensing & Perception {: #sensing-perception }

@@ -15,8 +15,8 @@ To run Autoware on one host and the scenario runner on another, see
 [Split-host Simulation](split-host.md).
 
 `run` downloads the Kashiwanoha map. Autoware takes about two minutes to be
-ready; the runner then executes the scenario, seven to eight minutes for the
-bundled one on a 4-vCPU host, and writes the results to
+ready; the runner then executes the scenario, three runs of the bundled sample
+in seven to eight minutes on a 4-vCPU host, and writes the results to
 `~/openadkit-output/scenario-simulation/results` (`run` prints the path).
 
 With `--verify`, `run` waits for the runner and ends with `verify: passed`, or
@@ -35,6 +35,7 @@ Set these in the host settings file,
 | `SCENARIO_HOST_PATH` | Host scenario directory, mounted at `/scenarios` | `./scenarios` |
 | `OUTPUT_HOST_PATH` | Host results directory | `~/openadkit-output/scenario-simulation/results` |
 | `SCENARIO_READY_TIMEOUT` | Seconds to wait for Autoware before running | `600` |
+| `INITIALIZE_DURATION` | Seconds each scenario gives Autoware to reach driving | `300` |
 | `GLOBAL_REAL_TIME_FACTOR` | Simulated seconds per wall-clock second; below `1` on a host that cannot run Autoware in real time | `1.0` |
 | `GLOBAL_TIMEOUT` | Wall-clock seconds each scenario may take; scale it with the factor | `180` |
 | `MAP_PATH` | Host map directory | `~/autoware_data/maps/kashiwanoha_map` |
@@ -52,7 +53,8 @@ SCENARIO=/scenarios/my-scenario.yaml
 ```
 
 The default `./scenarios` lies inside the installed release: files placed there
-mark the deployment as modified and are lost on `upgrade` or `uninstall`.
+mark the deployment as modified, stay behind in the old version on `upgrade`
+and are deleted by `uninstall`.
 
 Scenarios must match the map, and the planning sample map does not work here.
 To use your own map, point `MAP_PATH` at a directory that holds the same files

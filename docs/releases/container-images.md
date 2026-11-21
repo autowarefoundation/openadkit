@@ -29,8 +29,8 @@ the same patterns with `-jazzy` (for example `planning-jazzy`).
 - **Latest stable for a distro**: use `<target>-<ros_distro>`.
 - **Never** pin per-architecture tags such as `universe-common-amd64-humble`:
   CI moves them with every build of `main`, and pushes them only for the
-  common images its own builds start from. `universe-common`, the runtime base
-  of the component images, is not released; `universe-common-devel` is.
+  common images its own builds start from. `universe-common`, the runtime layer
+  the component images build on, is not released; `universe-common-devel` is.
 - **Source checkout**: `./openadkit` runs `<target>-<arch>-<ros_distro>`, the
   tags of a [local build](../development/build-from-source.md), not published
   images.
@@ -71,4 +71,4 @@ are not pinned, so security updates keep flowing into new builds.
 Generated from the image inventory (`.github/image-inventory.json`), so it always
 matches what CI builds. The [Tag Reference](#tag-reference) explains the tag names.
 
-{{ component_table() }}
+{{ image_table() }}

@@ -123,7 +123,6 @@ nav:
       - Compatibility: releases/compatibility.md
       - Evidence Policy: releases/evidence.md
       - Verify a Release: releases/verification.md
-      - Before v2.0.0: releases/before-v2.md
   - Development:
       - Build from Source: development/build-from-source.md
       - Release Process: development/release-process.md

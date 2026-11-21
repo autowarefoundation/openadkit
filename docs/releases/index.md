@@ -24,8 +24,6 @@ moves to the latest stable version with `openadkit upgrade`.
 - [Compatibility](compatibility.md) — what a version number promises
 - [Evidence Policy](evidence.md) — what a build must pass to be released
 - [Verify a Release](verification.md) — check the files before you run them
-- [Before v2.0.0](before-v2.md) — what the Open AD Kit name covered before
-  its first release
 
 ## Versions
 
@@ -39,8 +37,8 @@ version keeps working.
 - **One Autoware release per release.** Releases come from `main`, which pins
   one Autoware release in `.github/autoware.ref`. The
   [GitHub Release](https://github.com/autowarefoundation/openadkit/releases)
-  notes open with it, and `openadkit install` and `openadkit version` pair the
-  two, `Open AD Kit v2.0.1 · Autoware 2.0.0`.
+  notes open with it, and `openadkit install` and `openadkit version` name
+  both, as in `Open AD Kit v2.0.1 · Autoware 2.0.0`.
 - **Pinned inputs.** A release also pins the ROS distros and every image
   digest, and its images carry the Autoware version they are built from in
   `org.autoware.openadkit.autoware-version`.
@@ -49,6 +47,19 @@ version keeps working.
   the release notes list it, and the Autoware version stays the tag's.
 - **Older versions.** A `release/X.Y` branch is created from a release tag only
   to fix an older version.
+
+## Before v2.0.0
+
+v2.0.0 is the first Open AD Kit release with a version. It upgrades none of
+what the name covered before:
+
+- the "version 1.0" and "version 2.0" of the 2022
+  [documentation](https://autowarefoundation.github.io/open-ad-kit-docs/), a
+  driverless-bus reference design
+- the Docker images of the Autoware repository from 2024
+- the unversioned `main` builds of this repository on Autoware 1.x: v2.0.0 does
+  not read their settings or keep their image and service names, and nothing
+  updates their images on GHCR
 
 ## Support
 

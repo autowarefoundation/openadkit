@@ -21,8 +21,8 @@ Open AD Kit is licensed under **Apache License 2.0**. All contributions are acce
    certifies the [Developer Certificate of Origin](https://developercertificate.org/);
    a PR without it is not merged
 3. **Run the [local checks](#local-checks)** that match your change, and
-   preview docs with `pip install -r docs/requirements.txt && mkdocs serve`. The docs site documents the latest
-   stable release, so a docs change reaches it with the next one
+   preview docs with `mkdocs serve`. The docs site is built from `main` with
+   each stable release, so a docs change reaches it with the next one
 4. **Open a PR** against `main` with a clear description. Its title follows
    [Conventional Commits](https://www.conventionalcommits.org/) (`feat(cli): ...`,
    with `!` for a breaking change): PRs are squash-merged, so the title becomes
@@ -45,6 +45,14 @@ the pin and adapts the deployments to it.
 ## Local Checks
 
 Run these before pushing. They cover most of what `.github/workflows/lint.yaml` runs; CI also validates every deployment cell from `validation_matrix.py` and checks the Bake file.
+
+Install the Python tools in a virtual environment, since Ubuntu 24.04's own
+Python refuses `pip install` (on Ubuntu, `sudo apt install python3-venv` first):
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install yamllint pytest ruff mypy -r docs/requirements.txt
+```
 
 ```bash
 # Shell scripts (and the extensionless launcher)
@@ -82,7 +90,6 @@ bash .github/scripts/tests/test_setup_helpers.sh
 
 # Documentation (local build, from the repository root), then the links
 # READMEs make to the docs site
-pip install -r docs/requirements.txt
 mkdocs build
 python3 .github/scripts/check_site_links.py
 ```

@@ -71,6 +71,13 @@ def read_extends(kit_root: Path) -> str:
     return require_string(load_json(kit_root / "openadkit.json").get("extends"), "extends")
 
 
+def first_run(root: Path, catalog: Catalog, base: str) -> tuple[str, str]:
+    """The command a new kit on base starts with, and what it does: the base's verify step if it has one."""
+    if get_deployment(root, catalog, base).verify:
+        return "openadkit run --verify", "start, wait until ready, run the base's verify step"
+    return "openadkit run", "start and wait until ready"
+
+
 def create_kit(root: Path, catalog: Catalog, name: str, base: str, destination: Path) -> Path:
     """A kit named name in destination, on top of base, from cli/templates/kit.
 
@@ -92,7 +99,9 @@ def create_kit(root: Path, catalog: Catalog, name: str, base: str, destination: 
         extends = os.path.relpath(root.resolve(), target)
     else:
         extends = str(root.resolve())
-    values = {"name": name, "base": base, "extends": extends, "version": catalog.version or "(a source checkout)"}
+    command, purpose = first_run(root, catalog, base)
+    values = {"name": name, "base": base, "extends": extends, "version": catalog.version or "(a source checkout)",
+              "run": f"{command:<32} # {purpose}"}
 
     def fill(text: str) -> str:
         for key, value in values.items():
@@ -310,14 +319,17 @@ def show_version(root, catalog, *, json_output: bool = False) -> int:
         version = described.version
         commit = None
     else:
-        result = subprocess.run(
-            ["git", "-C", str(described_root), "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
         version = None
-        commit = result.stdout.strip() or None
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(described_root), "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            commit = result.stdout.strip() or None
+        except FileNotFoundError:
+            commit = None
     if json_output:
         print(
             json.dumps(
@@ -577,7 +589,7 @@ def new_command(root: Path, catalog: Catalog, args: argparse.Namespace) -> int:
     target = create_kit(root, catalog, args.name, args.base, Path.cwd())
     print(f"created: {target}")
     print(f"deployment: {args.name}-{args.base}, which runs {args.base} with the kit's files on top")
-    print(f"next: cd {args.name} && openadkit run --verify")
+    print(f"next: cd {args.name} && {first_run(root, catalog, args.base)[0]}")
     return 0
 
 
@@ -689,6 +701,14 @@ def protect_outdated_data(deployment: Deployment, selection) -> None:
     )
 
 
+def prepare_host(deployment: Deployment, selection) -> str:
+    """Install the data and create the writable mounts the settings name, before
+    Compose creates a container; return the resolved Compose model."""
+    protect_outdated_data(deployment, selection)
+    data.install_data(deployment, selection, force=False)
+    return compose.create_writable_mounts(deployment, selection)
+
+
 def fetch_command(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.Namespace) -> int:
     selection = select(root, catalog, deployment, args)
     if args.force:
@@ -727,10 +747,8 @@ def run_command(root: Path, catalog: Catalog, deployment: Deployment, args: argp
             f"{', '.join(live.display_name(project) for project in leftover)} left stopped containers on this host; "
             "remove them with openadkit stop before starting this deployment"
         )
-    protect_outdated_data(deployment, selection)
-    data.install_data(deployment, selection, force=False)
-    model = compose.create_writable_mounts(deployment, selection)
-    skipped = services & ({"visualizer"} if args.no_visualizer else set())
+    model = prepare_host(deployment, selection)
+    skipped = services &({"visualizer"} if args.no_visualizer else set())
     compose.require_local_images(catalog, selection, model, services - skipped)
     compose.write_run_state(deployment.project_name(selection.role), {
         "schemaVersion": 1,
@@ -867,9 +885,12 @@ def restart_command(args: argparse.Namespace) -> int:
         deployment.use_workspace(Path(state["workspace"]))
     selection = settings.resolve(deployment, catalog, state["rosDistro"], state["gpu"], role=state["role"])
     compose.check_overlay_build(deployment, selection, catalog.devel_image(selection.ros_distro))
-    skipped = set(state["skipped"])
     running = set(live.running_services(project))
     if args.all_services:
+        # A service run skipped stays out until it has a container, even a stopped one.
+        skipped = set(state["skipped"]) - running
+        if skipped:
+            skipped -= {container["service"] for container in live.containers(project)}
         services = compose.render(deployment, selection) - skipped
     elif args.services:
         # A service that is not up yet, such as a skipped visualizer, is still one to start.
@@ -882,6 +903,7 @@ def restart_command(args: argparse.Namespace) -> int:
         raise OpenADKitError(f"{live.display_name(project)} has no service that takes config overrides or an overlay workspace to restart")
     if not args.all_services:
         services |= live.pid_followers(project, services)
+    prepare_host(deployment, selection)
     compose.recreate(deployment, selection, services)
     print(f"restarted: {', '.join(sorted(services))}")
     kept = sorted(running - services)

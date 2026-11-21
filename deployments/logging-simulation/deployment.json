@@ -55,12 +55,6 @@
           "url": "https://huggingface.co/AutowareFoundation/lidar_centerpoint/resolve/494c8171def40bd36cc2feb323e0a5acbfab132b/tiny/detection_class_remapper.param.yaml",
           "sha256": "c711f8875ece9b527dfe31ffc75f8c0de2e77945ef67860a959a4e04c36772d5"
         }
-      ],
-      "requiredFiles": [
-        "tiny/pts_voxel_encoder.onnx",
-        "tiny/pts_backbone_neck_head.onnx",
-        "tiny/ml_package.param.yaml",
-        "tiny/detection_class_remapper.param.yaml"
       ]
     }
   ]

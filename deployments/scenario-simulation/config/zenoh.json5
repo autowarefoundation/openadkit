@@ -9,7 +9,7 @@
 // Derived from the pinned Scenario Simulator V2 25.0.20 concealer interfaces
 // (AutowareUniverse, FieldOperatorApplication) plus the Autoware ADAPI
 // servers/clients. The simple sensor simulator's detection, obstacle
-// segmentation, occupancy grid, and IMU outputs are included because the
+// segmentation, occupancy grid, traffic light and IMU outputs are included because the
 // Autoware host consumes/visualizes them and the single-host graph kept them
 // local; autonomous emergency braking needs the IMU, and autonomous-mode
 // availability on the Autoware host depends on that control stack coming up.
@@ -34,6 +34,7 @@
           "/perception/obstacle_segmentation/pointcloud",
           "/perception/object_recognition/detection/objects",
           "/perception/occupancy_grid_map/map",
+          "/perception/traffic_light_recognition/internal/traffic_signals",
           "/sensing/imu/imu_data",
           "/localization/acceleration",
           "/localization/kinematic_state",
@@ -61,6 +62,7 @@
           "/perception/obstacle_segmentation/pointcloud",
           "/perception/object_recognition/detection/objects",
           "/perception/occupancy_grid_map/map",
+          "/perception/traffic_light_recognition/internal/traffic_signals",
           "/sensing/imu/imu_data",
           "/localization/acceleration",
           "/localization/kinematic_state",

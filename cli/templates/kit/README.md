@@ -18,7 +18,7 @@ deployment, then your host settings file. Config overrides apply in the same
 order, without the host settings file.
 
 ```bash
-openadkit run --verify           # start, wait until ready, run the base's verify step
+{{run}}
 openadkit build                  # after you add ROS packages to overlay_ws/src
 openadkit restart                # the services pick up the build
 openadkit stop

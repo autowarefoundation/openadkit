@@ -19,8 +19,17 @@ set -euo pipefail
 : "${PR_NUMBER:?PR_NUMBER is required}"
 : "${BASE_METADATA:?BASE_METADATA is required}"
 inventory=${INVENTORY:-.github/image-inventory.json}
+# shellcheck source=.github/scripts/registry_lookup.sh
+source "$(dirname "${BASH_SOURCE[0]}")/registry_lookup.sh"
 
-exists() { docker buildx imagetools inspect "$1" >/dev/null 2>&1; }
+# Only an image the registry says is absent was not built: any other lookup
+# failure stops here, before the base's image would stand in for this run's.
+exists() {
+    local status=0
+    registry_inspect_json "$1" >/dev/null || status=$?
+    [ "${status}" -le 1 ] || exit 2
+    return "${status}"
+}
 
 built=0
 while read -r target distro; do

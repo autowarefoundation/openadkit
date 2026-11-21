@@ -43,9 +43,12 @@ def is_managed(target: Path) -> bool:
 
 
 def is_own(target: Path) -> bool:
-    """A directory with files that the CLI did not install: the user's own
-    data. It is used as it is, and never checked, replaced or removed."""
-    return not target.is_symlink() and target.is_dir() and not is_managed(target) and any(target.iterdir())
+    """A directory with files that the CLI did not install, or the user's (or
+    root's) link to a directory with files, such as data moved to another disk:
+    the user's own data. It is used as it is, and never checked, replaced or removed."""
+    if target.is_symlink():
+        return target.lstat().st_uid in (0, os.getuid()) and target.is_dir() and any(target.iterdir())
+    return target.is_dir() and not is_managed(target) and any(target.iterdir())
 
 
 def is_empty(target: Path) -> bool:

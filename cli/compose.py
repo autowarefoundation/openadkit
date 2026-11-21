@@ -789,7 +789,7 @@ def build_overlay(workspace: Path, image: str, ros_distro: str, colcon: Sequence
     require_docker()
     stamp = {"image": image, "rosDistro": ros_distro}
     built = read_overlay_stamp(workspace)
-    if built != stamp:
+    if built is None or {key: built.get(key) for key in stamp} != stamp:
         products = [path for path in (workspace / "build", workspace / "install")
                     if path.is_dir() and not path.is_symlink()]
         if built is None and any(any(path.iterdir()) for path in products):
@@ -799,10 +799,10 @@ def build_overlay(workspace: Path, image: str, ros_distro: str, colcon: Sequence
             )
         for path in products:
             shutil.rmtree(path)
-        # The stamp names the image the products belong to, so a failed
-        # build's retry continues from what it built.
         (workspace / "install").mkdir()
-        (workspace / "install" / OVERLAY_STAMP).write_text(json.dumps(stamp) + "\n", encoding="utf-8")
+    # The stamp names the image the products belong to, so a failed build's
+    # retry continues from what it built; "complete" waits for the build to pass.
+    write_overlay_stamp(workspace, stamp)
     # Ctrl+C ends the docker client but not the build in the container, so
     # the container is named and removed with it.
     name = f"openadkit-build-{os.getpid()}"
@@ -811,7 +811,12 @@ def build_overlay(workspace: Path, image: str, ros_distro: str, colcon: Sequence
     except KeyboardInterrupt:
         docker(["docker", "rm", "--force", name], check=False, trace=False)
         raise
+    write_overlay_stamp(workspace, {**stamp, "complete": True})
     print(f"built: {workspace}")
+
+
+def write_overlay_stamp(workspace: Path, stamp: dict[str, Any]) -> None:
+    (workspace / "install" / OVERLAY_STAMP).write_text(json.dumps(stamp) + "\n", encoding="utf-8")
 
 
 def build_container(name: str, workspace: Path, image: str, colcon: Sequence[str]) -> None:
@@ -844,6 +849,9 @@ def check_overlay_build(deployment: Deployment, selection: Selection, image: str
                   f"build it: openadkit build {workspace}", file=sys.stderr)
         return
     if stamp.get("rosDistro") == selection.ros_distro and (not image or stamp.get("image") == image):
+        if not stamp.get("complete"):
+            print(f"warning: overlay workspace: the last build of {workspace} failed, so some packages may "
+                  f"be missing; build it: openadkit build {workspace}", file=sys.stderr)
         return
     raise OpenADKitError(
         f"overlay workspace {workspace} was built for {stamp.get('rosDistro')} in {stamp.get('image')}; "

@@ -214,9 +214,20 @@ evidence_is_release() {
 }
 evidence_passed() { [ "$(jq -r '.result' "$1")" = PASSED ]; }
 
+# Usage: check_scan <dir>, check_evidence <dir>
+check_scan() {
+  select_latest_artifact "scan-metadata-${BUILD_TAG}" .github/workflows/scan-images.yaml \
+    scan-metadata.json scan_is_full scan_passed "$1"
+  validate_metadata "$1/scan-metadata.json"
+}
+check_evidence() {
+  select_latest_artifact "evidence-summary-${BUILD_TAG}" .github/workflows/evidence.yaml \
+    evidence-summary.json evidence_is_release evidence_passed "$1"
+}
+
 validate_metadata() {
   # The same model is parsed again at packaging; this is not a bypass token.
-  python3 "${script_dir}/images.py" validate release-input/build release-input/scan/scan-metadata.json
+  python3 "${script_dir}/images.py" validate release-input/build "$1"
 }
 
 # A release is a build of the branch it is released from, on an Autoware
@@ -289,17 +300,26 @@ main() {
   checkout_release_source
   validate_manifest_consistency
   download_build_metadata
-  select_latest_artifact "scan-metadata-${BUILD_TAG}" .github/workflows/scan-images.yaml \
-    scan-metadata.json scan_is_full scan_passed release-input/scan
-  validate_metadata
+  check_scan release-input/scan
   validate_release_rules
-  select_latest_artifact "evidence-summary-${BUILD_TAG}" .github/workflows/evidence.yaml \
-    evidence-summary.json evidence_is_release evidence_passed release-input/evidence
+  check_evidence release-input/evidence
   validate_git_tag
   validate_registry_conflicts
   write_outputs
 }
 
+# Publish checks scan and evidence again before it tags anything: the release
+# environment can hold the run for approval while a newer run of either fails.
+recheck_gate() {
+  validate_build_run
+  check_scan gate/scan
+  check_evidence gate/evidence
+}
+
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-  main
+  if [ "${1:-}" = --recheck ]; then
+    recheck_gate
+  else
+    main
+  fi
 fi

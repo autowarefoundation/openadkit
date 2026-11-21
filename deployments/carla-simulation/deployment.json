@@ -40,11 +40,6 @@
           "content": "projector_type: Local\n"
         }
       ],
-      "requiredFiles": [
-        "lanelet2_map.osm",
-        "pointcloud_map.pcd",
-        "map_projector_info.yaml"
-      ],
       "roles": ["autoware"]
     }
   ]

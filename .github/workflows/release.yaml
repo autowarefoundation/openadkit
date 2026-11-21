@@ -154,10 +154,12 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           sparse-checkout: |
+            .github/scripts/images.py
             .github/scripts/manage_github_release.sh
             .github/scripts/promote_release_images.sh
             .github/scripts/registry_lookup.sh
             .github/scripts/stable_alias_policy.sh
+            .github/scripts/validate_release.sh
             .github/scripts/write_release_notes.sh
             .github/scripts/release_notes.py
             .github/scripts/evidence/report.py
@@ -185,6 +187,13 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check scan and evidence again
+        env:
+          BUILD_TAG: ${{ inputs.build_tag }}
+          VERSION: ${{ inputs.version }}
+        run: bash .github/scripts/validate_release.sh --recheck
+        shell: bash
 
       - name: Create release metadata and notes
         run: bash .github/scripts/write_release_notes.sh

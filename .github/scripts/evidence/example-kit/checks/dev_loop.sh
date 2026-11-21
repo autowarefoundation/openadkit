@@ -9,11 +9,11 @@ set -euo pipefail
 cli=${1:?usage: dev_loop.sh <openadkit> <ros-distro>}
 distro=${2:?usage: dev_loop.sh <openadkit> <ros-distro>}
 source_file=overlay_ws/src/acme_probe/src/probe.cpp
-before="integrator overlay is running"
-after="integrator overlay was rebuilt"
+# New on every run: a retried cell starts from the kit the first attempt
+# changed and built, so a fixed message would show without build and restart.
+after="integrator overlay was rebuilt by run $(date +%s%N)"
 
-# A retried cell finds the change already made.
-sed -i "s/${before}/${after}/" "${source_file}"
+sed -i -E "s/integrator overlay (is running|was rebuilt by run [0-9]+)/${after}/" "${source_file}"
 grep -qF "\"${after}\"" "${source_file}"
 
 "${cli}" build --ros-distro "${distro}"

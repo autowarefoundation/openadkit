@@ -29,8 +29,7 @@ metadata, so `evidence.yaml` runs on it unchanged before merge. A fork's pull
 request loads its images (no push, read-only token) and stops at the scan,
 which applies the release gate's policy. Only pipeline changes (`PIPELINE_INPUTS`
 in `build.py`) build a single image, `localization-mapping`, which proves the pipeline end to end.
-Temporary shared caches are restricted to same-repository PRs. Published
-builds carry exact upstream contexts, source/lock labels and security-refresh
+Published builds carry exact upstream contexts, source/lock labels and security-refresh
 stamps, with a bounded cache policy. `components/docker-bake.hcl` owns the
 Dockerfiles and dependency edges.
 
@@ -81,8 +80,9 @@ After changing a shared build owner, update both workflow path triggers and the
 changed-input patterns in `build.py`. Python helpers needed by release and scan
 must also be included in their trusted policy sparse checkouts.
 
-The docs site documents the latest stable release: `deploy-docs.yaml` runs from
-the release workflow or by dispatch, not on a push to `main`. Production docs
+The docs site is built from `main` when a stable release is published:
+`deploy-docs.yaml` runs from the release workflow or by dispatch, not on a push
+to `main`. Production docs
 builds record their checkout SHA in `openadkit-docs-source.txt`.
 Inside the shared `gh-pages` publishing lane, `deploy-docs.yaml` rejects sources
 older than, or divergent from, that published revision. Rebuilding the same SHA

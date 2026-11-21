@@ -4,41 +4,68 @@ Thank you for your interest in contributing to Open AD Kit. This project is part
 
 ## Quick Links
 
-- [Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and request features
-- [Discord](https://discord.gg/Q94UsPvReQ) — real-time discussion
-- [Discussions](https://github.com/autowarefoundation/openadkit/discussions) — design and Q&A
-- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Issues](https://github.com/autowarefoundation/openadkit/issues) — report bugs and plan tasks
+- [Discord](https://discord.gg/Q94UsPvReQ) — questions, ideas, and design discussion
+- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
+- [Support](.github/SUPPORT.md) — community help and version coverage
+- [Security policy](.github/SECURITY.md) — private vulnerability reporting
 
 ## License
 
 Open AD Kit is licensed under **Apache License 2.0**. All contributions are accepted under the same license. No CLA is required.
 
-## For External Contributors
+## Submitting a Change
 
-1. **Fork** the repository and create a feature branch (`feat/`, `fix/`, `docs/`, etc.)
-2. **Sign off** your commits (`git commit -s`) to certify DCO compliance
-3. **Preview docs** locally with `make -C docs serve`
-4. **Open a PR** against `main` with a clear description
+1. **Fork** the repository and create a branch (`feat/`, `fix/`, `docs/`, etc.)
+2. **Sign off** every commit (`git commit -s`). The `Signed-off-by` line
+   certifies the [Developer Certificate of Origin](https://developercertificate.org/);
+   a PR without it is not merged
+3. **Run the [local checks](#local-checks)** that match your change, and
+   preview docs with `mkdocs serve`. The docs site is built from `main` with
+   each stable release, so a docs change reaches it with the next one
+4. **Open a PR** against `main` with a clear description. Its title follows
+   [Conventional Commits](https://www.conventionalcommits.org/) (`feat(cli): ...`,
+   with `!` for a breaking change): PRs are squash-merged, so the title becomes
+   the commit and its line in the release notes
 
-## For Internal (Foundation) Contributors
+Maintainers can branch in this repository instead of a fork. Such a PR also
+runs the evidence cells on its own images before merge; see
+[Testing a Pull Request](https://autowarefoundation.github.io/openadkit/development/build-from-source/#testing-a-pull-request).
 
-If you are a member of the Autoware Foundation contributing to active development branches or other internal work:
+## Branches
 
-### Branch Strategy
+- `main` — Open AD Kit development; releases come from it
+- `release/X.Y` — created from a release tag only when an older line needs a fix
+- `feat/...`, `fix/...`, `refactor/...` — development branches merged into `main` via PR
 
-- `main` — stable, production-ready code
-- `feat/...`, `fix/...`, `refactor/...` — active development branches merged into `main` via PR
+`.github/autoware.ref` pins the Autoware release a branch builds on, such as
+`2.0.0`. Moving `main` to a new Autoware release is a pull request that changes
+the pin and adapts the deployments to it.
 
-### Local CI Commands
+## Local Checks
 
-Run the full lint suite before pushing. These commands mirror (and extend) what CI runs in `.github/workflows/lint.yaml`:
+Run these before pushing. They cover most of what `.github/workflows/lint.yaml` runs; CI also validates every deployment cell from `validation_matrix.py` and checks the Bake file.
+
+Install the Python tools in a virtual environment, since Ubuntu 24.04's own
+Python refuses `pip install` (on Ubuntu, `sudo apt install python3-venv` first):
 
 ```bash
-# Shell scripts
-git ls-files '*.sh' | xargs shellcheck --severity=error
+python3 -m venv .venv && . .venv/bin/activate
+pip install yamllint pytest ruff mypy -r docs/requirements.txt
+```
 
-# GitHub Actions workflows (no glob — picks up .github/actions/ composites too)
+```bash
+# Shell scripts (and the extensionless launcher)
+{ git ls-files '*.sh'; echo openadkit; } | xargs shellcheck --severity=error
+
+# GitHub Actions workflows (no glob — picks up .github/actions/ composites too).
+# Download the binary once:
+#   bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
 ./actionlint
+
+# Python lint and types
+ruff check cli .github/scripts components/shared/entrypoint
+mypy
 
 # Dockerfiles
 git ls-files '**/Dockerfile*' | xargs hadolint --config .hadolint.yaml
@@ -46,8 +73,8 @@ git ls-files '**/Dockerfile*' | xargs hadolint --config .hadolint.yaml
 # YAML files
 yamllint -c .yamllint.yaml \
   .github/workflows/ .github/actions/ .github/ISSUE_TEMPLATE/ \
-  .github/DISCUSSION_TEMPLATE/ .github/dependabot.yaml .github/stale.yml \
-  .github/sync-files.yaml deployments/ platforms/ mkdocs.yaml docs/
+  .github/dependabot.yaml .github/stale.yml \
+  deployments/ platforms/ mkdocs.yaml docs/
 
 # Markdown
 npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.git/**'
@@ -55,23 +82,43 @@ npx --yes markdownlint-cli --config .markdownlint.yaml '**/*.md' '!site/**' '!.g
 # Python tests + shell tests
 pytest .github/scripts/
 bash .github/actions/combine-multi-arch-images/test-create-manifest.sh
-bash .github/scripts/tests/test_report_manifests.sh
+bash .github/scripts/tests/test_setup_helpers.sh
 
 # Deployment validation for both supported ROS distros
 ./openadkit validate planning-simulation --ros-distro humble
 ./openadkit validate planning-simulation --ros-distro jazzy
 
-# Documentation (local build, from the repository root)
-pip install -r docs/requirements.txt
+# Documentation (local build, from the repository root), then the links
+# READMEs make to the docs site
 mkdocs build
+python3 .github/scripts/check_site_links.py
 ```
 
-### Testing Deployments
+## Test Scope
 
-Before merging deployment-related changes, verify the Compose files. Every
-deployment carries one complete `config.env` for Compose interpolation. The
-shared `deployments/base/runtime.env` is loaded inside containers via
-`env_file:` and is not passed on the command line.
+The `.github/scripts/tests/` suite is risk-focused, not exhaustive. Keep regression
+coverage for managed-data deletion/replacement, checksums and unsafe archives,
+failed install/upgrade recovery, immutable image pins, split-role isolation, and
+the `PASSED` evidence release gate. Share release inputs through
+`release_fixtures.py`; do not import one test module from another.
+
+Help wording, exhaustive schema-error and option combinations, terminal signals,
+upgrade-check/rollback UX, one-shot services, bind-mount preparation, post-start
+crash/timeout diagnostics, and all GPU/role data combinations are deliberately
+not covered. Release draft recreation and every alias/retry variant are also
+outside this focused suite. Data-transfer tests use
+local files rather than a network server. Docker lifecycle calls use stubs; real
+Compose checks render models but do not run containers. These tests do not
+replace hosted build/scan/evidence or real two-host SIL acceptance.
+
+## Testing Deployments
+
+Before merging deployment-related changes, verify the Compose files. A
+deployment carries one complete `settings.env` for Compose interpolation (a kit
+deployment carries only its differences). A deployment with a
+`compose.gpu.yaml` also carries `settings.gpu.env`, loaded after `settings.env`
+when `--gpu` is set. The shared `deployments/shared/runtime.env` is loaded inside
+containers via `env_file:` and is not passed on the command line.
 
 ```bash
 # Validate the manifest and Compose configuration
@@ -81,19 +128,27 @@ shared `deployments/base/runtime.env` is loaded inside containers via
 ./openadkit run planning-simulation
 ```
 
-The same command surface is included in the release bundle. Use
-`deployments/<name>/config.local.env` for local overrides.
+Put local overrides in the host settings file,
+`~/.config/openadkit/<deployment>.env`.
 
-For zenoh-bridge split topology testing, follow the [documentation](https://autowarefoundation.github.io/openadkit/deployments/zenoh-bridge/).
+To test a split-host (`--role`) topology, follow [Split-host Simulation](https://autowarefoundation.github.io/openadkit/deployments/split-host/).
 
-### Releasing
+## Releasing
 
-Use the `release.yaml` workflow (GitHub Actions) to promote a build to a release. See the workflow input descriptions for details. The `default_ros_distro` input must match `openadkit.json` `defaultRosDistro`: to change the default, update the manifest (and its docs) in a commit before releasing.
+Every build of `main` (or of a `release/X.Y` branch) is scanned and runs the
+evidence cells. A release promotes one of those builds: run `release.yaml` on
+the same branch with a version and the `build_tag` of a build whose scan and
+evidence passed. The
+[Release Process](https://autowarefoundation.github.io/openadkit/development/release-process/)
+lists what must be in place, and the
+[Evidence Policy](https://autowarefoundation.github.io/openadkit/releases/evidence/)
+what the gate accepts.
 
-## DCO Requirement
+## Breaking Changes
 
-All commits must include a `Signed-off-by` line. CI enforces this automatically — PRs without sign-off will not be merged.
-
-```bash
-git commit -s -m "your commit message"
-```
+[Compatibility](https://autowarefoundation.github.io/openadkit/releases/compatibility/)
+lists what a major version keeps working. Removing or changing one of those
+items, such as a command, a manifest field, a covered setting or an extension
+point, is a breaking change: mark the pull request title with `!`, say what
+breaks and how to migrate, and expect it to wait for the next major version. A
+manifest contract change also bumps `schemaVersion`.

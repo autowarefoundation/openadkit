@@ -1,14 +1,13 @@
 """mkdocs-macros module — single-source repeated reference facts.
 
-The registry prefix and default ROS distro title come from openadkit.json — the
-same manifest validate_release.sh checks the release default_ros_distro input
-against, so the published docs cannot contradict the bare tag aliases. The
-component image table is generated from the catalog
+The registry prefix and default ROS distro title come from openadkit.json, the
+release manifest the release reads them from, so the published docs cannot
+contradict the release. The image table is generated from the image inventory
 (.github/image-inventory.json) so the docs cannot drift from what CI builds.
 
 Used by the `macros` plugin configured in mkdocs.yaml. Reference in any page
 under docs/ as `{{ registry }}`, `{{ default_distro_title }}`, or
-`{{ component_table() }}`.
+`{{ image_table() }}`.
 
 Parameterless shared blocks live as plain markdown under docs/includes/ and are
 inserted with pymdownx snippets (`--8<--`) — keep markdown in markdown files,
@@ -20,7 +19,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 INVENTORY = REPO_ROOT / ".github" / "image-inventory.json"
-KIT = REPO_ROOT / "openadkit.json"
+MANIFEST = REPO_ROOT / "openadkit.json"
 
 
 def _load_json(path, label):
@@ -31,35 +30,35 @@ def _load_json(path, label):
 
 
 def define_env(env):
-    kit = _load_json(KIT, "bundle manifest")
-    registry = kit["imagePrefixComponent"]
+    manifest = _load_json(MANIFEST, "release manifest")
+    registry = manifest["imageRepository"]
     if not isinstance(registry, str) or not registry.strip():
         raise RuntimeError(
-            "bundle manifest imagePrefixComponent must be a non-empty string"
+            "release manifest imageRepository must be a non-empty string"
         )
     env.variables["registry"] = registry
-    env.variables["default_distro_title"] = kit["defaultRosDistro"].capitalize()
+    env.variables["default_distro_title"] = manifest["defaultRosDistro"].capitalize()
 
     @env.macro
-    def component_table():
-        """Markdown table of component images, generated from the catalog.
+    def image_table():
+        """Markdown table of the released images, generated from the image inventory.
 
         The ROS Distros column reflects the per-image `ros_distros` override in
-        the catalog when present, otherwise the catalog-wide `ros_distros` list.
+        the inventory when present, otherwise the inventory-wide `ros_distros` list.
         """
-        data = _load_json(INVENTORY, "image catalog")
+        data = _load_json(INVENTORY, "image inventory")
         global_distros = data["ros_distros"]
         rows = [
-            "| Component | Image | ROS Distros | Platforms |",
+            "| Target | Image | ROS Distros | Platforms |",
             "|-----------|-------|-------------|-----------|",
         ]
         for img in data["images"]:
-            if img.get("stage") != "component":
+            if not img.get("release", True):
                 continue
             target = img["target"]
             distros = ", ".join(img.get("ros_distros", global_distros))
             arches = ", ".join(p.rsplit("/", 1)[-1] for p in img["platforms"])
             rows.append(
-                f"| `{target}` | `{registry}:{target}` | {distros} | {arches} |"
+                f"| `{target}` | `{registry}:{target}-<distro>` | {distros} | {arches} |"
             )
         return "\n".join(rows)

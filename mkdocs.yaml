@@ -1,10 +1,14 @@
 site_name: Open AD Kit
-site_description: A modular, container-based distribution of Autoware for building autonomous driving systems — from development laptops to vehicle edge deployment.
+site_description: "The deployment layer for the Autoware ecosystem: packaging its software into reproducible deployments, built for the path from simulation to in-vehicle systems."
 site_url: https://autowarefoundation.github.io/openadkit/
 repo_url: https://github.com/autowarefoundation/openadkit
 edit_uri: edit/main/docs/
 docs_dir: docs
 strict: true
+# With strict mode, a link to a missing #anchor fails the build.
+validation:
+  links:
+    anchors: warn
 copyright: Copyright &copy; 2026 The Autoware Foundation
 
 theme:
@@ -13,9 +17,7 @@ theme:
   features:
     - announce.dismiss
     - content.action.edit
-    - content.code.annotate
     - content.code.copy
-    - content.tabs.link
     - navigation.expand
     - navigation.footer
     - navigation.indexes
@@ -51,49 +53,29 @@ theme:
 extra_css:
   - assets/css/extra.css
 
+# Snippets, the macros module and the theme overrides are no pages.
+exclude_docs: |
+  /includes/
+  /macros.py
+  /diagrams.py
+  /requirements.txt
+  /overrides/
+  __pycache__/
+
 plugins:
-  - awesome-pages
-  - exclude:
-      regex:
-        - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?jpg|(.*\.)?pages).*$
-        - ^(.*/)?[^.]*$
-        - ^includes/.*\.md$
   - macros:
       # docs/macros.py: variables + catalog-generated tables.
       module_name: docs/macros
       on_error_fail: true
-  - redirects:
-      redirect_maps:
-        deployments/samples/planning-simulation/index.md: deployments/planning-simulation/index.md
-        deployments/samples/scenario-simulation/index.md: deployments/scenario-simulation/index.md
-        deployments/samples/logging-simulation/index.md: deployments/logging-simulation/index.md
-        deployments/samples/carla-simulation/index.md: deployments/carla-simulation/index.md
-        deployments/demos/zenoh-bridge/index.md: deployments/zenoh-bridge/index.md
-        deployments/samples/index.md: deployments/index.md
-        deployments/demos/index.md: deployments/index.md
-        contributing/index.md: development/contributing.md
-        hardware/index.md: platforms/hardware/index.md
-        tools/index.md: development/index.md
-        components/sensing.md: components/sensing-perception.md
-        components/perception.md: components/sensing-perception.md
-        components/localization.md: components/localization-mapping.md
-        components/mapping.md: components/localization-mapping.md
-        components/planning.md: components/planning-control.md
-        components/control.md: components/planning-control.md
-        getting-started/image-tags.md: getting-started/container-images.md
-        getting-started/versioning.md: getting-started/container-images.md
-        getting-started/release-flow.md: getting-started/container-images.md
   - search
 
 markdown_extensions:
-  - abbr
   - admonition
   - attr_list
   - md_in_html
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - footnotes
   - mdx_truly_sane_lists
   - pymdownx.details
   - pymdownx.highlight
@@ -105,9 +87,43 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.tabbed:
-      alternate_style: true
   - toc:
       permalink: "#"
       toc_depth: 3
       title: "On this page"
+
+nav:
+  - Introduction:
+      - index.md
+      - Glossary: glossary.md
+  - Getting Started:
+      - getting-started/index.md
+      - CLI & Maintenance: getting-started/cli.md
+      - Troubleshooting: getting-started/troubleshooting.md
+  - Deployments:
+      - deployments/index.md
+      - Planning Simulation: deployments/planning-simulation.md
+      - Scenario Simulation: deployments/scenario-simulation.md
+      - Logging Simulation: deployments/logging-simulation.md
+      - CARLA Simulation: deployments/carla-simulation.md
+      - Safety Island Simulation: deployments/safety-island-simulation.md
+      - Split-host Simulation: deployments/split-host.md
+      - Components: deployments/components.md
+  - Kits:
+      - Create a Kit: kits/create-a-kit.md
+      - Develop and Debug: kits/develop-and-debug.md
+      - A New Vehicle: kits/new-vehicle.md
+      - Kit Guide: kits/kit-guide.md
+      - Manifest and Output Reference: kits/reference.md
+  - Platforms:
+      - platforms/index.md
+      - AutoSD: platforms/autosd.md
+  - Releases:
+      - releases/index.md
+      - Container Images: releases/container-images.md
+      - Compatibility: releases/compatibility.md
+      - Evidence Policy: releases/evidence.md
+      - Verify a Release: releases/verification.md
+  - Development:
+      - Build from Source: development/build-from-source.md
+      - Release Process: development/release-process.md

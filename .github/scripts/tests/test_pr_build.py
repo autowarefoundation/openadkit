@@ -25,7 +25,9 @@ def test_the_build_uses_its_images_and_copies_the_rest_from_the_base(tmp_path):
 import sys
 args = sys.argv[1:]
 if args[:3] == ["buildx", "imagetools", "inspect"]:
-    sys.exit(0 if args[3] in {sorted(built)!r} else 1)
+    if args[3] in {sorted(built)!r}:
+        sys.exit(0)
+    sys.exit("ERROR: " + args[3] + ": not found")
 with open({str(calls)!r}, "a") as log:
     log.write(" ".join(args) + "\\n")
 ''')
@@ -46,9 +48,26 @@ with open({str(calls)!r}, "a") as log:
 def test_an_image_missing_from_the_base_fails(tmp_path):
     (tmp_path / "inventory.json").write_text(json.dumps({"ros_distros": ["humble"], "images": [{"target": "api"}]}))
     (tmp_path / "base.json").write_text(json.dumps({"images": []}))
-    executable(tmp_path / "bin/docker", "#!/usr/bin/env bash\nexit 1\n")
+    executable(tmp_path / "bin/docker", '#!/usr/bin/env bash\necho "ERROR: ${4}: not found" >&2\nexit 1\n')
     env = {"PATH": f"{tmp_path / 'bin'}:/usr/bin:/bin", "CI_REPO": CI, "BUILD_TAG": "7-1", "RUN_ID": "7",
            "RUN_ATTEMPT": "1", "PR_NUMBER": "42", "BASE_METADATA": str(tmp_path / "base.json"),
            "INVENTORY": str(tmp_path / "inventory.json")}
     result = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True)
     assert result.returncode != 0 and "no api-humble image" in result.stderr
+
+
+def test_a_registry_failure_stops_the_build_instead_of_using_the_base(tmp_path):
+    # A 503 for this run's own image is not "not built": the base's image would stand in for it.
+    (tmp_path / "inventory.json").write_text(json.dumps({"ros_distros": ["humble"], "images": [{"target": "api"}]}))
+    (tmp_path / "base.json").write_text(json.dumps({"images": [
+        {"repo": "ghcr.io/example/openadkit", "target": "api", "ros_distro": "humble", "digest": "sha256:api"}]}))
+    executable(tmp_path / "bin/docker", '#!/usr/bin/env bash\n'
+               '[ "$3" = inspect ] || { echo copied >> "$CALLS"; exit 0; }\n'
+               'echo "ERROR: 503 Service Unavailable" >&2\nexit 1\n')
+    env = {"PATH": f"{tmp_path / 'bin'}:/usr/bin:/bin", "CI_REPO": CI, "BUILD_TAG": "7-1", "RUN_ID": "7",
+           "RUN_ATTEMPT": "1", "PR_NUMBER": "42", "BASE_METADATA": str(tmp_path / "base.json"),
+           "INVENTORY": str(tmp_path / "inventory.json"), "CALLS": str(tmp_path / "calls"),
+           "REGISTRY_LOOKUP_RETRY_DELAY_SECONDS": "0"}
+    result = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True)
+    assert result.returncode == 2 and "after 3 attempts" in result.stderr
+    assert not (tmp_path / "calls").exists()

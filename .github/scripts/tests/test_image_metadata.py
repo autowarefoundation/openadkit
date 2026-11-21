@@ -67,8 +67,35 @@ def test_artifact_checks_stay_exact_at_the_shell_boundary(tmp_path, artifacts, p
     scan_dir = tmp_path / "release-input/scan"
     scan_dir.mkdir()
     (scan_dir / "scan-metadata.json").write_text(json.dumps(scan))
-    result = run_validator(tmp_path, "validate_metadata", IMAGE_REPO="ghcr.io/example/openadkit")
+    result = run_validator(tmp_path, "validate_metadata release-input/scan/scan-metadata.json",
+                           IMAGE_REPO="ghcr.io/example/openadkit")
     assert (result.returncode == 0) is (problem is None), result.stderr
+
+
+@pytest.mark.parametrize("complete", [True, False])
+def test_publish_recheck_requires_scan_coverage_of_the_build(tmp_path, artifacts, complete):
+    directory, metadata, scan = artifacts
+    (directory / "build-metadata.json").write_text(json.dumps(metadata))
+    if not complete:
+        scan["scanned_images"].pop()
+    (tmp_path / "scan.json").write_text(json.dumps(scan))
+    result = run_validator(tmp_path, '''
+        validate_build_run() { :; }
+        select_latest_artifact() {
+            if [ "$6" = gate/scan ]; then
+                mkdir -p "$6"
+                cp scan.json "$6/$3"
+                "$4" "$6/$3" && "$5" "$6/$3"
+            else
+                echo "checked evidence"
+            fi
+        }
+        recheck_gate
+    ''', IMAGE_REPO="ghcr.io/example/openadkit")
+    assert (result.returncode == 0) is complete, result.stderr
+    assert ("checked evidence" in result.stdout) is complete
+    if not complete:
+        assert "scan metadata does not cover exactly the build digest/platforms" in result.stderr
 
 
 def test_capture_uses_registry_platforms_and_scan_rows(artifacts, monkeypatch):

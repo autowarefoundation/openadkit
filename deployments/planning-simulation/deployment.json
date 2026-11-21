@@ -47,8 +47,7 @@
           "url": "https://huggingface.co/AutowareFoundation/diffusion_planner/resolve/bfd50193841f20b2131fd546feaf2f8456f0133e/diffusion_planner.param.json",
           "sha256": "ee3145b68fd1e1e44e532933dfe66cfee4384fbd637382c87ab5190c66a8e268"
         }
-      ],
-      "requiredFiles": ["diffusion_planner_encoder.onnx", "diffusion_planner_decoder.onnx", "diffusion_planner_turn_indicator.onnx", "diffusion_planner.param.json"]
+      ]
     }
   ]
 }

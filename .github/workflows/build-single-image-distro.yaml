@@ -4,8 +4,8 @@ permissions:
   contents: read
 
 # The jobs of build-single-image.yaml for one ROS distribution. That workflow
-# calls this once per distribution; it also owns the concurrency group and the
-# pull request's cache cleanup, which both distributions share.
+# calls this once per distribution; it also owns the concurrency group, which
+# both distributions share.
 
 on:
   workflow_call:

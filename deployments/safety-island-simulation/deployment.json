@@ -40,8 +40,7 @@
           "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/cyclonedds-domain2.xml",
           "sha256": "5d0b2b1ba647d95f348914346867996d7313bb62a5015ad0fc75c5b0a3f0070b"
         }
-      ],
-      "requiredFiles": ["actuation_freertos", "bridge-config.yaml", "cyclonedds-domain2.xml"]
+      ]
     }
   ]
 }

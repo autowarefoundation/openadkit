@@ -193,6 +193,20 @@ def test_third_party_services_stay_in_the_deployments_that_use_them():
     assert shared and not [(path.name, name) for path in shared for name in external if name in path.read_text()]
 
 
+@pytest.mark.parametrize("name", sorted(path.parent.name for path in (ROOT / "deployments").glob("*/deployment.json")))
+def test_ros2_run_services_of_a_deployment_have_distinct_node_names(name):
+    # Autoware's duplicated node check fails the system, so autonomous mode
+    # never becomes available; a node is named after its executable unless remapped.
+    names = []
+    for path in sorted((ROOT / "deployments" / name).glob("compose*.yaml")):
+        for service in (yaml.safe_load(path.read_text()).get("services") or {}).values():
+            words = str(service.get("command", "")).split()
+            if words[:2] == ["ros2", "run"]:
+                remap = [word.removeprefix("__node:=") for word in words if word.startswith("__node:=")]
+                names.append(remap[0] if remap else words[3])
+    assert len(names) == len(set(names)), names
+
+
 @pytest.mark.parametrize("name", ["scenario-simulation", "carla-simulation"])
 def test_the_bridge_mounts_its_allowlist_without_creating_it(name):
     directory = ROOT / "deployments" / name
@@ -204,10 +218,12 @@ def test_the_bridge_mounts_its_allowlist_without_creating_it(name):
 
 
 @pytest.mark.parametrize(("name", "role", "present", "absent"), [
-    ("scenario-simulation", None, {"scenario-simulator", "map", "mrm-state-relay", "visualizer"}, {"zenoh-bridge"}),
-    ("scenario-simulation", "autoware", {"map", "zenoh-bridge", "mrm-state-relay"}, {"scenario-simulator", "visualizer"}),
+    ("scenario-simulation", None, {"scenario-simulator", "map", "mrm-state-relay", "traffic-light-relay", "visualizer"},
+     {"zenoh-bridge"}),
+    ("scenario-simulation", "autoware", {"map", "zenoh-bridge", "mrm-state-relay", "traffic-light-relay"},
+     {"scenario-simulator", "visualizer"}),
     ("scenario-simulation", "scenario", {"scenario-simulator", "zenoh-bridge", "visualizer"},
-     {"map", "vehicle", "mrm-state-relay"}),
+     {"map", "vehicle", "mrm-state-relay", "traffic-light-relay"}),
     ("carla-simulation", None, {"carla", "carla-interface", "map", "visualizer"}, {"zenoh-bridge"}),
     ("carla-simulation", "autoware", {"map", "zenoh-bridge"}, {"carla", "carla-interface", "visualizer"}),
     ("carla-simulation", "carla", {"carla", "carla-interface", "carla-map-loader", "zenoh-bridge", "visualizer"},

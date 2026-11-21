@@ -41,3 +41,9 @@ capture/
 overlay_ws/build/
 overlay_ws/install/
 overlay_ws/log/
+
+# AutoSD image build output, from the commands in docs/platforms/autosd.md
+/_build/
+/auto-image-builder.sh
+/out/
+/disk.qcow2

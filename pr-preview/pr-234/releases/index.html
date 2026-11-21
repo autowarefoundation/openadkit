@@ -1312,8 +1312,6 @@
       
         
       
-        
-      
     
     
     
@@ -1470,34 +1468,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1681,6 +1651,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#before-v200" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before v2.0.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1741,8 +1722,6 @@ moves to the latest stable version with <code>openadkit upgrade</code>.</p>
 <li><a href="compatibility/">Compatibility</a> — what a version number promises</li>
 <li><a href="evidence/">Evidence Policy</a> — what a build must pass to be released</li>
 <li><a href="verification/">Verify a Release</a> — check the files before you run them</li>
-<li><a href="before-v2/">Before v2.0.0</a> — what the Open AD Kit name covered before
-  its first release</li>
 </ul>
 <h2 id="versions">Versions<a class="headerlink" href="#versions" title="Permanent link">#</a></h2>
 <p>Open AD Kit versions follow <a href="https://semver.org/">Semantic Versioning</a> on their
@@ -1755,8 +1734,8 @@ version keeps working.</p>
 <li><strong>One Autoware release per release.</strong> Releases come from <code>main</code>, which pins
   one Autoware release in <code>.github/autoware.ref</code>. The
   <a href="https://github.com/autowarefoundation/openadkit/releases">GitHub Release</a>
-  notes open with it, and <code>openadkit install</code> and <code>openadkit version</code> pair the
-  two, <code>Open AD Kit v2.0.1 · Autoware 2.0.0</code>.</li>
+  notes open with it, and <code>openadkit install</code> and <code>openadkit version</code> name
+  both, as in <code>Open AD Kit v2.0.1 · Autoware 2.0.0</code>.</li>
 <li><strong>Pinned inputs.</strong> A release also pins the ROS distros and every image
   digest, and its images carry the Autoware version they are built from in
   <code>org.autoware.openadkit.autoware-version</code>.</li>
@@ -1765,6 +1744,18 @@ version keeps working.</p>
   the release notes list it, and the Autoware version stays the tag's.</li>
 <li><strong>Older versions.</strong> A <code>release/X.Y</code> branch is created from a release tag only
   to fix an older version.</li>
+</ul>
+<h2 id="before-v200">Before v2.0.0<a class="headerlink" href="#before-v200" title="Permanent link">#</a></h2>
+<p>v2.0.0 is the first Open AD Kit release with a version. It upgrades none of
+what the name covered before:</p>
+<ul>
+<li>the "version 1.0" and "version 2.0" of the 2022
+  <a href="https://autowarefoundation.github.io/open-ad-kit-docs/">documentation</a>, a
+  driverless-bus reference design</li>
+<li>the Docker images of the Autoware repository from 2024</li>
+<li>the unversioned <code>main</code> builds of this repository on Autoware 1.x: v2.0.0 does
+  not read their settings or keep their image and service names, and nothing
+  updates their images on GHCR</li>
 </ul>
 <h2 id="support">Support<a class="headerlink" href="#support" title="Permanent link">#</a></h2>
 <p>The latest stable release is supported: fixes, including CVE remediation, ship

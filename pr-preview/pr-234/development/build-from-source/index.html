@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/development/build-from-source/">
       
       
-        <link rel="prev" href="../../releases/before-v2/">
+        <link rel="prev" href="../../releases/verification/">
       
       
         <link rel="next" href="../release-process/">
@@ -1310,8 +1310,6 @@
       
         
       
-        
-      
     
     
     
@@ -1467,34 +1465,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1944,12 +1914,12 @@ the same file CI uses.</p>
     CORE --&gt; UCD["universe-common-devel&lt;br/&gt;(builds overlay workspaces)"]
     UC --&gt; COMP["sensing-perception&lt;br/&gt;localization-mapping&lt;br/&gt;planning, control&lt;br/&gt;vehicle-system&lt;br/&gt;visualizer, simulator"]
     CUDA["autoware:base-cuda-{devel,runtime}"] --&gt; GPU["sensing-perception-cuda&lt;br/&gt;planning-cuda"]
-    UC -.-&gt; GPU</code></pre>
+    UCD -.-&gt; GPU</code></pre>
 <p><code>universe-common</code> compiles the shared part of Autoware Universe on the upstream
 <code>core-devel</code> image and copies the result onto the lean upstream <code>base</code> image, so
 build tools never reach the runtime layers. Every component builds from it.
 The CUDA variants, <code>sensing-perception-cuda</code> and <code>planning-cuda</code>, build on the
-upstream CUDA images and add the <code>universe-common</code> install tree.</p>
+upstream CUDA images and copy in the Autoware tree of the devel image.</p>
 <p>The published images end with a per-build Ubuntu security refresh. Components
 compile on <code>universe-common-build</code>, the devel image without that refresh, which
 CI pushes only to its build cache. Its digest changes only with its inputs, so a
@@ -2148,7 +2118,7 @@ images from the build. A pull request's run is never release evidence.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../../releases/before-v2/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Before v2.0.0">
+          <a href="../../releases/verification/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Verify a Release">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2158,7 +2128,7 @@ images from the build. A pull request's run is never release evidence.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Before v2.0.0
+                Verify a Release
               </div>
             </div>
           </a>

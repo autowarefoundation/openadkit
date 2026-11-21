@@ -1534,8 +1534,6 @@
       
         
       
-        
-      
     
     
     
@@ -1691,34 +1689,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -2294,6 +2264,9 @@ differs.</p>
   and in separate PID namespaces every launch gets the same one: Autoware then
   reports the repeated node name as an error, and autonomous mode becomes
   unavailable.</li>
+<li><strong>A service that runs <code>ros2 run</code></strong> gets a node named after its executable.
+  When another service runs the same executable, name it with
+  <code>--ros-args -r __node:=&lt;name&gt;</code>, for the same reason.</li>
 <li><strong>With <code>--gpu</code></strong>, the base's <code>compose.gpu.yaml</code> applies after your
   <code>compose.yaml</code>, so what it sets for a service, such as the CUDA image of
   <code>planning</code>, wins over yours. A kit deployment has no <code>compose.gpu.yaml</code> of

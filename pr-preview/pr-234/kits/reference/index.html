@@ -1506,8 +1506,6 @@
       
         
       
-        
-      
     
     
     
@@ -1663,34 +1661,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -2203,7 +2173,7 @@ cannot add any.</p>
 </tr>
 <tr>
 <td><code>requiredFiles</code></td>
-<td>Paths that must exist, and not be empty, in data the CLI installed</td>
+<td>Paths that must exist, and not be empty, in data the CLI installed. For <code>files</code>, every listed file unless it names fewer</td>
 </tr>
 <tr>
 <td><code>gpu</code></td>
@@ -2326,7 +2296,7 @@ and <code>VISUALIZER_IMAGE</code>, with <code>SENSING_PERCEPTION_GPU_IMAGE</code
 </tr>
 <tr>
 <td><code>bom</code></td>
-<td>What the release runs: <code>autoware</code> (the pinned Autoware release: <code>version</code>, <code>ref</code>, <code>lockSha256</code>), <code>images</code> (the digest-pinned component images per ROS distro) and <code>externalImages</code></td>
+<td>What the release runs: <code>autoware</code> (the pinned Autoware release: <code>version</code>, <code>ref</code>, <code>lockSha256</code>, and <code>backports</code> when the release applies Autoware fixes: each with its <code>repository</code>, <code>subject</code> and <code>upstream</code> link), <code>images</code> (the digest-pinned component images per ROS distro) and <code>externalImages</code></td>
 </tr>
 </tbody>
 </table>
@@ -2402,7 +2372,7 @@ plain <code>validate</code> checks each of them.</p>
 </tr>
 <tr>
 <td><code>readySeconds</code></td>
-<td>How long the services took to become ready</td>
+<td>How long <code>run</code> took to start the services, from pulling missing images until they settled</td>
 </tr>
 <tr>
 <td><code>verify</code></td>

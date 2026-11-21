@@ -1461,8 +1461,6 @@
       
         
       
-        
-      
     
     
     
@@ -1618,34 +1616,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -2073,12 +2043,14 @@ WAN and VPN links are best-effort and are not the supported setup.</p>
   role from its Compose project, so you normally omit <code>--role</code>. When several
   roles of one deployment run on the same machine, <code>status</code> and <code>stop</code> act on
   all of them; pass <code>--role</code> to choose one for the other commands.</li>
+<li><code>record</code> and a bare <code>shell</code> use the <code>api</code> service, which only the Autoware
+  role runs. On the simulator host, name the service for <code>shell</code>.</li>
 <li>Running a role that is already up updates it in place. Starting the
   single-host deployment while a role is running, or a role while the
   single-host deployment is running, is refused: stop it first.</li>
 </ul>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
-<p>If RViz shows no <strong>Auto</strong> button and
+<p>If RViz shows no <strong>AUTO</strong> button and
 <code>/api/operation_mode/change_to_autonomous</code> answers "The target mode is not
 available", a bridged vehicle-status topic has stopped flowing:</p>
 <ul>

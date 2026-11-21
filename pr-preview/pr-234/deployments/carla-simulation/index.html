@@ -1406,8 +1406,6 @@
       
         
       
-        
-      
     
     
     
@@ -1563,34 +1561,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1859,11 +1829,13 @@ check of Autoware itself and is
 <p><code>config/sensor_mapping.yaml</code> enables LiDAR, IMU, and GNSS. Camera entries are
 available but commented out.</p>
 <h2 id="drive">Drive<a class="headerlink" href="#drive" title="Permanent link">#</a></h2>
-<p>Open the <a href="../#open-the-visualizer">visualizer</a>. In RViz, set a goal with <strong>2D Goal Pose</strong> and select <strong>Auto</strong>.</p>
+<p>Open the <a href="../#open-the-visualizer">visualizer</a>. In RViz, set a goal with
+<strong>2D Goal Pose</strong>, then press <strong>AUTO</strong> in the <strong>OperationMode</strong> section of the
+AutowareStatePanel.</p>
 <h2 id="stop-and-recover">Stop and Recover<a class="headerlink" href="#stop-and-recover" title="Permanent link">#</a></h2>
 <p>Run <code>stop</code> also after a failed start, to release the GPU. If autonomous mode is
 unavailable, inspect <code>/system/command_mode/availability</code> and
-<code>/diagnostics_graph/status</code>. See <a href="../#stop-and-recover">Stop and Recover</a> for the rest.</p>
+<code>/diagnostics_graph/status</code>. See <a href="../../getting-started/troubleshooting/">Troubleshooting</a> for the rest.</p>
 
 
 

@@ -1312,8 +1312,6 @@
       
         
       
-        
-      
     
     
     
@@ -1580,34 +1578,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1919,8 +1889,8 @@ the same patterns with <code>-jazzy</code> (for example <code>planning-jazzy</co
 <li><strong>Latest stable for a distro</strong>: use <code>&lt;target&gt;-&lt;ros_distro&gt;</code>.</li>
 <li><strong>Never</strong> pin per-architecture tags such as <code>universe-common-amd64-humble</code>:
   CI moves them with every build of <code>main</code>, and pushes them only for the
-  common images its own builds start from. <code>universe-common</code>, the runtime base
-  of the component images, is not released; <code>universe-common-devel</code> is.</li>
+  common images its own builds start from. <code>universe-common</code>, the runtime layer
+  the component images build on, is not released; <code>universe-common-devel</code> is.</li>
 <li><strong>Source checkout</strong>: <code>./openadkit</code> runs <code>&lt;target&gt;-&lt;arch&gt;-&lt;ros_distro&gt;</code>, the
   tags of a <a href="../../development/build-from-source/">local build</a>, not published
   images.</li>
@@ -1968,13 +1938,19 @@ matches what CI builds. The <a href="#tag-reference">Tag Reference</a> explains 
 <table>
 <thead>
 <tr>
-<th>Component</th>
+<th>Target</th>
 <th>Image</th>
 <th>ROS Distros</th>
 <th>Platforms</th>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>universe-common-devel</code></td>
+<td><code>ghcr.io/autowarefoundation/openadkit:universe-common-devel-&lt;distro&gt;</code></td>
+<td>humble, jazzy</td>
+<td>amd64, arm64</td>
+</tr>
 <tr>
 <td><code>sensing-perception</code></td>
 <td><code>ghcr.io/autowarefoundation/openadkit:sensing-perception-&lt;distro&gt;</code></td>

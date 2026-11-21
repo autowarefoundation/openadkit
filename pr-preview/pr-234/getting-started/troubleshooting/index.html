@@ -1573,8 +1573,6 @@
       
         
       
-        
-      
     
     
     
@@ -1730,34 +1728,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -2220,12 +2190,8 @@ setup. Ubuntu's own <code>docker-compose-v2</code> package is too old.</p>
 openadkit<span class="w"> </span>fetch<span class="w"> </span>&lt;deployment&gt;<span class="w">            </span><span class="c1"># missing or outdated data</span>
 openadkit<span class="w"> </span>fetch<span class="w"> </span>&lt;deployment&gt;<span class="w"> </span>--force<span class="w">    </span><span class="c1"># incomplete data</span>
 </code></pre></div>
-<p><code>validate --data</code> reports each resource as <code>ok</code>, <code>missing</code>, <code>incomplete</code> or
-<code>outdated</code>, and a directory of your own as <code>own</code>; add <code>--gpu</code> to include the
-data of a GPU mode, such as Logging Simulation's CenterPoint models. <code>fetch</code>
-always includes it. <code>--force</code> only replaces data the CLI installed, and leaves
-a directory of your own alone. See
-<a href="../cli/#downloaded-data">Downloaded Data</a>.</p>
+<p>Add <code>--gpu</code> to <code>validate</code> to include the data of a GPU mode, such as Logging
+Simulation's CenterPoint models. See <a href="../cli/#downloaded-data">Downloaded Data</a>.</p>
 <h2 id="gpu">GPU<a class="headerlink" href="#gpu" title="Permanent link">#</a></h2>
 <h3 id="nvidia-container-toolkit-not-detected">NVIDIA Container Toolkit not detected<a class="headerlink" href="#nvidia-container-toolkit-not-detected" title="Permanent link">#</a></h3>
 <ul>

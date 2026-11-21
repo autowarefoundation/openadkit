@@ -16,7 +16,7 @@
         <link rel="prev" href="../evidence/">
       
       
-        <link rel="next" href="../before-v2/">
+        <link rel="next" href="../../development/build-from-source/">
       
       
         
@@ -1312,8 +1312,6 @@
       
         
       
-        
-      
     
     
     
@@ -1549,34 +1547,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -1818,8 +1788,10 @@ the pinned Autoware release and image digests, and <code>.evidence</code> the te
 commit (<code>source_sha</code>), the passing cells, the CI exemptions (<code>exempt</code>) and the
 <code>url</code> of the evidence run the release gate accepted.</p>
 <p>After verification, install with the downloaded <code>openadkit</code> or follow the
-<a href="../../getting-started/">Quickstart</a>. Evidence is bounded to the tested
-cells; it is not a vehicle-safety or security certification.</p>
+<a href="../../getting-started/">Quickstart</a>. The installer downloads the bundle
+again and checks it against the release's published SHA-256; releases are
+immutable, so it gets the same bytes you verified. Evidence is bounded to the
+tested cells; it is not a vehicle-safety or security certification.</p>
 <h2 id="checksum-only">Checksum Only<a class="headerlink" href="#checksum-only" title="Permanent link">#</a></h2>
 <p>Without the GitHub CLI you can still check the bundle against the release
 metadata. This proves the bundle is the one the release names, not where it
@@ -1893,13 +1865,13 @@ installer makes this same check before it installs a bundle.</p>
         
         
           
-          <a href="../before-v2/" class="md-footer__link md-footer__link--next" aria-label="Next: Before v2.0.0">
+          <a href="../../development/build-from-source/" class="md-footer__link md-footer__link--next" aria-label="Next: Build from Source">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Before v2.0.0
+                Build from Source
               </div>
             </div>
             <div class="md-footer__button md-icon">

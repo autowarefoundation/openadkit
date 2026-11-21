@@ -1308,8 +1308,6 @@
       
         
       
-        
-      
     
     
     
@@ -1465,34 +1463,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1967,7 +1937,9 @@ how an older line is validated. Its jobs run in order:</p>
 <li><strong>deploy-docs</strong>: publishes the docs site from <code>main</code> when the latest
    aliases moved. If it fails after a publish, re-run only the failed job or
    dispatch <code>deploy-docs</code>: re-running all jobs stops at the draft step, since
-   the release is already published.</li>
+   the release is already published. Dispatch it too when <code>publish</code> failed
+   after the release went public, for example waiting for it to turn
+   immutable: <code>deploy-docs</code> is then skipped.</li>
 </ol>
 <p>The release plan records the exact image digests, aliases and assets of the
 release for the jobs after it; it stays in the workflow run. The release itself
@@ -2019,8 +1991,8 @@ the previous release.
 Missing metrics are shown as <code>-</code>, never replaced with zeroes.</p>
 <p>See <a href="../../releases/verification/">Verify a Release</a> to check a release yourself.</p>
 <h2 id="the-docs-site">The Docs Site<a class="headerlink" href="#the-docs-site" title="Permanent link">#</a></h2>
-<p>The site documents the latest stable release. A push to <code>main</code> does not
-publish it: a docs change reaches the site with the next stable release, and a
+<p>The site is built from <code>main</code> each time the newest stable release is
+published. A push to <code>main</code> does not publish it: a docs change reaches the site with the next stable release, and a
 pull request shows its own preview. To publish a fix in between, dispatch
 <a href="https://github.com/autowarefoundation/openadkit/blob/main/.github/workflows/deploy-docs.yaml"><code>deploy-docs.yaml</code></a>,
 which builds the site from <code>main</code>; do that only while <code>main</code> documents nothing

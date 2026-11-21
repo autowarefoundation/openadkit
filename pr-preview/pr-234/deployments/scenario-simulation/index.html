@@ -1384,8 +1384,6 @@
       
         
       
-        
-      
     
     
     
@@ -1541,34 +1539,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1798,8 +1768,8 @@ No GPU is required.</p>
 <p>To run Autoware on one host and the scenario runner on another, see
 <a href="../split-host/">Split-host Simulation</a>.</p>
 <p><code>run</code> downloads the Kashiwanoha map. Autoware takes about two minutes to be
-ready; the runner then executes the scenario, seven to eight minutes for the
-bundled one on a 4-vCPU host, and writes the results to
+ready; the runner then executes the scenario, three runs of the bundled sample
+in seven to eight minutes on a 4-vCPU host, and writes the results to
 <code>~/openadkit-output/scenario-simulation/results</code> (<code>run</code> prints the path).</p>
 <p>With <code>--verify</code>, <code>run</code> waits for the runner and ends with <code>verify: passed</code>, or
 fails with the runner's exit code. The runner's log ends with
@@ -1838,6 +1808,11 @@ fails with the runner's exit code. The runner's log ends with
 <td><code>600</code></td>
 </tr>
 <tr>
+<td><code>INITIALIZE_DURATION</code></td>
+<td>Seconds each scenario gives Autoware to reach driving</td>
+<td><code>300</code></td>
+</tr>
+<tr>
 <td><code>GLOBAL_REAL_TIME_FACTOR</code></td>
 <td>Simulated seconds per wall-clock second; below <code>1</code> on a host that cannot run Autoware in real time</td>
 <td><code>1.0</code></td>
@@ -1863,7 +1838,8 @@ the YAML there, and point the deployment at it in the host settings file:</p>
 <span class="nv">SCENARIO</span><span class="o">=</span>/scenarios/my-scenario.yaml
 </code></pre></div>
 <p>The default <code>./scenarios</code> lies inside the installed release: files placed there
-mark the deployment as modified and are lost on <code>upgrade</code> or <code>uninstall</code>.</p>
+mark the deployment as modified, stay behind in the old version on <code>upgrade</code>
+and are deleted by <code>uninstall</code>.</p>
 <p>Scenarios must match the map, and the planning sample map does not work here.
 To use your own map, point <code>MAP_PATH</code> at a directory that holds the same files
 as the bundled map: <code>lanelet2_map.osm</code>, <code>pointcloud_map.pcd</code>,

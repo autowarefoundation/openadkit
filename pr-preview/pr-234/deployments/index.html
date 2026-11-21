@@ -1313,8 +1313,6 @@
       
         
       
-        
-      
     
     
     
@@ -1470,34 +1468,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1692,17 +1662,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#stop-and-recover" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stop and Recover
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -1821,7 +1780,8 @@ openadkit<span class="w"> </span>stop
 <li>Put host settings in <code>~/.config/openadkit/&lt;deployment&gt;.env</code>; see
   <a href="../getting-started/cli/#settings">Settings</a>.</li>
 </ul>
-<p><a href="../getting-started/cli/">CLI &amp; Maintenance</a> covers the other commands.</p>
+<p><a href="../getting-started/cli/">CLI &amp; Maintenance</a> covers the other commands, and
+<a href="../getting-started/troubleshooting/">Troubleshooting</a> what goes wrong.</p>
 <h3 id="open-the-visualizer">Open the Visualizer<a class="headerlink" href="#open-the-visualizer" title="Permanent link">#</a></h3>
 <p>Open <code>http://localhost:6080/vnc.html</code> and sign in with the default password
 <strong><code>openadkit</code></strong>. To use your own, set <code>REMOTE_PASSWORD</code> in the host settings
@@ -1830,10 +1790,6 @@ file, <code>~/.config/openadkit/&lt;deployment&gt;.env</code>.</p>
 over SSH and open <code>http://localhost:8080/vnc.html</code> locally:</p>
 <div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">8080</span>:localhost:6080<span class="w"> </span>&lt;user&gt;@&lt;host&gt;
 </code></pre></div>
-<h3 id="stop-and-recover">Stop and Recover<a class="headerlink" href="#stop-and-recover" title="Permanent link">#</a></h3>
-<p><code>openadkit stop</code> stops and removes the deployment. To download missing data,
-run <code>openadkit fetch &lt;deployment&gt;</code>; to repair incomplete data, add <code>--force</code>.
-For other issues, see <a href="../getting-started/troubleshooting/">Troubleshooting</a>.</p>
 <h2 id="your-own-kit">Your Own Kit<a class="headerlink" href="#your-own-kit" title="Permanent link">#</a></h2>
 <p>Start a kit with <code>openadkit new</code> (<a href="../kits/create-a-kit/">Create a Kit</a>). It
 is your own project: it runs one or more of these deployments with your

@@ -798,17 +798,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#your-own-kit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Own Kit
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#upgrading" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1511,8 +1500,6 @@
       
         
       
-        
-      
     
     
     
@@ -1668,34 +1655,6 @@
     
   
     Verify a Release
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../releases/before-v2/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Before v2.0.0
   
 
     
@@ -1973,17 +1932,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#your-own-kit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Own Kit
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#upgrading" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2080,7 +2028,7 @@ checkout, call its launcher by path: <code>./openadkit</code> in the checkout, o
 <td>Download or delete a deployment's data</td>
 </tr>
 <tr>
-<td><a href="#your-own-kit"><code>new</code>, <code>build</code></a></td>
+<td><a href="../../kits/create-a-kit/"><code>new</code>, <code>build</code></a></td>
 <td>Create a kit and build its overlay workspace</td>
 </tr>
 <tr>
@@ -2264,7 +2212,9 @@ services. To change a node parameter instead, use a
 </table>
 <p>Set <code>OPENADKIT_HOME</code> to an absolute path to keep everything Open AD Kit writes
 under that one directory, for example to keep a test run apart from your own
-files.</p>
+files. Outside it stay the <code>openadkit</code> launcher in <code>~/.local/bin</code> and its Tab
+completion, which <code>install</code>, <code>upgrade</code> and <code>uninstall</code> change, and the system
+files <code>setup</code> changes.</p>
 <h2 id="downloaded-data">Downloaded Data<a class="headerlink" href="#downloaded-data" title="Permanent link">#</a></h2>
 <p>Maps, rosbags and models live under one data directory, <code>~/autoware_data</code> (see
 the table above): maps in <code>maps/</code>, rosbags in <code>rosbags/</code>, models and the Safety
@@ -2290,7 +2240,8 @@ openadkit<span class="w"> </span>clean<span class="w"> </span>planning-simulatio
 </ul>
 <p>The CLI marks the data it installs with a <code>.openadkit-resource.json</code> file, and
 checks, updates and deletes only marked data. A directory that holds files and
-no marker is yours, such as your own map at <code>MAP_PATH</code>: the deployment uses it
+no marker is yours, such as your own map at <code>MAP_PATH</code>, and so is a link you
+made to a directory with files, such as data moved to another disk: the deployment uses it
 as it is, whatever its files are called, and <code>fetch</code>, <code>--force</code> and <code>clean</code>
 leave it alone. Name its files in the settings where the deployment has them,
 such as <code>LANELET2_MAP_FILE</code> and <code>POINTCLOUD_MAP_FILE</code>.</p>
@@ -2301,11 +2252,6 @@ the path for a typo when you see that line.</p>
 <p><code>clean</code> and <code>fetch --force</code> refuse while that deployment is running, or while
 any live container mounts the data (including another kit or deployment). If
 data usage cannot be checked, they refuse as well.</p>
-<h2 id="your-own-kit">Your Own Kit<a class="headerlink" href="#your-own-kit" title="Permanent link">#</a></h2>
-<p><code>openadkit new my-kit [--base DEPLOYMENT]</code> makes <code>./my-kit</code>, a kit with one
-deployment on top of a catalog deployment (Planning Simulation by default), and
-<code>openadkit build</code> builds its overlay workspace. See
-<a href="../../kits/create-a-kit/">Create a Kit</a>.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>upgrade<span class="w"> </span>--check<span class="w">   </span><span class="c1"># report whether a newer stable version exists</span>
 openadkit<span class="w"> </span>upgrade<span class="w">           </span><span class="c1"># install it</span>

@@ -369,3 +369,9 @@ def test_centerpoint_models_mount_where_the_cli_installs_them(compose_context, t
     mounts = {item["target"]: item["source"] for item in json.loads(result.stdout)["services"]["perception"]["volumes"]}
     assert mounts["/autoware_data"] == "/srv/autoware_data"
     assert mounts["/autoware_data/lidar_centerpoint"] == str(data.resolve_destination(resource, selection))
+
+
+def test_the_docs_diagrams_match_the_deployments():
+    result = subprocess.run([sys.executable, str(ROOT / "docs" / "diagrams.py"), "--check"],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

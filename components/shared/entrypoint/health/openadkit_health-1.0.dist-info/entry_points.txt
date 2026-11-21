@@ -1,0 +1,2 @@
+[ros2launch.option]
+openadkit_health = openadkit_health:HealthOption

@@ -1,0 +1,18 @@
+# Localization — determines the vehicle's position on the map.
+# Its point cloud nodes run in a container of its own, not in sensing's, so
+# either service restarts without the other.
+services:
+  localization:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-localization
+    pid: service:map
+    command: >
+      ros2 launch autoware_launch component_localization.launch.xml
+      launch_pointcloud_container:=true
+      localization_pointcloud_container_name:=localization_pointcloud_container
+      system_run_mode:=${SYSTEM_RUN_MODE}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}

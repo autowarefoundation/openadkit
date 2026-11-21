@@ -1,0 +1,46 @@
+{
+  "description": "Planning Simulation controlled by the Safety Island",
+  "waitTimeout": 600,
+  "verify": {
+    "service": "api",
+    "command": ["python3", "/openadkit/checks/drive_to_goal.py"]
+  },
+  "requirements": {
+    "architectures": ["amd64"],
+    "rosDistros": ["humble", "jazzy"],
+    "gpu": "none"
+  },
+  "data": [
+    {
+      "name": "sample-map-planning",
+      "kind": "zip",
+      "destinationEnv": "MAP_PATH",
+      "expectedRoot": "sample-map-planning",
+      "url": "https://autoware-files.s3.us-west-2.amazonaws.com/maps/demos/sample-map-planning.zip",
+      "sha256": "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9",
+      "requiredFiles": ["lanelet2_map.osm", "pointcloud_map.pcd"]
+    },
+    {
+      "name": "safety-island-simulation",
+      "kind": "files",
+      "destinationEnv": "SAFETY_ISLAND_PATH",
+      "files": [
+        {
+          "path": "actuation_freertos",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/actuation_freertos",
+          "sha256": "4bf02d259f1508e2e66282475ed3c3824237bbfea3a6487b09dca0c1e8181ac7"
+        },
+        {
+          "path": "bridge-config.yaml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/bridge-config.yaml",
+          "sha256": "d87d25ce531fa16c200b74c5c7ba542131ed18129920934303460019f7314fd2"
+        },
+        {
+          "path": "cyclonedds-domain2.xml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/cyclonedds-domain2.xml",
+          "sha256": "5d0b2b1ba647d95f348914346867996d7313bb62a5015ad0fc75c5b0a3f0070b"
+        }
+      ]
+    }
+  ]
+}

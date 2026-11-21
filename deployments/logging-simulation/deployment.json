@@ -1,29 +1,14 @@
 {
-  "schemaVersion": 1,
-  "name": "logging-simulation",
-  "description": "Replay recorded sensor data through sensing and perception",
-  "shared": ["base"],
-  "compose": {
-    "files": ["docker-compose.yaml"],
-    "gpuFiles": ["docker-compose.gpu.yaml"],
-    "profiles": ["rosbag"],
-    "services": ["map", "system", "sensing", "perception", "localization", "rosbag", "visualizer"],
-    "resetServices": ["map-check", "rosbag"],
-    "waitTimeout": 300
+  "description": "Recorded sensor data replayed through sensing, perception and localization",
+  "verify": {
+    "service": "api",
+    "command": ["python3", "/openadkit/checks/follow_replay.py"]
   },
   "requirements": {
     "architectures": ["amd64", "arm64"],
     "rosDistros": ["humble", "jazzy"],
     "gpu": "optional",
     "gpuArchitectures": ["amd64"]
-  },
-  "distroEnvironment": {
-    "humble": {
-      "AUTOWARE_UNIVERSE_IMAGE": "ghcr.io/autowarefoundation/autoware:universe@sha256:df96858b83f11c1d30aba1522108093ac09e8587ef3f85b8278c44ee37305175"
-    },
-    "jazzy": {
-      "AUTOWARE_UNIVERSE_IMAGE": "ghcr.io/autowarefoundation/autoware:universe-jazzy@sha256:a392e1b331a59774f59751f82535e29bf26967ff4601ed78a1770d7dfeed7a02"
-    }
   },
   "data": [
     {
@@ -42,7 +27,7 @@
       "expectedRoot": "sample-rosbag",
       "url": "https://autoware-files.s3.us-west-2.amazonaws.com/recordings/bags/demos/sample-rosbag.zip",
       "sha256": "5f9d36353393b3d249212153c19049822b1298db56512aa045b4f7f6fc37cf88",
-      "requiredFiles": ["metadata.yaml", "sample-rosbag_0.db3"]
+      "requiredFiles": ["metadata.yaml"]
     },
     {
       "name": "centerpoint-model",
@@ -51,31 +36,25 @@
       "gpu": true,
       "files": [
         {
-          "path": "pts_voxel_encoder_centerpoint_tiny.onnx",
-          "url": "https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/pts_voxel_encoder_centerpoint_tiny.onnx",
+          "path": "tiny/pts_voxel_encoder.onnx",
+          "url": "https://huggingface.co/AutowareFoundation/lidar_centerpoint/resolve/494c8171def40bd36cc2feb323e0a5acbfab132b/tiny/pts_voxel_encoder.onnx",
           "sha256": "2c53465715c1fd2e9dc5727ef3fca74f4cdf0538f74286b0946e219d0ca5693b"
         },
         {
-          "path": "pts_backbone_neck_head_centerpoint_tiny.onnx",
-          "url": "https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/pts_backbone_neck_head_centerpoint_tiny.onnx",
+          "path": "tiny/pts_backbone_neck_head.onnx",
+          "url": "https://huggingface.co/AutowareFoundation/lidar_centerpoint/resolve/494c8171def40bd36cc2feb323e0a5acbfab132b/tiny/pts_backbone_neck_head.onnx",
           "sha256": "9bb0b634f3664bd098ce7d6a3d8a9fb7cc8d9b8252b27f302c71e43316bab551"
         },
         {
-          "path": "centerpoint_tiny_ml_package.param.yaml",
-          "url": "https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/centerpoint_tiny_ml_package.param.yaml",
-          "sha256": "e0846b08fbd023d6a7c085f5389d0ccaef8ad9cd2c5e1eb7dbc6583618e38424"
+          "path": "tiny/ml_package.param.yaml",
+          "url": "https://huggingface.co/AutowareFoundation/lidar_centerpoint/resolve/494c8171def40bd36cc2feb323e0a5acbfab132b/tiny/ml_package.param.yaml",
+          "sha256": "d52a48d11f704b1ea7291fcb6219afecbd768602297bd1685f214f48b147877b"
         },
         {
-          "path": "detection_class_remapper.param.yaml",
-          "url": "https://awf.ml.dev.web.auto/perception/models/centerpoint/v3/detection_class_remapper.param.yaml",
+          "path": "tiny/detection_class_remapper.param.yaml",
+          "url": "https://huggingface.co/AutowareFoundation/lidar_centerpoint/resolve/494c8171def40bd36cc2feb323e0a5acbfab132b/tiny/detection_class_remapper.param.yaml",
           "sha256": "c711f8875ece9b527dfe31ffc75f8c0de2e77945ef67860a959a4e04c36772d5"
         }
-      ],
-      "requiredFiles": [
-        "pts_voxel_encoder_centerpoint_tiny.onnx",
-        "pts_backbone_neck_head_centerpoint_tiny.onnx",
-        "centerpoint_tiny_ml_package.param.yaml",
-        "detection_class_remapper.param.yaml"
       ]
     }
   ]

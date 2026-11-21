@@ -1,0 +1,88 @@
+# The Autoware role's services for scenario simulation.
+#
+# Shared by the single-host compose.yaml and the
+# `--role autoware` view (this file plus compose.zenoh.yaml). The scenario
+# runner lives in compose.scenario.yaml.
+include:
+  - ../shared/services/map.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/simulator.yaml
+  - ../shared/services/simulated-perception.yaml
+  - ../shared/services/api.yaml
+
+services:
+  planning:
+    depends_on:
+      - map
+
+  vehicle:
+    depends_on:
+      - map
+
+  system:
+    depends_on:
+      - map
+
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
+  # Scenario Simulator V2 adapter. Stays on the Autoware host in split mode:
+  # only the TIER IV runner and its simple sensor simulator move to the scenario
+  # host.
+  simulator:
+    depends_on:
+      map:
+        condition: service_started
+      system:
+        condition: service_started
+      vehicle:
+        condition: service_started
+
+  simulated-perception:
+    depends_on:
+      - map
+
+  api:
+    depends_on:
+      - map
+
+  # Scenario Simulator V2 25.0.20 subscribes /api/fail_safe/mrm_state as
+  # volatile, and its node ignores launch remaps, while the ADAPI publishes it
+  # transient-local and only on change. Autoware keeps running across the
+  # scenarios of a workflow, so a scenario without an MRM transition never
+  # receives NORMAL and cannot succeed. Relay the 10 Hz source to the ADAPI
+  # topic until Scenario Simulator V2 subscribes transient-local.
+  mrm-state-relay:
+    extends:
+      file: ../shared/services/autoware.yaml
+      service: autoware
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-mrm-state-relay
+    command: >
+      ros2 run topic_tools relay /system/fail_safe/mrm_state /api/fail_safe/mrm_state
+      --ros-args -r __node:=mrm_state_relay -p use_sim_time:=${USE_SIM_TIME}
+    depends_on:
+      - system
+
+  # Scenario Simulator V2 publishes the signal states its scenario sets on
+  # perception's internal topic, which no service here reads: without
+  # perception, the planning simulator's dummy traffic light publisher takes
+  # them from /simulator/input/traffic_signals and else reports none. Each relay
+  # has its own node name: Autoware's duplicated node check fails on two /relay.
+  traffic-light-relay:
+    extends:
+      file: ../shared/services/autoware.yaml
+      service: autoware
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-traffic-light-relay
+    command: >
+      ros2 run topic_tools relay /perception/traffic_light_recognition/internal/traffic_signals /simulator/input/traffic_signals
+      --ros-args -r __node:=traffic_light_relay -p use_sim_time:=${USE_SIM_TIME}
+    depends_on:
+      - simulated-perception

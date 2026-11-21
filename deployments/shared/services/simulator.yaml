@@ -1,0 +1,24 @@
+# Simulator — the built-in dummy simulator behind the planning stack.
+services:
+  simulator:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-simulator
+    pid: service:map
+    volumes:
+      - ../launch/component.launch.py:/openadkit/launch/component.launch.py:ro
+    command: >
+      ros2 launch /openadkit/launch/component.launch.py component:=tier4_simulator_component
+      initial_engage_state:=${INITIAL_ENGAGE_STATE}
+      launch_dummy_doors:=${LAUNCH_DUMMY_DOORS}
+      launch_dummy_vehicle:=${LAUNCH_DUMMY_VEHICLE}
+      launch_fault_injection:=${LAUNCH_FAULT_INJECTION}
+      launch_scenario_simulator_v2_adapter:=${LAUNCH_SCENARIO_SIMULATOR_V2_ADAPTER}
+      localization_sim_mode:=${LOCALIZATION_SIM_MODE}
+      raw_vehicle_cmd_converter_param_path:=/tmp/openadkit/autoware_launch/share/autoware_launch/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml
+      scenario_simulation:=${SCENARIO_SIMULATION}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_info_param_file:=/tmp/openadkit/vehicle_description/config/vehicle_info.param.yaml
+      vehicle_model:=${VEHICLE_MODEL}

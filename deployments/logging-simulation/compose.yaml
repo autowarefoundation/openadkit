@@ -1,0 +1,117 @@
+# Logging simulation — the live sensing, perception, and localization stack plus
+# a rosbag player. Pair with compose.gpu.yaml to GPU-accelerate perception.
+#
+# Service definitions live in ../shared/services/<service>.yaml (one file per service).
+# This file selects the stack, owns its topology (depends_on), and adds
+# deployment-specific mounts and the rosbag player.
+include:
+  - ../shared/services/map.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/sensing.yaml
+  - ../shared/services/perception.yaml
+  - ../shared/services/localization.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
+
+services:
+  system:
+    depends_on:
+      - map
+
+  # Publishes the vehicle and sensor-kit TF (robot_state_publisher), which the
+  # rosbag does not carry: without it sensing cannot transform any lidar or IMU
+  # frame. The bag supplies the vehicle status, so the interface stays off
+  # (LAUNCH_VEHICLE_INTERFACE=false in settings.env).
+  vehicle:
+    depends_on:
+      - map
+
+  sensing:
+    depends_on:
+      - map
+      - system
+      - vehicle
+
+  perception:
+    depends_on:
+      - map
+      - system
+      - sensing
+
+  localization:
+    depends_on:
+      - map
+      - system
+      - sensing
+      - perception
+
+  # The AD API initializes localization: its automatic pose initializer starts
+  # it from the bag's GNSS, and RViz's 2D Pose Estimate goes through it too.
+  api:
+    depends_on:
+      - map
+      - localization
+
+  visualizer:
+    depends_on:
+      - map
+
+  # Logging-only service. The sensing image has rosbag2 and the message types
+  # of the sensor data.
+  rosbag:
+    image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-rosbag
+    network_mode: host
+    init: true
+    ipc: host
+    pid: service:map
+    env_file:
+      - ../shared/runtime.env
+    environment:
+      # Passed as runtime environment data (not interpolated into the command
+      # program) so shell metacharacters in a value cannot alter the script.
+      - ROSBAG_FORMAT=${ROSBAG_FORMAT}
+      - ROSBAG_READY_TOPIC=${ROSBAG_READY_TOPIC}
+      - ROSBAG_READY_TIMEOUT=${ROSBAG_READY_TIMEOUT}
+      - ROSBAG_RATE=${ROSBAG_RATE}
+    volumes:
+      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      - ${ROSBAG_PATH}:/autoware_map/rosbag:ro
+      # The kit's message packages, for a recording of its own.
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
+    depends_on:
+      sensing:
+        condition: service_started
+      perception:
+        condition: service_started
+      localization:
+        condition: service_started
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+        # Validate the values that arrive as environment data before use.
+        case "$$ROSBAG_FORMAT" in
+          sqlite3|mcap) ;;
+          *) echo "Invalid ROSBAG_FORMAT '$$ROSBAG_FORMAT' (expected sqlite3 or mcap)" >&2; exit 1 ;;
+        esac
+        case "$$ROSBAG_READY_TIMEOUT" in
+          ''|*[!0-9]*) echo "ROSBAG_READY_TIMEOUT must be a positive integer, got '$$ROSBAG_READY_TIMEOUT'" >&2; exit 1 ;;
+        esac
+        case "$$ROSBAG_RATE" in
+          ''|*[!0-9.]*) echo "ROSBAG_RATE must be numeric, got '$$ROSBAG_RATE'" >&2; exit 1 ;;
+        esac
+        ros2 bag info /autoware_map/rosbag -s "$$ROSBAG_FORMAT"
+        topic="$$ROSBAG_READY_TOPIC"
+        deadline=$$((SECONDS + ROSBAG_READY_TIMEOUT))
+        until ros2 topic info "$$topic" 2>/dev/null | grep -Eq 'Subscription count: [1-9][0-9]*'; do
+          if (( SECONDS >= deadline )); then
+            echo "Timed out waiting for a subscriber on $$topic" >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        exec ros2 bag play /autoware_map/rosbag -r "$$ROSBAG_RATE" -s "$$ROSBAG_FORMAT"
+    restart: "no"

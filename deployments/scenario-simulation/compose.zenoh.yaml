@@ -1,0 +1,66 @@
+# The Zenoh bridge that links this deployment's split-host roles.
+#
+# Each role lists this file in deployment.json, so the bridge starts beside the
+# role's own services. The single-host compose.yaml never includes it.
+#
+# Each role is its own Compose project with its own ROS domain, so the bridge
+# has no fixed container_name: two roles may share one host, each with its own
+# ZENOH_LISTEN port.
+#
+# Host networking lets the bridge reach the LAN listen address and share the
+# host's Cyclone environment. DDS stays local: runtime.env points
+# CYCLONEDDS_URI at shared/cyclonedds.xml, whose <NetworkInterface> pins
+# Cyclone to `lo`. Only Zenoh traffic crosses the LAN. Do not add
+# ROS_LOCALHOST_ONLY here: the plugin's discovery manager reuses the same
+# Cyclone config and rejects the duplicated `lo` selection at startup.
+services:
+  zenoh-bridge:
+    image: ${ZENOH_BRIDGE_IMAGE:?pinned in openadkit.json externalImages}
+    network_mode: host
+    init: true
+    ipc: host
+    restart: on-failure
+    # RMW_IMPLEMENTATION, ROS_DOMAIN_ID, CYCLONEDDS_URI and
+    # CYCLONEDDS_NETWORK_INTERFACE=lo. Without the URI the interface pin is a
+    # no-op and DDS would leak onto the LAN.
+    env_file:
+      - ../shared/runtime.env
+    environment:
+      # Must match the ROS graph this bridge joins. Without it the plugin
+      # assumes iron and drops Humble discovery info (24-byte GIDs), leaving
+      # the Zenoh session up but routing no topics. The CLI sets the selected
+      # distro.
+      - ROS_DISTRO=${ROS_DISTRO:-humble}
+      # From the host settings file or the shell. The empty defaults keep
+      # `stop`, `status` and `logs` working without them; the command below
+      # fails when it needs a listen endpoint.
+      - ZENOH_LISTEN=${ZENOH_LISTEN:-}
+      - ZENOH_PEER=${ZENOH_PEER:-}
+    volumes:
+      - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      # The allowlist: what may cross between the roles. In this long form a
+      # missing file fails the start; the short form would create a directory
+      # in its place.
+      - type: bind
+        source: ./config/zenoh.json5
+        target: /config/zenoh.json5
+        read_only: true
+        bind:
+          create_host_path: false
+    # The image's entrypoint is /entrypoint.sh (Alpine ash), which execs
+    # /zenoh-bridge-ros2dds; the binary is not on PATH. This wrapper replaces
+    # it and turns the environment into the binary's arguments.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -z "$${ZENOH_LISTEN:-}" ]; then
+          echo "zenoh-bridge: ZENOH_LISTEN is required (tcp/<this-host-lan-ip>:7447)" >&2
+          exit 1
+        fi
+        set -- -l "$$ZENOH_LISTEN" -c /config/zenoh.json5
+        if [ -n "$${ZENOH_PEER:-}" ]; then
+          set -- "$$@" -e "$$ZENOH_PEER"
+        fi
+        echo "zenoh-bridge: listening on $$ZENOH_LISTEN"
+        exec /zenoh-bridge-ros2dds "$$@"

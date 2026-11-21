@@ -1,0 +1,18 @@
+# Planning — computes a safe, feasible trajectory to the goal.
+services:
+  planning:
+    extends:
+      file: autoware.yaml
+      service: autoware
+    image: ${PLANNING_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-planning
+    pid: service:map
+    command: >
+      ros2 launch autoware_launch component_planning.launch.xml
+      data_path:=/autoware_data/ml_models
+      enable_all_modules_auto_mode:=${ENABLE_ALL_MODULES_AUTO_MODE}
+      is_simulation:=${IS_SIMULATION_MODE}
+      module_preset:=${PLANNING_MODULE_PRESET}
+      planning_setting:=${PLANNING_SETTING:-rule_based}
+      use_sim_time:=${USE_SIM_TIME}
+      vehicle_model:=${VEHICLE_MODEL}

@@ -1,0 +1,26 @@
+# What every Autoware service shares: the host network and IPC, the DDS
+# settings, the config overrides and the overlay workspace. A service file
+# extends `autoware` and adds its image, its name and its command.
+services:
+  autoware:
+    network_mode: host
+    init: true
+    ipc: host
+    env_file:
+      - ../runtime.env
+    volumes:
+      - ../cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
+      # Config overrides and the overlay workspace, which the image entrypoint applies (components/shared/entrypoint).
+      - ${OPENADKIT_CONFIG_BASE:?set by the openadkit CLI}:/openadkit/config/base:ro
+      - ${OPENADKIT_CONFIG_KIT:?set by the openadkit CLI}:/openadkit/config/kit:ro
+      - ${OPENADKIT_CONFIG_DEPLOYMENT:?set by the openadkit CLI}:/openadkit/config/deployment:ro
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
+    # `ros2 launch` keeps running when one of its nodes dies. The image records
+    # the death (components/shared/entrypoint/health), and the service turns
+    # unhealthy and reports the node; nothing stops or restarts it.
+    healthcheck:
+      test: ["CMD-SHELL", "! cat /tmp/openadkit/died 2>/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 1
+    restart: on-failure

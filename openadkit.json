@@ -1,13 +1,14 @@
 {
-  "schemaVersion": 1,
-  "kind": "repository",
+  "schemaVersion": 2,
+  "kind": "source",
   "defaultRosDistro": "humble",
-  "imagePrefixComponent": "ghcr.io/autowarefoundation/openadkit",
+  "imageRepository": "ghcr.io/autowarefoundation/openadkit",
   "componentImages": {
     "LOCALIZATION_MAPPING_IMAGE": "localization-mapping",
-    "PLANNING_CONTROL_IMAGE": "planning-control",
+    "PLANNING_IMAGE": "planning",
+    "PLANNING_GPU_IMAGE": "planning-cuda",
+    "CONTROL_IMAGE": "control",
     "VEHICLE_SYSTEM_IMAGE": "vehicle-system",
-    "API_IMAGE": "api",
     "VISUALIZER_IMAGE": "visualizer",
     "SIMULATOR_IMAGE": "simulator",
     "SENSING_PERCEPTION_IMAGE": "sensing-perception",
@@ -25,6 +26,23 @@
     },
     "carla-simulation": {
       "path": "deployments/carla-simulation"
+    },
+    "safety-island-simulation": {
+      "path": "deployments/safety-island-simulation"
+    }
+  },
+  "externalImages": {
+    "SCENARIO_SIMULATOR_IMAGE": {
+      "distros": {
+        "humble": "ghcr.io/tier4/scenario_simulator_v2:humble-25.0.20-runtime@sha256:80dc759586c0aa55b5c49b120635b9bda8d52ae4fe3ad96478dd0f5a5bfec5ad",
+        "jazzy": "ghcr.io/tier4/scenario_simulator_v2:jazzy-25.0.20-runtime@sha256:be6b5026ee7bcfad091bd365b18690dee3608ed222a2bd128e268405ace63b1d"
+      }
+    },
+    "ZENOH_BRIDGE_IMAGE": {
+      "ref": "eclipse/zenoh-bridge-ros2dds:1.10.1@sha256:74fae6a9d4f449c53d1ee6f0faaca97d01c1e68dfcafd785b657f01907157d22"
+    },
+    "CARLA_IMAGE": {
+      "ref": "carlasim/carla:0.9.16@sha256:aaf1df22702780ece072069e23d03c4879b002ae028c79744b09c4c7ddbae953"
     }
   }
 }

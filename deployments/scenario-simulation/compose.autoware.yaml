@@ -66,6 +66,23 @@ services:
     container_name: autoware-mrm-state-relay
     command: >
       ros2 run topic_tools relay /system/fail_safe/mrm_state /api/fail_safe/mrm_state
-      --ros-args -p use_sim_time:=${USE_SIM_TIME}
+      --ros-args -r __node:=mrm_state_relay -p use_sim_time:=${USE_SIM_TIME}
     depends_on:
       - system
+
+  # Scenario Simulator V2 publishes the signal states its scenario sets on
+  # perception's internal topic, which no service here reads: without
+  # perception, the planning simulator's dummy traffic light publisher takes
+  # them from /simulator/input/traffic_signals and else reports none. Each relay
+  # has its own node name: Autoware's duplicated node check fails on two /relay.
+  traffic-light-relay:
+    extends:
+      file: ../shared/services/autoware.yaml
+      service: autoware
+    image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
+    container_name: autoware-traffic-light-relay
+    command: >
+      ros2 run topic_tools relay /perception/traffic_light_recognition/internal/traffic_signals /simulator/input/traffic_signals
+      --ros-args -r __node:=traffic_light_relay -p use_sim_time:=${USE_SIM_TIME}
+    depends_on:
+      - simulated-perception

@@ -78,6 +78,8 @@ services:
     volumes:
       - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${ROSBAG_PATH}:/autoware_map/rosbag:ro
+      # The kit's message packages, for a recording of its own.
+      - ${OPENADKIT_OVERLAY_WS:?set by the openadkit CLI}:/openadkit/overlay_ws:ro
     depends_on:
       sensing:
         condition: service_started

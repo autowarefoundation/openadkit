@@ -150,3 +150,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 # universe-common's entrypoint runs first: it switches to the host user and
 # applies the config overrides and the overlay workspace (components/shared/entrypoint).
 ENTRYPOINT ["/opt/openadkit/entrypoint.sh", "/usr/local/bin/visualizer_entrypoint.sh"]
+
+# No change to the image: this line only makes a pull request build it.

@@ -75,20 +75,10 @@ openadkit restart           # the services pick up the build
 
 ## Documentation
 
-- [**Overview**](https://autowarefoundation.github.io/openadkit/) — what Open AD Kit is and how it is put together
-- [**CLI & Maintenance**](https://autowarefoundation.github.io/openadkit/getting-started/cli/) — every command, settings, upgrades and cleanup
-- [**Troubleshooting**](https://autowarefoundation.github.io/openadkit/getting-started/troubleshooting/) — Docker, data, GPU, visualizer and network
-- [**Components**](https://autowarefoundation.github.io/openadkit/deployments/components/) — the container images and what each one runs
-- [**Platforms**](https://autowarefoundation.github.io/openadkit/platforms/) — support tiers, AutoSD and host requirements
-- [**Releases**](https://autowarefoundation.github.io/openadkit/releases/) — what a release ships, promises and proves
-- [**Build from Source**](https://autowarefoundation.github.io/openadkit/development/build-from-source/) — build the images yourself
+[Overview](https://autowarefoundation.github.io/openadkit/) · [CLI & Maintenance](https://autowarefoundation.github.io/openadkit/getting-started/cli/) · [Troubleshooting](https://autowarefoundation.github.io/openadkit/getting-started/troubleshooting/) · [Components](https://autowarefoundation.github.io/openadkit/deployments/components/) · [Platforms](https://autowarefoundation.github.io/openadkit/platforms/) · [Releases](https://autowarefoundation.github.io/openadkit/releases/) · [Build from Source](https://autowarefoundation.github.io/openadkit/development/build-from-source/)
 
 ## Community
 
 - **Working Group** — Thursdays at 13:00 UTC, open to everyone: [calendar](https://www.google.com/calendar/event?eid=YnY4dmJxZTVsM2h2cWE1cTJ2NmhtOWdwMzZfMjAyNjA5MjRUMTMwMDAwWiBhdXRvd2FyZS5vcmdfNmxvbDBobzVmdDAyMTdoOGM2MHBpMWZtMzBAZw) · [agendas](https://github.com/orgs/autowarefoundation/discussions?discussions_q=label%3Ameeting%3Aopenadkit-wg)
 - **Chat** — questions and design discussions on the [Autoware Discord](https://discord.gg/Q94UsPvReQ)
 - **Contribute** — [CONTRIBUTING.md](CONTRIBUTING.md) has the development workflow and validation steps
-
-## License
-
-Apache License 2.0. See [LICENSE](LICENSE).

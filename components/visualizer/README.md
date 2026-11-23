@@ -10,4 +10,4 @@ docker run --rm --name visualizer --network host \
   ghcr.io/autowarefoundation/openadkit:visualizer-humble
 ```
 
-Open `http://localhost:6080/vnc.html`.
+Open `http://localhost:6080/vnc.html?resize=remote&autoconnect=true`.

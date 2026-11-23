@@ -1,0 +1,37 @@
+diff --git a/ansible/roles/acados/tasks/main.yaml b/ansible/roles/acados/tasks/main.yaml
+index 9efdd01..c8103e9 100644
+--- a/ansible/roles/acados/tasks/main.yaml
++++ b/ansible/roles/acados/tasks/main.yaml
+@@ -43,7 +43,7 @@
+ 
+ - name: Set tera renderer architecture
+   ansible.builtin.set_fact:
+-    acados_tera_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] }}"
++    acados_tera_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(ansible_architecture, '') }}"
+ 
+ - name: Download tera renderer
+   become: true
+@@ -51,6 +51,23 @@
+     url: https://github.com/acados/tera_renderer/releases/download/{{ acados_tera_renderer_version }}/t_renderer-{{ acados_tera_renderer_version }}-linux-{{ acados_tera_arch }}
+     dest: /opt/acados/bin/t_renderer
+     mode: "0755"
++  when: acados_tera_arch | length > 0
++
++# tera_renderer publishes no binary for other architectures, so build it.
++# It uses Rust edition 2024, which needs cargo 1.85 or newer.
++- name: Install cargo to build tera renderer
++  become: true
++  ansible.builtin.apt:
++    name: cargo-1.91
++    update_cache: true
++  when: acados_tera_arch | length == 0
++
++- name: Build tera renderer from source
++  become: true
++  ansible.builtin.command:
++    cmd: cargo-1.91 install --root /opt/acados --git https://github.com/acados/tera_renderer --tag {{ acados_tera_renderer_version }}
++    creates: /opt/acados/bin/t_renderer
++  when: acados_tera_arch | length == 0
+ 
+ # ---------- Python virtual environment ----------
+ 

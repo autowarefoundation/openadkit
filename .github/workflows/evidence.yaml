@@ -252,6 +252,21 @@ jobs:
         if: ${{ matrix.backend == 'quadlet' }}
         run: sudo apt-get update && sudo apt-get install -y podman catatonit
 
+      - name: Log Podman in to Container Registry
+        # The units pull as root under systemd, which reads this file; the
+        # Docker login above does not reach Podman. Without it a pull
+        # request's images, which are in the CI package, are refused.
+        if: ${{ matrix.backend == 'quadlet' }}
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /run/containers/0
+          printenv REGISTRY_TOKEN |
+            sudo podman login ghcr.io --username "$REGISTRY_USER" --password-stdin \
+              --authfile /run/containers/0/auth.json
+
       - name: Build the kit's overlay workspace
         # As an integrator would: the staged kit pins its devel image.
         if: ${{ matrix.kit != '' }}

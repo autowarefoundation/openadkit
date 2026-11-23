@@ -10,10 +10,9 @@
 
 [Autoware](https://github.com/autowarefoundation/autoware) provides the autonomy stack; Open AD Kit makes it deployable. It packages the stack into focused container images and ready-to-run deployments, with [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) alongside. One CLI runs them the same way on every host.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/images/readme-hero-dark.svg">
-  <img src="docs/assets/images/readme-hero-light.svg" width="100%" alt="Open AD Kit packages Autoware into component images, combines them into ready-to-run deployments with your kit on top, and one command runs them on Ubuntu, on two hosts or on in-vehicle Linux. One reproducible path from simulation to in-vehicle systems.">
-</picture>
+<p align="center">
+  <img src="docs/assets/images/readme-demo.gif" width="640" alt="RViz in the browser: after openadkit run planning-simulation, the ego vehicle follows its planned route in autonomous mode at 15 km/h. The recording is sped up 2.5 times.">
+</p>
 
 ## Quickstart
 
@@ -39,6 +38,13 @@ openadkit run planning-simulation
 # 5. Stop
 openadkit stop
 ```
+
+## How It Fits Together
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/images/readme-hero-dark.svg">
+  <img src="docs/assets/images/readme-hero-light.svg" width="100%" alt="Open AD Kit packages Autoware into component images, combines them into ready-to-run deployments with your kit on top, and one command runs them on Ubuntu, on two hosts or on in-vehicle Linux. One reproducible path from simulation to in-vehicle systems.">
+</picture>
 
 ## Deployments
 

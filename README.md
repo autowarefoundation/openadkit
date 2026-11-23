@@ -11,7 +11,7 @@
 [Autoware](https://github.com/autowarefoundation/autoware) provides the autonomy stack; Open AD Kit makes it deployable. It packages the stack into focused container images and ready-to-run deployments, with [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) alongside. One CLI runs them the same way on every host.
 
 <p align="center">
-  <img src="docs/assets/images/readme-demo.gif" width="640" alt="RViz in the browser: after openadkit run planning-simulation, the ego vehicle follows its planned route in autonomous mode at 15 km/h. The recording is sped up 2.5 times.">
+  <img src="docs/assets/images/readme-demo.gif" width="100%" alt="A run of Open AD Kit 2.0 in three steps. One: the install script puts the CLI on the host. Two: openadkit run planning-simulation pulls six images and starts nine services, all healthy. Three: in RViz in the browser, the ego vehicle follows its planned route in autonomous mode; that part is sped up three times.">
 </p>
 
 ## Quickstart

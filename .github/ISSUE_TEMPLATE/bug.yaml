@@ -21,14 +21,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    attributes:
-      label: Deployment
-      description: The deployment and its options, or your kit's deployment.
-      placeholder: planning-simulation --gpu
-    validations:
-      required: false
-
   - type: dropdown
     attributes:
       label: ROS distribution
@@ -64,12 +56,5 @@ body:
         The relevant part of `openadkit logs`. Remove credentials and personal
         or sensitive data first.
       render: text
-    validations:
-      required: false
-
-  - type: textarea
-    attributes:
-      label: Possible causes
-      description: Write the possible causes if you have any ideas.
     validations:
       required: false

@@ -21,12 +21,61 @@ body:
     validations:
       required: true
 
+  - type: input
+    attributes:
+      label: Deployment
+      description: The deployment and its options, or your kit's deployment.
+      placeholder: planning-simulation --gpu
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: ROS distribution
+      options:
+        - Humble
+        - Jazzy
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Host architecture
+      options:
+        - amd64
+        - arm64
+    validations:
+      required: true
+
   - type: textarea
     attributes:
       label: Versions
-      description: Paste the output of `openadkit version --json`, and name your OS.
+      description: >-
+        Paste the output of `openadkit version --json` (run it in the kit if
+        you use one), `docker version --format '{{.Server.Version}}'` and
+        `docker compose version`, and name your OS.
     validations:
       required: true
+
+  - type: textarea
+    attributes:
+      label: Logs
+      description: >-
+        The relevant part of `openadkit logs`. Remove credentials and personal
+        or sensitive data first.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Kit validation
+      description: >-
+        If you use a kit, paste the output of
+        `openadkit validate <deployment> --json`, run in the kit.
+      render: json
+    validations:
+      required: false
 
   - type: textarea
     attributes:

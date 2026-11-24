@@ -49,13 +49,15 @@ Open the visualizer address that `run` prints (password: `openadkit`). In RViz, 
 
 A deployment is a ready-to-run Autoware stack for one task. `openadkit list` prints them in your terminal.
 
-| Deployment | What it runs | Needs |
-|---|---|---|
-| [`planning-simulation`](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/) | Plan and follow a route on a sample map | No GPU |
-| [`scenario-simulation`](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/) | Predefined traffic scenarios in Scenario Simulator | No GPU |
-| [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data, sensing to localization | No GPU |
-| [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Closed-loop driving in the CARLA simulator | NVIDIA GPU, amd64, Humble |
-| [`safety-island-simulation`](https://autowarefoundation.github.io/openadkit/deployments/safety-island-simulation/) | Planning Simulation controlled by the Safety Island | amd64 |
+| Deployment | What it runs |
+|---|---|
+| [`planning-simulation`](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/) | Plan and follow a route on a sample map |
+| [`scenario-simulation`](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/) | Predefined traffic scenarios in Scenario Simulator |
+| [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data, sensing to localization |
+| [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Closed-loop driving in the CARLA simulator |
+| [`safety-island-simulation`](https://autowarefoundation.github.io/openadkit/deployments/safety-island-simulation/) | Planning Simulation controlled by the Safety Island |
+
+None of them needs a GPU except CARLA Simulation, which needs an NVIDIA GPU on amd64 with Humble. Safety Island Simulation runs on amd64 only.
 
 With `--gpu`, Planning Simulation plans with the Diffusion Planner (experimental) and Logging Simulation runs CenterPoint on CUDA. With `--role`, Scenario and CARLA Simulation [split across two hosts](https://autowarefoundation.github.io/openadkit/deployments/split-host/) (experimental).
 

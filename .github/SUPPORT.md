@@ -14,11 +14,10 @@ community-based; there is no response-time or service-level guarantee.
 - Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
   Do not put exploit details in a public issue or chat.
 
-For a bug report, include `openadkit version --json`, the deployment, ROS
-distro, host architecture, Docker/Compose versions, reproduction steps, and
-relevant logs. Remove credentials and personal or sensitive data first.
-For a kit, also include the pinned release version and the result of
-`openadkit validate <deployment> --json`, run in the kit.
+For a bug report, include reproduction steps, the ROS distro, host
+architecture, `openadkit version --json` (run in the kit if you use one),
+Docker/Compose versions, and relevant logs. Remove credentials and personal
+or sensitive data first.
 
 ## Supported versions and configurations
 

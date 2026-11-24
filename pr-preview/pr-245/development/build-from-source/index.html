@@ -2068,7 +2068,8 @@ disables the local tags (<code>LOCAL_IMAGE=""</code>) and tags images through
 pins the Autoware release a branch builds on its official images. CI builds
 <code>main</code> and <code>release/*</code> pushes, keeps registry caches per branch, and scans and
 runs the evidence cells after each build. A weekly scan of <code>main</code>'s latest build
-opens a GitHub issue when it fails.</p>
+reports its findings in the repository's Security tab; a failed run shows in
+Actions.</p>
 <h3 id="testing-a-pull-request">Testing a Pull Request<a class="headerlink" href="#testing-a-pull-request" title="Permanent link">#</a></h3>
 <p>A pull request that changes an image's inputs builds the affected images, amd64
 only, for both distros. A pull request from this repository pushes them to the

@@ -53,8 +53,10 @@ theme:
 extra_css:
   - assets/css/extra.css
 
-# Snippets, the macros module and the theme overrides are no pages.
+# Snippets, the macros module and the theme overrides are no pages, and the
+# README's recording is no site asset.
 exclude_docs: |
+  /assets/images/readme-demo.gif
   /includes/
   /macros.py
   /diagrams.py

@@ -159,7 +159,8 @@ disables the local tags (`LOCAL_IMAGE=""`) and tags images through
 pins the Autoware release a branch builds on its official images. CI builds
 `main` and `release/*` pushes, keeps registry caches per branch, and scans and
 runs the evidence cells after each build. A weekly scan of `main`'s latest build
-opens a GitHub issue when it fails.
+reports its findings in the repository's Security tab; a failed run shows in
+Actions.
 
 ### Testing a Pull Request
 

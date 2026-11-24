@@ -24,6 +24,7 @@ body:
   - type: dropdown
     attributes:
       label: ROS distribution
+      description: Humble unless you passed `--ros-distro`.
       options:
         - Humble
         - Jazzy
@@ -53,8 +54,9 @@ body:
     attributes:
       label: Logs
       description: >-
-        The relevant part of `openadkit logs`. Remove credentials and personal
-        or sensitive data first.
+        The failing command's output, or the relevant part of
+        `openadkit logs`. Remove credentials and personal or sensitive data
+        first.
       render: text
     validations:
       required: false

@@ -16,8 +16,8 @@ community-based; there is no response-time or service-level guarantee.
 
 For a bug report, include reproduction steps, the ROS distro, host
 architecture, `openadkit version --json` (run in the kit if you use one),
-Docker/Compose versions, and relevant logs. Remove credentials and personal
-or sensitive data first.
+Docker/Compose versions, the OS, and relevant logs. Remove credentials and
+personal or sensitive data first.
 
 ## Supported versions and configurations
 

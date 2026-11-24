@@ -73,7 +73,7 @@ git ls-files '**/Dockerfile*' | xargs hadolint --config .hadolint.yaml
 # YAML files
 yamllint -c .yamllint.yaml \
   .github/workflows/ .github/actions/ .github/ISSUE_TEMPLATE/ \
-  .github/dependabot.yaml .github/stale.yml \
+  .github/dependabot.yaml \
   deployments/ platforms/ mkdocs.yaml docs/
 
 # Markdown

@@ -209,26 +209,3 @@ jobs:
       - name: Fail if full scan failed
         if: needs.scan.result != 'success'
         run: exit 1
-
-  notify-failure:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [prepare, scan, publish-metadata]
-    if: failure() && github.event_name == 'schedule'
-    permissions:
-      issues: write
-    steps:
-      - name: Create failure issue
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Weekly image scan failed (${new Date().toISOString().split('T')[0]})`,
-              body: [
-                '**The weekly scan of main\'s latest build failed.**',
-                '',
-                `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              ].join('\n'),
-            })

@@ -1,6 +1,7 @@
 # Bug Report Template
 name: Bug
 description: Report a bug
+type: Bug
 body:
   - type: textarea
     attributes:

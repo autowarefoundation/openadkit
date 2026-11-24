@@ -1,6 +1,7 @@
 # Bug Report Template
 name: Bug
 description: Report a bug
+type: Bug
 body:
   - type: textarea
     attributes:
@@ -20,16 +21,42 @@ body:
     validations:
       required: true
 
-  - type: textarea
+  - type: dropdown
     attributes:
-      label: Versions
-      description: Paste the output of `openadkit version --json`, and name your OS.
+      label: ROS distribution
+      description: Humble unless you passed `--ros-distro`.
+      options:
+        - Humble
+        - Jazzy
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Host architecture
+      options:
+        - amd64
+        - arm64
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: Possible causes
-      description: Write the possible causes if you have any ideas.
+      label: Versions
+      description: >-
+        Paste the output of `openadkit version --json` (run it in the kit if
+        you use one), `docker version --format '{{.Server.Version}}'` and
+        `docker compose version`, and name your OS.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Logs
+      description: >-
+        The failing command's output, or the relevant part of
+        `openadkit logs`. Remove credentials and personal or sensitive data
+        first.
+      render: text
     validations:
       required: false

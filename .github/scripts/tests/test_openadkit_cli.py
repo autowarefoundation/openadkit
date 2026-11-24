@@ -898,7 +898,7 @@ def test_run_prints_https_only_for_a_site_certificate(tmp_path):
     host_settings(root, "NOVNC_CERT=/certs/novnc.crt\nNOVNC_KEY=/certs/novnc.key\n")
     result = run_cli(root, "run", "example")
     assert result.returncode == 0, result.stderr
-    assert "visualizer: https://localhost:6080/vnc.html" in result.stdout
+    assert "visualizer: https://localhost:6080/vnc.html?resize=remote&autoconnect=true" in result.stdout
 
 
 @pytest.mark.parametrize(("projects", "args", "message"), [
@@ -1453,7 +1453,7 @@ def test_status_gives_the_visualizer_address_only_when_it_runs(tmp_path):
     root, _ = runtime_tree(tmp_path)
     fake_docker(tmp_path, projects=["openadkit-example"], services=("map", "visualizer"))
     result = run_cli(root, "status")
-    assert result.returncode == 0 and "visualizer: http://localhost:6080/vnc.html" in result.stdout
+    assert result.returncode == 0 and "visualizer: http://localhost:6080/vnc.html?resize=remote&autoconnect=true" in result.stdout
     assert "password: REMOTE_PASSWORD" in result.stdout
     fake_docker(tmp_path, projects=["openadkit-example"], services=("map",))
     result = run_cli(root, "status")

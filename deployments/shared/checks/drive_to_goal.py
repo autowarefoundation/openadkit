@@ -83,7 +83,7 @@ class DriveToGoal(Node):
         print(f"[verify] {time.monotonic() - self.t0:6.1f}s {what}", flush=True)
 
     def run(self):
-        for cli in (self.init_cli, self.route_cli, self.auto_cli):
+        for cli in (self.init_cli, self.route_cli, self.clear_cli, self.auto_cli):
             if not self.spin_until(cli.service_is_ready, TIMEOUT_READY, cli.srv_name):
                 return 2
         self.mark("services ready")
@@ -110,8 +110,12 @@ class DriveToGoal(Node):
         # run, driven or not, makes set_route_points refuse the new one.
         self.spin_until(lambda: self.route is not None, 10.0, "route state")
         if self.route not in (None, RouteState.UNSET):
-            self.call(self.clear_cli, ClearRoute.Request(), "clear_route")
-            self.spin_until(lambda: self.route == RouteState.UNSET, 10.0, "route UNSET")
+            # The AD API refuses to clear a route the vehicle is still driving.
+            if not (
+                self.call(self.clear_cli, ClearRoute.Request(), "clear_route")
+                and self.spin_until(lambda: self.route == RouteState.UNSET, 10.0, "route UNSET")
+            ):
+                return 4
             self.mark("earlier route cleared")
         rreq = SetRoutePoints.Request()
         rreq.header.frame_id = "map"

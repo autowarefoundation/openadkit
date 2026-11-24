@@ -33,7 +33,7 @@ newgrp docker
 # 3. Start Autoware
 openadkit run planning-simulation
 
-# 4. Drive: open the visualizer address `run` prints (password: openadkit). In RViz,
+# 4. Drive: open http://localhost:6080/vnc.html (password: openadkit). In RViz,
 #    set an initial pose and a goal, then press AUTO in the OperationMode panel.
 
 # 5. Stop

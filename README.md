@@ -1,43 +1,42 @@
-# Open AD Kit
+<h1 align="center">Open AD Kit</h1>
 
-[![Build](https://img.shields.io/github/actions/workflow/status/autowarefoundation/openadkit/build-all-images.yaml?branch=main&label=build)](https://github.com/autowarefoundation/openadkit/actions/workflows/build-all-images.yaml)
-[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](https://autowarefoundation.github.io/openadkit/)
-[![Release](https://img.shields.io/github/v/release/autowarefoundation/openadkit?label=release)](https://github.com/autowarefoundation/openadkit/releases)
-[![ROS 2](https://img.shields.io/badge/ROS%202-Humble%20%7C%20Jazzy-22314E?logo=ros&logoColor=white)](https://autowarefoundation.github.io/openadkit/platforms/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+<p align="center">
+  <b>The deployment layer for the Autoware ecosystem.</b><br>
+  Autoware as container images and ready-to-run deployments, with one CLI on top.
+</p>
 
-**The deployment layer for the Autoware ecosystem.**
-
-[Autoware](https://github.com/autowarefoundation/autoware) provides the autonomy stack; Open AD Kit makes it deployable. It packages the stack into focused container images and ready-to-run deployments, with [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) alongside. One CLI runs them the same way on every host.
+<p align="center">
+  <a href="https://github.com/autowarefoundation/openadkit/releases"><img src="https://img.shields.io/github/v/release/autowarefoundation/openadkit?label=release&color=0969da" alt="Latest release"></a>
+  <a href="https://github.com/autowarefoundation/openadkit/actions/workflows/build-all-images.yaml"><img src="https://img.shields.io/github/actions/workflow/status/autowarefoundation/openadkit/build-all-images.yaml?branch=main&label=build" alt="Build status"></a>
+  <a href="https://autowarefoundation.github.io/openadkit/platforms/"><img src="https://img.shields.io/badge/ROS%202-Humble%20%7C%20Jazzy-0969da" alt="ROS 2 Humble and Jazzy"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0969da" alt="Apache License 2.0"></a>
+</p>
 
 <p align="center">
   <img src="docs/assets/images/readme-demo.gif" width="100%" alt="A run of Open AD Kit 2.0 in three steps. One: the install script puts the CLI on the host. Two: openadkit run planning-simulation pulls six images and starts nine services, all healthy. Three: in RViz in the browser, the ego vehicle follows its planned route in autonomous mode; that part is sped up three times.">
 </p>
 
+[Autoware](https://github.com/autowarefoundation/autoware) provides the autonomy stack; Open AD Kit makes it deployable. It packages the stack into focused container images and ready-to-run deployments, with [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) alongside. One CLI runs them the same way on every host.
+
 ## Quickstart
 
-From nothing to a driving Autoware on Ubuntu. No GPU needed. The [full Quickstart](https://autowarefoundation.github.io/openadkit/getting-started/) has the details.
+On Ubuntu 22.04 or 24.04. No GPU needed.
 
 ```bash
-# 1. Install the CLI. A new account has ~/.local/bin on PATH only from its
-#    next login, so add it to this shell.
+# Install the CLI and put it on PATH
 curl -fsSL https://github.com/autowarefoundation/openadkit/releases/latest/download/openadkit \
   | bash -s -- install
 export PATH="$HOME/.local/bin:$PATH"
 
-# 2. Prepare the host, then start a shell in the docker group it adds you to
+# Prepare the host, then start a shell in the docker group it adds you to
 openadkit setup
 newgrp docker
 
-# 3. Start Autoware
+# Start Autoware
 openadkit run planning-simulation
-
-# 4. Drive: open http://localhost:6080/vnc.html (password: openadkit). In RViz,
-#    set an initial pose and a goal, then press AUTO in the OperationMode panel.
-
-# 5. Stop
-openadkit stop
 ```
+
+Open the visualizer address that `run` prints (password: `openadkit`). In RViz, set an initial pose and a goal, then press **AUTO** in the OperationMode panel. `openadkit stop` ends it. The [full Quickstart](https://autowarefoundation.github.io/openadkit/getting-started/) has the details.
 
 ## How It Fits Together
 
@@ -50,13 +49,15 @@ openadkit stop
 
 A deployment is a ready-to-run Autoware stack for one task. `openadkit list` prints them in your terminal.
 
-| Deployment | What it runs | Requires |
+| Deployment | What it runs | Needs |
 |---|---|---|
-| [`planning-simulation`](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/) | Plan and follow a route on a sample map<br>`--gpu` plans with the Diffusion Planner (experimental) | |
-| [`scenario-simulation`](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/) | Predefined traffic scenarios in Scenario Simulator<br>`--role` [splits it across two hosts](https://autowarefoundation.github.io/openadkit/deployments/split-host/) (experimental) | |
-| [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data, sensing to localization<br>`--gpu` runs CenterPoint on CUDA | |
-| [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Closed-loop driving in the CARLA simulator<br>`--role` [splits it across two hosts](https://autowarefoundation.github.io/openadkit/deployments/split-host/) (experimental) | NVIDIA GPU<br>amd64, Humble |
+| [`planning-simulation`](https://autowarefoundation.github.io/openadkit/deployments/planning-simulation/) | Plan and follow a route on a sample map | No GPU |
+| [`scenario-simulation`](https://autowarefoundation.github.io/openadkit/deployments/scenario-simulation/) | Predefined traffic scenarios in Scenario Simulator | No GPU |
+| [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data, sensing to localization | No GPU |
+| [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Closed-loop driving in the CARLA simulator | NVIDIA GPU, amd64, Humble |
 | [`safety-island-simulation`](https://autowarefoundation.github.io/openadkit/deployments/safety-island-simulation/) | Planning Simulation controlled by the Safety Island | amd64 |
+
+With `--gpu`, Planning Simulation plans with the Diffusion Planner (experimental) and Logging Simulation runs CenterPoint on CUDA. With `--role`, Scenario and CARLA Simulation [split across two hosts](https://autowarefoundation.github.io/openadkit/deployments/split-host/) (experimental).
 
 ## Create a Kit
 

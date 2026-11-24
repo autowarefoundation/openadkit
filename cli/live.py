@@ -111,8 +111,12 @@ def running_services(project: str) -> list[str]:
 
 
 def visualizer_address(tls: bool) -> str:
-    """Plain HTTP unless the host settings give noVNC its own certificate."""
-    return f"visualizer: {'https' if tls else 'http'}://localhost:6080/vnc.html"
+    """Plain HTTP unless the host settings give noVNC its own certificate.
+
+    resize=remote makes the desktop follow the browser window: at the VNC
+    server's own 1024x768, RViz's panels leave the 3D view a narrow strip.
+    """
+    return f"visualizer: {'https' if tls else 'http'}://localhost:6080/vnc.html?resize=remote&autoconnect=true"
 
 
 def unhealthy_services(project: str) -> dict[str, str]:

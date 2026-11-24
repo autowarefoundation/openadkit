@@ -27,7 +27,7 @@ body:
       description: The deployment and its options, or your kit's deployment.
       placeholder: planning-simulation --gpu
     validations:
-      required: true
+      required: false
 
   - type: dropdown
     attributes:
@@ -64,16 +64,6 @@ body:
         The relevant part of `openadkit logs`. Remove credentials and personal
         or sensitive data first.
       render: text
-    validations:
-      required: false
-
-  - type: textarea
-    attributes:
-      label: Kit validation
-      description: >-
-        If you use a kit, paste the output of
-        `openadkit validate <deployment> --json`, run in the kit.
-      render: json
     validations:
       required: false
 

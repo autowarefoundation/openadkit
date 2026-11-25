@@ -12,9 +12,10 @@ is required.
 
 ## Requirements
 
-- amd64 host: the pinned Safety Island release ships a `linux/amd64` binary.
+- amd64 or arm64 host: the pinned Safety Island release ships a binary for
+  each.
 - No GPU mode: the deployment's diagnostics graph belongs to the rule-based
-  planner. `validate` and `run` refuse arm64 and `--gpu`.
+  planner. `validate` and `run` refuse `--gpu`.
 
 ## Run
 

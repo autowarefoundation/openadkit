@@ -6,7 +6,7 @@
     "command": ["python3", "/openadkit/checks/drive_to_goal.py"]
   },
   "requirements": {
-    "architectures": ["amd64"],
+    "architectures": ["amd64", "arm64"],
     "rosDistros": ["humble", "jazzy"],
     "gpu": "none"
   },
@@ -26,18 +26,23 @@
       "destinationEnv": "SAFETY_ISLAND_PATH",
       "files": [
         {
-          "path": "actuation_freertos",
-          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/actuation_freertos",
-          "sha256": "4bf02d259f1508e2e66282475ed3c3824237bbfea3a6487b09dca0c1e8181ac7"
+          "path": "actuation_freertos-x86_64",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.4.0/actuation_freertos-x86_64",
+          "sha256": "e69102ac168969a0431e2dfb45230095a6e3cc47e45ce84fb3c40ef6d509a447"
+        },
+        {
+          "path": "actuation_freertos-aarch64",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.4.0/actuation_freertos-aarch64",
+          "sha256": "d962900d5d63058773ee0eda53802f0303b2748ba220cc37e8e43511545e458b"
         },
         {
           "path": "bridge-config.yaml",
-          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/bridge-config.yaml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.4.0/bridge-config.yaml",
           "sha256": "d87d25ce531fa16c200b74c5c7ba542131ed18129920934303460019f7314fd2"
         },
         {
           "path": "cyclonedds-domain2.xml",
-          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/cyclonedds-domain2.xml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.4.0/cyclonedds-domain2.xml",
           "sha256": "5d0b2b1ba647d95f348914346867996d7313bb62a5015ad0fc75c5b0a3f0070b"
         }
       ]

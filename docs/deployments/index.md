@@ -9,7 +9,7 @@ release ships are its catalog. New users should start with Planning Simulation.
 | [Scenario Simulation](scenario-simulation.md) | Run predefined traffic scenarios in Scenario Simulator | No | amd64, arm64 | Yes |
 | [Logging Simulation](logging-simulation.md) | Replay recorded sensor data through sensing, perception and localization | Optional | amd64, arm64 | Yes, in CPU mode |
 | [CARLA Simulation](carla-simulation.md) | Drive in closed loop with the CARLA simulator | Required | amd64 | Exempt |
-| [Safety Island Simulation](safety-island-simulation.md) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller | No | amd64 | Yes |
+| [Safety Island Simulation](safety-island-simulation.md) | Planning Simulation driven by the [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/) controller | No | amd64, arm64 | Yes |
 
 All run on Humble and Jazzy except CARLA Simulation, which is Humble-only, and
 the GPU modes are amd64-only. **CI evidence** says whether a release runs the

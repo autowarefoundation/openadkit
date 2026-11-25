@@ -2395,7 +2395,7 @@ def test_a_deployment_on_a_base_narrows_its_requirements_but_never_widens_them(t
 def test_safety_island_simulation_runs_where_its_release_does():
     kit = cli_catalog.load_catalog(ROOT)
     deployment = cli_catalog.get_deployment(ROOT, kit, "safety-island-simulation")
-    assert deployment.requirements == {"architectures": ["amd64"], "rosDistros": ["humble", "jazzy"], "gpu": "none"}
+    assert deployment.requirements == {"architectures": ["amd64", "arm64"], "rosDistros": ["humble", "jazzy"], "gpu": "none"}
     assert not any(item.get("gpu") for item in deployment.data)
 
 

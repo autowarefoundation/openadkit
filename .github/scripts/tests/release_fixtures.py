@@ -100,7 +100,7 @@ def packager_env(tmp_path):
                f'if [[ "$*" == *"config --environment"* ]]; then exec "{docker}" "$@"; fi\n'
                f'printf "%s|%s\\n" "${{ROS_DISTRO:-}}" "$*" >> "{calls}"\n'
                'if [[ "$*" == *"config --services"* ]]; then\n'
-               "printf '%s\\n' map planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario-simulator carla carla-interface carla-map-loader zenoh-bridge\nfi\n")
+               "printf '%s\\n' map planning vehicle system control simulator api visualizer sensing perception localization rosbag scenario-simulator carla carla-interface zenoh-bridge\nfi\n")
     build = tmp_path / "release-input/build"
     build.mkdir(parents=True)
     metadata = build_metadata()

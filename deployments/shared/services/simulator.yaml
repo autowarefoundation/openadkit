@@ -22,3 +22,4 @@ services:
       use_sim_time:=${USE_SIM_TIME}
       vehicle_info_param_file:=/tmp/openadkit/vehicle_description/config/vehicle_info.param.yaml
       vehicle_model:=${VEHICLE_MODEL}
+      ${SIMULATOR_LAUNCH_ARGS:-}

@@ -18,3 +18,4 @@ services:
       sensor_model:=${SENSOR_MODEL}
       system_run_mode:=${SYSTEM_RUN_MODE}
       use_sim_time:=${USE_SIM_TIME}
+      ${SYSTEM_LAUNCH_ARGS:-}

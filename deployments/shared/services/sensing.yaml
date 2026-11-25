@@ -15,3 +15,4 @@ services:
       sensor_model:=${SENSOR_MODEL}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
+      ${SENSING_LAUNCH_ARGS:-}

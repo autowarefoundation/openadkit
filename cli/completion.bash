@@ -19,7 +19,7 @@ except (ValueError, KeyError, TypeError):
 _openadkit() {
     local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD - 1]}
     local command=${COMP_WORDS[1]:-}
-    local commands="install upgrade setup uninstall list version new validate config fetch run build clean status logs restart shell record stop"
+    local commands="install upgrade setup uninstall list version new validate config settings fetch run build clean status logs restart shell record stop"
     COMPREPLY=()
 
     if ((COMP_CWORD == 1)); then
@@ -35,7 +35,7 @@ _openadkit() {
         --output | --ws)
             mapfile -t COMPREPLY < <(compgen -d -- "${cur}")
             return ;;
-        --role)
+        --role | --service | --set | --unset)
             return ;;
         --version)
             [[ ${command} == install ]] && return ;;
@@ -50,6 +50,7 @@ _openadkit() {
         list | version) options="--json --verbose --help" ;;
         validate) options="--ros-distro --gpu --role --ws --data --json --verbose --help" ;;
         config) options="--ros-distro --gpu --role --ws --verbose --help" ;;
+        settings) options="--ros-distro --gpu --role --ws --service --set --unset --verbose --help" ;;
         fetch) options="--force --verbose --help" ;;
         run) options="--ros-distro --gpu --role --ws --no-visualizer --verify --verbose --help" ;;
         build) options="--ros-distro --verbose --help" ;;
@@ -75,14 +76,14 @@ _openadkit() {
     # option nor an option's value. The commands that act on the running
     # deployment take no name.
     case ${command} in
-        validate | config | fetch | run | clean) ;;
+        validate | config | settings | fetch | run | clean) ;;
         *) return ;;
     esac
     local index word
     for ((index = 2; index < COMP_CWORD; index++)); do
         word=${COMP_WORDS[index]}
         case ${word} in
-            --ros-distro | --role | --output | --ws) ((index++)) ;;
+            --ros-distro | --role | --output | --ws | --service | --set | --unset) ((index++)) ;;
             -*) ;;
             *) return ;;
         esac

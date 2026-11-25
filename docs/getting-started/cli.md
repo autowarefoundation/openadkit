@@ -12,6 +12,7 @@ The commands you need after the first run. `openadkit --help` and
 | [`restart`](#restart) | Apply changed settings, config overrides and overlay workspaces |
 | [`stop`](#runtime-controls) | Stop and remove the running deployment |
 | [`validate`, `config`](#validate-before-running) | Check a deployment, or print its Compose model, without starting it |
+| [`settings`](#settings) | List a deployment's settings and launch arguments, and change them |
 | [`fetch`, `clean`](#downloaded-data) | Download or delete a deployment's data |
 | [`new`, `build`](../kits/create-a-kit.md) | Create a kit and build its overlay workspace |
 | [`setup`](index.md#set-up-the-host) | Install the host dependencies |
@@ -181,6 +182,38 @@ Most settings are arguments of Autoware's launch files, such as
 `VEHICLE_MODEL`; the rest are host paths and options of Open AD Kit's own
 services. To change a node parameter instead, use a
 [config override](../kits/kit-guide.md#2-config-overrides).
+
+```bash
+openadkit settings planning-simulation                     # every setting, where it is set and its value
+openadkit settings planning-simulation --service planning  # planning's launch arguments and what sets them
+openadkit settings planning-simulation --set LATERAL_CONTROLLER_MODE=pid
+openadkit settings planning-simulation --unset LATERAL_CONTROLLER_MODE
+openadkit restart                                          # apply a change to the running deployment
+```
+
+`--set` and `--unset` edit your host settings file, and `--set` refuses a name
+the deployment does not use. A command that reads the settings warns about a
+name in the host settings file that the deployment does not use, such as a
+misspelled one: Compose would ignore it.
+
+Each service that runs `ros2 launch` also takes a `<SERVICE>_LAUNCH_ARGS`
+setting, such as `PLANNING_LAUNCH_ARGS`, with launch arguments that no setting
+passes:
+
+```bash
+openadkit settings planning-simulation --set 'PLANNING_LAUNCH_ARGS=planning_input_objects_topic_name:=/my/objects'
+```
+
+`--service` lists the arguments the service's launch files declare, read from
+its image. `validate`, `run` and `restart` refuse an argument that the
+service's command already passes: change that one through the setting
+`--service` names. They warn about one the launch files do not declare, which
+`ros2 launch` ignores unless a launch file reads it without declaring it.
+
+To try a node parameter on the running deployment, set it with
+`openadkit shell <service> ros2 param set <node> <parameter> <value>`. Only a
+node that applies parameter changes uses the new value, and a restart drops it;
+keep it with a config override.
 
 | Directory | Default | With `OPENADKIT_HOME` |
 | --- | --- | --- |

@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "cli"))
 import catalog as cli_catalog  # noqa: E402
 import compose as cli_compose  # noqa: E402
 import data as cli_data  # noqa: E402
+import launch_args as cli_launch_args  # noqa: E402
 import live as cli_live  # noqa: E402
 import manifest as cli_manifest  # noqa: E402
 import settings as cli_settings  # noqa: E402
@@ -2808,3 +2809,151 @@ def test_a_kit_deployment_cannot_take_a_release_deployments_name(tmp_path):
     (kit / "deployments/custom").rename(kit / "deployments/example")
     result = run_cli(root, "validate", directory=kit)
     assert result.returncode != 0 and "kit deployment example has the name of a deployment of" in result.stderr
+
+
+def test_show_args_gives_each_arguments_default_and_description():
+    text = """Arguments (pass arguments as '<name>:=<value>'):
+
+    'module_preset':
+        no description given
+        (default: 'default')
+
+    'planning_setting':
+        planning setting diffusion_planner / rule_based
+        (default: 'rule_based')
+
+    'param_path':
+        no description given
+        (default: LaunchConfig('config_dir') + '/x.param.yaml')
+
+    'vehicle_model':
+        vehicle model
+"""
+    assert cli_launch_args.parse_show_args(text) == {
+        "module_preset": ("default", ""),
+        "planning_setting": ("rule_based", "planning setting diffusion_planner / rule_based"),
+        "param_path": ("LaunchConfig('config_dir') + '/x.param.yaml'", ""),
+        "vehicle_model": (None, "vehicle model"),
+    }
+
+
+def test_host_settings_edits_keep_the_other_lines(tmp_path):
+    path = tmp_path / "example.env"
+    path.write_text("# mine\nA=1\nB=2\nA=3\n")
+    deployment = types.SimpleNamespace(host_settings=path)
+    cli_settings.edit_host_settings(deployment, {"A": "new", "C": "x y"}, ["B"])
+    # A setting stays where it was set first, once; a value with spaces is quoted.
+    assert path.read_text() == "# mine\nA=new\nC='x y'\n"
+    with pytest.raises(cli_manifest.OpenADKitError, match="does not set B"):
+        cli_settings.edit_host_settings(deployment, {}, ["B"])
+    with pytest.raises(cli_manifest.OpenADKitError, match="yourself"):
+        cli_settings.edit_host_settings(deployment, {"A": "it's"}, [])
+
+
+def test_a_host_setting_nothing_reads_is_warned_about(tmp_path):
+    root, directory = runtime_tree(tmp_path, config="MAP_PATH=$HOME/data/map\nVALUE=base\n")
+    (directory / "compose.yaml").write_text("services:\n  app:\n    image: busybox:1.36.1\n    command: echo ${USED:-x}\n")
+    host_settings(root, "USED=1\nVALUE=2\nVALEU=3\n")
+    fake_docker(tmp_path)
+    result = run_cli(root, "validate", "example")
+    assert result.returncode == 0, result.stderr
+    assert "example.env sets VALEU, which example does not use" in result.stderr
+    # --set refuses such a name rather than writing it.
+    result = run_cli(root, "settings", "example", "--set", "VALUS=1")
+    assert result.returncode == 1 and "example has no setting VALUS" in result.stderr
+
+
+def launch_model(launch_args):
+    """A Compose model as the CLI resolves it, and as it resolves it with each setting a marker."""
+    def services(preset, planning_args, map_args):
+        return {
+            "planning": {"image": "planning-image", "command": [
+                "ros2", "launch", "autoware_launch", "component_planning.launch.xml",
+                f"module_preset:={preset}", "data_path:=/data", *planning_args]},
+            "map": {"image": "map-image", "command": [
+                "ros2", "launch", cli_launch_args.WRAPPER, "component:=component_map", *map_args]},
+            # A kit's own launch without the setting, and a service without a command.
+            "probe": {"image": "probe-image", "command": ["ros2", "launch", "acme", "probe.launch.xml"]},
+            "visualizer": {"image": "visualizer-image"},
+        }
+    return (services("default", launch_args.split(), []),
+            services("/@PLANNING_MODULE_PRESET@", ["/@PLANNING_LAUNCH_ARGS@"], ["/@MAP_LAUNCH_ARGS@"]))
+
+
+def launch_selection(tmp_path, monkeypatch, launch_args="", environment=None):
+    model, probe = launch_model(launch_args)
+    compose_file = tmp_path / "planning.yaml"
+    compose_file.write_text("command: >\n  module_preset:=${PLANNING_MODULE_PRESET}\n  ${PLANNING_LAUNCH_ARGS:-}\n")
+    monkeypatch.setattr(cli_launch_args, "_services",
+                        lambda deployment, selection: probe if selection.injections else model)
+    monkeypatch.setattr(cli_launch_args, "configuration_environment",
+                        lambda deployment, gpu: {"PLANNING_MODULE_PRESET": "default"})
+    monkeypatch.setattr(cli_settings, "setting_files", lambda deployment: [compose_file])
+    monkeypatch.setattr(cli_launch_args, "declared",
+                        lambda service: {"planning_input_objects_topic_name": (None, "")})
+    monkeypatch.setattr(cli_launch_args, "image_present", lambda image: True)
+    monkeypatch.setattr(cli_launch_args, "run_compose", lambda *args, **options: None)
+    deployment = types.SimpleNamespace(name="example")
+    environment = {"PLANNING_LAUNCH_ARGS": launch_args} if environment is None else environment
+    return deployment, cli_settings.Selection("humble", False, None, {}, environment)
+
+
+def test_launch_services_show_which_setting_passes_which_argument(tmp_path, monkeypatch):
+    services = cli_launch_args.launch_services(*launch_selection(tmp_path, monkeypatch))
+    assert set(services) == {"planning", "map"}
+    planning = services["planning"]
+    assert planning.setting == "PLANNING_LAUNCH_ARGS"
+    assert planning.fixed == {"module_preset": "PLANNING_MODULE_PRESET", "data_path": None}
+    assert planning.launch == ["autoware_launch", "component_planning.launch.xml"]
+    # The wrapper includes its component, so --show-args reads the component.
+    assert services["map"].launch == ["autoware_launch", "component_map.launch.xml"]
+
+
+@pytest.mark.parametrize("value, error, warning", [
+    ("planning_input_objects_topic_name:=/my/objects", None, None),
+    ("module_preset:=x", "planning already passes module_preset; set PLANNING_MODULE_PRESET instead", None),
+    ("data_path:=/x", "planning already passes data_path; Open AD Kit sets it", None),
+    ("oops", "'oops' is not name:=value", None),
+    ("unbalanced:='x", "No closing quotation", None),
+    # --show-args misses an argument a launch file reads without declaring it.
+    ("no_such_argument:=1", None, "the launch files of planning declare no no_such_argument"),
+])
+def test_launch_args_pass_only_arguments_no_setting_passes(tmp_path, monkeypatch, capsys, value, error, warning):
+    deployment, selection = launch_selection(tmp_path, monkeypatch, value)
+    if error:
+        with pytest.raises(cli_manifest.OpenADKitError, match=re.escape(error)):
+            cli_launch_args.check(deployment, selection, pull=True)
+    else:
+        cli_launch_args.check(deployment, selection, pull=True)
+    stderr = capsys.readouterr().err
+    assert warning in stderr if warning else "warning" not in stderr
+
+
+def test_launch_args_exported_in_the_shell_are_checked_too(tmp_path, monkeypatch):
+    # Compose takes a value no env file sets from the shell.
+    deployment, selection = launch_selection(tmp_path, monkeypatch, environment={})
+    monkeypatch.setenv("PLANNING_LAUNCH_ARGS", "module_preset:=x")
+    with pytest.raises(cli_manifest.OpenADKitError, match="already passes module_preset"):
+        cli_launch_args.check(deployment, selection, pull=True)
+
+
+def test_known_settings_follow_the_files_a_deployment_includes(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    root, directory = runtime_tree(tmp_path)
+    (directory / "compose.yaml").write_text(
+        "services:\n  app:\n    image: busybox:1.36.1\n    command: echo ${BASE_SETTING:-base} $${CONTAINER_ONLY}\n")
+    kit_root = extending_kit(tmp_path, root)
+    (kit_root / "services").mkdir()
+    (kit_root / "services/ota.yaml").write_text(
+        "services:\n  ota:\n    image: busybox:1.36.1\n    command: echo ${OTA_SETTING}\n")
+    (kit_root / "unused.yaml").write_text("services:\n  other:\n    command: echo ${OTHER_SETTING}\n")
+    (kit_root / "deployments/custom/compose.yaml").write_text(
+        "include:\n  - ${OPENADKIT_BASE_DEPLOYMENT}/compose.yaml\n  - ../../services/ota.yaml\n")
+    deployment = cli_catalog.get_deployment(kit_root, cli_catalog.load_catalog(kit_root), "custom")
+    known = cli_settings.known_settings(deployment)
+    assert known["BASE_SETTING"] == "base" and known["VALUE"] is None and "OTA_SETTING" in known
+    assert not {"CONTAINER_ONLY", "OTHER_SETTING"} & known.keys()
+    deployment.host_settings.parent.mkdir(parents=True)
+    deployment.host_settings.write_text("OTA_SETTING=1\nBASE_SETING=2\nROS_DISTRO=jazzy\n")
+    # A misspelled name, and one the CLI sets itself.
+    assert cli_settings.unused_host_settings(deployment, pinned=False) == ["BASE_SETING", "ROS_DISTRO"]

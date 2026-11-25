@@ -24,3 +24,4 @@ services:
       scenario_simulation:=${SCENARIO_SIMULATION}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
+      ${API_LAUNCH_ARGS:-}

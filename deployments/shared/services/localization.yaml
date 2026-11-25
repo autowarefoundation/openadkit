@@ -16,3 +16,4 @@ services:
       system_run_mode:=${SYSTEM_RUN_MODE}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
+      ${LOCALIZATION_LAUNCH_ARGS:-}

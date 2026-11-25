@@ -27,8 +27,8 @@
       "files": [
         {
           "path": "lanelet2_map.osm",
-          "source": "data/lanelet2_map.osm",
-          "sha256": "5fe0f15b9c40b12eea973bf2e67209b622a1003ecf5327c353b64b1c94c9bf6a"
+          "url": "https://bitbucket.org/carla-simulator/autoware-contents/raw/062f94b5322e679ee0430e2daa6995dca9f7f0ea/maps/vector_maps/lanelet2/Town01.osm",
+          "sha256": "5e3c0873004666a399494a59048b93ecfbd1d40433c29d29e7319847a2a8afa2"
         },
         {
           "path": "pointcloud_map.pcd",

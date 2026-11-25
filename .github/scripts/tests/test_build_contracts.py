@@ -17,6 +17,7 @@ sys.path[:0] = [str(ROOT / "cli"), str(ROOT / ".github/scripts")]
 import build as matrices  # noqa: E402
 import catalog  # noqa: E402
 import compose  # noqa: E402
+import launch_args  # noqa: E402
 import settings  # noqa: E402
 
 INVENTORY = json.loads((ROOT / ".github/image-inventory.json").read_text())
@@ -183,6 +184,17 @@ def compose_context(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENADKIT_KIT", raising=False)
     monkeypatch.delenv("OPENADKIT_DELEGATED", raising=False)
     return catalog.load_catalog(ROOT)
+
+
+@pytest.mark.parametrize("name", sorted(path.parent.name for path in (ROOT / "deployments").glob("*/deployment.json")))
+def test_every_ros2_launch_service_takes_its_launch_args_setting(compose_context, name):
+    # <SERVICE>_LAUNCH_ARGS passes the launch arguments no setting passes; a
+    # launch without it leaves them out of reach.
+    deployment = catalog.get_deployment(ROOT, compose_context, name)
+    selection = settings.resolve(deployment, compose_context, "humble", False)
+    model = json.loads(compose.run_compose(deployment, selection, ["config", "--format", "json"]).stdout)["services"]
+    launched = {service for service, value in model.items() if (value.get("command") or [])[:2] == ["ros2", "launch"]}
+    assert launched and set(launch_args.launch_services(deployment, selection)) == launched
 
 
 def test_third_party_services_stay_in_the_deployments_that_use_them():

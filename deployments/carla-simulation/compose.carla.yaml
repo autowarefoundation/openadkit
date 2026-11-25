@@ -74,6 +74,7 @@ services:
       carla_map:=${CARLA_WORLD}
       sensor_kit_name:=carla_sensor_kit_description
       sensor_mapping_file:=/autoware_config/sensor_mapping.yaml
+      ${CARLA_INTERFACE_LAUNCH_ARGS:-}
 
   carla-map-loader:
     image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}

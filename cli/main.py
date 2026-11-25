@@ -17,6 +17,7 @@ from typing import Any, NoReturn
 
 import compose
 import data
+import launch_args
 import live
 import settings
 from catalog import (
@@ -387,6 +388,15 @@ def warn_unread_kit_files(root: Path, deployments: tuple[str, ...]) -> None:
         print(f"warning: this kit does not read {item}", file=sys.stderr)
 
 
+def warn_unused_host_settings(deployment: Deployment, catalog: Catalog) -> None:
+    unused = settings.unused_host_settings(deployment, catalog.pinned)
+    if unused:
+        print(
+            f"warning: {deployment.host_settings} sets {', '.join(unused)}, which {deployment.name} does not use",
+            file=sys.stderr,
+        )
+
+
 def warn_if_modified(root, deployment, catalog) -> None:
     if deployment_modified(root, deployment, catalog):
         print(
@@ -492,6 +502,19 @@ def validate_arguments(parser: argparse.ArgumentParser) -> None:
         "--data", action="store_true", help="also check that the deployment's downloaded data is complete"
     )
     json_argument(parser)
+
+
+def settings_arguments(parser: argparse.ArgumentParser) -> None:
+    selection_arguments(parser)
+    parser.add_argument(
+        "--service", metavar="SERVICE", help="list the launch arguments this service accepts and what sets them"
+    )
+    parser.add_argument(
+        "--set", action="append", default=[], metavar="NAME=VALUE", help="set a setting in the host settings file"
+    )
+    parser.add_argument(
+        "--unset", action="append", default=[], metavar="NAME", help="remove a setting from the host settings file"
+    )
 
 
 def fetch_arguments(parser: argparse.ArgumentParser) -> None:
@@ -643,6 +666,7 @@ def select(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.
         warn_unread_kit_files(root, tuple(catalog.deployments))
     if getattr(args, "ws", None):
         deployment.use_workspace(Path(args.ws).expanduser().resolve())
+    warn_unused_host_settings(deployment, catalog)
     compose.ensure_runtime_user()
     return settings.resolve(
         deployment, catalog, getattr(args, "ros_distro", None), getattr(args, "gpu", False),
@@ -661,6 +685,7 @@ def check_deployment(deployment: Deployment, catalog: Catalog, selection: Select
 def validate_command(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.Namespace) -> int:
     selection = select(root, catalog, deployment, args)
     check_deployment(deployment, catalog, selection)
+    launch_args.check(deployment, selection, pull=False)
     results = data.check_installed_data(deployment, selection) if args.data else None
     if args.json_output:
         print(json.dumps({
@@ -690,6 +715,87 @@ def validate_command(root: Path, catalog: Catalog, deployment: Deployment, args:
 def config_command(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.Namespace) -> int:
     selection = select(root, catalog, deployment, args)
     print(compose.run_compose(deployment, selection, ["config", "--format", "json"]).stdout, end="")
+    return 0
+
+
+# Settings shown as set or not, never by value.
+SECRET_SETTING_PARTS = ("PASSWORD", "SECRET", "TOKEN")
+
+
+def shown_path(root: Path, path: Path) -> str:
+    if path.is_relative_to(root):
+        return str(path.relative_to(root))
+    return f"~/{path.relative_to(Path.home())}" if path.is_relative_to(Path.home()) else str(path)
+
+
+def settings_command(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.Namespace) -> int:
+    if args.set or args.unset:
+        if args.service:
+            raise UsageError("--service lists a service's launch arguments; it does not combine with --set or --unset")
+        return edit_settings(root, catalog, deployment, args)
+    selection = select(root, catalog, deployment, args)
+    services = launch_args.launch_services(deployment, selection)
+    if args.service:
+        service = services.get(args.service)
+        if service is None:
+            raise UsageError(
+                f"{deployment.name} has no service {args.service} that takes launch arguments; "
+                f"these do: {', '.join(services)}"
+            )
+        _print_table(("ARGUMENT", "DEFAULT", "SET BY", "DESCRIPTION"), [
+            (name, "" if default is None else default, service.fixed.get(name) or ("Open AD Kit" if name in service.fixed else ""), description)
+            for name, (default, description) in sorted(launch_args.declared(service).items())
+        ])
+        print(f"\npass one that no setting sets: openadkit settings {deployment.name} --set '{service.setting}=NAME:=VALUE ...'")
+        return 0
+    sources = settings.setting_sources(deployment, selection.gpu)
+    defaults = settings.known_settings(deployment, catalog.pinned)
+    rows = []
+    # A setting no env file sets keeps the default its Compose file gives it.
+    names = {*sources, *(name for name, default in defaults.items() if default is not None)}
+    for name in sorted(name for name in names if not name.endswith("_LAUNCH_ARGS")):
+        value = selection.environment[name] if name in sources else defaults.get(name) or ""
+        if value and any(part in name for part in SECRET_SETTING_PARTS):
+            value = "(set)"
+        rows.append((name, shown_path(root, sources[name]) if name in sources else "default", value))
+    _print_table(("SETTING", "SET IN", "VALUE"), rows)
+    print()
+    _print_table(
+        ("SERVICE", "LAUNCH ARGUMENTS SETTING", "VALUE"),
+        [(service.name, service.setting, launch_args.passthrough_value(selection, service.setting))
+         for service in services.values()],
+    )
+    print(f"\nlist a service's launch arguments: openadkit settings {deployment.name} --service SERVICE")
+    print(f"change a setting: openadkit settings {deployment.name} --set NAME=VALUE, then openadkit restart")
+    return 0
+
+
+def edit_settings(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.Namespace) -> int:
+    """--set and --unset: edit the host settings file, refusing a name the deployment does not use."""
+    assignments = {}
+    for item in args.set:
+        name, separator, value = item.partition("=")
+        if not separator or not settings.SETTING_NAME.fullmatch(name):
+            raise UsageError(f"--set takes NAME=VALUE, got {item!r}")
+        assignments[name] = value
+    unknown = sorted(set(assignments).difference(settings.known_settings(deployment, catalog.pinned)))
+    if unknown:
+        raise OpenADKitError(
+            f"{deployment.name} has no setting {', '.join(unknown)}; list them with: openadkit settings {deployment.name}"
+        )
+    path = deployment.host_settings
+    before = path.read_text() if path.is_file() else None
+    settings.edit_host_settings(deployment, assignments, args.unset)
+    if any(name.endswith("_LAUNCH_ARGS") for name in assignments):
+        try:
+            launch_args.check(deployment, select(root, catalog, deployment, args), pull=False)
+        except BaseException:
+            if before is None:
+                path.unlink()
+            else:
+                path.write_text(before)
+            raise
+    print(f"updated {shown_path(root, path)}; a running deployment applies it with: openadkit restart")
     return 0
 
 
@@ -750,6 +856,7 @@ def run_command(root: Path, catalog: Catalog, deployment: Deployment, args: argp
     model = prepare_host(deployment, selection)
     skipped = services &({"visualizer"} if args.no_visualizer else set())
     compose.require_local_images(catalog, selection, model, services - skipped)
+    launch_args.check(deployment, selection, pull=True)
     compose.write_run_state(deployment.project_name(selection.role), {
         "schemaVersion": 1,
         "cli": str(root_path()),
@@ -797,6 +904,7 @@ def clean_command(root: Path, catalog: Catalog, deployment: Deployment, args: ar
     if not deployment.data:
         print("no data resources declared")
         return 0
+    warn_unused_host_settings(deployment, catalog)
     selection = settings.resolve(deployment, catalog, data_only=True)
     installed = data.check_installed_data(deployment, selection)
     compose.require_stopped(deployment)
@@ -883,8 +991,10 @@ def restart_command(args: argparse.Namespace) -> int:
     deployment = get_deployment(root, catalog, state["deployment"])
     if state["workspace"]:
         deployment.use_workspace(Path(state["workspace"]))
+    warn_unused_host_settings(deployment, catalog)
     selection = settings.resolve(deployment, catalog, state["rosDistro"], state["gpu"], role=state["role"])
     compose.check_overlay_build(deployment, selection, catalog.devel_image(selection.ros_distro))
+    launch_args.check(deployment, selection, pull=True)
     running = set(live.running_services(project))
     if args.all_services:
         # A service run skipped stays out until it has a container, even a stopped one.
@@ -948,6 +1058,10 @@ COMMANDS = {
     "config": Command(
         "deployment", "print a deployment's resolved Compose model as JSON", config_command, selection_arguments
     ),
+    "settings": Command(
+        "deployment", "list or change a deployment's settings and the launch arguments they pass",
+        settings_command, settings_arguments,
+    ),
     "fetch": Command("deployment", "download deployment data", fetch_command, fetch_arguments),
     "run": Command("deployment", "fetch data and start a deployment", run_command, run_arguments),
     "build": Command(
@@ -977,7 +1091,7 @@ COMMANDS = {
 # wrote must not start a download or a program it names there. They run with
 # the pinned release only when it is installed, so an older openadkit never
 # has to read a newer release's manifests.
-ACTING_COMMANDS = frozenset({"validate", "config", "fetch", "run", "build", "clean"})
+ACTING_COMMANDS = frozenset({"validate", "config", "settings", "fetch", "run", "build", "clean"})
 READING_COMMANDS = frozenset({"list", "version", "new"})
 # Without a deployment name, these act on every deployment of the kit around them.
 ALL_DEPLOYMENTS_COMMANDS = frozenset({"validate", "fetch"})

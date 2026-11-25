@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import os
+import re
 import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -29,6 +30,102 @@ COMPOSE_CONTROL_ENV = {
 
 # What Compose adds to `config --environment` on its own.
 COMPOSE_OWN_SETTINGS = {"COMPOSE_PROJECT_NAME", "PWD"}
+
+SETTING_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# An assignment in an env file.
+SETTING_LINE = re.compile(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
+# A name Compose interpolates, ${NAME}, with the default of ${NAME:-default}
+# or ${NAME-default}. $${NAME} is the container's own variable.
+REFERENCE = re.compile(r"(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*)\})?")
+# A file a Compose or env file names: what it includes, extends, loads or mounts.
+FILE_REFERENCE = re.compile(r"[\w${}./-]+\.(?:ya?ml|env)\b")
+# A value the host settings file holds without quotes.
+PLAIN_VALUE = re.compile(r"[A-Za-z0-9_./:@%+,=-]*")
+
+
+def defined_names(path: Path) -> list[str]:
+    """The settings an env file assigns, in order."""
+    return [match.group(1) for line in path.read_text().splitlines() if (match := SETTING_LINE.match(line))]
+
+
+def setting_sources(deployment: Deployment, gpu: bool) -> dict[str, Path]:
+    """The env file that sets each setting: the last one, as Compose reads them."""
+    return {name: path for path in deployment.env_files(gpu) for name in defined_names(path)}
+
+
+def setting_files(deployment: Deployment) -> set[Path]:
+    """The deployment's env files and Compose files, for every role and GPU
+    mode, and every file they include, extend, load or mount, the host
+    settings file aside."""
+    todo = [path for path in deployment.env_files(True) if path != deployment.host_settings]
+    todo += {
+        path for role in (None, *deployment.roles) for gpu in (False, True)
+        for path in deployment.compose_files(gpu, role)
+    }
+    found: set[Path] = set()
+    while todo:
+        path = todo.pop()
+        if path in found or not path.is_file():
+            continue
+        found.add(path)
+        for reference in FILE_REFERENCE.findall(path.read_text(errors="ignore")):
+            # A kit includes its base's Compose file through the base's directory.
+            for name, value in deployment.kit_environment.items():
+                reference = reference.replace(f"${{{name}}}", value)
+            todo.append((path.parent / reference).resolve())
+    return found
+
+
+def known_settings(deployment: Deployment, pinned: bool = False) -> dict[str, str | None]:
+    """Every setting the deployment's env files set or its Compose files
+    read, with the default a Compose file gives it, if one does. Not those
+    the CLI sets itself, nor, in a release, the images it pins."""
+    env_files = [path for path in deployment.env_files(True) if path != deployment.host_settings]
+    known: dict[str, str | None] = {name: None for path in env_files for name in defined_names(path)}
+    for path in setting_files(deployment):
+        for match in REFERENCE.finditer(path.read_text(errors="ignore")):
+            if known.get(match.group(1)) is None:
+                known[match.group(1)] = match.group(2)
+    return {
+        name: default for name, default in known.items()
+        if name != "ROS_DISTRO" and not name.startswith("OPENADKIT_") and not (pinned and name.endswith("_IMAGE"))
+    }
+
+
+def unused_host_settings(deployment: Deployment, pinned: bool) -> list[str]:
+    """Host settings that nothing of the deployment reads: misspelled, meant
+    for another deployment, or set by the CLI. Compose ignores them without a word."""
+    host = deployment.host_settings
+    if not host.is_file():
+        return []
+    known = known_settings(deployment, pinned)
+    return [name for name in defined_names(host) if name not in known]
+
+
+def edit_host_settings(deployment: Deployment, assignments: dict[str, str], removals: list[str]) -> Path:
+    """Set and remove settings in the host settings file, keeping its other lines."""
+    path = deployment.host_settings
+    lines = path.read_text().splitlines() if path.is_file() else []
+
+    def assigns(line: str, name: str) -> bool:
+        match = SETTING_LINE.match(line)
+        return match is not None and match.group(1) == name
+
+    for name in removals:
+        if not any(assigns(line, name) for line in lines):
+            raise OpenADKitError(f"{path} does not set {name}")
+        lines = [line for line in lines if not assigns(line, name)]
+    for name, value in assignments.items():
+        # Compose reads none of these right inside single quotes.
+        if re.search(r"['\\\n]", value):
+            raise OpenADKitError(f"{name}: put a value with a quote, backslash or line break in {path} yourself")
+        entry = f"{name}={value}" if PLAIN_VALUE.fullmatch(value) else f"{name}='{value}'"
+        index = next((index for index, line in enumerate(lines) if assigns(line, name)), len(lines))
+        lines = [line for line in lines if not assigns(line, name)]
+        lines.insert(index, entry)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(f"{line}\n" for line in lines))
+    return path
 
 
 def compose_environment(files: Iterable[Path], environment: dict[str, str], cwd: Path) -> dict[str, str]:

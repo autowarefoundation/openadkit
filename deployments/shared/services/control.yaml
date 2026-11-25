@@ -16,3 +16,4 @@ services:
       use_sim_time:=${USE_SIM_TIME}
       vehicle_id:=${VEHICLE_ID}
       vehicle_model:=${VEHICLE_MODEL}
+      ${CONTROL_LAUNCH_ARGS:-}

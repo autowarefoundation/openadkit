@@ -16,3 +16,4 @@ services:
       planning_setting:=${PLANNING_SETTING:-rule_based}
       use_sim_time:=${USE_SIM_TIME}
       vehicle_model:=${VEHICLE_MODEL}
+      ${PLANNING_LAUNCH_ARGS:-}

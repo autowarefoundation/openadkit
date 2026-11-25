@@ -1,0 +1,2498 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The deployment layer for the Autoware ecosystem: packaging its software into reproducible deployments, built for the path from simulation to in-vehicle systems.">
+      
+      
+      
+        <link rel="canonical" href="https://autowarefoundation.github.io/openadkit/kits/kit-guide/">
+      
+      
+        <link rel="prev" href="../new-vehicle/">
+      
+      
+        <link rel="next" href="../reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/autoware-foundation.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Kit Guide - Open AD Kit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/css/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kit-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+              <button class="md-banner__button md-icon" aria-label="Don't show this again">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            
+            
+  <a href="../../getting-started/">
+    <svg class="oak-banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27zM5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M19.22 4c.28 0 .53 0 .74.05.17 1.39-.02 4.25-3.3 7.53-1.7 1.71-3.73 3.02-6.01 3.89l-2.15-2.1c.92-2.31 2.23-4.34 3.92-6.03C15.18 4.58 17.64 4 19.22 4m0-2c-1.98 0-4.98.69-8.22 3.93-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.38.38.89.61 1.42.61.23 0 .47-.06.7-.15A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61S20.7 2 19.22 2m-4.68 7.46c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83s-2.05.78-2.83 0m-5.66 7.07-1.41-1.41zM6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22zM2 22h1.41l4.77-4.76-1.42-1.41L2 20.59zm0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76z"/></svg>
+    New here? Follow the <strong>Getting Started</strong> guide to run your first deployment
+  </a>
+
+          </div>
+          
+            <script>var el=document.querySelector("[data-md-component=announce]");if(el){var content=el.querySelector(".md-typeset");__md_hash(content.innerHTML)===__md_get("__announce")&&(el.hidden=!0)}</script>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Open AD Kit" class="md-header__button md-logo" aria-label="Open AD Kit" data-md-component="logo">
+      
+  <img src="../../assets/images/autoware-foundation.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Open AD Kit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Kit Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/autowarefoundation/openadkit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  
+    
+  
+  Introduction
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../deployments/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Deployments
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../create-a-kit/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Kits
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../platforms/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Platforms
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../releases/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Releases
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/build-from-source/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Open AD Kit" class="md-nav__button md-logo" aria-label="Open AD Kit" data-md-component="logo">
+      
+  <img src="../../assets/images/autoware-foundation.png" alt="logo">
+
+    </a>
+    Open AD Kit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/autowarefoundation/openadkit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../.." class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Introduction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI & Maintenance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../deployments/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployments
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/planning-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/scenario-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenario Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/logging-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/carla-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CARLA Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/safety-island-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety Island Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/split-host/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Split-host Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployments/components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kits
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kits
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../create-a-kit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create a Kit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../develop-and-debug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Develop and Debug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../new-vehicle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A New Vehicle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kit Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kit Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pin-the-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin the Release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-a-base-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a Base Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose a Base Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-applies-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Applies Where
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Extension Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-config-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Config Overrides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-overlay-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Overlay Workspace
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-extra-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Extra Services
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-image-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Image Replacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation and Evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-without-losing-your-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade Without Losing Your Work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-designs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference Designs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference Designs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-goes-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Goes Where
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manifest and Output Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../platforms/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platforms
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platforms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platforms/autosd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AutoSD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../releases/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/container-images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/compatibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../releases/verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verify a Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/build-from-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build from Source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/release-process/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pin-the-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin the Release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-a-base-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose a Base Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choose a Base Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-applies-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Applies Where
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Extension Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-config-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Config Overrides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-overlay-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Overlay Workspace
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-extra-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Extra Services
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-image-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Image Replacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation and Evidence
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade-without-losing-your-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade Without Losing Your Work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-designs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference Designs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference Designs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-goes-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Goes Where
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/autowarefoundation/openadkit/edit/main/docs/kits/kit-guide.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="kit-guide">Kit Guide<a class="headerlink" href="#kit-guide" title="Permanent link">#</a></h1>
+<p>The reference for a kit: what it pins, each extension point, and how it is
+validated and upgraded. A kit owns its differences; Open AD Kit owns the
+CLI, the images and the catalog. Start one with <code>openadkit new</code>
+(<a href="../create-a-kit/">Create a Kit</a>).</p>
+<h2 id="pin-the-release">Pin the Release<a class="headerlink" href="#pin-the-release" title="Permanent link">#</a></h2>
+<p>In the kit's <code>openadkit.json</code>, <code>kind</code> is <code>kit</code> and <code>extends</code> names a published
+release tag or, for development, the path of a source checkout. The kit's
+<code>openadkit.json</code> has <code>schemaVersion: 2</code>.</p>
+<ul>
+<li><strong>The pinned release runs the kit.</strong> The CLI finds it under
+  <code>~/.local/share/openadkit/openadkit-&lt;tag&gt;</code> (<code>releases/</code> under
+  <code>OPENADKIT_HOME</code> when set) and hands the command to its launcher. A missing version is
+  downloaded and verified on first use, as a build tool's wrapper does; your
+  active <code>openadkit</code> stays as it is.</li>
+<li><strong>Only the commands that act on a kit download it:</strong> <code>validate</code>, <code>config</code>,
+  <code>fetch</code>, <code>run</code>, <code>build</code> and <code>clean</code>. <code>list</code>, <code>version</code> and Tab completion
+  run with the pinned release when it is installed; while it is missing, they
+  stop and name it. <code>--help</code> is always that of the CLI you called. A directory
+  you only look at starts no download and no program that it names.</li>
+<li><strong>One level of <code>extends</code>:</strong> a kit extends Open AD Kit, not another kit.</li>
+</ul>
+<h2 id="choose-a-base-deployment">Choose a Base Deployment<a class="headerlink" href="#choose-a-base-deployment" title="Permanent link">#</a></h2>
+<p>Each deployment of a kit names a <code>base</code> deployment of the pinned release in
+its entry of the kit's <code>openadkit.json</code>:
+<code>"deployments": { "&lt;name&gt;": { "base": "planning-simulation" } }</code>. The entry may
+also hold <code>description</code>, <code>requirements</code>, <code>data</code>, <code>verify</code> and <code>waitTimeout</code>;
+the <a href="../reference/#deployment-entry">reference</a> lists their fields.</p>
+<ul>
+<li><strong>Requirements</strong> (architectures, ROS distros, GPU) are inherited.
+  <code>requirements</code> may narrow them: fewer architectures or ROS distros, or <code>gpu</code>
+  set to <code>none</code> or <code>required</code> where the base leaves it optional. It never
+  widens them, since the kit runs the base's services. Without a GPU mode, the
+  base's GPU-only downloads are left out.</li>
+<li><strong>Downloads and one-shot services</strong> are inherited. A kit can add downloads
+  and one-shot services of its own. A download whose <code>destinationEnv</code> a base's
+  download has, such as <code>ROSBAG_PATH</code>, replaces that one. Set that variable in
+  the deployment's own <code>deployments/&lt;name&gt;/settings.env</code> too, so the download
+  gets a directory of its own.</li>
+<li><strong>Split-host roles are not inherited:</strong> a kit deployment runs on one host.</li>
+</ul>
+<h3 id="what-applies-where">What Applies Where<a class="headerlink" href="#what-applies-where" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Files</th>
+<th>At the kit root</th>
+<th>In <code>deployments/&lt;name&gt;/</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>settings.env</code>, <code>settings.gpu.env</code></td>
+<td>Every deployment</td>
+<td>That deployment, after the kit's</td>
+</tr>
+<tr>
+<td><code>config/autoware/</code></td>
+<td>Every deployment</td>
+<td>That deployment, after the kit's</td>
+</tr>
+<tr>
+<td><code>overlay_ws/</code></td>
+<td>Every deployment</td>
+<td>Not read</td>
+</tr>
+<tr>
+<td><code>compose.yaml</code></td>
+<td>Not read</td>
+<td>That deployment's services</td>
+</tr>
+</tbody>
+</table>
+<p>The CLI warns about a <code>compose.yaml</code> at the kit root and about a directory
+under <code>deployments/</code> that holds a deployment's files but matches no name in
+<code>openadkit.json</code>.</p>
+<p>The kit root is your vehicle's layer. A setting or a parameter that a
+deployment does not use does no harm there. A Compose file is different: a
+service depends on other services, and not every base has them, so each
+deployment has its own. A deployment's name is also its Compose project, its
+host settings file and its output directory, so keep it unique among the kits
+on one host.</p>
+<h2 id="extension-points">Extension Points<a class="headerlink" href="#extension-points" title="Permanent link">#</a></h2>
+<h3 id="1-settings">1. Settings<a class="headerlink" href="#1-settings" title="Permanent link">#</a></h3>
+<p>Put only differences in the kit's <code>settings.env</code>, and what one deployment alone
+needs in <code>deployments/&lt;name&gt;/settings.env</code>. Compose reads these files in order
+(later files win); each <code>settings.gpu.env</code> follows its <code>settings.env</code> when GPU
+mode is selected:</p>
+<ol>
+<li>The base's <code>settings.env</code></li>
+<li>The kit's <code>settings.env</code>, if present</li>
+<li>The deployment's <code>settings.env</code>, if present</li>
+<li>The host settings file, <code>~/.config/openadkit/&lt;deployment&gt;.env</code>, if present</li>
+</ol>
+<p>Shell exports do not override values set in these files. The CLI adds the ROS
+distro, the host UID and GID, the config override and overlay workspace mounts,
+<code>OPENADKIT_ROOT</code> (the release's root), <code>OPENADKIT_BASE_DEPLOYMENT</code> (the
+directory of the <code>base</code> deployment) and <code>OPENADKIT_KIT</code> (the kit's root); a
+release's component and external images stay pinned. Inside the containers, the
+ROS and DDS defaults come from the base services' <code>runtime.env</code>.</p>
+<p>A setting that names a file of the kit builds its path on <code>OPENADKIT_KIT</code>. A
+relative path would resolve inside the release, next to the base's Compose
+file:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">SCENARIO_HOST_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">OPENADKIT_KIT</span><span class="si">}</span>/scenarios
+</code></pre></div>
+<h3 id="2-config-overrides">2. Config Overrides<a class="headerlink" href="#2-config-overrides" title="Permanent link">#</a></h3>
+<p>Store overrides under
+<code>config/autoware/&lt;package&gt;/&lt;path-relative-to-package-share&gt;</code> at the kit root,
+or in <code>deployments/&lt;name&gt;/</code> for one deployment. For example,
+<code>config/autoware/autoware_control_config/config/lane_departure_checker/lane_departure_checker.param.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">/**</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ros__parameters</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">update_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20.0</span>
+</code></pre></div>
+<p>On each start the images' entrypoint merges the overrides over the package's
+own files: the base deployment's layer, then the kit's, then the deployment's.
+YAML mappings merge recursively; scalars and lists replace the old value, and a
+non-YAML file replaces its counterpart. Nothing is written into the image:
+remove an override and restart to return to the remaining layers.</p>
+<p>An override without a counterpart is a warning, not a startup failure. Once the
+services are up, <code>run</code> names each one: a package that no service has, or a
+file or parameter its package does not have. That is intended for a new file
+such as a diagnostics graph; after a release change it usually means a renamed
+package, file or parameter.</p>
+<h3 id="3-overlay-workspace">3. Overlay Workspace<a class="headerlink" href="#3-overlay-workspace" title="Permanent link">#</a></h3>
+<p>Put ROS packages in <code>overlay_ws/src</code> and build them in the
+<code>universe-common-devel</code> image from the <strong>same build</strong> as your runtime images.
+A release pins that image next to its runtime images, so the CLI builds with
+the right one:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>build<span class="w"> </span><span class="o">[</span>--ros-distro<span class="w"> </span>humble<span class="o">]</span><span class="w">   </span><span class="c1"># in the kit: its overlay_ws</span>
+openadkit<span class="w"> </span>build<span class="w"> </span>PATH<span class="w">                    </span><span class="c1"># any workspace, with the pins of the kit around it</span>
+openadkit<span class="w"> </span>build<span class="w"> </span>--<span class="w"> </span>--packages-select<span class="w"> </span>my_pkg<span class="w">                </span><span class="c1"># arguments after -- go to colcon build</span>
+openadkit<span class="w"> </span>build<span class="w"> </span>--<span class="w"> </span>--cmake-args<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Debug<span class="w">   </span><span class="c1"># Release unless you set another</span>
+</code></pre></div>
+<h4 id="build">Build<a class="headerlink" href="#build" title="Permanent link">#</a></h4>
+<ul>
+<li>Packages build incrementally: a second build compiles only what changed.</li>
+<li>The CLI records the image and distro in <code>install/.openadkit-overlay.json</code>.
+  After a release upgrade or a distro change, <code>validate</code>, <code>run</code> and <code>restart</code>
+  stop and name the rebuild; that rebuild starts from a clean <code>build/</code> and
+  <code>install/</code>, since CMake caches record the paths they were configured with.</li>
+<li>Without <code>--ros-distro</code>, the build uses the release's default distro, or
+  the first one that every kit deployment runs on.</li>
+<li>A <code>build/</code> or <code>install/</code> that <code>openadkit build</code> did not make, such as a colcon
+  build on the host, stops the build; remove them first.</li>
+<li><code>--install-base</code> and <code>--build-base</code> stay fixed: the services source
+  <code>install/</code> where they mount the workspace.</li>
+<li>On a source checkout, the build uses the devel image of the build the
+  runtime images come from: the
+  <a href="../../development/build-from-source/#build-and-run-locally">local build</a>'s,
+  or the one of the CI build <code>OPENADKIT_BUILD</code> names.</li>
+</ul>
+<h4 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h4>
+<p>The workspace belongs to the kit: the one <code>overlay_ws</code> at the kit root serves
+every deployment of the kit, since they all extend one release and its images.
+Every Autoware service mounts it, and the image entrypoint sources
+<code>overlay_ws/install/local_setup.bash</code> on top of Autoware, so its packages are
+visible in every service. Whether your code runs depends on what starts it:</p>
+<ul>
+<li>A changed copy of an Autoware package shadows the image's own. It runs where
+  Autoware already launches that package, with nothing more to configure;
+  Autoware packages that link against its library keep the copy they were
+  built with.</li>
+<li>A new node runs only where something starts it: an extra service (as the
+  <a href="https://github.com/autowarefoundation/openadkit/tree/main/.github/scripts/evidence/example-kit">example kit</a>'s <code>acme-probe</code>), a launch file you override under
+  <code>config/autoware</code>, or by hand with
+  <code>openadkit shell &lt;service&gt; ros2 run &lt;package&gt; &lt;node&gt;</code>.</li>
+</ul>
+<h4 id="without-a-kit">Without a Kit<a class="headerlink" href="#without-a-kit" title="Permanent link">#</a></h4>
+<p>To try a workspace with a catalog deployment, without writing a kit, mount it
+with <code>--ws</code>:</p>
+<div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>build<span class="w"> </span>~/my_ws
+openadkit<span class="w"> </span>run<span class="w"> </span>planning-simulation<span class="w"> </span>--ws<span class="w"> </span>~/my_ws
+</code></pre></div>
+<p><code>--ws</code> is for a deployment without packages of its own; on a kit whose
+<code>overlay_ws/src</code> holds packages it is an error rather than a second layer.</p>
+<h4 id="abi">ABI<a class="headerlink" href="#abi" title="Permanent link">#</a></h4>
+<p>The devel and runtime images install ROS packages from the same
+<a href="../../releases/container-images/#ros-package-snapshot">ROS snapshot</a>, so
+an overlay built in the devel image links the ROS versions the runtime image
+ships. A dependency you add must also exist in the runtime image; the overlay
+cannot install packages. The example kit's C++ node links <code>diagnostic_updater</code>
+deliberately to test this devel/runtime boundary, then publishes <code>/acme/probe</code>.</p>
+<h3 id="4-extra-services">4. Extra Services<a class="headerlink" href="#4-extra-services" title="Permanent link">#</a></h3>
+<p>A deployment without a <code>compose.yaml</code> runs its base's services. To add or
+change services, write <code>deployments/&lt;name&gt;/compose.yaml</code>: include the base's
+Compose file through <code>OPENADKIT_BASE_DEPLOYMENT</code>, then define your services
+under <code>services:</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">include</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${OPENADKIT_BASE_DEPLOYMENT}/compose.yaml</span>
+
+<span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ota-agent</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${OTA_AGENT_IMAGE:?pinned in openadkit.json externalImages}</span>
+<span class="w">    </span><span class="nt">init</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>Keep communicating ROS services on the base ROS domain and middleware, and give
+each one <code>init: true</code>
+(<a href="../develop-and-debug/#the-development-loop">Develop and Debug</a>). A service
+that is already in the base changes the same way: name it and set only what
+differs.</p>
+<ul>
+<li><strong>A service that runs <code>ros2 launch</code></strong> also sets <code>pid: service:map</code>, as the
+  base's Autoware services and the example kit's <code>acme-probe</code> do. <code>ros2 launch</code> names its own node after its PID,
+  and in separate PID namespaces every launch gets the same one: Autoware then
+  reports the repeated node name as an error, and autonomous mode becomes
+  unavailable.</li>
+<li><strong>A service that runs <code>ros2 run</code></strong> gets a node named after its executable.
+  When another service runs the same executable, name it with
+  <code>--ros-args -r __node:=&lt;name&gt;</code>, for the same reason.</li>
+<li><strong>With <code>--gpu</code></strong>, the base's <code>compose.gpu.yaml</code> applies after your
+  <code>compose.yaml</code>, so what it sets for a service, such as the CUDA image of
+  <code>planning</code>, wins over yours. A kit deployment has no <code>compose.gpu.yaml</code> of
+  its own; its <code>settings.gpu.env</code> is read.</li>
+</ul>
+<p>A service that several deployments of the kit run goes in a file of its own,
+such as <code>services/ota-agent.yaml</code> at the kit root, which each of their Compose
+files includes next to the base. Compose resolves the relative paths of an
+included file against that file's own directory.</p>
+<p>An extra service on an Open AD Kit runtime image extends
+<code>${OPENADKIT_ROOT}/deployments/shared/services/autoware.yaml</code>, as the example
+kit's <code>acme-probe</code> does. That gives it what the base's Autoware services share:
+the host network, the ROS domain and DDS settings, the config overrides and the
+kit workspace at <code>/openadkit/overlay_ws</code>. It also turns unhealthy when a
+process of its <code>ros2 launch</code> dies
+(<a href="../../getting-started/troubleshooting/#a-service-is-unhealthy">A Service Is Unhealthy</a>).
+A <code>healthcheck</code> of its own replaces that check. To keep it, start the command
+with <code>! cat /tmp/openadkit/died 2&gt;/dev/null &amp;&amp;</code>, as <code>acme-probe</code> does.</p>
+<p>Such a service needs no image of its own: a runtime image and the workspace are
+enough. Build your own image only for what the runtime images lack, such as a
+system package or a non-ROS application, and declare it as an external image
+(<a href="#5-image-replacement">point 5</a>).</p>
+<p>To replace one role of a base that runs as split-host roles, include only the
+other role's Compose file instead of the base's <code>compose.yaml</code>. For
+example, a kit that brings its own simulator to <code>carla-simulation</code> includes
+<code>${OPENADKIT_BASE_DEPLOYMENT}/compose.autoware.yaml</code>: no service in it depends
+on a CARLA service. A kit that leaves out the service of its base's verify step
+has none, until it names its own.</p>
+<h3 id="5-image-replacement">5. Image Replacement<a class="headerlink" href="#5-image-replacement" title="Permanent link">#</a></h3>
+<p>Declare the images your kit uses but does not build in its <code>externalImages</code>,
+each with either one digest-pinned <code>ref</code> or a <code>distros</code> map of digest-pinned
+references. A name matching a component image variable replaces that
+component; other names supply images for new services. Use <code>${NAME:?}</code> in
+Compose to require the declared reference.</p>
+<p>A replaced component image needs your own runtime evidence: pinning alone does not
+prove that it honors the entrypoint, launch or parameter interfaces.</p>
+<h2 id="validation-and-evidence">Validation and Evidence<a class="headerlink" href="#validation-and-evidence" title="Permanent link">#</a></h2>
+<p><code>openadkit validate</code> renders the deployment and checks its manifest (and, with
+<code>--data</code>, its data). It does not pull images or prove that the runtime works;
+<code>run</code> reports overrides without a counterpart (see
+<a href="#2-config-overrides">Config Overrides</a>).</p>
+<p>Your kit's acceptance checks run where CI runs its own:</p>
+<ul>
+<li><strong>Readiness:</strong> give a service of your own a Compose <code>healthcheck</code>. <code>run</code>
+  waits until it passes. The example kit's <code>acme-probe</code> service runs
+  <code>checks/example_kit.py</code>, which checks the fresh <code>/acme/probe</code> publication of
+  its C++ package and its parameters.</li>
+<li><strong>End to end:</strong> the base's <code>verify</code> step runs on top of your layer with
+  <code>openadkit run --verify</code>. To check something else, name your own in the
+  deployment's manifest entry: <code>{"verify": {"service": "&lt;service&gt;", "command": [...]}}</code>
+  runs the command in that running service, and without <code>command</code> the step
+  waits for the service to exit and takes its exit code.</li>
+</ul>
+<p>Every release runs both checks on the
+<a href="../../releases/evidence/#cells-and-levels">example kit</a>, which uses every
+extension point. That shows the extension points work on the build; it does
+not verify your kit.</p>
+<p>A base deployment's CI exemption stays with the kit; an exemption is not
+runtime evidence.</p>
+<h2 id="upgrade-without-losing-your-work">Upgrade Without Losing Your Work<a class="headerlink" href="#upgrade-without-losing-your-work" title="Permanent link">#</a></h2>
+<p>Update <code>extends</code> (the next command downloads that release), rebuild your
+workspace against its devel digest, then validate and run your acceptance
+checks. Your repository, host settings, downloaded data and output directories
+are outside the release, and <code>openadkit upgrade</code> does not change a kit's
+<code>extends</code>. See <a href="../../getting-started/cli/#settings">Settings</a> and
+<a href="../../getting-started/cli/#downloaded-data">Downloaded Data</a>.</p>
+<h2 id="reference-designs">Reference Designs<a class="headerlink" href="#reference-designs" title="Permanent link">#</a></h2>
+<p>An <a href="https://docs.autoware.org/main/reference-design/">Autoware Reference Design</a>
+combines a Deployment Profile (the vehicle, the operating conditions and the
+use case) with a Reference Software Stack (the modules, the model versions and
+the parameters), so that others can reproduce the system. A kit is the form in
+which Open AD Kit holds such a software stack: it pins every part, and one
+command runs it.</p>
+<p>No Reference Design is published as a kit.</p>
+<h3 id="what-goes-where">What Goes Where<a class="headerlink" href="#what-goes-where" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Part of a Reference Design</th>
+<th>In a kit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Autoware version</td>
+<td><code>extends</code>: one Open AD Kit release, which pins one Autoware release and its images</td>
+</tr>
+<tr>
+<td>Modules</td>
+<td>The base deployment's services, your packages in <code>overlay_ws/</code> and your extra services</td>
+</tr>
+<tr>
+<td>Model versions</td>
+<td><code>data</code> in the deployment's manifest entry: each download with its URL and SHA-256</td>
+</tr>
+<tr>
+<td>Parameters</td>
+<td><code>config/autoware/</code> and <code>settings.env</code></td>
+</tr>
+<tr>
+<td>Vehicle and sensors</td>
+<td><code>VEHICLE_MODEL</code> and <code>SENSOR_MODEL</code>, with the vehicle's description and launch packages in <code>overlay_ws/</code> (<a href="../new-vehicle/">A New Vehicle</a>)</td>
+</tr>
+<tr>
+<td>Evaluation and testing</td>
+<td>The <code>verify</code> step, which <code>openadkit run --verify</code> runs</td>
+</tr>
+</tbody>
+</table>
+<p>The Deployment Profile stays in the Reference Design's own documents: the
+hardware, the operational design domain and the use case. The kit states only
+what it needs from the host, in <code>requirements</code>: architectures, ROS distros and
+GPU.</p>
+<h3 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Simulation only.</strong> Every catalog deployment is a simulation, so a kit shows
+  the stack in simulation, not on the vehicle.</li>
+<li><strong>A base is required.</strong> A kit deployment builds on a base deployment. A stack
+  that does not run the Autoware Universe pipeline, such as
+  <a href="https://github.com/autowarefoundation/vision_pilot">Vision Pilot</a>, cannot be
+  a kit.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../new-vehicle/" class="md-footer__link md-footer__link--prev" aria-label="Previous: A New Vehicle">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                A New Vehicle
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../reference/" class="md-footer__link md-footer__link--next" aria-label="Next: Manifest and Output Reference">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Manifest and Output Reference
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 The Autoware Foundation
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.copy", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

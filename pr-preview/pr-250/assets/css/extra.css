@@ -1,0 +1,908 @@
+/* ==========================================================================
+   Open AD Kit documentation theme
+   --------------------------------------------------------------------------
+   Layered on top of MkDocs Material. Everything here is expressed through the
+   design tokens below so light/dark stay in sync and pages only use a small,
+   shared vocabulary of classes:
+
+     .oak-hero-lead                    landing hero
+     .oak-card-grid / .oak-card        linked content cards
+
+   Keep new component rules token-based; avoid one-off colors.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* Brand chrome (banner, table heads, footer) */
+  --oak-navy: #1a1a2e;
+  --oak-navy-soft: #252545;
+
+  /* Geometry and elevation */
+  --oak-radius: 0.625rem;
+  --oak-radius-sm: 0.4rem;
+}
+
+/* Scheme-dependent tokens. Material sets the palette on <body>, so aliases of
+   its variables must be declared per scheme instead of on :root. */
+[data-md-color-scheme="default"] {
+  --oak-surface: var(--md-default-bg-color);
+  --oak-fg: var(--md-default-fg-color);
+  --oak-accent: var(--md-accent-fg-color);
+  --oak-accent-soft: var(--md-accent-fg-color--transparent);
+
+  --oak-surface-alt: #f6f8fb;
+  --oak-border: rgba(15, 23, 42, 0.1);
+  --oak-border-strong: rgba(15, 23, 42, 0.16);
+
+  --oak-fg-muted: #57687a;
+  --oak-fg-subtle: #6b7c8c;
+
+  --oak-accent-line: rgba(66, 135, 255, 0.35);
+
+  --oak-note: #4287ff;
+  --oak-tip: #12a150;
+  --oak-warn: #c2740a;
+  --oak-info: #0e7490;
+  --oak-danger: #d02b2b;
+
+  --oak-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --oak-shadow-2: 0 10px 24px rgba(15, 23, 42, 0.09);
+  --oak-ring: 0 0 0 0.2rem var(--oak-accent-soft);
+}
+
+[data-md-color-scheme="slate"] {
+  --oak-surface: var(--md-default-bg-color);
+  --oak-fg: var(--md-default-fg-color);
+  --oak-accent: var(--md-accent-fg-color);
+  --oak-accent-soft: var(--md-accent-fg-color--transparent);
+
+  --oak-navy: #20203a;
+  --oak-navy-soft: #2b2b4d;
+
+  --oak-surface-alt: rgba(255, 255, 255, 0.045);
+  --oak-border: rgba(255, 255, 255, 0.12);
+  --oak-border-strong: rgba(255, 255, 255, 0.2);
+
+  --oak-fg-muted: rgba(255, 255, 255, 0.74);
+  --oak-fg-subtle: rgba(255, 255, 255, 0.64);
+
+  --oak-accent-line: rgba(120, 170, 255, 0.45);
+
+  --oak-note: #7cacff;
+  --oak-tip: #34d399;
+  --oak-warn: #fbbf24;
+  --oak-info: #22d3ee;
+  --oak-danger: #f87171;
+
+  --oak-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --oak-shadow-2: 0 12px 28px rgba(0, 0, 0, 0.4);
+  --oak-ring: 0 0 0 0.2rem var(--oak-accent-soft);
+}
+
+/* Wider reading column on large screens. Material caps the grid at 61rem,
+   which leaves the content column narrower than a tablet viewport. */
+@media screen and (min-width: 76.25em) {
+  .md-grid {
+    max-width: 76rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2. Typography
+   -------------------------------------------------------------------------- */
+.md-typeset h1 {
+  color: var(--oak-fg);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  margin-bottom: 1em;
+}
+
+.md-typeset h2 {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin-top: 2.4em;
+  margin-bottom: 0.8em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--oak-border);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 1.9em;
+  margin-bottom: 0.6em;
+}
+
+.md-typeset h2 + h3,
+.md-typeset h1 + h2 {
+  margin-top: 1.2em;
+}
+
+.md-typeset p,
+.md-typeset li {
+  line-height: 1.7;
+}
+
+/* Prose keeps a comfortable measure (~85 characters) even though the grid is
+   wider; tables, code, and diagrams use the full content width. */
+.md-typeset p,
+.md-typeset ul,
+.md-typeset ol,
+.md-typeset blockquote {
+  max-width: 42em;
+}
+
+/* Layout components manage their own width. */
+
+.md-typeset .oak-card p {
+  max-width: none;
+}
+
+.md-typeset hr {
+  border-bottom-color: var(--oak-border);
+}
+
+.md-typeset blockquote {
+  color: var(--oak-fg-muted);
+  border-left: 3px solid var(--oak-border-strong);
+}
+
+/* --------------------------------------------------------------------------
+   3. Links
+   -------------------------------------------------------------------------- */
+.md-typeset a {
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+/* Body copy and list links stay visibly underlined; component links below
+   opt out because they carry their own affordances. */
+.md-typeset p a:not(.md-button),
+.md-typeset li a,
+.md-typeset td a,
+.md-typeset blockquote a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  text-decoration-color: color-mix(in srgb, currentcolor 45%, transparent);
+  transition: text-decoration-color 0.15s ease;
+}
+
+.md-typeset p a:not(.md-button):hover,
+.md-typeset li a:hover,
+.md-typeset td a:hover,
+.md-typeset blockquote a:hover {
+  text-decoration-color: currentcolor;
+}
+
+.md-typeset a:focus-visible {
+  outline: none;
+  border-radius: 2px;
+  box-shadow: var(--oak-ring);
+}
+
+/* --------------------------------------------------------------------------
+   4. Code
+   -------------------------------------------------------------------------- */
+.md-typeset pre {
+  border: 1px solid var(--oak-border);
+  border-radius: var(--oak-radius-sm);
+  padding: 1rem;
+  font-size: 0.85em;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.md-typeset pre > code {
+  border: none;
+  background: none;
+}
+
+.md-typeset code {
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+  font-size: 0.9em;
+  background-color: var(--oak-surface-alt);
+  border: 1px solid var(--oak-border);
+}
+
+/* Keep long identifiers (image tags, paths, launch files) readable instead of
+   wrapping them mid-token; wide tables scroll in their own scrollwrap. */
+.md-typeset table:not([class]) code {
+  white-space: nowrap;
+}
+
+.md-clipboard {
+  color: var(--oak-fg-subtle);
+}
+
+.md-clipboard:focus,
+.md-clipboard:hover {
+  color: var(--oak-accent);
+}
+
+/* --------------------------------------------------------------------------
+   5. Tables
+   -------------------------------------------------------------------------- */
+.md-typeset table:not([class]) {
+  border: none;
+  border-radius: var(--oak-radius-sm);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--oak-navy);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.72em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border: none;
+}
+
+.md-typeset table:not([class]) td {
+  padding: 0.75rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--oak-border);
+  vertical-align: top;
+}
+
+.md-typeset table:not([class]) tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.md-typeset table:not([class]) tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.md-typeset table:not([class]) tbody tr:hover {
+  background-color: var(--oak-surface-alt);
+}
+
+.md-typeset table:not([class]) td:first-child {
+  font-weight: 500;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* --------------------------------------------------------------------------
+   6. Admonitions and details
+   -------------------------------------------------------------------------- */
+.md-typeset .admonition,
+.md-typeset details {
+  position: relative;
+  max-width: 44em;
+  padding: 0.85rem 1rem 0.85rem 2.6rem;
+  border: 1px solid var(--oak-border);
+  border-left: 3px solid var(--oak-adm-color, var(--oak-note));
+  border-radius: 0 var(--oak-radius-sm) var(--oak-radius-sm) 0;
+  background: var(--oak-surface-alt);
+  box-shadow: none;
+  font-size: inherit;
+}
+
+.md-typeset .admonition > *,
+.md-typeset details > * {
+  box-sizing: border-box;
+}
+
+/* Titles share the body's left edge; the icon lives in the left gutter. */
+.md-typeset .admonition > .admonition-title,
+.md-typeset details > summary {
+  margin: 0 0 0.35rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--oak-adm-color, var(--oak-note));
+}
+
+.md-typeset .admonition > .admonition-title::before,
+.md-typeset details > summary::before {
+  left: -1.6rem;
+  top: 0.2rem;
+  background-color: var(--oak-adm-color, var(--oak-note));
+}
+
+.md-typeset details > summary::after {
+  top: 0.2rem;
+  color: var(--oak-adm-color, var(--oak-note));
+}
+
+/* Material styles a summary through its type class and the text direction,
+   which outrank the rules above: restate them so a collapsible block looks
+   like an admonition. */
+[dir] .md-typeset details[class] > summary {
+  padding: 0 1.6rem 0 0;
+  overflow: visible;
+  background: transparent;
+}
+
+[dir] .md-typeset details[class] > summary::before {
+  left: -1.6rem;
+}
+
+[dir] .md-typeset details[class] > summary::after {
+  right: 0;
+}
+
+.md-typeset .admonition > .admonition-title code,
+.md-typeset details > summary code {
+  box-shadow: none;
+}
+
+.md-typeset .admonition p:last-child,
+.md-typeset details p:last-child {
+  margin-bottom: 0;
+}
+
+.md-typeset .admonition .md-typeset__scrollwrap,
+.md-typeset details .md-typeset__scrollwrap {
+  margin: 0.8rem -1rem;
+}
+
+/* Type accents. Colors are harmonized with the blue brand accent instead of
+   Material's wider rainbow. */
+.md-typeset .admonition.note,
+.md-typeset details.note {
+  --oak-adm-color: var(--oak-note);
+}
+
+.md-typeset .admonition.warning,
+.md-typeset details.warning {
+  --oak-adm-color: var(--oak-warn);
+}
+
+.md-typeset .admonition .admonition,
+.md-typeset details .admonition {
+  margin: 0.8rem 0;
+}
+
+/* --------------------------------------------------------------------------
+   7. Buttons
+   -------------------------------------------------------------------------- */
+.md-typeset .md-button {
+  padding: 0.5em 1.1em;
+  border-width: 1.5px;
+  border-radius: var(--oak-radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.md-typeset .md-button:focus-visible {
+  outline: none;
+  box-shadow: var(--oak-ring);
+}
+
+/* --------------------------------------------------------------------------
+   8. Cards and grids
+   -------------------------------------------------------------------------- */
+.oak-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  margin: 1.4rem 0 1.8rem;
+}
+
+/* Four-card grids read best as a balanced 2x2 block at every width. */
+
+/* The landing page's start cards: compact, four in one row once they fit. */
+.oak-card-grid--start {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+}
+
+/* The landing page starts higher, so the hero and the cards share one screen. */
+.md-main__inner:has(.oak-card-grid--start) {
+  margin-top: 0.4rem;
+}
+
+.md-typeset .oak-hero-lead + h2.oak-eyebrow {
+  margin-top: 1.1rem;
+}
+
+@media screen and (min-width: 60em) {
+  .oak-card-grid--start {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The icon sits beside the title, so a card is as tall as its text needs. */
+.oak-card-grid--start .oak-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  column-gap: 0.6rem;
+  align-items: center;
+  padding: 0.9rem 1rem 0.9rem;
+}
+
+.oak-card-grid--start .oak-card > p {
+  grid-column: 1 / -1;
+}
+
+.oak-card-grid--start .oak-card > p:first-child,
+.oak-card-grid--start .oak-card > .oak-card-title {
+  grid-column: auto;
+  margin: 0;
+}
+
+.oak-card-grid--start .oak-card > p:nth-child(3) {
+  align-self: start;
+  margin-top: 0.55rem;
+}
+
+.oak-card-grid--start .oak-card .oak-card-icon,
+.oak-card-grid--start .oak-card .twemoji.oak-card-icon {
+  width: 1.8rem;
+  height: 1.8rem;
+  margin: 0;
+}
+
+.oak-card-grid--start .oak-card .oak-card-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.oak-card-grid--start .oak-card .oak-card-title {
+  font-size: 0.88rem;
+}
+
+.oak-card-grid--start .oak-card p {
+  font-size: 0.82em;
+  line-height: 1.55;
+}
+
+/* The buttons line up at the bottom of cards of equal height. */
+.oak-card-grid--start .oak-card p:has(> .md-button) {
+  align-self: end;
+  padding-top: 0.6rem;
+}
+
+.oak-card-grid--start .oak-card .md-button {
+  padding: 0.35em 0.9em;
+  font-size: 0.7rem;
+}
+
+/* Compact index list used on the landing page. */
+
+.oak-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--oak-border);
+  border-radius: var(--oak-radius);
+  background: var(--oak-surface);
+  box-shadow: var(--oak-shadow-1);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.oak-card {
+  padding: 1.35rem 1.4rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .oak-card:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.oak-card:hover {
+  border-color: var(--oak-accent-line);
+  box-shadow: var(--oak-shadow-2);
+}
+
+.oak-card p {
+  margin: 0 0 0.35rem;
+  font-size: 0.9em;
+  line-height: 1.6;
+  color: var(--oak-fg-muted);
+}
+
+.oak-card p:last-child {
+  margin-bottom: 0;
+}
+
+.oak-card h3,
+.oak-card .oak-card-title {
+  margin: 0 0 0.5rem;
+  color: var(--oak-fg);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Icon in a soft accent tile keeps the card headers visually anchored. */
+.oak-card .oak-card-icon,
+.oak-card .twemoji.oak-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 0 0.85rem;
+  border-radius: var(--oak-radius-sm);
+  background: var(--oak-accent-soft);
+}
+
+.oak-card .oak-card-icon .md-icon,
+.oak-card .oak-card-icon svg,
+.oak-card .twemoji.oak-card-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: var(--oak-accent);
+}
+
+/* --------------------------------------------------------------------------
+   9. Status badges
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   10. Key-takeaway callout
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   11. Quickstart progress navigation
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   12. Landing hero
+   -------------------------------------------------------------------------- */
+.md-typeset h1:has(+ .oak-hero-lead) {
+  margin-bottom: 0.5rem;
+  border-bottom: none;
+  padding-bottom: 0;
+  color: var(--oak-fg);
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.oak-hero-lead {
+  max-width: 38em;
+  margin: 0 0 1rem;
+  color: var(--oak-fg-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.md-typeset h2.oak-eyebrow {
+  margin-top: 2rem;
+  padding-bottom: 0;
+  border-bottom: none;
+  color: var(--oak-fg-subtle);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@media screen and (max-width: 768px) {
+  .md-typeset h1:has(+ .oak-hero-lead) {
+    font-size: 1.7rem;
+  }
+
+  .oak-hero-lead {
+    font-size: 0.9rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   13. Mermaid diagrams
+   -------------------------------------------------------------------------- */
+.md-typeset .mermaid {
+  margin: 1.2rem 0;
+  padding: 1rem;
+  border: 1px solid var(--oak-border);
+  border-radius: var(--oak-radius);
+  background: var(--oak-surface-alt);
+  line-height: normal;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.md-typeset .mermaid svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+@media screen and (max-width: 768px) {
+  .md-typeset .mermaid svg {
+    min-width: 30rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   14. Header, tabs, banner and footer
+   -------------------------------------------------------------------------- */
+.md-banner {
+  background-color: var(--oak-navy);
+  color: #fff;
+}
+
+[data-md-color-scheme="slate"] .md-banner {
+  background-color: var(--oak-navy-soft);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.md-banner__inner {
+  font-size: 0.72rem;
+}
+
+.md-banner a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.md-banner a:hover {
+  text-decoration: underline;
+}
+
+.md-banner strong {
+  font-weight: 600;
+}
+
+.md-banner .oak-banner-icon {
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.35em;
+  fill: currentcolor;
+  vertical-align: -0.16em;
+}
+
+.md-banner__button {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.md-banner__button:hover {
+  color: #fff;
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-banner__inner {
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+}
+
+/* Header */
+.md-header {
+  box-shadow: none;
+}
+
+.md-header[data-md-state="shadow"],
+.md-header--shadow {
+  box-shadow: 0 1px 0 var(--oak-border), var(--oak-shadow-1);
+}
+
+.md-header__title {
+  font-weight: 600;
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.md-tabs {
+  border-bottom: 1px solid var(--oak-border);
+}
+
+/* Material hides the tabs below 76.25em (1220px), which a 1920x1080 laptop at
+   150% scaling never reaches. They fit from 60em, so show them from there; the
+   drawer still holds the pages of a section. */
+@media screen and (min-width: 60em) and (max-width: 76.234375em) {
+  .md-tabs {
+    display: block;
+  }
+}
+
+/* Below 76.25em Material moves a section's pages into the drawer, so with the
+   tabs above shown there a tab's other pages were out of sight. From 60em,
+   keep them on the left as on a wide screen: the active tab's pages only. */
+@media screen and (min-width: 60em) and (max-width: 76.234375em) {
+  .md-header__button[for="__drawer"] {
+    display: none;
+  }
+
+  /* With the drawer button gone, the logo comes back as on a wide screen. */
+  .md-header__button.md-logo {
+    display: inline-block;
+  }
+
+  .md-sidebar--primary,
+  [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
+    background-color: initial;
+    box-shadow: none;
+    height: auto;
+    left: auto;
+    position: sticky;
+    top: 4.8rem;
+    transform: none;
+    transition: none;
+    width: 10rem;
+    z-index: auto;
+  }
+
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    margin: 0 0.2rem;
+    overflow-y: auto;
+    position: static;
+  }
+
+  .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner {
+    margin-left: 1.2rem;
+  }
+
+  .md-nav--primary,
+  .md-nav--primary .md-nav {
+    background-color: initial;
+    display: block;
+    height: auto;
+    position: static;
+    z-index: auto;
+  }
+
+  .md-nav--primary .md-nav__title,
+  .md-nav--primary .md-nav__link .md-nav__icon {
+    display: none;
+  }
+
+  .md-nav--primary .md-nav__item {
+    border-top: 0;
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+
+  .md-nav--primary .md-nav__list {
+    padding-bottom: 0.4rem;
+    padding-left: 0.6rem;
+  }
+
+  .md-nav--primary .md-nav__title ~ .md-nav__list {
+    box-shadow: none;
+  }
+
+  /* The drawer colours the path to the page; on the left only the page is. */
+  .md-nav--primary .md-nav__item--active > .md-nav__link:not(.md-nav__link--active) {
+    color: inherit;
+  }
+
+  .md-nav--primary .md-nav__link {
+    margin-top: 0.625em;
+    padding: 0;
+  }
+
+  .md-nav__toggle ~ .md-nav {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    visibility: visible;
+  }
+
+  .md-nav--lifted > .md-nav__list > .md-nav__item {
+    display: none;
+  }
+
+  .md-nav--lifted > .md-nav__list > .md-nav__item--active {
+    display: block;
+  }
+
+  .md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link {
+    box-shadow: none;
+    font-weight: 700;
+  }
+
+  .md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link:not(.md-nav__container) {
+    color: var(--md-default-fg-color--light);
+    pointer-events: none;
+  }
+
+  .md-nav--lifted > .md-nav__list > .md-nav__item > .md-nav:not(.md-nav--secondary) {
+    margin-left: -0.6rem;
+  }
+}
+
+.md-tabs__link {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  opacity: 1;
+}
+
+/* Footer */
+.md-footer {
+  background-color: var(--oak-navy);
+}
+
+.md-footer-meta {
+  background-color: rgba(0, 0, 0, 0.28);
+}
+
+[data-md-color-scheme="slate"] .md-footer {
+  background-color: var(--oak-navy);
+}
+
+[data-md-color-scheme="slate"] .md-footer-meta {
+  background-color: rgba(0, 0, 0, 0.24);
+}
+
+.md-footer .md-copyright {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.md-footer-nav__link {
+  opacity: 0.95;
+}
+
+.md-footer-nav__link:hover {
+  opacity: 1;
+}
+
+/* Sidebar navigation and table of contents */
+.md-nav__title,
+.md-nav__item--nested > .md-nav__link,
+.md-nav__item--section > .md-nav__link {
+  font-weight: 600;
+}
+
+.md-nav__link {
+  border-radius: var(--oak-radius-sm);
+}
+
+.md-nav__link:not(.md-nav__link--active):hover {
+  color: var(--oak-accent);
+}
+
+.md-nav__link--active,
+.md-nav__link--passed.md-nav__link--active {
+  font-weight: 600;
+}
+
+.md-sidebar--secondary .md-nav__link {
+  font-size: 0.68rem;
+}
+
+/* --------------------------------------------------------------------------
+   15. Responsive
+   -------------------------------------------------------------------------- */
+@media screen and (max-width: 768px) {
+  .oak-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oak-card {
+    padding: 1.2rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   16. Motion preferences
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .md-typeset *,
+  .md-header,
+  .md-footer {
+    transition: none !important;
+    animation: none !important;
+  }
+}

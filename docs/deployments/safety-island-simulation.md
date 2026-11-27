@@ -28,7 +28,7 @@ starts Planning Simulation's services and two more:
 
 | Service | What it runs |
 |---------|--------------|
-| `safety-island` | The release's actuation binary (FreeRTOS on POSIX) |
+| `safety-island` | The release's actuation binary for the host's architecture (FreeRTOS on POSIX) |
 | `safety-island-bridge` | `domain_bridge` between the two domains, with the release's `bridge-config.yaml` topic contract |
 
 Autoware's trajectory follower is switched off, so the control command comes

@@ -16,7 +16,7 @@ distro, architecture and topology:
 | Planning Simulation | Humble, Jazzy | amd64, arm64 | Single host; also under Podman and systemd with the [AutoSD](../platforms/autosd.md) units |
 | Scenario Simulation | Humble, Jazzy | amd64, arm64 | Single host; two isolated roles on one host |
 | Logging Simulation | Humble, Jazzy | amd64, arm64 | Single host, in CPU mode |
-| Safety Island Simulation | Humble, Jazzy | amd64 | Single host, with the pinned Safety Island release over `domain_bridge` |
+| Safety Island Simulation | Humble, Jazzy | amd64, arm64 | Single host, with the pinned Safety Island release over `domain_bridge` |
 | `example-kit-planning-simulation` | Humble, Jazzy | amd64, arm64 | Single host: a kit made with `openadkit new` on Planning Simulation, plus a fixture that uses every extension point and its own vehicle and sensor kit packages |
 
 A cell runs on a hosted runner of its own architecture.

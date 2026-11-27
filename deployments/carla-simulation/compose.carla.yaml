@@ -49,8 +49,7 @@ services:
 
   carla-interface:
     # What every Autoware service shares: host network, DDS settings, config
-    # overrides, the overlay workspace, and the healthcheck that turns it
-    # unhealthy when the bridge node dies while `ros2 launch` keeps running.
+    # overrides and the overlay workspace.
     extends:
       file: ../shared/services/autoware.yaml
       service: autoware
@@ -64,6 +63,17 @@ services:
         restart: true
     # The interface loads CARLA_WORLD itself when CARLA runs another map
     # (load_world_if_different) and waits up to `timeout` seconds for it.
+    # Healthy while the bridge node lives (the check this replaces, from
+    # ../shared/services/autoware.yaml) and CARLA runs that map, so `run`
+    # waits for the load and fails when it never comes.
+    healthcheck:
+      test: >-
+        ! cat /tmp/openadkit/died 2>/dev/null &&
+        python3 -c "import carla, sys;
+        client = carla.Client('${CARLA_RPC_HOST}', ${CARLA_RPC_PORT}); client.set_timeout(2);
+        name = client.get_world().get_map().name;
+        sys.exit(None if name.split('/')[-1] == '${CARLA_WORLD}' else f'CARLA runs {name}, not ${CARLA_WORLD}')"
+      start_period: ${CARLA_LOAD_TIMEOUT}s
     command: >
       ros2 launch autoware_carla_interface autoware_carla_interface.launch.xml
       host:=${CARLA_RPC_HOST}

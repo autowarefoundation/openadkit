@@ -69,7 +69,7 @@ def test_a_cell_runs_on_every_architecture_its_deployment_supports():
     for name, found in platforms.items():
         assert found == {f"linux/{arch}" for arch in manifest(name)["requirements"]["architectures"]}, name
     assert platforms["planning-simulation"] == {"linux/amd64", "linux/arm64"}
-    assert platforms["safety-island-simulation"] == {"linux/amd64"}
+    assert platforms["safety-island-simulation"] == {"linux/amd64", "linux/arm64"}
     # A pull request lists one platform.
     amd64 = validation_matrix.evidence_cells(runtime, ROOT, platforms=("linux/amd64",))
     assert amd64 and {cell["platform"] for cell in amd64} == {"linux/amd64"}

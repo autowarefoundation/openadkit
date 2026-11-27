@@ -86,7 +86,8 @@ services:
 
   safety-island:
     # The FreeRTOS POSIX build needs only glibc and libstdc++, which every
-    # runtime image ships. Downloaded data has no executable bit.
+    # runtime image ships. Downloaded data has no executable bit. The release
+    # has one binary per architecture, named as `uname -m` prints it.
     image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
     container_name: safety-island
     network_mode: host
@@ -96,7 +97,7 @@ services:
     volumes:
       - ${SAFETY_ISLAND_PATH:?set in settings.env}:/safety-island:ro
     command: >
-      sh -c 'install -m 0755 /safety-island/actuation_freertos /tmp/actuation_freertos
+      sh -c 'install -m 0755 /safety-island/actuation_freertos-$$(uname -m) /tmp/actuation_freertos
       && exec /tmp/actuation_freertos'
     depends_on:
       - safety-island-bridge

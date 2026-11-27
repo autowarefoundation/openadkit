@@ -15,7 +15,7 @@ cd ../..
 
 | File | What it does |
 | --- | --- |
-| `deployment.json` | Pins the Safety Island release by SHA-256: its FreeRTOS POSIX binary, its `bridge-config.yaml` topic contract and its `cyclonedds-domain2.xml` DDS setting. Requires amd64 and has no GPU mode |
+| `deployment.json` | Pins the Safety Island release by SHA-256: its two FreeRTOS POSIX binaries (`actuation_freertos-x86_64` and `actuation_freertos-aarch64`), its `bridge-config.yaml` topic contract and its `cyclonedds-domain2.xml` DDS setting. Runs on amd64 and arm64 and has no GPU mode |
 | `compose.yaml` | Planning Simulation's services, plus the `safety-island` and `safety-island-bridge` services |
 | `settings.env` | Planning Simulation's settings, then where the release is fetched and the diagnostics graph below |
 | `config/autoware/autoware_control_config/.../default_preset.yaml` | The default control preset with `trajectory_follower_mode: none` |
@@ -30,6 +30,6 @@ interface of the rest of the stack (`lo` unless the host settings file sets
 
 ## Upgrade
 
-Update the release tag in the three URLs and the three checksums in
+Update the release tag in the four URLs and the four checksums in
 `deployment.json` (from the release's `sha256sums.txt`), and the tag in
 `SAFETY_ISLAND_PATH`.

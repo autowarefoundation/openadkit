@@ -7,7 +7,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-simulated-perception
+    container_name: autoware-simulated-perception${OPENADKIT_NAME_SUFFIX:-}
     pid: service:map
     volumes:
       - ../launch/component.launch.py:/openadkit/launch/component.launch.py:ro

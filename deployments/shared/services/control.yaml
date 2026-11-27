@@ -5,7 +5,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${CONTROL_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-control
+    container_name: autoware-control${OPENADKIT_NAME_SUFFIX:-}
     pid: service:map
     command: >
       ros2 launch autoware_launch component_control.launch.xml

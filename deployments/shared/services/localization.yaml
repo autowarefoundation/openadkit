@@ -7,7 +7,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-localization
+    container_name: autoware-localization${OPENADKIT_NAME_SUFFIX:-}
     pid: service:map
     command: >
       ros2 launch autoware_launch component_localization.launch.xml

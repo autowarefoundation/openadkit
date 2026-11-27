@@ -10,7 +10,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${VISUALIZER_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-visualizer
+    container_name: autoware-visualizer${OPENADKIT_NAME_SUFFIX:-}
     # No pid: service:map. RViz runs without ros2 launch, so it has no
     # launch_ros_<PID> node to keep unique, and a split simulator role has no
     # map service to join.

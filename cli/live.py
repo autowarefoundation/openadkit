@@ -66,35 +66,43 @@ def format_autoware_state(state: dict[str, Any]) -> list[str]:
 # The running stack is found from Docker, not from a kit: any directory and
 # any release's CLI reach it. run allows one deployment per host, so the live
 # projects are all its own: its single-host project, or the roles of it that
-# run here.
-def running_projects(role: str | None = None) -> list[str]:
-    projects = sorted(live_projects())
+# run here; or copies run with --instance, each in its own ROS domain.
+def _select(projects: list[str], role: str | None, instance: int | None) -> list[str]:
     if role is not None:
         projects = [name for name in projects if name.endswith(f"_{role}")]
+    if instance is not None:
+        projects = [name for name in projects if (read_run_state(name) or {}).get("instance") == instance]
     return projects
 
 
-def stopped_projects(role: str | None = None) -> list[str]:
+def running_projects(role: str | None = None, instance: int | None = None) -> list[str]:
+    return _select(sorted(live_projects()), role, instance)
+
+
+def stopped_projects(role: str | None = None, instance: int | None = None) -> list[str]:
     """Projects whose containers are left but none runs; stop removes them."""
-    projects = sorted(stopped_project_files())
-    if role is not None:
-        projects = [name for name in projects if name.endswith(f"_{role}")]
-    return projects
+    return _select(sorted(stopped_project_files()), role, instance)
 
 
 def display_name(project: str) -> str:
     return project[len(PROJECT_PREFIX):]
 
 
-def running_project(role: str | None, *, stopped: bool = False) -> str:
+def not_running(role: str | None, instance: int | None = None) -> str:
+    if instance is not None:
+        return f"instance {instance} is not running here"
+    return f"role {role} is not running here" if role else "nothing is running"
+
+
+def running_project(role: str | None, instance: int | None = None, *, stopped: bool = False) -> str:
     """The one live project a command acts on; with `stopped`, a stack whose
     containers all stopped too, as after a failed start."""
-    projects = running_projects(role) or (stopped_projects(role) if stopped else [])
+    projects = running_projects(role, instance) or (stopped_projects(role, instance) if stopped else [])
     if not projects:
-        raise OpenADKitError(f"role {role} is not running here" if role else "nothing is running")
+        raise OpenADKitError(not_running(role, instance))
     if len(projects) > 1:
         names = ", ".join(display_name(project) for project in projects)
-        raise OpenADKitError(f"{names} run here; choose one with --role")
+        raise OpenADKitError(f"{names} run here; choose one with --role or --instance")
     return projects[0]
 
 

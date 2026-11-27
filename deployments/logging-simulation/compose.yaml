@@ -61,7 +61,7 @@ services:
   # of the sensor data.
   rosbag:
     image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-rosbag
+    container_name: autoware-rosbag${OPENADKIT_NAME_SUFFIX:-}
     network_mode: host
     init: true
     ipc: host

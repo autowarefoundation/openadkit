@@ -435,9 +435,13 @@ def report_data_gaps(deployment_name: str, results: list[dict[str, object]]) -> 
 
 
 def print_run_next_steps(
-    deployment, services: set[str], role: str | None, output: str | None, *, tls: bool = False
+    deployment, services: set[str], role: str | None, output: str | None, *, tls: bool = False,
+    instance: int | None = None,
 ) -> None:
-    target = deployment.name if role is None else f"{deployment.name} --role {role}"
+    selector = f" --role {role}" if role else ""
+    if instance is not None:
+        selector = f" --instance {instance}"
+    target = f"{deployment.name}{selector}"
     # A kit deployment names what it runs, which its own name may not say.
     on_base = f" ({deployment.base.name} with the kit's files on top)" if deployment.base else ""
     print(f"running: {target}{on_base}")
@@ -447,13 +451,17 @@ def print_run_next_steps(
             "password: REMOTE_PASSWORD (default openadkit; override in "
             f"{deployment.host_settings})"
         )
+    if instance is not None:
+        print(f"instance: {instance}, in ROS domain {instance}")
     if output:
         print(f"output: {output}")
-    print(f"stop with: openadkit stop{f' --role {role}' if role else ''}")
+    print(f"stop with: openadkit stop{selector}")
 
 
 ROLE_HELP = "role from this deployment's manifest (omit for single host; experimental)"
 LIVE_ROLE_HELP = "role to act on when several roles run on this host (experimental)"
+INSTANCE_HELP = "run a copy of the deployment as instance N, in ROS domain N, beside other deployments (experimental)"
+LIVE_INSTANCE_HELP = "instance to act on, by the number run started it with (experimental)"
 VERBOSE_HELP = "print the docker commands it runs, status queries aside (or set OPENADKIT_VERBOSE=1)"
 
 
@@ -502,6 +510,7 @@ def fetch_arguments(parser: argparse.ArgumentParser) -> None:
 
 def run_arguments(parser: argparse.ArgumentParser) -> None:
     selection_arguments(parser)
+    parser.add_argument("--instance", type=int, metavar="N", help=INSTANCE_HELP)
     parser.add_argument(
         "--no-visualizer", action="store_true", help="start without the visualizer, for hosts nobody watches"
     )
@@ -646,7 +655,8 @@ def select(root: Path, catalog: Catalog, deployment: Deployment, args: argparse.
     compose.ensure_runtime_user()
     return settings.resolve(
         deployment, catalog, getattr(args, "ros_distro", None), getattr(args, "gpu", False),
-        role=getattr(args, "role", None), data_only=args.command == "fetch",
+        role=getattr(args, "role", None), instance=getattr(args, "instance", None),
+        data_only=args.command == "fetch",
     )
 
 
@@ -727,35 +737,52 @@ def run_command(root: Path, catalog: Catalog, deployment: Deployment, args: argp
     if args.verify and deployment.verify is None:
         raise OpenADKitError(f"{deployment.name} declares no verify step")
     compose.check_daemon(selection)
-    # Deployments share host networking, fixed container names and the
-    # default DDS domain, so only one runs at a time. Rerunning the same
-    # project updates it in place; other roles of it may share this host.
-    others = compose.other_projects(deployment)
-    if others:
-        raise OpenADKitError(
-            f"{', '.join(live.display_name(project) for project in others)} is already running; "
-            "stop it with openadkit stop before starting this deployment"
-        )
-    conflict = compose.live_state_conflict(deployment, selection)
-    if conflict:
-        raise OpenADKitError(conflict)
-    # A start that failed, or a Docker that restarted, leaves containers that
-    # no longer run but keep their names; they stay until stop, for their logs.
-    leftover = compose.stopped_other_projects(deployment, selection.role)
-    if leftover:
-        raise OpenADKitError(
-            f"{', '.join(live.display_name(project) for project in leftover)} left stopped containers on this host; "
-            "remove them with openadkit stop before starting this deployment"
-        )
+    skipped = services & ({"visualizer"} if args.no_visualizer else set())
+    if selection.instance is not None:
+        # An instance has container names and a ROS domain of its own, so it runs
+        # beside any project in another domain; the visualizer's port is one per host.
+        clashing = compose.same_domain_projects(deployment, selection)
+        if clashing:
+            raise OpenADKitError(
+                f"{', '.join(live.display_name(project) for project in clashing)} already uses ROS domain "
+                f"{selection.instance} or this instance's name on this host; choose another instance or stop it "
+                "with openadkit stop"
+            )
+        if "visualizer" in services - skipped and any(
+            "visualizer" in live.running_services(project) for project in compose.live_projects()
+        ):
+            raise OpenADKitError("a visualizer already runs on this host; start this instance with --no-visualizer")
+    else:
+        # Deployments share host networking, fixed container names and the
+        # default DDS domain, so only one runs at a time. Rerunning the same
+        # project updates it in place; other roles of it, and instances in other
+        # domains, may share this host.
+        others = compose.other_projects(deployment)
+        if others:
+            raise OpenADKitError(
+                f"{', '.join(live.display_name(project) for project in others)} is already running; "
+                "stop it with openadkit stop before starting this deployment"
+            )
+        conflict = compose.live_state_conflict(deployment, selection)
+        if conflict:
+            raise OpenADKitError(conflict)
+        # A start that failed, or a Docker that restarted, leaves containers that
+        # no longer run but keep their names; they stay until stop, for their logs.
+        leftover = compose.stopped_other_projects(deployment, selection.role)
+        if leftover:
+            raise OpenADKitError(
+                f"{', '.join(live.display_name(project) for project in leftover)} left stopped containers on this "
+                "host; remove them with openadkit stop before starting this deployment"
+            )
     model = prepare_host(deployment, selection)
-    skipped = services &({"visualizer"} if args.no_visualizer else set())
     compose.require_local_images(catalog, selection, model, services - skipped)
-    compose.write_run_state(deployment.project_name(selection.role), {
+    compose.write_run_state(deployment.project_name(selection.role, selection.instance), {
         "schemaVersion": 1,
         "cli": str(root_path()),
         "kit": str(root) if catalog.kind == "kit" else None,
         "deployment": deployment.name,
         "role": selection.role,
+        "instance": selection.instance,
         "rosDistro": selection.ros_distro,
         "gpu": selection.gpu,
         "workspace": str(Path(args.ws).expanduser().resolve()) if args.ws else None,
@@ -764,10 +791,10 @@ def run_command(root: Path, catalog: Catalog, deployment: Deployment, args: argp
     started = time.monotonic()
     compose.start(deployment, selection, services, skipped)
     run_report = compose.run_report(deployment, selection, catalog, model, started)
-    compose.write_run_report(deployment, run_report)
+    compose.write_run_report(deployment, run_report, selection.instance)
     print_run_next_steps(
         deployment, services - skipped, selection.role, selection.environment.get("OUTPUT_HOST_PATH"),
-        tls=bool(selection.environment.get("NOVNC_CERT")),
+        tls=bool(selection.environment.get("NOVNC_CERT")), instance=selection.instance,
     )
     if args.verify:
         return compose.verify(deployment, selection, services - skipped, run_report)
@@ -834,10 +861,10 @@ def clean_command(root: Path, catalog: Catalog, deployment: Deployment, args: ar
 
 def status_command(args: argparse.Namespace) -> int:
     """status and stop: what runs here, and what a stopped stack left behind."""
-    projects = live.running_projects(args.role)
-    stopped = live.stopped_projects(args.role)
+    projects = live.running_projects(args.role, args.instance)
+    stopped = live.stopped_projects(args.role, args.instance)
     if not projects and not stopped:
-        print("nothing is running" if args.role is None else f"role {args.role} is not running here")
+        print(live.not_running(args.role, args.instance))
         return 0
     several = len(projects) + len(stopped) > 1
     for project in projects:
@@ -862,7 +889,7 @@ def status_command(args: argparse.Namespace) -> int:
 
 
 def logs_command(args: argparse.Namespace) -> int:
-    live.logs(live.running_project(args.role, stopped=True), args.follow, args.services)
+    live.logs(live.running_project(args.role, args.instance, stopped=True), args.follow, args.services)
     return 0
 
 
@@ -871,7 +898,7 @@ def restart_command(args: argparse.Namespace) -> int:
     with the current settings, config overrides and overlay workspace; from any directory."""
     if args.services and args.all_services:
         raise UsageError("name the services to restart, or pass --all")
-    project = live.running_project(args.role)
+    project = live.running_project(args.role, args.instance)
     state = compose.read_run_state(project)
     if state is None:
         raise OpenADKitError(
@@ -883,7 +910,10 @@ def restart_command(args: argparse.Namespace) -> int:
     deployment = get_deployment(root, catalog, state["deployment"])
     if state["workspace"]:
         deployment.use_workspace(Path(state["workspace"]))
-    selection = settings.resolve(deployment, catalog, state["rosDistro"], state["gpu"], role=state["role"])
+    selection = settings.resolve(
+        deployment, catalog, state["rosDistro"], state["gpu"], role=state["role"],
+        instance=state.get("instance"),
+    )
     compose.check_overlay_build(deployment, selection, catalog.devel_image(selection.ros_distro))
     running = set(live.running_services(project))
     if args.all_services:
@@ -913,14 +943,14 @@ def restart_command(args: argparse.Namespace) -> int:
 
 
 def shell_command(args: argparse.Namespace) -> int:
-    return live.shell(live.running_project(args.role), args.service, args.command_args)
+    return live.shell(live.running_project(args.role, args.instance), args.service, args.command_args)
 
 
 def record_command(args: argparse.Namespace) -> int:
     if bool(args.topics) == args.all_topics:
         raise UsageError("name the topics to record, or pass --all")
     output = Path(args.output).expanduser().resolve() if args.output else None
-    bag = live.record(live.running_project(args.role), args.topics, output)
+    bag = live.record(live.running_project(args.role, args.instance), args.topics, output)
     print(f"recorded: {bag}")
     return 0
 
@@ -1019,6 +1049,7 @@ def build_parser() -> OpenADKitParser:
             subparser.help_inventory = "catalog"
         if command.group == "live":
             subparser.add_argument("--role", metavar="ROLE", help=LIVE_ROLE_HELP)
+            subparser.add_argument("--instance", type=int, metavar="N", help=LIVE_INSTANCE_HELP)
         if command.group != "install":
             subparser.add_argument("--verbose", action="store_true", help=VERBOSE_HELP)
     return parser

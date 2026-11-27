@@ -17,7 +17,7 @@ from catalog import (
     host_architecture,
     state_root,
 )
-from manifest import OpenADKitError
+from manifest import MAX_ROS_DOMAIN_ID, OpenADKitError
 
 # Compose settings the CLI passes itself; a shell export must not change them.
 COMPOSE_CONTROL_ENV = {
@@ -90,6 +90,8 @@ class Selection:
     # Data-only selections: the settings a GPU run sees, so GPU-only data
     # goes where a GPU run mounts it. None when no GPU-only data is selected.
     gpu_environment: dict[str, str] | None = None
+    # run --instance N: a copy of the deployment, in ROS domain N, beside others.
+    instance: int | None = None
 
 
 def configuration_environment(deployment: Deployment, gpu: bool = False) -> dict[str, str]:
@@ -159,12 +161,16 @@ def _require_host_support(deployment: Deployment, distro: str, architecture: str
     return gpu
 
 
-def _injections(deployment: Deployment, distro: str, role: str | None) -> dict[str, str]:
+def _injections(
+    deployment: Deployment, distro: str, role: str | None, instance: int | None = None
+) -> dict[str, str]:
     """What the CLI sets for every command, images aside."""
     # settings.env defaults OUTPUT_HOST_PATH to this directory.
     injections = {
         "ROS_DISTRO": distro,
-        "OPENADKIT_RESULTS_DIR": str(deployment.output_directory / "results"),
+        # An instance keeps its own results (compose.write_run_report).
+        "OPENADKIT_RESULTS_DIR": str(deployment.output_directory / "results" / (
+            str(instance) if instance is not None else "")),
         # The deployments' data paths build on it (settings.env).
         "OPENADKIT_DATA_DIR": str(data_root()),
         **host_user_environment(),
@@ -179,6 +185,11 @@ def _injections(deployment: Deployment, distro: str, role: str | None) -> dict[s
         # LAN interface: roles reach each other only through a service that
         # their own Compose files start.
         injections["CYCLONEDDS_NETWORK_INTERFACE"] = "lo"
+    if instance is not None:
+        # An instance beside others on one host: ROS domain N, and container
+        # names of its own (the service files append the suffix).
+        injections["OPENADKIT_ROS_DOMAIN_ID"] = str(instance)
+        injections["OPENADKIT_NAME_SUFFIX"] = f"-{instance}"
     return injections
 
 
@@ -241,6 +252,7 @@ def resolve(
     gpu: bool = False,
     *,
     role: str | None = None,
+    instance: int | None = None,
     data_only: bool = False,
 ) -> Selection:
     """How to run the deployment on this host, with every setting resolved.
@@ -252,16 +264,21 @@ def resolve(
     if role is not None and role not in deployment.roles:
         valid = ", ".join(sorted(deployment.roles)) if deployment.roles else "none"
         raise OpenADKitError(f"{deployment.name} has no role {role}\navailable roles: {valid}")
+    if instance is not None:
+        if role is not None:
+            raise OpenADKitError("a role runs in the ROS domain its manifest gives it; --instance is for single-host")
+        if not 0 <= instance <= MAX_ROS_DOMAIN_ID:
+            raise OpenADKitError(f"--instance must be from 0 to {MAX_ROS_DOMAIN_ID}: instance N runs in ROS domain N")
     require_own_destinations(deployment)
     distro = ros_distro or default_ros_distro(catalog, deployment.requirements["rosDistros"])
-    injections = _injections(deployment, distro, role)
+    injections = _injections(deployment, distro, role, instance)
     if data_only:
         environment = _resolved(deployment, False, injections)
         gpu_environment = None
         if any(resource.get("gpu") for resource in deployment.data):
             same_files = deployment.env_files(True) == deployment.env_files(False)
             gpu_environment = environment if same_files else _resolved(deployment, True, injections)
-        return Selection(distro, False, role, injections, environment, gpu_environment)
+        return Selection(distro, False, role, injections, environment, gpu_environment, instance)
 
     architecture = host_architecture()
     gpu = _require_host_support(deployment, distro, architecture, gpu)
@@ -286,4 +303,4 @@ def resolve(
             f"required environment variable(s) are missing: {', '.join(missing)}\n"
             f"set them in {deployment.host_settings}"
         )
-    return Selection(distro, gpu, role, injections, environment)
+    return Selection(distro, gpu, role, injections, environment, instance=instance)

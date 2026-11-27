@@ -35,7 +35,7 @@ _openadkit() {
         --output | --ws)
             mapfile -t COMPREPLY < <(compgen -d -- "${cur}")
             return ;;
-        --role)
+        --role | --instance)
             return ;;
         --version)
             [[ ${command} == install ]] && return ;;
@@ -51,14 +51,14 @@ _openadkit() {
         validate) options="--ros-distro --gpu --role --ws --data --json --verbose --help" ;;
         config) options="--ros-distro --gpu --role --ws --verbose --help" ;;
         fetch) options="--force --verbose --help" ;;
-        run) options="--ros-distro --gpu --role --ws --no-visualizer --verify --verbose --help" ;;
+        run) options="--ros-distro --gpu --role --instance --ws --no-visualizer --verify --verbose --help" ;;
         build) options="--ros-distro --verbose --help" ;;
         new) options="--base --verbose --help" ;;
         clean) options="--yes --verbose --help" ;;
-        status | stop | shell) options="--role --verbose --help" ;;
-        restart) options="--role --all --verbose --help" ;;
-        logs) options="--role --follow --verbose --help" ;;
-        record) options="--role --all --output --verbose --help" ;;
+        status | stop | shell) options="--role --instance --verbose --help" ;;
+        restart) options="--role --instance --all --verbose --help" ;;
+        logs) options="--role --instance --follow --verbose --help" ;;
+        record) options="--role --instance --all --output --verbose --help" ;;
     esac
     if [[ ${cur} == -* ]]; then
         mapfile -t COMPREPLY < <(compgen -W "${options}" -- "${cur}")
@@ -82,7 +82,7 @@ _openadkit() {
     for ((index = 2; index < COMP_CWORD; index++)); do
         word=${COMP_WORDS[index]}
         case ${word} in
-            --ros-distro | --role | --output | --ws) ((index++)) ;;
+            --ros-distro | --role | --instance | --output | --ws) ((index++)) ;;
             -*) ;;
             *) return ;;
         esac

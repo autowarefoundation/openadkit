@@ -14,7 +14,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${LOCALIZATION_MAPPING_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-map
+    container_name: autoware-map${OPENADKIT_NAME_SUFFIX:-}
     volumes:
       - type: bind
         source: ${MAP_PATH}

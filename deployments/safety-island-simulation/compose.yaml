@@ -57,7 +57,7 @@ services:
 
   safety-island-bridge:
     image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
-    container_name: safety-island-bridge
+    container_name: safety-island-bridge${OPENADKIT_NAME_SUFFIX:-}
     network_mode: host
     init: true
     ipc: host
@@ -88,7 +88,7 @@ services:
     # The FreeRTOS POSIX build needs only glibc and libstdc++, which every
     # runtime image ships. Downloaded data has no executable bit.
     image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
-    container_name: safety-island
+    container_name: safety-island${OPENADKIT_NAME_SUFFIX:-}
     network_mode: host
     init: true
     environment:

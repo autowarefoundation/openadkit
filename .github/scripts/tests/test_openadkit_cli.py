@@ -532,8 +532,8 @@ def test_the_json_output_has_the_fields_the_reference_lists(tmp_path):
     assert set(output("validate", "missing", "--json")) == {"schemaVersion", "deployment", "valid", "error"}
     assert run_cli(root, "run", "example", "--verify").returncode == 0
     record = json.loads((root.parent / "home/openadkit-output/example/results/run.json").read_text())
-    assert set(record) == {"schemaVersion", "deployment", "role", "rosDistro", "gpu", "version", "extends", "images",
-                           "modelSha256", "configSha256", "overlaySha256", "readySeconds", "verify"}
+    assert set(record) == {"schemaVersion", "deployment", "role", "instance", "rosDistro", "gpu", "version", "extends",
+                           "images", "modelSha256", "configSha256", "overlaySha256", "readySeconds", "verify"}
     assert set(record["configSha256"]) == {"base", "kit", "deployment"}
     assert set(record["verify"]) == {"service", "seconds", "exitCode", "result"}
     for document in (listed, version, valid, record):
@@ -988,6 +988,101 @@ def test_several_live_roles_stop_together_but_take_one_target_otherwise(tmp_path
     assert run_cli(root, "stop").returncode == 0
     assert [row["args"][2] for row in recorded(calls) if "down" in row["args"]][1:] == [
         "openadkit-example_primary", "openadkit-example_secondary"]
+
+
+def test_an_instance_runs_beside_another_domain_with_its_own_names_and_results(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    calls = fake_docker(tmp_path, projects=["openadkit-example"], services=("app",))
+    result = run_cli(root, "run", "example", "--instance", "7")
+    assert result.returncode == 0, result.stderr
+    up = next(row for row in recorded(calls) if "up" in row["args"])
+    assert "openadkit-example-7" in up["args"]
+    assert up["env"]["OPENADKIT_ROS_DOMAIN_ID"] == "7" and up["env"]["OPENADKIT_NAME_SUFFIX"] == "-7"
+    report = json.loads((root.parent / "home/openadkit-output/example/results/7/run.json").read_text())
+    assert report["instance"] == 7
+    assert "instance: 7, in ROS domain 7" in result.stdout
+    assert "stop with: openadkit stop --instance 7" in result.stdout
+
+
+@pytest.mark.parametrize(("domain", "args", "message"), [
+    # The single-host run beside it is in the default domain.
+    ("1", [], "already uses ROS domain 1"),
+    ("7", ["--role", "primary"], "--instance is for single-host"),
+    ("102", [], "--instance must be from 0 to 101"),
+])
+def test_an_instance_never_shares_a_domain(tmp_path, domain, args, message):
+    root, _ = runtime_tree(tmp_path, document=manifest(roles=True))
+    calls = fake_docker(tmp_path, projects=["openadkit-example"])
+    result = run_cli(root, "run", "example", "--instance", domain, *args)
+    assert result.returncode != 0 and message in result.stderr
+    assert not any("up" in row["args"] for row in recorded(calls))
+
+
+def test_a_single_host_run_starts_beside_an_instance_in_another_domain(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, services=("app",))
+    assert run_cli(root, "run", "example", "--instance", "7").returncode == 0
+    calls = fake_docker(tmp_path, projects=["openadkit-example-7"], services=("app",))
+    result = run_cli(root, "run", "example")
+    assert result.returncode == 0, result.stderr
+    assert any("openadkit-example" in row["args"] and "up" in row["args"] for row in recorded(calls))
+
+
+@pytest.mark.parametrize("first", ["instance", "deployment"])
+def test_an_instance_and_a_deployment_of_its_project_name_never_replace_each_other(tmp_path, first):
+    # Instance 7 of example and a deployment named example-7 are both openadkit-example-7.
+    root, directory = runtime_tree(tmp_path)
+    shutil.copytree(directory, directory.with_name("example-7"))
+    catalog = json.loads((root / "openadkit.json").read_text())
+    catalog["deployments"]["example-7"] = {"path": "deployments/example-7"}
+    (root / "openadkit.json").write_text(json.dumps(catalog))
+    runs = [["example", "--instance", "7"], ["example-7"]]
+    if first == "deployment":
+        runs.reverse()
+    fake_docker(tmp_path, services=("app",))
+    assert run_cli(root, "run", *runs[0]).returncode == 0
+    calls = fake_docker(tmp_path, projects=["openadkit-example-7"], services=("app",))
+    calls.write_text("")
+    result = run_cli(root, "run", *runs[1])
+    assert result.returncode != 0 and "example-7" in result.stderr
+    assert not any("up" in row["args"] for row in recorded(calls))
+
+
+def test_an_instance_never_replaces_another_kits_instance(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, services=("app",))
+    assert run_cli(root, "run", "example", "--instance", "7").returncode == 0
+    # The same project, as another kit's deployment of that name started it.
+    record = next((tmp_path / "home").rglob("openadkit-example-7.json"))
+    record.write_text(json.dumps(json.loads(record.read_text()) | {"kit": str(tmp_path / "other-kit")}))
+    calls = fake_docker(tmp_path, projects=["openadkit-example-7"], services=("app",))
+    calls.write_text("")
+    result = run_cli(root, "run", "example", "--instance", "7")
+    assert result.returncode != 0 and "this instance's name" in result.stderr
+    assert not any("up" in row["args"] for row in recorded(calls))
+
+
+def test_live_commands_reach_an_instance_by_its_number(tmp_path):
+    root, _ = runtime_tree(tmp_path)
+    fake_docker(tmp_path, services=("app",))
+    assert run_cli(root, "run", "example", "--instance", "7").returncode == 0
+    calls = fake_docker(tmp_path, projects=["openadkit-example", "openadkit-example-7"])
+    calls.write_text("")
+    result = run_cli(root, "logs")
+    assert result.returncode != 0 and "choose one with --role or --instance" in result.stderr
+    assert run_cli(root, "logs", "--instance", "7").returncode == 0
+    assert recorded(calls)[-1]["args"][:4] == ["compose", "--project-name", "openadkit-example-7", "logs"]
+    assert run_cli(root, "stop", "--instance", "7").returncode == 0
+    assert [row["args"][2] for row in recorded(calls) if "down" in row["args"]] == ["openadkit-example-7"]
+
+
+def test_every_fixed_container_name_takes_the_instance_suffix():
+    # A name without it would collide when an instance runs beside the deployment.
+    for path in (ROOT / "deployments").rglob("*.yaml"):
+        for line in path.read_text().splitlines():
+            key, _, name = line.strip().partition(":")
+            if key == "container_name" and not name.strip().startswith("${"):
+                assert name.strip().endswith("${OPENADKIT_NAME_SUFFIX:-}"), (path, name)
 
 
 def test_a_role_starts_exactly_the_files_its_manifest_lists(tmp_path):

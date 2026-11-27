@@ -5,7 +5,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-api
+    container_name: autoware-api${OPENADKIT_NAME_SUFFIX:-}
     pid: service:map
     volumes:
       - ../checks:/openadkit/checks:ro

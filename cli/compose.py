@@ -28,6 +28,8 @@ from settings import Selection, compose_process_environment, docker_environment
 
 PROJECT_PREFIX = "openadkit-"
 LIVE_PROJECT_STATES = {"running", "restarting", "paused", "removing"}
+# runtime.env's ROS_DOMAIN_ID when the CLI sets none.
+DEFAULT_ROS_DOMAIN_ID = 1
 
 # Launch failures show up within seconds; watch this long after `up`.
 SETTLE_SECONDS = 10
@@ -84,7 +86,7 @@ def compose_command(deployment: Deployment, selection: Selection) -> list[str]:
         "docker",
         "compose",
         "--project-name",
-        deployment.project_name(selection.role),
+        deployment.project_name(selection.role, selection.instance),
     ]
     for env_file in deployment.env_files(selection.gpu):
         command.extend(("--env-file", str(env_file)))
@@ -169,11 +171,13 @@ def stopped_project_files() -> dict[str, list[str]]:
     return {name: files for name, files in _project_files(stopped=True).items() if name not in live}
 
 
-def _started_here(deployment: Deployment, role: str | None, projects: dict[str, list[str]]) -> bool:
-    """Whether the project of this role started from the deployment's own
+def _started_here(
+    deployment: Deployment, role: str | None, projects: dict[str, list[str]], instance: int | None = None
+) -> bool:
+    """Whether the project of this role or instance started from the deployment's own
     entry Compose file. Compose that reports no files keeps the name as the
     only evidence."""
-    project = deployment.project_name(role)
+    project = deployment.project_name(role, instance)
     files = projects.get(project)
     if files is None:
         return False
@@ -183,6 +187,10 @@ def _started_here(deployment: Deployment, role: str | None, projects: dict[str, 
     if state is not None and "kit" in state:
         kit = deployment.root.resolve() if deployment.base is not None else None
         if (Path(state["kit"]).resolve() if state["kit"] else None) != kit:
+            return False
+        # An instance's project has the name another deployment's may have:
+        # instance 2 of foo, and foo-2.
+        if state.get("deployment") != deployment.name:
             return False
     return not files or Path(files[0]).resolve() == deployment.compose_files(False, role)[0].resolve()
 
@@ -195,20 +203,52 @@ def other_projects(deployment: Deployment) -> list[str]:
     when it started from its own entry Compose file; otherwise `run`
     would replace another stack in place. stop, status and logs still go by name, so
     a stack started from an older release stays reachable after an upgrade.
+    An instance in another ROS domain shares neither names nor topics, so it may coexist too.
     """
     live = live_project_files()
-    own = {
-        deployment.project_name(role) for role in (None, *deployment.roles)
-        if _started_here(deployment, role, live)
-    }
-    return sorted(set(live) - own)
+    names = {deployment.project_name(role) for role in (None, *deployment.roles)}
+    own = {deployment.project_name(role) for role in (None, *deployment.roles) if _started_here(deployment, role, live)}
+    # An instance under one of this deployment's names would be replaced in place.
+    return sorted(project for project in set(live) - own if project in names or not _copy_elsewhere(project))
 
 
 def stopped_other_projects(deployment: Deployment, role: str | None) -> list[str]:
     """Stopped projects other than the one this run starts again in place."""
     stopped = stopped_project_files()
-    own = {deployment.project_name(role)} if _started_here(deployment, role, stopped) else set()
-    return sorted(set(stopped) - own)
+    name = deployment.project_name(role)
+    own = {name} if _started_here(deployment, role, stopped) else set()
+    return sorted(project for project in set(stopped) - own if project == name or not _copy_elsewhere(project))
+
+
+def _copy_elsewhere(project: str) -> bool:
+    """An instance outside the default ROS domain; instance N runs in domain N."""
+    domain = (read_run_state(project) or {}).get("instance")
+    return domain is not None and domain != DEFAULT_ROS_DOMAIN_ID
+
+
+def same_domain_projects(deployment: Deployment, selection: Selection) -> list[str]:
+    """Projects, live or left stopped, that an instance cannot start beside.
+
+    Every project shares the host network, so only one in the same domain
+    would see the instance's topics. A project whose run record names no
+    instance runs single-host in the default domain, or in its role's. A project
+    of the instance's name that another kit or deployment started is never
+    replaced in place.
+    """
+    own = deployment.project_name(None, selection.instance)
+    clashing = []
+    for project, files in {**stopped_project_files(), **live_project_files()}.items():
+        if project == own:
+            if not _started_here(deployment, None, {project: files}, selection.instance):
+                clashing.append(project)
+            continue
+        state = read_run_state(project) or {}
+        domain = state.get("instance")
+        if domain is None and not (state.get("role") or "_" in project):
+            domain = DEFAULT_ROS_DOMAIN_ID
+        if domain == selection.instance:
+            clashing.append(project)
+    return sorted(clashing)
 
 
 def live_roles(deployment: Deployment) -> list[str | None]:
@@ -394,6 +434,8 @@ def run_report(
         "schemaVersion": 1,
         "deployment": deployment.name,
         "role": selection.role,
+        # run --instance N: the copy's number, which is also its ROS domain.
+        "instance": selection.instance,
         "rosDistro": selection.ros_distro,
         "gpu": selection.gpu,
         "version": catalog.version or (catalog.extended.version if catalog.extended else None),
@@ -410,8 +452,10 @@ def run_report(
     }
 
 
-def write_run_report(deployment: Deployment, report: dict[str, Any]) -> Path:
+def write_run_report(deployment: Deployment, report: dict[str, Any], instance: int | None = None) -> Path:
     results = deployment.output_directory / "results"
+    if instance is not None:
+        results /= str(instance)
     results.mkdir(parents=True, exist_ok=True)
     path = results / "run.json"
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -689,7 +733,7 @@ def verify(deployment: Deployment, selection: Selection, services: set[str], rep
         "exitCode": code,
         "result": "PASSED" if code == 0 else "FAILED",
     }
-    path = write_run_report(deployment, report)
+    path = write_run_report(deployment, report, selection.instance)
     print(f"verify: {'passed' if code == 0 else f'failed (exit {code})'}; report: {path}")
     return code
 

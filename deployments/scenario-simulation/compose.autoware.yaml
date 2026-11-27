@@ -63,7 +63,7 @@ services:
       file: ../shared/services/autoware.yaml
       service: autoware
     image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-mrm-state-relay
+    container_name: autoware-mrm-state-relay${OPENADKIT_NAME_SUFFIX:-}
     command: >
       ros2 run topic_tools relay /system/fail_safe/mrm_state /api/fail_safe/mrm_state
       --ros-args -r __node:=mrm_state_relay -p use_sim_time:=${USE_SIM_TIME}
@@ -80,7 +80,7 @@ services:
       file: ../shared/services/autoware.yaml
       service: autoware
     image: ${SIMULATOR_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-traffic-light-relay
+    container_name: autoware-traffic-light-relay${OPENADKIT_NAME_SUFFIX:-}
     command: >
       ros2 run topic_tools relay /perception/traffic_light_recognition/internal/traffic_signals /simulator/input/traffic_signals
       --ros-args -r __node:=traffic_light_relay -p use_sim_time:=${USE_SIM_TIME}

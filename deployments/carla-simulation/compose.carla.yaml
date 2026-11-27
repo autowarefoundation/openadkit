@@ -15,7 +15,7 @@ include:
 services:
   # The visualizer renders CARLA on the GPU, so it needs the graphics caps.
   visualizer:
-    container_name: autoware-e2e-visualizer
+    container_name: autoware-e2e-visualizer${OPENADKIT_NAME_SUFFIX:-}
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all

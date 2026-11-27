@@ -5,7 +5,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-sensing
+    container_name: autoware-sensing${OPENADKIT_NAME_SUFFIX:-}
     pid: service:map
     command: >
       ros2 launch autoware_launch component_sensing.launch.xml

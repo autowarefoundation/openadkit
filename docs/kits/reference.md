@@ -168,6 +168,7 @@ plain `validate` checks each of them.
 | Field | Meaning |
 | --- | --- |
 | `deployment`, `role`, `rosDistro`, `gpu` | What ran; `gpu` is `true` for the GPU mode |
+| `instance` | The number of a copy run with `--instance`, which is also its ROS domain; else `null` |
 | `version`, `extends` | The release, and what a kit pins |
 | `images` | The image of each service |
 | `modelSha256` | The digest of the resolved Compose model |

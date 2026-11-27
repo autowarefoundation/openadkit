@@ -8,7 +8,7 @@ services:
       file: autoware.yaml
       service: autoware
     image: ${SENSING_PERCEPTION_IMAGE:?set by the openadkit CLI}
-    container_name: autoware-perception
+    container_name: autoware-perception${OPENADKIT_NAME_SUFFIX:-}
     pid: service:map
     volumes:
       - ${DATA_PATH}:/autoware_data:rw

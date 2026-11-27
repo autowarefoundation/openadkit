@@ -328,11 +328,14 @@ class Deployment:
             "OPENADKIT_KIT": str(root),
         } if base else {}
 
-    def project_name(self, role: str | None = None) -> str:
+    def project_name(self, role: str | None = None, instance: int | None = None) -> str:
         """Each role is its own Compose project, so roles never share state.
+        So is each copy of a deployment run with --instance.
 
         Names never contain "_", so it separates the role unambiguously.
         """
+        if instance is not None:
+            return f"{self.project}-{instance}"
         return self.project if role is None else f"{self.project}_{role}"
 
     @property

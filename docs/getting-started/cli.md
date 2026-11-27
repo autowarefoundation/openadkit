@@ -45,7 +45,14 @@ returns once the deployment is ready.
   even one with the same name. `run` refuses while another is running, or
   while another has left stopped containers; remove either with
   `openadkit stop`. The roles of one
-  [split-host](../deployments/split-host.md) deployment can run together.
+  [split-host](../deployments/split-host.md) deployment can run together, and
+  so can copies started with `--instance`.
+- **`--instance N`** (experimental) runs a copy of a deployment beside other
+  deployments, for example parallel test runs on one host. Instance `N` runs in
+  ROS domain `N` and has its own Compose project, container names (suffix
+  `-N`) and `results/N/`; `run` refuses a domain that another deployment uses,
+  and a second visualizer. The live commands take the same option to pick an
+  instance: `openadkit stop --instance 7`.
 
 Every run writes `results/run.json` in the deployment's output directory: what
 it started, how long it took to be ready and, with `--verify`, the step's

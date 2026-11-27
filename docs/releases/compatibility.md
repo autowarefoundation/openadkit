@@ -111,6 +111,9 @@ release:
 - **Split-host roles:** `--role`, `roles` in `deployment.json`, the Compose
   files a role lists and the Zenoh bridge. See
   [Split-host Simulation](../deployments/split-host.md).
+- **Instances of a deployment:** `--instance` and the
+  `OPENADKIT_NAME_SUFFIX` that the service files append to container names.
+  See [CLI & Maintenance](../getting-started/cli.md#run-a-deployment).
 - **AutoSD with Podman and Quadlet:** `platforms/autosd/` and the units it
   generates. See [AutoSD](../platforms/autosd.md).
 - **The Diffusion Planner:** `planning-simulation --gpu`. See

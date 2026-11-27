@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The safety-island-bridge's DDS configuration, in place of the shared one.
+
+     The shared cyclonedds.xml has one <Domain> for every domain. CycloneDDS
+     adds up the interfaces of every <Domain> that matches, so a domain-2
+     interface added on top of it would leave domain 2 on lo as well, and the
+     bridge would also advertise loopback addresses to the Safety Island.
+     Here each domain has its own interface: domain 1, Autoware, stays on the
+     stack's (lo unless the host settings file sets CYCLONEDDS_NETWORK_INTERFACE),
+     and domain 2 uses only the one that reaches the Safety Island.
+
+     The release's cyclonedds-domain2.xml follows this file in CYCLONEDDS_URI. -->
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <!-- Autoware: as ../shared/cyclonedds.xml. -->
+  <Domain id="1">
+    <General>
+      <Interfaces>
+        <NetworkInterface name="${CYCLONEDDS_NETWORK_INTERFACE}"/>
+      </Interfaces>
+    </General>
+    <Internal>
+      <SocketReceiveBufferSize max="64MiB"/>
+      <SocketSendBufferSize max="64MiB"/>
+    </Internal>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+  <!-- The Safety Island, on its link: tap0, or the board's network. -->
+  <Domain id="2">
+    <General>
+      <Interfaces>
+        <NetworkInterface name="${SAFETY_ISLAND_DDS_INTERFACE}"/>
+      </Interfaces>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

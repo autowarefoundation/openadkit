@@ -20,7 +20,7 @@ cd ../..
 | `settings.env` | Planning Simulation's settings, then where the release is fetched and the diagnostics graph below |
 | `config/autoware/autoware_control_config/.../default_preset.yaml` | The default control preset with `trajectory_follower_mode: none` |
 | `config/autoware/autoware_launch/.../autoware-safety-island.yaml` | Autoware's main diagnostics graph without the follower's `control_state`, which nothing publishes with the follower off |
-| `checks/safety_island.py` | The bridge's healthcheck: the control command's only publisher is the Safety Island's bridge, and Autoware's follower is not running |
+| `../shared/checks/safety_island.py` | The bridge's healthcheck, shared with Safety Island HIL Simulation: the control command's only publisher is the Safety Island's bridge, and Autoware's follower is not running |
 
 The deployment uses the release's files as they are. The bridge carries the
 topics of `bridge-config.yaml`, and `cyclonedds-domain2.xml` keeps its domain-2

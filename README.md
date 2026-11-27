@@ -51,6 +51,7 @@ A deployment is a ready-to-run Autoware stack for one task. `openadkit list` pri
 | [`logging-simulation`](https://autowarefoundation.github.io/openadkit/deployments/logging-simulation/) | Replay recorded sensor data, sensing to localization<br>`--gpu` runs CenterPoint on CUDA | |
 | [`carla-simulation`](https://autowarefoundation.github.io/openadkit/deployments/carla-simulation/) | Closed-loop driving in the CARLA simulator<br>`--role` [splits it across two hosts](https://autowarefoundation.github.io/openadkit/deployments/split-host/) (experimental) | NVIDIA GPU<br>amd64, Humble |
 | [`safety-island-simulation`](https://autowarefoundation.github.io/openadkit/deployments/safety-island-simulation/) | Planning Simulation controlled by the Safety Island | amd64 |
+| [`safety-island-hil-simulation`](https://autowarefoundation.github.io/openadkit/deployments/safety-island-hil-simulation/) | The same, with the Safety Island on Arm Virtual Hardware, an FVP or a board | A running Safety Island |
 
 ## Create a Kit
 

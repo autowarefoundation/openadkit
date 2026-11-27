@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           for ros_distro in humble jazzy; do
-            for deployment in planning-simulation scenario-simulation logging-simulation safety-island-simulation; do
+            for deployment in planning-simulation scenario-simulation logging-simulation safety-island-simulation safety-island-hil-simulation; do
               ./openadkit validate "${deployment}" --ros-distro "${ros_distro}"
             done
             ./openadkit validate logging-simulation \

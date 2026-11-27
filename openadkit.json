@@ -29,6 +29,9 @@
     },
     "safety-island-simulation": {
       "path": "deployments/safety-island-simulation"
+    },
+    "safety-island-hil-simulation": {
+      "path": "deployments/safety-island-hil-simulation"
     }
   },
   "externalImages": {

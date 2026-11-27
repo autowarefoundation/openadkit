@@ -25,12 +25,12 @@ THEMES = {
     "light": {
         "frame": "#d0d7de", "pill": "#0d1117", "pill_stroke": "#0d1117", "line": "#afb8c1",
         "band": "#f6f8fa", "muted": "#656d76", "dim": "#8c959f", "fill": "#eef4ff",
-        "accent": "#2f6fe4", "text": "#1f2328",
+        "accent": "#2f6fe4", "text": "#1f2328", "outside": "#9a6700", "outside_fill": "#fff8c5",
     },
     "dark": {
         "frame": "#30363d", "pill": "#161b22", "pill_stroke": "#3d444d", "line": "#484f58",
         "band": "#161b22", "muted": "#8b949e", "dim": "#6e7681", "fill": "#17233b",
-        "accent": "#7cacff", "text": "#e6edf3",
+        "accent": "#7cacff", "text": "#e6edf3", "outside": "#d29922", "outside_fill": "#2e2512",
     },
 }
 WIDTH, LEFT, RIGHT = 1000, 41, 960
@@ -56,6 +56,9 @@ IMAGE_BOX = {
 }
 # Services that are a box of their own, whatever image runs them.
 SERVICE_BOX = {"rosbag": "rosbag", "safety-island": "Safety Island", "safety-island-bridge": "Safety Island"}
+# A box whose bridge runs in the deployment while the box's own service does
+# not: it runs on separate hardware, as the Safety Island on a board, AVH or an FVP.
+OUTSIDE_BOX = {"Safety Island": ("safety-island-bridge", "safety-island")}
 
 
 def compose_images(path: Path) -> dict[str, str]:
@@ -77,6 +80,12 @@ def deployment_boxes(name: str) -> set[str]:
     for service, image in compose_images(ROOT / "deployments" / name / "compose.yaml").items():
         boxes.add(SERVICE_BOX.get(service) or IMAGE_BOX[image])
     return boxes
+
+
+def outside_boxes(name: str) -> set[str]:
+    """The boxes a deployment bridges to but does not run."""
+    services = compose_images(ROOT / "deployments" / name / "compose.yaml")
+    return {box for box, (bridge, own) in OUTSIDE_BOX.items() if bridge in services and own not in services}
 
 
 class Svg:
@@ -119,9 +128,11 @@ class Svg:
         if note:
             self.text(RIGHT, y, note, size=13, fill=self.c["muted"], anchor="end")
 
-    def box(self, x, y, width, label, *, height=56, on=True, mono=True, dashed=False, sub="") -> None:
+    def box(self, x, y, width, label, *, height=56, on=True, mono=True, dashed=False, sub="", outside=False) -> None:
         c = self.c
-        if on and not dashed:
+        if outside:
+            style = f'fill="{c["outside_fill"]}" stroke="{c["outside"]}" stroke-width="1.5"'
+        elif on and not dashed:
             style = f'fill="{c["fill"]}" stroke="{c["accent"]}" stroke-width="1.5"'
         else:
             style = f'fill="none" stroke="{c["line"]}" stroke-width="1.5" stroke-dasharray="5 5"'
@@ -157,13 +168,16 @@ class Svg:
             x += width + 34
         return centres
 
-    def row(self, y, labels) -> dict[str, float]:
+    def row(self, y, labels, outside=frozenset()) -> dict[str, float]:
         """Boxes centred as a group; returns each box's centre."""
         x = (WIDTH - sum(map(box_width, labels)) - 34 * (len(labels) - 1)) / 2
         centres = {}
         for label in labels:
             width = box_width(label)
-            self.box(x, y, width, label, mono=label in IMAGES)
+            if label in outside:
+                self.box(x, y, width, label, mono=False, sub="on separate hardware", outside=True)
+            else:
+                self.box(x, y, width, label, mono=label in IMAGES)
             centres[label] = x + width / 2
             x += width + 34
         return centres
@@ -183,7 +197,8 @@ def overview(theme: str) -> str:
         "Open AD Kit: Autoware as images, deployments and one command",
         "Open AD Kit packages Autoware into component images: sensing-perception, localization-mapping, "
         "planning, control and vehicle-system, with a simulator and a visualizer. Deployments combine them "
-        "into ready-to-run stacks: Planning, Scenario, Logging, CARLA and Safety Island Simulation, and your "
+        "into ready-to-run stacks: Planning, Scenario, Logging, CARLA, Safety Island and Safety Island HIL "
+        "Simulation, and your "
         "own kit puts your vehicle on top of one. openadkit run starts a deployment on an Ubuntu host with "
         "Docker Compose, split over two hosts, or on in-vehicle Linux with AutoSD. Caption: one reproducible "
         "path from simulation to in-vehicle systems.",
@@ -231,14 +246,16 @@ def deployment(name: str, theme: str) -> str:
     unknown = on - set(PIPELINE) - set(AROUND)
     if unknown:
         raise SystemExit(f"{name}: no place in the diagram for {sorted(unknown)}")
-    title = name.replace("-", " ").title().replace("Carla", "CARLA")
+    title = name.replace("-", " ").title().replace("Carla", "CARLA").replace("Hil", "HIL")
     around = [box for box in AROUND if box in on]
+    outside = outside_boxes(name)
+    started = [box for box in PIPELINE if box in on] + [box for box in around if box not in outside]
+    bridged = "".join(f", and bridges to the {box} on separate hardware" for box in sorted(outside))
     svg = Svg(
         theme,
         400,
         f"What {title} runs",
-        f"openadkit run {name} starts {', '.join([box for box in PIPELINE if box in on] + around)}, "
-        "which talk over ROS 2.",
+        f"openadkit run {name} starts {', '.join(started)}, which talk over ROS 2{bridged}.",
     )
     c = svg.c
     svg.frame(376, f"openadkit run {name}")
@@ -251,18 +268,26 @@ def deployment(name: str, theme: str) -> str:
     )
     svg.text(500, 220.5, "ROS 2", size=13, weight=600, fill=c["muted"], spacing=0.6)
     svg.caption(287, "Simulation and tools")
-    bottom = svg.row(254, around)
+    bottom = svg.row(254, around, outside)
     taps = [(x, 178) for box, x in top.items() if box in on] + [(x, 230) for x in bottom.values()]
     for x, y in taps:
         svg.add(f'<line x1="{x:g}" y1="{y}" x2="{x:g}" y2="{y + 24}" stroke="{c["line"]}" stroke-width="1.5"/>')
 
-    svg.add(f'<rect x="330" y="337" width="14" height="14" rx="4" fill="{c["fill"]}" stroke="{c["accent"]}" stroke-width="1.5"/>')
-    svg.text(352, 348.5, "runs in this deployment", size=13, fill=c["muted"], anchor="start")
+    # The legend, centred; a third entry only where a box runs on separate hardware.
+    here, absent = (210, 410) if outside else (330, 530)
+    svg.add(f'<rect x="{here}" y="337" width="14" height="14" rx="4" fill="{c["fill"]}" stroke="{c["accent"]}" stroke-width="1.5"/>')
+    svg.text(here + 22, 348.5, "runs in this deployment", size=13, fill=c["muted"], anchor="start")
     svg.add(
-        f'<rect x="530" y="337" width="14" height="14" rx="4" fill="none" stroke="{c["line"]}" '
+        f'<rect x="{absent}" y="337" width="14" height="14" rx="4" fill="none" stroke="{c["line"]}" '
         'stroke-width="1.5" stroke-dasharray="3 3"/>'
     )
-    svg.text(552, 348.5, "not in this deployment", size=13, fill=c["muted"], anchor="start")
+    svg.text(absent + 22, 348.5, "not in this deployment", size=13, fill=c["muted"], anchor="start")
+    if outside:
+        svg.add(
+            f'<rect x="604" y="337" width="14" height="14" rx="4" fill="{c["outside_fill"]}" '
+            f'stroke="{c["outside"]}" stroke-width="1.5"/>'
+        )
+        svg.text(626, 348.5, "runs on separate hardware", size=13, fill=c["muted"], anchor="start")
     return svg.render()
 
 

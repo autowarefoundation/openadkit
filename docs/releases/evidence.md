@@ -70,10 +70,11 @@ and blocks the release.
 
 ## CI Exemptions
 
-CARLA Simulation requires a GPU, which the hosted runners do not have. Its
-deployment manifest carries a reasoned `evidence.exempt` entry. It remains in
-the bundle, is listed in the release metadata and notes, and the CLI warns when
-it runs. **An exemption is not runtime evidence.**
+CARLA Simulation requires a GPU, and Safety Island HIL Simulation a Safety
+Island on Arm Virtual Hardware, an FVP or a board; the hosted runners have
+neither. Each deployment manifest carries a reasoned `evidence.exempt` entry.
+Each remains in the bundle, is listed in the release metadata and notes, and
+the CLI warns when it runs. **An exemption is not runtime evidence.**
 
 Adding an exemption is a reviewed source change, not a release-time override.
 Do not use it to hide a known failure in a normally tested cell.

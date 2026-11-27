@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -283,6 +284,69 @@ def test_safety_island_simulation_keeps_planning_simulations_stack():
     assert standalone["verify"] == base["verify"]
     assert standalone["waitTimeout"] == base["waitTimeout"]
     assert [item for item in base["data"] if not item.get("gpu")] == standalone["data"][:1]
+
+
+def test_safety_island_hil_simulation_keeps_safety_island_simulations_stack():
+    """Safety Island HIL Simulation is Safety Island Simulation without the
+    Safety Island's binary, in its own files, so the copies must not drift apart."""
+    island, hil = ROOT / "deployments/safety-island-simulation", ROOT / "deployments/safety-island-hil-simulation"
+
+    def stack(directory):
+        text = (directory / "compose.yaml").read_text(encoding="utf-8")
+        return text[text.index("include:"):text.index("  safety-island-bridge:")]
+
+    assert stack(hil) == stack(island)
+
+    def values(directory):
+        lines = (directory / "settings.env").read_text(encoding="utf-8").splitlines()
+        return dict(line.split("=", 1) for line in lines if line and not line.startswith("#"))
+
+    own = {"SAFETY_ISLAND_PATH", "SAFETY_ISLAND_DDS_INTERFACE"}
+    assert {name: value for name, value in values(hil).items() if name not in own} == {
+        name: value for name, value in values(island).items() if name not in own}
+
+    def overrides(directory):
+        return {path.relative_to(directory): path.read_bytes() for path in (directory / "config").rglob("*") if path.is_file()}
+
+    assert overrides(hil) == overrides(island)
+
+    def data(directory):
+        return {resource["name"]: resource for resource in json.loads((directory / "deployment.json").read_text())["data"]}
+
+    island_data, hil_data = data(island), data(hil)
+    assert hil_data["sample-map-planning"] == island_data["sample-map-planning"]
+    # The same release's contract, without the binary that runs elsewhere.
+    release = {item["path"]: item for item in island_data["safety-island-simulation"]["files"]}
+    contract = hil_data["safety-island-contract"]["files"]
+    assert [item["path"] for item in contract] == ["bridge-config.yaml", "cyclonedds-domain2.xml"]
+    assert all(item == release[item["path"]] for item in contract)
+
+
+def test_safety_island_hil_bridge_puts_each_domain_on_its_own_interface():
+    # CycloneDDS adds up the interfaces of every <Domain> that matches a domain,
+    # so the shared file's catch-all <Domain> would keep domain 2 on lo too. The
+    # bridge's own file names each domain and has no catch-all one.
+    namespace = "{https://cdds.io/config}"
+    root = ET.parse(ROOT / "deployments/safety-island-hil-simulation/cyclonedds.xml").getroot()
+    interfaces = {
+        domain.get("id"): [item.get("name") for item in domain.iter(f"{namespace}NetworkInterface")]
+        for domain in root.findall(f"{namespace}Domain")
+    }
+    assert interfaces == {"1": ["${CYCLONEDDS_NETWORK_INTERFACE}"], "2": ["${SAFETY_ISLAND_DDS_INTERFACE}"]}
+
+
+def test_real_compose_runs_only_the_bridge_of_an_external_safety_island(compose_context):
+    deployment = catalog.get_deployment(ROOT, compose_context, "safety-island-hil-simulation")
+    selection = settings.resolve(deployment, compose_context, "humble", False)
+    services = json.loads(compose.run_compose(deployment, selection, ["config", "--format", "json"]).stdout)["services"]
+    assert "safety-island-bridge" in services and "safety-island" not in services
+    bridge = services["safety-island-bridge"]
+    mounts = {item["target"]: item["source"] for item in bridge["volumes"]}
+    assert mounts["/etc/cyclonedds/safety-island-hil.xml"] == str(deployment.directory / "cyclonedds.xml")
+    assert "/etc/cyclonedds/cyclonedds.xml" not in mounts
+    assert bridge["environment"]["CYCLONEDDS_URI"] == (
+        "file:///etc/cyclonedds/safety-island-hil.xml,file:///safety-island/cyclonedds-domain2.xml")
+    assert bridge["environment"]["SAFETY_ISLAND_DDS_INTERFACE"] == "tap0"
 
 
 def test_real_kit_validates_against_its_source_base(tmp_path, compose_context):

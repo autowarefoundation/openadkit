@@ -19,7 +19,8 @@ packages, config overrides and services on top of one of them.
 
 It also integrates [Autoware Safety Island](https://autowarefoundation.github.io/autoware-safety-island/),
 which runs on real-time operating systems and automotive hardware in a vehicle;
-Safety Island Simulation runs its POSIX build in a container. Open AD Kit is not
+Safety Island Simulation runs its POSIX build in a container, and Safety Island
+HIL Simulation drives Autoware from one on its own platform. Open AD Kit is not
 an OTA service, a Kubernetes stack or a fork of upstream workloads, and it makes
 no ASIL or NCAP certification claim.
 

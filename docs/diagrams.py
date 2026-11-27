@@ -197,7 +197,8 @@ def overview(theme: str) -> str:
         "Open AD Kit: Autoware as images, deployments and one command",
         "Open AD Kit packages Autoware into component images: sensing-perception, localization-mapping, "
         "planning, control and vehicle-system, with a simulator and a visualizer. Deployments combine them "
-        "into ready-to-run stacks: Planning, Scenario, Logging, CARLA and Safety Island Simulation, and your "
+        "into ready-to-run stacks: Planning, Scenario, Logging, CARLA, Safety Island and Safety Island HIL "
+        "Simulation, and your "
         "own kit puts your vehicle on top of one. openadkit run starts a deployment on an Ubuntu host with "
         "Docker Compose, split over two hosts, or on in-vehicle Linux with AutoSD. Caption: one reproducible "
         "path from simulation to in-vehicle systems.",

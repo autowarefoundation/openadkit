@@ -51,8 +51,8 @@ them, as two services from one image.
 - **`map`** — launch: `component_map.launch.xml`
 - **`localization`** — launch: `component_localization.launch.xml`
 
-Planning, Scenario and Safety Island Simulation run only `map`: the simulator
-stands in for localization. Logging and CARLA Simulation also run
+Planning, Scenario, Safety Island and Safety Island HIL Simulation run only
+`map`: the simulator stands in for localization. Logging and CARLA Simulation also run
 `localization`.
 
 ### Planning {: #planning }

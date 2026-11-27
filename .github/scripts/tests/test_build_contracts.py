@@ -226,7 +226,7 @@ def test_the_bridge_mounts_its_allowlist_without_creating_it(name):
      {"map", "vehicle", "mrm-state-relay", "traffic-light-relay"}),
     ("carla-simulation", None, {"carla", "carla-interface", "map", "visualizer"}, {"zenoh-bridge"}),
     ("carla-simulation", "autoware", {"map", "zenoh-bridge"}, {"carla", "carla-interface", "visualizer"}),
-    ("carla-simulation", "carla", {"carla", "carla-interface", "carla-map-loader", "zenoh-bridge", "visualizer"},
+    ("carla-simulation", "carla", {"carla", "carla-interface", "zenoh-bridge", "visualizer"},
      {"map", "vehicle"}),
 ])
 def test_real_compose_preserves_single_and_split_graphs(compose_context, name, role, present, absent):

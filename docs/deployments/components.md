@@ -24,7 +24,7 @@ carries RViz and its plugins. A kit compiles its overlay workspace in the
 | `planning` | `planning` | Planning, Scenario, CARLA, Safety Island |
 | `control` | `control` | Planning, Scenario, CARLA, Safety Island |
 | `vehicle-system` | `vehicle`, `system`, `api`, `safety-island-bridge`, `safety-island` | All; the last two in Safety Island |
-| `simulator` | `simulator`, `simulated-perception`, `mrm-state-relay`, `traffic-light-relay`, `carla-interface`, `carla-map-loader` | Planning, Scenario, Safety Island; the relays in Scenario; `carla-*` in CARLA |
+| `simulator` | `simulator`, `simulated-perception`, `mrm-state-relay`, `traffic-light-relay`, `carla-interface` | Planning, Scenario, Safety Island; the relays in Scenario; `carla-*` in CARLA |
 | `visualizer` | `visualizer` | All |
 
 ### Sensing & Perception {: #sensing-perception }
@@ -122,7 +122,9 @@ To open it, see the
 ### CARLA Interface {: #carla-interface }
 
 The simulator image's `autoware_carla_interface` translates Autoware control
-commands to CARLA and CARLA sensor data to ROS 2 messages. Launch:
+commands to CARLA and CARLA sensor data to ROS 2 messages. When it starts, it
+loads the map that `CARLA_WORLD` names if CARLA runs another one, and waits up
+to `CARLA_LOAD_TIMEOUT` seconds for it. Launch:
 `autoware_carla_interface.launch.xml`
 
 CARLA publishes its Python client for x86_64 only, so only the amd64 simulator

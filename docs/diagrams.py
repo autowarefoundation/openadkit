@@ -57,7 +57,7 @@ IMAGE_BOX = {
 # Services that are a box of their own, whatever image runs them.
 SERVICE_BOX = {"rosbag": "rosbag", "safety-island": "Safety Island", "safety-island-bridge": "Safety Island"}
 # A box whose bridge runs in the deployment while the box's own service does
-# not: it runs outside Open AD Kit, as the Safety Island on its own platform.
+# not: it runs on separate hardware, as the Safety Island on a board, AVH or an FVP.
 OUTSIDE_BOX = {"Safety Island": ("safety-island-bridge", "safety-island")}
 
 
@@ -175,7 +175,7 @@ class Svg:
         for label in labels:
             width = box_width(label)
             if label in outside:
-                self.box(x, y, width, label, mono=False, sub="outside Open AD Kit", outside=True)
+                self.box(x, y, width, label, mono=False, sub="on separate hardware", outside=True)
             else:
                 self.box(x, y, width, label, mono=label in IMAGES)
             centres[label] = x + width / 2
@@ -249,7 +249,7 @@ def deployment(name: str, theme: str) -> str:
     around = [box for box in AROUND if box in on]
     outside = outside_boxes(name)
     started = [box for box in PIPELINE if box in on] + [box for box in around if box not in outside]
-    bridged = "".join(f", and bridges to the {box} outside Open AD Kit" for box in sorted(outside))
+    bridged = "".join(f", and bridges to the {box} on separate hardware" for box in sorted(outside))
     svg = Svg(
         theme,
         400,
@@ -272,7 +272,7 @@ def deployment(name: str, theme: str) -> str:
     for x, y in taps:
         svg.add(f'<line x1="{x:g}" y1="{y}" x2="{x:g}" y2="{y + 24}" stroke="{c["line"]}" stroke-width="1.5"/>')
 
-    # The legend, centred; a third entry only where a box runs outside.
+    # The legend, centred; a third entry only where a box runs on separate hardware.
     here, absent = (210, 410) if outside else (330, 530)
     svg.add(f'<rect x="{here}" y="337" width="14" height="14" rx="4" fill="{c["fill"]}" stroke="{c["accent"]}" stroke-width="1.5"/>')
     svg.text(here + 22, 348.5, "runs in this deployment", size=13, fill=c["muted"], anchor="start")
@@ -286,7 +286,7 @@ def deployment(name: str, theme: str) -> str:
             f'<rect x="604" y="337" width="14" height="14" rx="4" fill="{c["outside_fill"]}" '
             f'stroke="{c["outside"]}" stroke-width="1.5"/>'
         )
-        svg.text(626, 348.5, "runs outside Open AD Kit", size=13, fill=c["muted"], anchor="start")
+        svg.text(626, 348.5, "runs on separate hardware", size=13, fill=c["muted"], anchor="start")
     return svg.render()
 
 

@@ -1822,8 +1822,9 @@ support:</p>
 <div class="highlight"><pre><span></span><code>openadkit<span class="w"> </span>run<span class="w"> </span>carla-simulation
 </code></pre></div>
 <p><code>run</code> downloads and verifies the Town01 map, then starts CARLA and the Autoware
-stack. CARLA renders offscreen by default. <code>run</code> returns once CARLA accepts
-connections and the services stay up; this deployment declares no readiness
+stack. CARLA renders offscreen by default. <code>run</code> returns once CARLA runs Town01
+and the services stay up, and fails when CARLA has not loaded it within
+<code>CARLA_LOAD_TIMEOUT</code> seconds; this deployment declares no readiness
 check of Autoware itself and is
 <a href="../../releases/evidence/#ci-exemptions">exempt from CI evidence</a>.</p>
 <p>To run Autoware and CARLA on separate hosts, see

@@ -9,8 +9,8 @@ Autoware runs on DDS domain 1, the Safety Island on domain 2, and
 [`domain_bridge`](https://github.com/ros2/domain_bridge) connects them over the
 interface that reaches the Safety Island. No GPU is required.
 
-![Safety Island HIL Simulation runs localization-mapping, planning, control, vehicle-system, simulator, Safety Island and visualizer, which talk over ROS 2](../assets/images/deployment-safety-island-hil-simulation-light.svg#only-light)
-![Safety Island HIL Simulation runs localization-mapping, planning, control, vehicle-system, simulator, Safety Island and visualizer, which talk over ROS 2](../assets/images/deployment-safety-island-hil-simulation-dark.svg#only-dark)
+![Safety Island HIL Simulation runs localization-mapping, planning, control, vehicle-system, simulator and visualizer, which talk over ROS 2, and bridges to the Safety Island outside Open AD Kit](../assets/images/deployment-safety-island-hil-simulation-light.svg#only-light)
+![Safety Island HIL Simulation runs localization-mapping, planning, control, vehicle-system, simulator and visualizer, which talk over ROS 2, and bridges to the Safety Island outside Open AD Kit](../assets/images/deployment-safety-island-hil-simulation-dark.svg#only-dark)
 
 ## Requirements
 

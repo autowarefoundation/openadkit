@@ -1,0 +1,56 @@
+{
+  "description": "Planning Simulation controlled by a Safety Island on hardware or a virtual platform",
+  "evidence": {
+    "exempt": "Needs a Safety Island outside Open AD Kit (AVH, an FVP or a board); the CI runners have none."
+  },
+  "waitTimeout": 600,
+  "verify": {
+    "service": "api",
+    "command": [
+      "python3",
+      "/openadkit/checks/drive_to_goal.py"
+    ]
+  },
+  "requirements": {
+    "architectures": [
+      "amd64",
+      "arm64"
+    ],
+    "rosDistros": [
+      "humble",
+      "jazzy"
+    ],
+    "gpu": "none"
+  },
+  "data": [
+    {
+      "name": "sample-map-planning",
+      "kind": "zip",
+      "destinationEnv": "MAP_PATH",
+      "expectedRoot": "sample-map-planning",
+      "url": "https://autoware-files.s3.us-west-2.amazonaws.com/maps/demos/sample-map-planning.zip",
+      "sha256": "5536fce7bb8db7688fdf94ec004118b898637ad0d5b6175108b10989dd6e93b9",
+      "requiredFiles": [
+        "lanelet2_map.osm",
+        "pointcloud_map.pcd"
+      ]
+    },
+    {
+      "name": "safety-island-contract",
+      "kind": "files",
+      "destinationEnv": "SAFETY_ISLAND_PATH",
+      "files": [
+        {
+          "path": "bridge-config.yaml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/bridge-config.yaml",
+          "sha256": "d87d25ce531fa16c200b74c5c7ba542131ed18129920934303460019f7314fd2"
+        },
+        {
+          "path": "cyclonedds-domain2.xml",
+          "url": "https://github.com/autowarefoundation/autoware-safety-island/releases/download/v0.3.0/cyclonedds-domain2.xml",
+          "sha256": "5d0b2b1ba647d95f348914346867996d7313bb62a5015ad0fc75c5b0a3f0070b"
+        }
+      ]
+    }
+  ]
+}

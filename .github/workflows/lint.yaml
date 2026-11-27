@@ -12,6 +12,7 @@ on:
       - 'pyproject.toml'
       - '.github/scripts/evidence/example-kit/**'
       - 'deployments/safety-island-simulation/**'
+      - 'deployments/safety-island-hil-simulation/**'
       - '**/*.sh'
       - '**/*.json'
       - '**/*.json5'

@@ -231,7 +231,7 @@ def deployment(name: str, theme: str) -> str:
     unknown = on - set(PIPELINE) - set(AROUND)
     if unknown:
         raise SystemExit(f"{name}: no place in the diagram for {sorted(unknown)}")
-    title = name.replace("-", " ").title().replace("Carla", "CARLA")
+    title = name.replace("-", " ").title().replace("Carla", "CARLA").replace("Hil", "HIL")
     around = [box for box in AROUND if box in on]
     svg = Svg(
         theme,

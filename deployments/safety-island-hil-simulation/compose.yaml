@@ -1,0 +1,89 @@
+# Planning Simulation with the Safety Island as the controller, the Safety Island
+# running outside Open AD Kit: on Arm Virtual Hardware, an FVP or a board.
+#
+# Autoware runs on DDS domain 1 without its trajectory follower (control preset).
+# The Safety Island runs on domain 2 on its own platform and publishes the
+# control command that the follower would; domain_bridge carries the topics of
+# the Safety Island's released bridge-config.yaml between the two domains, with
+# domain 2 on the interface that reaches the Safety Island.
+include:
+  - ../shared/services/map.yaml
+  - ../shared/services/planning.yaml
+  - ../shared/services/vehicle.yaml
+  - ../shared/services/system.yaml
+  - ../shared/services/control.yaml
+  - ../shared/services/simulator.yaml
+  - ../shared/services/simulated-perception.yaml
+  - ../shared/services/api.yaml
+  - ../shared/services/visualizer.yaml
+
+services:
+  planning:
+    depends_on:
+      - map
+
+  vehicle:
+    depends_on:
+      - map
+
+  system:
+    depends_on:
+      - map
+
+  control:
+    depends_on:
+      - map
+      - planning
+      - system
+
+  simulator:
+    depends_on:
+      map:
+        condition: service_started
+      system:
+        condition: service_started
+      vehicle:
+        condition: service_started
+
+  simulated-perception:
+    depends_on:
+      - map
+
+  api:
+    depends_on:
+      - map
+
+  visualizer:
+    depends_on:
+      - map
+
+  safety-island-bridge:
+    image: ${VEHICLE_SYSTEM_IMAGE:?set by the openadkit CLI}
+    container_name: safety-island-bridge
+    network_mode: host
+    init: true
+    ipc: host
+    env_file:
+      - ../shared/runtime.env
+    environment:
+      # This deployment's file, not the shared one, so domain 2 joins only the
+      # Safety Island's interface (see cyclonedds.xml); the release's domain-2
+      # setting keeps datagrams within what the Safety Island receives.
+      CYCLONEDDS_URI: file:///etc/cyclonedds/safety-island-hil.xml,file:///safety-island/cyclonedds-domain2.xml
+      SAFETY_ISLAND_DDS_INTERFACE: ${SAFETY_ISLAND_DDS_INTERFACE:?set in settings.env}
+    volumes:
+      - ./cyclonedds.xml:/etc/cyclonedds/safety-island-hil.xml:ro
+      - ${SAFETY_ISLAND_PATH:?set in settings.env}:/safety-island:ro
+      - ../shared/checks/safety_island.py:/openadkit/checks/safety_island.py:ro
+    command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
+    # Healthy once the Safety Island, not Autoware's follower, publishes the
+    # control command, which `openadkit run` waits for: start the Safety Island
+    # before or while this deployment starts.
+    healthcheck:
+      test: ["CMD-SHELL", ". /opt/ros/${ROS_DISTRO}/setup.sh && . /opt/autoware/setup.sh && exec python3 /openadkit/checks/safety_island.py"]
+      start_period: 10m
+      start_interval: 5s
+      interval: 1m
+      timeout: 90s
+      retries: 3
+    restart: on-failure

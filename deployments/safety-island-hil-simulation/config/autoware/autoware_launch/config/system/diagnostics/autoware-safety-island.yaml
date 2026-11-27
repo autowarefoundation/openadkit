@@ -1,0 +1,8 @@
+# Autoware's main diagnostics graph without the trajectory follower's own
+# diagnostics: the Safety Island replaces that node, so they never arrive and
+# would keep autonomous mode unavailable. Selected by SYSTEM_DIAGNOSTICS_GRAPH.
+files:
+  - {path: $(dirname)/autoware-main.yaml}
+
+edits:
+  - {type: remove, path: /autoware/control/performance_monitoring/control_state}

@@ -21,10 +21,10 @@ carries RViz and its plugins. A kit compiles its overlay workspace in the
 |-------|----------|-------------|
 | `sensing-perception` | `sensing`, `perception`, Logging's `rosbag` | Logging, CARLA; CARLA's `perception` runs the CUDA variant |
 | `localization-mapping` | `map`, `localization` | `map` in all; `localization` in Logging and CARLA |
-| `planning` | `planning` | Planning, Scenario, CARLA, Safety Island |
-| `control` | `control` | Planning, Scenario, CARLA, Safety Island |
-| `vehicle-system` | `vehicle`, `system`, `api`, `safety-island-bridge`, `safety-island` | All; the last two in Safety Island |
-| `simulator` | `simulator`, `simulated-perception`, `mrm-state-relay`, `traffic-light-relay`, `carla-interface`, `carla-map-loader` | Planning, Scenario, Safety Island; the relays in Scenario; `carla-*` in CARLA |
+| `planning` | `planning` | Planning, Scenario, CARLA, Safety Island, Safety Island HIL |
+| `control` | `control` | Planning, Scenario, CARLA, Safety Island, Safety Island HIL |
+| `vehicle-system` | `vehicle`, `system`, `api`, `safety-island-bridge`, `safety-island` | All; the last two in Safety Island, only `safety-island-bridge` in Safety Island HIL |
+| `simulator` | `simulator`, `simulated-perception`, `mrm-state-relay`, `traffic-light-relay`, `carla-interface`, `carla-map-loader` | Planning, Scenario, Safety Island, Safety Island HIL; the relays in Scenario; `carla-*` in CARLA |
 | `visualizer` | `visualizer` | All |
 
 ### Sensing & Perception {: #sensing-perception }

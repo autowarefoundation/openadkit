@@ -107,6 +107,7 @@ nav:
       - Logging Simulation: deployments/logging-simulation.md
       - CARLA Simulation: deployments/carla-simulation.md
       - Safety Island Simulation: deployments/safety-island-simulation.md
+      - Safety Island HIL Simulation: deployments/safety-island-hil-simulation.md
       - Split-host Simulation: deployments/split-host.md
       - Components: deployments/components.md
   - Kits:

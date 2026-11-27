@@ -71,7 +71,7 @@ services:
     volumes:
       - ../shared/cyclonedds.xml:/etc/cyclonedds/cyclonedds.xml:ro
       - ${SAFETY_ISLAND_PATH:?set in settings.env}:/safety-island:ro
-      - ./checks:/openadkit/checks:ro
+      - ../shared/checks/safety_island.py:/openadkit/checks/safety_island.py:ro
     command: ros2 run domain_bridge domain_bridge /safety-island/bridge-config.yaml
     # Healthy once the Safety Island, not Autoware's follower, publishes the
     # control command, which `openadkit run` waits for.
